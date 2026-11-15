@@ -38,22 +38,6 @@ prepare_native_inputs() {
   done <<< "$presets"
 }
 
-prepare_browser_runtimes() {
-  local backend preset directory
-  for backend in webgl webgpu; do
-    preset="emscripten-wasm32-${backend}"
-    directory="${build_root}/${preset}/install/share/maplibre-native-kotlin"
-    rm -rf "$directory"
-    cmake -S bindings/kotlin/wasm --preset "$preset" \
-      -B "${build_root}/${preset}/module" \
-      -DMLN_FFI_NATIVE_PREFIX="${build_root}/${preset}/install" \
-      -DCMAKE_INSTALL_PREFIX="$directory"
-    cmake --build "${build_root}/${preset}/module" \
-      --target maplibre_native_kotlin --config Release --parallel
-    cmake --install "${build_root}/${preset}/module" --component maplibre_native_kotlin --config Release
-  done
-}
-
 add_publications() {
   local project="$1"
   shift
@@ -72,19 +56,14 @@ publish() {
   # the repository default.
   publication_tasks=()
   add_publications :bindings:kotlin Android "${android_native[@]}" "${linux[@]}"
-  add_publications :bindings:kotlin:runtimes:opengl Android "${android_native[@]}" "${linux[@]}"
-  add_publications :bindings:kotlin:runtimes:vulkan "${android_native[@]}" "${linux[@]}"
+  add_publications :bindings:kotlin:runtimes:native Android "${android_native[@]}" "${linux[@]}"
   ./gradlew "$@" -Pkotlin.native.enableKlibsCrossCompilation=true "${publication_tasks[@]}"
-  # One run packages the Android libraries of one backend.
-  ./gradlew "$@" -Pmaplibre.android.backend=vulkan \
-    ":bindings:kotlin:runtimes:vulkan:publishAndroidPublicationTo${repository}"
 
   publication_tasks=()
   add_publications :bindings:kotlin KotlinMultiplatform Jvm WasmJs "${apple[@]}"
-  add_publications :bindings:kotlin:runtimes:opengl KotlinMultiplatform Jvm MacosArm64 WasmJs
+  add_publications :bindings:kotlin:runtimes:native KotlinMultiplatform Jvm "${apple[@]}"
+  add_publications :bindings:kotlin:runtimes:webgl KotlinMultiplatform WasmJs
   add_publications :bindings:kotlin:runtimes:webgpu KotlinMultiplatform WasmJs
-  add_publications :bindings:kotlin:runtimes:vulkan KotlinMultiplatform Jvm MacosArm64
-  add_publications :bindings:kotlin:runtimes:metal KotlinMultiplatform Jvm "${apple[@]}"
   ./gradlew "$@" "${publication_tasks[@]}"
 }
 
@@ -103,7 +82,6 @@ case "$operation" in
     staging_root="${staging_base}/maven-staging"
     rm -rf "$staging_root"
     prepare_native_inputs
-    prepare_browser_runtimes
     release_version_args=()
     if [[ -n "$version" ]]; then
       release_version_args=("-Pmaplibre.maven.version=$version")

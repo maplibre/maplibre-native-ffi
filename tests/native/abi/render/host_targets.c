@@ -1,5 +1,6 @@
-// Targets that the host creates: a session renders into a borrowed ring and
-// presents to a surface, both made by tests/graphics for the preset's backend.
+// Targets that the host creates: a session renders into a borrowed ring that
+// tests/graphics makes for the preset's backend, and presents to a window or
+// layer.
 // The browser presets have no such fixtures, because JavaScript owns their
 // canvases.
 
@@ -22,7 +23,6 @@
 #include "support/host_graphics.h"
 #include "support/test_support.h"
 
-#if !defined(__EMSCRIPTEN__)
 static uint32_t render_frame(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {
@@ -220,7 +220,8 @@ static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED,
     mln_render_session_resize(
-      fixture.session, smaller, &resize.descriptor, MLN_TEST_DIAGNOSTIC
+      fixture.session, mln_test_session_extent(fixture.session, smaller),
+      &resize.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
   TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "sized by its owner"));
@@ -593,10 +594,14 @@ static void sync_files_order_frame_reads_and_slot_reuse(void) {
     );
     mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
     MLN_TEST_OK(mln_acquired_frame_get_producer_sync(frame, &producer, NULL));
-    TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_SYNC_FD, producer.kind);
-    // -1 is a fence that has already signaled.
-    const int produced = (int)(int64_t)producer.handle;
-    TEST_ASSERT_GREATER_OR_EQUAL_INT(-1, produced);
+    // A sync file that has already signaled hands over as CPU complete.
+    int produced = -1;
+    if (producer.kind == MLN_GPU_SYNC_SYNC_FD) {
+      produced = (int)(int64_t)producer.handle;
+      TEST_ASSERT_GREATER_OR_EQUAL_INT(0, produced);
+    } else {
+      TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_CPU_COMPLETE, producer.kind);
+    }
     if (produced >= 0) {
       struct pollfd signaled = {.fd = produced, .events = POLLIN};
       TEST_ASSERT_EQUAL_INT(1, poll(&signaled, 1, 10000));
@@ -777,7 +782,7 @@ static bool event_reached(void* context) {
          target->value;
 }
 
-// Metal, MoltenVK, and ANGLE all hand frames over this way.
+// Metal hands frames over this way.
 static void metal_shared_events_order_frame_reads_and_slot_reuse(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -987,7 +992,8 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, size, &completion.descriptor, NULL
+      fixture.session, mln_test_session_extent(fixture.session, size),
+      &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_UINT32(
@@ -1002,10 +1008,7 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-#endif
-
 MLN_TEST_GROUP {
-#if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_borrowed_ring_hands_each_frame_to_the_host);
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
   RUN_TEST(queue_ordered_frames_share_the_hosts_queue);
@@ -1029,5 +1032,4 @@ MLN_TEST_GROUP {
   RUN_TEST(borrowed_opengl_frames_support_gpu_fences);
 #endif
   RUN_TEST(a_surface_presents_frames_and_takes_a_resize);
-#endif
 }

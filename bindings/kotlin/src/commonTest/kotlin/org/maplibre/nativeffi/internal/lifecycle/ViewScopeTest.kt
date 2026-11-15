@@ -20,6 +20,8 @@ class ViewScopeTest {
           texture = texture,
           device = NativePointer.scoped(0x20L, scope),
           pixelFormat = 0uL,
+          depthTexture = NativePointer.scoped(0x30L, scope),
+          depthPixelFormat = 0uL,
         )
         .also { it.bindingScope = scope }
     assertEquals(2u, frame.width)
@@ -28,6 +30,7 @@ class ViewScopeTest {
     // The scope guards only what the frame lends; plain values stay readable.
     assertEquals(2u, frame.width)
     assertFailsWith<IllegalStateException> { frame.texture }
+    assertFailsWith<IllegalStateException> { frame.depthTexture }
     assertFailsWith<IllegalStateException> { texture.address }
     assertFailsWith<IllegalStateException> { texture.toString() }
     assertFailsWith<IllegalStateException> { texture.hashCode() }

@@ -1,7 +1,11 @@
 {
   "$schema": "https://raw.githubusercontent.com/Kitware/CMake/v3.28.6/Help/manual/presets/schema.json",
   "version": 8,
-  "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "_base",
@@ -18,7 +22,9 @@
       "name": "_single-config",
       "hidden": true,
       "inherits": "_base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     },
     {
       "name": "_linux-x64",
@@ -30,7 +36,9 @@
         "MLN_FFI_TARGET_PLATFORM": "linux-gnu-x64",
         "MLN_FFI_ZIG_TARGET": "x86_64-linux-gnu",
         "MLN_FFI_RUST_TARGET": "x86_64-unknown-linux-gnu",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
+        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -50,7 +58,9 @@
         "MLN_FFI_TARGET_PLATFORM": "linux-gnu-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-linux-gnu",
         "MLN_FFI_RUST_TARGET": "aarch64-unknown-linux-gnu",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
+        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -70,7 +80,11 @@
         "MLN_FFI_ZIG_TARGET": "x86_64-linux-musl",
         "MLN_FFI_RUST_TARGET": "x86_64-unknown-linux-musl"
       },
-      "vendor": { "maplibre-native-ffi": { "unit": "linux-musl" } }
+      "vendor": {
+        "maplibre-native-ffi": {
+          "unit": "linux-musl"
+        }
+      }
     },
     {
       "name": "_linux-musl-arm64",
@@ -82,7 +96,11 @@
         "MLN_FFI_ZIG_TARGET": "aarch64-linux-musl",
         "MLN_FFI_RUST_TARGET": "aarch64-unknown-linux-musl"
       },
-      "vendor": { "maplibre-native-ffi": { "unit": "linux-musl-arm64" } }
+      "vendor": {
+        "maplibre-native-ffi": {
+          "unit": "linux-musl-arm64"
+        }
+      }
     },
     {
       "name": "_linux-riscv64",
@@ -95,7 +113,9 @@
         "MLN_FFI_ZIG_TARGET": "riscv64-linux-gnu",
         "MLN_FFI_RUST_TARGET": "riscv64gc-unknown-linux-gnu",
         "MLN_FFI_ZIG_SYSROOT": "${sourceDir}/build/sysroot/riscv64",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
+        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -138,7 +158,9 @@
         "MLN_FFI_ZIG_TARGET": "loongarch64-linux-gnu",
         "MLN_FFI_RUST_TARGET": "loongarch64-unknown-linux-gnu",
         "MLN_FFI_ZIG_SYSROOT": "${sourceDir}/build/sysroot/loongarch64",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
+        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -181,7 +203,9 @@
         "MLN_FFI_TARGET_PLATFORM": "freebsd-x64",
         "MLN_FFI_ZIG_TARGET": "x86_64-freebsd",
         "MLN_FFI_RUST_TARGET": "x86_64-unknown-freebsd",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
+        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -206,7 +230,8 @@
         "MLN_FFI_TARGET_PLATFORM": "macos-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-macos",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-darwin",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal",
+        "MLN_FFI_RENDER_BACKENDS": "metal"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -225,7 +250,11 @@
         "MLN_FFI_ZIG_TARGET": "x86_64-macos",
         "MLN_FFI_RUST_TARGET": "x86_64-apple-darwin"
       },
-      "vendor": { "maplibre-native-ffi": { "unit": "macos-x64" } }
+      "vendor": {
+        "maplibre-native-ffi": {
+          "unit": "macos-x64"
+        }
+      }
     },
     {
       "name": "_ios-arm64",
@@ -238,7 +267,8 @@
         "CMAKE_OSX_DEPLOYMENT_TARGET": "15.0",
         "MLN_FFI_TARGET_PLATFORM": "ios-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-ios",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal",
+        "MLN_FFI_RENDER_BACKENDS": "metal"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -258,7 +288,8 @@
         "CMAKE_OSX_DEPLOYMENT_TARGET": "15.0",
         "MLN_FFI_TARGET_PLATFORM": "tvos-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-tvos",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal",
+        "MLN_FFI_RENDER_BACKENDS": "metal"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -278,7 +309,8 @@
         "CMAKE_OSX_DEPLOYMENT_TARGET": "1.0",
         "MLN_FFI_TARGET_PLATFORM": "visionos-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-visionos",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal",
+        "MLN_FFI_RENDER_BACKENDS": "metal"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -295,11 +327,14 @@
       "cacheVariables": {
         "ANDROID_PLATFORM": "android-24",
         "ANDROID_STL": "c++_static",
-        "MLN_FFI_CARGO_TARGET_DIR": "${sourceDir}/build/${presetName}/cargo",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl",
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
+        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
       },
       "vendor": {
-        "maplibre-native-ffi": { "runner": "blacksmith-4vcpu-ubuntu-2404" }
+        "maplibre-native-ffi": {
+          "runner": "blacksmith-4vcpu-ubuntu-2404"
+        }
       }
     },
     {
@@ -312,7 +347,11 @@
         "MLN_FFI_ZIG_TARGET": "arm-linux-android",
         "MLN_FFI_RUST_TARGET": "armv7-linux-androideabi"
       },
-      "vendor": { "maplibre-native-ffi": { "unit": "android-arm" } }
+      "vendor": {
+        "maplibre-native-ffi": {
+          "unit": "android-arm"
+        }
+      }
     },
     {
       "name": "_android-arm64",
@@ -324,7 +363,11 @@
         "MLN_FFI_ZIG_TARGET": "aarch64-linux-android",
         "MLN_FFI_RUST_TARGET": "aarch64-linux-android"
       },
-      "vendor": { "maplibre-native-ffi": { "unit": "android-arm64" } }
+      "vendor": {
+        "maplibre-native-ffi": {
+          "unit": "android-arm64"
+        }
+      }
     },
     {
       "name": "_android-x86",
@@ -336,7 +379,15 @@
         "MLN_FFI_ZIG_TARGET": "x86-linux-android",
         "MLN_FFI_RUST_TARGET": "i686-linux-android"
       },
-      "vendor": { "maplibre-native-ffi": { "unit": "android-x86" } }
+      "vendor": {
+        "maplibre-native-ffi": {
+          "unit": "android-x86",
+          "device": {
+            "name": "Android emulator",
+            "command": "tools/devices/android-serial android-x86"
+          }
+        }
+      }
     },
     {
       "name": "_android-x64",
@@ -353,27 +404,25 @@
           "unit": "android",
           "device": {
             "name": "Android emulator",
-            "command": "tools/devices/android-serial x86_64"
+            "command": "tools/devices/android-serial android-x64"
           }
         }
       }
     },
     {
-      "name": "_emscripten-wasm32",
+      "name": "_web-wasm32",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "${fileDir}/cmake/toolchains/emscripten.cmake",
       "cacheVariables": {
-        "MLN_FFI_TARGET_PLATFORM": "emscripten-wasm32",
-        "MLN_FFI_ZIG_TARGET": "wasm32-emscripten",
-        "MLN_FFI_RUST_TARGET": "wasm32-unknown-emscripten",
+        "MLN_FFI_TARGET_PLATFORM": "web-wasm32",
+        "MLN_FFI_RUST_TARGET": "wasm32-unknown-unknown",
         "MLN_FFI_DEFAULT_RENDER_BACKEND": "webgpu"
       },
       "vendor": {
         "maplibre-native-ffi": {
           "unit": "web",
           "runner": "blacksmith-4vcpu-ubuntu-2404",
-          "miseEnv": "emscripten"
+          "miseEnv": "web"
         }
       }
     },
@@ -385,8 +434,9 @@
       "cacheVariables": {
         "OHOS_STL": "c++_shared",
         "OHOS_COMPATIBLE_SDK_VERSION": "20",
-        "MLN_FFI_ENABLE_CLANG_TIDY": false,
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl",
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
+        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
       }
     },
     {
@@ -436,10 +486,15 @@
       "toolchainFile": "${fileDir}/cmake/toolchains/clang-cl.cmake",
       "cacheVariables": {
         "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
-        "HAVE_FSEEKO": { "type": "BOOL", "value": "OFF" },
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
+        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "wgl"
       },
-      "vendor": { "maplibre-native-ffi": { "softwareGpu": true } }
+      "vendor": {
+        "maplibre-native-ffi": {
+          "softwareGpu": true
+        }
+      }
     },
     {
       "name": "_windows-x64",
@@ -489,7 +544,9 @@
         "MLN_FFI_TARGET_PLATFORM": "windows-mingw-x64",
         "MLN_FFI_ZIG_TARGET": "x86_64-windows-gnu",
         "MLN_FFI_RUST_TARGET": "x86_64-pc-windows-gnu",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan"
+        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
+        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "wgl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -518,177 +575,90 @@
       }
     },
     {
-      "name": "_metal",
-      "hidden": true,
-      "cacheVariables": { "MLN_FFI_RENDER_BACKEND": "metal" }
+      "name": "linux-gnu-x64",
+      "displayName": "Linux GNU x64",
+      "inherits": "_linux-x64"
     },
     {
-      "name": "_egl",
-      "hidden": true,
+      "name": "linux-gnu-arm64",
+      "displayName": "Linux GNU ARM64",
+      "inherits": "_linux-arm64"
+    },
+    {
+      "name": "linux-musl-x64",
+      "displayName": "Linux musl x64",
+      "inherits": "_linux-musl-x64"
+    },
+    {
+      "name": "linux-musl-arm64",
+      "displayName": "Linux musl ARM64",
+      "inherits": "_linux-musl-arm64"
+    },
+    {
+      "name": "linux-gnu-riscv64",
+      "displayName": "Linux GNU RISC-V64",
+      "inherits": "_linux-riscv64"
+    },
+    {
+      "name": "linux-gnu-loongarch64",
+      "displayName": "Linux GNU LoongArch64",
+      "inherits": "_linux-loongarch64"
+    },
+    {
+      "name": "linux-musl-riscv64",
+      "displayName": "Linux musl RISC-V64",
+      "inherits": "_linux-musl-riscv64"
+    },
+    {
+      "name": "linux-musl-loongarch64",
+      "displayName": "Linux musl LoongArch64",
+      "inherits": "_linux-musl-loongarch64"
+    },
+    {
+      "name": "freebsd-x64",
+      "displayName": "FreeBSD x64",
+      "inherits": "_freebsd-x64"
+    },
+    {
+      "name": "web-wasm32-webgl",
+      "displayName": "Browser WASM32 WebGL",
+      "inherits": "_web-wasm32",
       "cacheVariables": {
-        "MLN_FFI_RENDER_BACKEND": "opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
-      }
-    },
-    {
-      "name": "_wgl",
-      "hidden": true,
-      "cacheVariables": {
-        "MLN_FFI_RENDER_BACKEND": "opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "wgl"
-      }
-    },
-    {
-      "name": "_vulkan",
-      "hidden": true,
-      "cacheVariables": { "MLN_FFI_RENDER_BACKEND": "vulkan" }
-    },
-    {
-      "name": "_webgpu",
-      "hidden": true,
-      "cacheVariables": { "MLN_FFI_RENDER_BACKEND": "webgpu" }
-    },
-    {
-      "name": "_webgl",
-      "hidden": true,
-      "cacheVariables": {
-        "MLN_FFI_RENDER_BACKEND": "opengl",
+        "MLN_FFI_RENDER_BACKENDS": "opengl",
         "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "webgl"
       }
     },
     {
-      "name": "linux-gnu-x64-egl",
-      "displayName": "Linux GNU x64 EGL",
-      "inherits": ["_linux-x64", "_egl"]
-    },
-    {
-      "name": "linux-gnu-x64-vulkan",
-      "displayName": "Linux GNU x64 Vulkan",
-      "inherits": ["_linux-x64", "_vulkan"]
-    },
-    {
-      "name": "linux-gnu-arm64-egl",
-      "displayName": "Linux GNU ARM64 EGL",
-      "inherits": ["_linux-arm64", "_egl"]
-    },
-    {
-      "name": "linux-gnu-arm64-vulkan",
-      "displayName": "Linux GNU ARM64 Vulkan",
-      "inherits": ["_linux-arm64", "_vulkan"]
-    },
-    {
-      "name": "linux-musl-x64-egl",
-      "displayName": "Linux musl x64 EGL",
-      "inherits": ["_linux-musl-x64", "_egl"]
-    },
-    {
-      "name": "linux-musl-x64-vulkan",
-      "displayName": "Linux musl x64 Vulkan",
-      "inherits": ["_linux-musl-x64", "_vulkan"]
-    },
-    {
-      "name": "linux-musl-arm64-egl",
-      "displayName": "Linux musl ARM64 EGL",
-      "inherits": ["_linux-musl-arm64", "_egl"]
-    },
-    {
-      "name": "linux-musl-arm64-vulkan",
-      "displayName": "Linux musl ARM64 Vulkan",
-      "inherits": ["_linux-musl-arm64", "_vulkan"]
-    },
-    {
-      "name": "linux-gnu-riscv64-egl",
-      "displayName": "Linux GNU RISC-V64 EGL",
-      "inherits": ["_linux-riscv64", "_egl"]
-    },
-    {
-      "name": "linux-gnu-riscv64-vulkan",
-      "displayName": "Linux GNU RISC-V64 Vulkan",
-      "inherits": ["_linux-riscv64", "_vulkan"]
-    },
-    {
-      "name": "linux-gnu-loongarch64-egl",
-      "displayName": "Linux GNU LoongArch64 EGL",
-      "inherits": ["_linux-loongarch64", "_egl"]
-    },
-    {
-      "name": "linux-gnu-loongarch64-vulkan",
-      "displayName": "Linux GNU LoongArch64 Vulkan",
-      "inherits": ["_linux-loongarch64", "_vulkan"]
-    },
-    {
-      "name": "linux-musl-riscv64-egl",
-      "displayName": "Linux musl RISC-V64 EGL",
-      "inherits": ["_linux-musl-riscv64", "_egl"]
-    },
-    {
-      "name": "linux-musl-riscv64-vulkan",
-      "displayName": "Linux musl RISC-V64 Vulkan",
-      "inherits": ["_linux-musl-riscv64", "_vulkan"]
-    },
-    {
-      "name": "linux-musl-loongarch64-egl",
-      "displayName": "Linux musl LoongArch64 EGL",
-      "inherits": ["_linux-musl-loongarch64", "_egl"]
-    },
-    {
-      "name": "linux-musl-loongarch64-vulkan",
-      "displayName": "Linux musl LoongArch64 Vulkan",
-      "inherits": ["_linux-musl-loongarch64", "_vulkan"]
-    },
-    {
-      "name": "freebsd-x64-egl",
-      "displayName": "FreeBSD x64 EGL",
-      "inherits": ["_freebsd-x64", "_egl"]
-    },
-    {
-      "name": "freebsd-x64-vulkan",
-      "displayName": "FreeBSD x64 Vulkan",
-      "inherits": ["_freebsd-x64", "_vulkan"]
-    },
-    {
-      "name": "emscripten-wasm32-webgl",
-      "displayName": "Browser WASM32 WebGL",
-      "inherits": ["_emscripten-wasm32", "_webgl"]
-    },
-    {
-      "name": "emscripten-wasm32-webgpu",
+      "name": "web-wasm32-webgpu",
       "displayName": "Browser WASM32 WebGPU",
-      "inherits": ["_emscripten-wasm32", "_webgpu"]
+      "inherits": "_web-wasm32",
+      "cacheVariables": {
+        "MLN_FFI_RENDER_BACKENDS": "webgpu"
+      }
     },
     {
-      "name": "macos-arm64-metal",
-      "displayName": "macOS ARM64 Metal",
-      "inherits": ["_macos-arm64", "_metal"]
+      "name": "macos-arm64",
+      "displayName": "macOS ARM64",
+      "inherits": "_macos-arm64"
     },
     {
-      "name": "macos-arm64-vulkan",
-      "displayName": "macOS ARM64 Vulkan",
-      "inherits": ["_macos-arm64", "_vulkan"]
+      "name": "macos-x64",
+      "displayName": "macOS x64",
+      "inherits": "_macos-x64"
     },
     {
-      "name": "macos-arm64-egl",
-      "displayName": "macOS ARM64 EGL",
-      "inherits": ["_macos-arm64", "_egl"]
-    },
-    {
-      "name": "macos-x64-metal",
-      "displayName": "macOS x64 Metal",
-      "inherits": ["_macos-x64", "_metal"]
-    },
-    {
-      "name": "ios-arm64-metal",
-      "displayName": "iOS ARM64 Metal",
-      "inherits": ["_ios-arm64", "_metal"],
+      "name": "ios-arm64",
+      "displayName": "iOS ARM64",
+      "inherits": "_ios-arm64",
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "iphoneos",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-ios"
       }
     },
     {
-      "name": "ios-simulator-arm64-metal",
-      "displayName": "iOS Simulator ARM64 Metal",
-      "inherits": ["_ios-arm64", "_metal"],
+      "name": "ios-simulator-arm64",
+      "displayName": "iOS Simulator ARM64",
+      "inherits": "_ios-arm64",
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "iphonesimulator",
         "MLN_FFI_TARGET_PLATFORM": "ios-simulator-arm64",
@@ -705,9 +675,9 @@
       }
     },
     {
-      "name": "ios-maccatalyst-arm64-metal",
-      "displayName": "iOS Mac Catalyst ARM64 Metal",
-      "inherits": ["_ios-arm64", "_metal"],
+      "name": "ios-maccatalyst-arm64",
+      "displayName": "iOS Mac Catalyst ARM64",
+      "inherits": "_ios-arm64",
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "macosx",
         "MLN_FFI_TARGET_PLATFORM": "ios-maccatalyst-arm64",
@@ -716,27 +686,27 @@
       }
     },
     {
-      "name": "tvos-arm64-metal",
-      "displayName": "tvOS ARM64 Metal",
-      "inherits": ["_tvos-arm64", "_metal"],
+      "name": "tvos-arm64",
+      "displayName": "tvOS ARM64",
+      "inherits": "_tvos-arm64",
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "appletvos",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-tvos"
       }
     },
     {
-      "name": "visionos-arm64-metal",
-      "displayName": "visionOS ARM64 Metal",
-      "inherits": ["_visionos-arm64", "_metal"],
+      "name": "visionos-arm64",
+      "displayName": "visionOS ARM64",
+      "inherits": "_visionos-arm64",
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "xros",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-visionos"
       }
     },
     {
-      "name": "tvos-simulator-arm64-metal",
-      "displayName": "tvOS Simulator ARM64 Metal",
-      "inherits": ["_tvos-arm64", "_metal"],
+      "name": "tvos-simulator-arm64",
+      "displayName": "tvOS Simulator ARM64",
+      "inherits": "_tvos-arm64",
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "appletvsimulator",
         "MLN_FFI_TARGET_PLATFORM": "tvos-simulator-arm64",
@@ -753,9 +723,9 @@
       }
     },
     {
-      "name": "visionos-simulator-arm64-metal",
-      "displayName": "visionOS Simulator ARM64 Metal",
-      "inherits": ["_visionos-arm64", "_metal"],
+      "name": "visionos-simulator-arm64",
+      "displayName": "visionOS Simulator ARM64",
+      "inherits": "_visionos-arm64",
       "cacheVariables": {
         "CMAKE_OSX_SYSROOT": "xrsimulator",
         "MLN_FFI_TARGET_PLATFORM": "visionos-simulator-arm64",
@@ -772,120 +742,54 @@
       }
     },
     {
-      "name": "android-arm-egl",
-      "displayName": "Android ARMv7 EGL",
-      "inherits": ["_android-arm", "_egl"]
+      "name": "android-arm",
+      "displayName": "Android ARMv7",
+      "inherits": "_android-arm"
     },
     {
-      "name": "android-arm-vulkan",
-      "displayName": "Android ARMv7 Vulkan",
-      "inherits": ["_android-arm", "_vulkan"]
+      "name": "android-arm64",
+      "displayName": "Android ARM64",
+      "inherits": "_android-arm64"
     },
     {
-      "name": "android-arm64-egl",
-      "displayName": "Android ARM64 EGL",
-      "inherits": ["_android-arm64", "_egl"]
+      "name": "android-x86",
+      "displayName": "Android x86",
+      "inherits": "_android-x86"
     },
     {
-      "name": "android-arm64-vulkan",
-      "displayName": "Android ARM64 Vulkan",
-      "inherits": ["_android-arm64", "_vulkan"]
+      "name": "android-x64",
+      "displayName": "Android x64",
+      "inherits": "_android-x64"
     },
     {
-      "name": "android-x86-egl",
-      "displayName": "Android x86 EGL",
-      "inherits": ["_android-x86", "_egl"],
-      "vendor": {
-        "maplibre-native-ffi": {
-          "device": {
-            "name": "Android emulator",
-            "command": "tools/devices/android-serial android-x86-egl"
-          }
-        }
-      }
+      "name": "ohos-arm64",
+      "displayName": "OHOS ARM64",
+      "inherits": "_ohos-arm64"
     },
     {
-      "name": "android-x86-vulkan",
-      "displayName": "Android x86 Vulkan",
-      "inherits": ["_android-x86", "_vulkan"]
+      "name": "ohos-x64",
+      "displayName": "OHOS x64",
+      "inherits": "_ohos-x64"
     },
     {
-      "name": "android-x64-egl",
-      "displayName": "Android x64 EGL",
-      "inherits": ["_android-x64", "_egl"],
-      "vendor": {
-        "maplibre-native-ffi": {
-          "device": {
-            "name": "Android emulator",
-            "command": "tools/devices/android-serial android-x64-egl"
-          }
-        }
-      }
+      "name": "mingw-x64",
+      "displayName": "MSYS2 MinGW x64",
+      "inherits": "_mingw-x64"
     },
     {
-      "name": "android-x64-vulkan",
-      "displayName": "Android x64 Vulkan",
-      "inherits": ["_android-x64", "_vulkan"]
+      "name": "mingw-arm64",
+      "displayName": "MSYS2 MinGW ARM64",
+      "inherits": "_mingw-arm64"
     },
     {
-      "name": "ohos-arm64-egl",
-      "displayName": "OHOS ARM64 EGL",
-      "inherits": ["_ohos-arm64", "_egl"]
+      "name": "windows-x64",
+      "displayName": "Windows x64",
+      "inherits": "_windows-x64"
     },
     {
-      "name": "ohos-arm64-vulkan",
-      "displayName": "OHOS ARM64 Vulkan",
-      "inherits": ["_ohos-arm64", "_vulkan"]
-    },
-    {
-      "name": "ohos-x64-egl",
-      "displayName": "OHOS x64 EGL",
-      "inherits": ["_ohos-x64", "_egl"]
-    },
-    {
-      "name": "ohos-x64-vulkan",
-      "displayName": "OHOS x64 Vulkan",
-      "inherits": ["_ohos-x64", "_vulkan"]
-    },
-    {
-      "name": "mingw-x64-wgl",
-      "displayName": "MSYS2 MinGW x64 WGL",
-      "inherits": ["_mingw-x64", "_wgl"]
-    },
-    {
-      "name": "mingw-x64-vulkan",
-      "displayName": "MSYS2 MinGW x64 Vulkan",
-      "inherits": ["_mingw-x64", "_vulkan"]
-    },
-    {
-      "name": "mingw-arm64-wgl",
-      "displayName": "MSYS2 MinGW ARM64 WGL",
-      "inherits": ["_mingw-arm64", "_wgl"]
-    },
-    {
-      "name": "mingw-arm64-vulkan",
-      "displayName": "MSYS2 MinGW ARM64 Vulkan",
-      "inherits": ["_mingw-arm64", "_vulkan"]
-    },
-    {
-      "name": "windows-x64-wgl",
-      "displayName": "Windows x64 WGL",
-      "inherits": ["_windows-x64", "_wgl"]
-    },
-    {
-      "name": "windows-x64-vulkan",
-      "displayName": "Windows x64 Vulkan",
-      "inherits": ["_windows-x64", "_vulkan"]
-    },
-    {
-      "name": "windows-arm64-wgl",
-      "displayName": "Windows ARM64 WGL",
-      "inherits": ["_windows-arm64", "_wgl"]
-    },
-    {
-      "name": "windows-arm64-vulkan",
-      "displayName": "Windows ARM64 Vulkan",
-      "inherits": ["_windows-arm64", "_vulkan"]
+      "name": "windows-arm64",
+      "displayName": "Windows ARM64",
+      "inherits": "_windows-arm64"
     }
   ]
 }

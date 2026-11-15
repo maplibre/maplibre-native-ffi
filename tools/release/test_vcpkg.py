@@ -27,9 +27,6 @@ def main() -> int:
     parser.add_argument("assets", type=pathlib.Path)
     parser.add_argument("vcpkg", type=pathlib.Path)
     parser.add_argument("--triplet", required=True)
-    parser.add_argument(
-        "--backend", required=True, choices=("opengl", "metal", "vulkan")
-    )
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as temporary:
         root = pathlib.Path(temporary)
@@ -62,7 +59,7 @@ def main() -> int:
             {
                 "name": "registry-consumer",
                 "version-string": "0",
-                "dependencies": [{"name": PORT, "features": [args.backend]}],
+                "dependencies": [PORT],
             },
         )
         write_json(

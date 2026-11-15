@@ -100,6 +100,17 @@ class GoEmitterTests(unittest.TestCase):
         self.assertNotIn("func RuntimeCreate(", source)
         self.assertIn("func SetLogCallback(handler LogHandler) error {", source)
 
+    def test_a_factory_besides_create_names_its_verb_and_type(self):
+        source = emitted(go, real_api())["generated_api.go"]
+        self.assertIn(
+            "func NewGPUDevice(options *GPUDeviceOptions) (*GPUDeviceHandle, error) {",
+            source,
+        )
+        self.assertIn(
+            "func WrapVulkanGPUDevice(descriptor VulkanDeviceDescriptor) (*GPUDeviceHandle, error) {",
+            source,
+        )
+
     def test_a_summary_names_the_go_symbols_of_the_c_identifiers(self):
         source = emitted(go, real_api())["generated_api.go"]
         self.assertIn("MapHandle.CancelCameraTransitions()", source)
@@ -154,7 +165,9 @@ class GoEmitterTests(unittest.TestCase):
             for plan in values.records.values()
             if plan.registration and accepts_native(values, plan)
         }
-        self.assertEqual(native, {"mln_queue_lock", "mln_wake"})
+        self.assertEqual(
+            native, {"mln_custom_layer_host", "mln_queue_lock", "mln_wake"}
+        )
 
     def test_dispose_is_public_only_where_c_has_one_besides_a_void_release(self):
         source = emitted(go, real_api())["generated_api.go"]
@@ -174,7 +187,7 @@ class GoEmitterTests(unittest.TestCase):
             for line in source.splitlines()
             if line.endswith("struct { *bindingOwner }")
         ]
-        self.assertEqual(len(owners), 11)
+        self.assertEqual(len(owners), 10)
         for owner in owners:
             for member in ("ID() uint64", "IsClosed() bool", "String() string"):
                 self.assertIn(f"func (handle *{owner}) {member}", source)

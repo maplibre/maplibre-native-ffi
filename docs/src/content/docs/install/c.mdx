@@ -10,10 +10,11 @@ sidebar:
 
 Each [release](https://github.com/maplibre/maplibre-native-ffi/releases/latest)
 publishes the C library as `maplibre-native-c-<preset>.tar.gz`, one archive for
-each preset. A preset names a platform, an architecture, and a
-[backend](/maplibre-native-ffi/install/#choose-a-backend), such as
-`macos-arm64-metal` or `linux-gnu-x64-vulkan`. OpenGL presets name their context
-instead of the backend: `egl`, `wgl`, or `webgl`.
+each preset. A preset names a platform and an architecture, such as
+`macos-arm64` or `linux-gnu-x64`, and its archive carries every
+[backend](/maplibre-native-ffi/install/#choose-a-backend) of the platform. The
+browser has a preset for each backend: `web-wasm32-webgpu` and
+`web-wasm32-webgl`.
 
 Download the archive for your preset and unpack it. The directory inside,
 `maplibre-native-c-<preset>`, is the install prefix.
@@ -53,7 +54,7 @@ With xmake 3.1.2 or later, add the distribution repository at a release's tag:
 
 ```lua title="xmake.lua"
 add_repositories("maplibre https://github.com/maplibre/maplibre-native-ffi-distribution.git v{{version}}")
-add_requires("maplibre-native-c {{version}}", {configs = {backend = "vulkan"}})
+add_requires("maplibre-native-c {{version}}")
 
 target("app")
     set_kind("binary")
@@ -61,8 +62,7 @@ target("app")
     add_packages("maplibre-native-c")
 ```
 
-Leave out `backend` to use the platform's default. For musl on Linux, add
-`libc = "musl"` to `configs`.
+For musl on Linux, add `{configs = {libc = "musl"}}`.
 
 ### vcpkg
 
@@ -86,12 +86,11 @@ git ls-remote https://github.com/maplibre/maplibre-native-ffi-distribution 'refs
 }
 ```
 
-Choose one backend feature, `opengl`, `metal`, or `vulkan`, and link the CMake
-target as above:
+Add the port, and link the CMake target as above:
 
 ```json title="vcpkg.json"
 {
-  "dependencies": [{ "name": "maplibre-native-c", "features": ["vulkan"] }]
+  "dependencies": ["maplibre-native-c"]
 }
 ```
 
@@ -108,11 +107,10 @@ index. Pull the clone to see newer releases.
 git clone https://github.com/maplibre/maplibre-native-ffi-distribution.git
 conan remote add maplibre-native-ffi ./maplibre-native-ffi-distribution --type=local-recipes-index
 conan install --requires="maplibre-native-c/{{version}}" --build=missing \
-  -o "maplibre-native-c/*:backend=vulkan" -g CMakeDeps -g CMakeToolchain
+  -g CMakeDeps -g CMakeToolchain
 ```
 
-`backend` takes `metal`, `opengl`, `vulkan`, `webgpu`, or `default`. For musl on
-Linux, add `-o "maplibre-native-c/*:libc=musl"`.
+For musl on Linux, add `-o "maplibre-native-c/*:libc=musl"`.
 
 ### Swift Package Manager
 
@@ -143,7 +141,7 @@ android {
 }
 
 dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl-android:{{version}}")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-android:{{version}}")
 }
 ```
 

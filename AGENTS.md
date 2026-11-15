@@ -1,9 +1,9 @@
 # Repository guidance
 
-MapLibre Native FFI is a C API for MapLibre Native. A generator writes bindings
-for nine languages from the C headers. Each binding also has a handwritten
-runtime. Mise provides every tool and task. Run `mise tasks --all` to list the
-tasks.
+MapLibre Native FFI is a C API for MapLibre Native, implemented by mln-rs, its
+Rust port. A generator writes bindings for eight languages from the C headers.
+Each binding also has a handwritten runtime. Mise provides every tool and task.
+Run `mise tasks --all` to list the tasks.
 
 Read these when the task needs them:
 
@@ -25,24 +25,27 @@ these goals conflict, safety comes first, then similarity, then language idioms.
 Add a convenience API to a binding only when its language's safety or ergonomics
 require one. Don't repeat validation that native code already does.
 
-The engine is the `third_party/maplibre-native` submodule at its pinned commit,
-with the patches in `patches/maplibre-native/` applied. Answer questions about
-engine behavior from that source. If the submodule is empty, run `mise deps` to
-check it out and apply the patches. Every `mise run`, `mise exec`, and commit
-hook does the same, which discards submodule edits that no patch holds. Save an
-engine change to its patch before you run any of them.
+The library is [mln-rs](https://github.com/louwers/mln-rs), the Rust port of
+MapLibre Native, at the `third_party/mln-rs` submodule's pinned commit with the
+patches in `patches/mln-rs/` applied. Its `crates/mln_c` crate implements the C
+API, and the native build compiles it with Cargo. Answer questions about library
+behavior from that source. `include/` stays the source of truth for the C API:
+configuring a preset fails while mln-rs's copy in `crates/mln_c/include` differs
+from it. If the submodule is empty, run `mise deps` to check it out and apply
+the patches. Every `mise run`, `mise exec`, and commit hook does the same, which
+discards submodule edits that no patch holds. Save a change to mln-rs to its
+patch before you run any of them.
 
 After a rebase, run `mise deps` before you stage anything.
 `git submodule update` skips this submodule. Before you push, check
 `git diff origin/main...HEAD --stat`. If `git add -A` staged a stale checkout,
-the diff reverts the engine pin.
+the diff reverts the mln-rs pin.
 
 ## Tests
 
-Test native behavior once, in C, under `tests/native`. An engine patch is the
-exception: its tests go in upstream's `test/` tree. A binding's suite tests only
-what the binding adds: its runtime, its generated code, and its platform
-integration.
+Test native behavior once, in C, under `tests/native`. A patch to mln-rs is the
+exception: its tests go in mln-rs's own tests. A binding's suite tests only what
+the binding adds: its runtime, its generated code, and its platform integration.
 
 Test behavior that callers can observe, not implementation details. Add a test
 only when it would catch a regression in that behavior. Don't test what the

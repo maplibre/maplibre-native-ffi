@@ -129,6 +129,20 @@ mln_status mln_test_render_fixture_finish_operation(
   return mln_test_completion_status(completion);
 }
 
+mln_logical_extent mln_test_session_extent(
+  mln_render_session session, mln_logical_size size
+) {
+  mln_render_session_snapshot snapshot = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  MLN_TEST_OK(mln_render_session_get_snapshot(session, &snapshot, NULL));
+  return (mln_logical_extent){
+    .width = size.width,
+    .height = size.height,
+    .scale_factor = snapshot.extent.scale_factor,
+  };
+}
+
 mln_status mln_test_render_session_failure(
   mln_render_session session, char* message, size_t capacity
 ) {
@@ -226,13 +240,15 @@ static bool attach_offscreen(
   void** out_state, mln_render_session* out_session,
   const mln_completion* completion, mln_status* out_status
 ) {
-  mln_offscreen_descriptor descriptor = {
-    .size = sizeof(mln_offscreen_descriptor)
+  mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_OFFSCREEN,
   };
-  descriptor.logical_size = (mln_logical_size){.width = 64, .height = 64};
+  target.data.offscreen.logical_size =
+    (mln_logical_size){.width = 64, .height = 64};
   *out_state = NULL;
-  *out_status = mln_map_attach_offscreen(
-    map, &descriptor, options, MLN_HANDLE_NULL, out_session, completion,
+  *out_status = mln_map_attach(
+    map, &target, MLN_HANDLE_NULL, options, out_session, completion,
     MLN_TEST_DIAGNOSTIC
   );
   return true;
@@ -324,6 +340,13 @@ bool mln_test_render_fixture_create_with(
   return create_fixture(map, fixture, attach, mln_test_backend_driver(), 0);
 }
 
+bool mln_test_render_fixture_create_on(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_backend_attach_fn attach, uint32_t driver
+) {
+  return create_fixture(map, fixture, attach, driver, 0);
+}
+
 bool mln_test_render_fixture_create_offscreen(
   mln_map map, mln_test_render_fixture* fixture
 ) {
@@ -352,7 +375,7 @@ bool mln_test_render_fixture_create_borrowed_ring(
   );
 }
 
-static mln_status start_attach(
+mln_status mln_test_render_fixture_start_attach_with(
   mln_map map, const mln_render_session_attach_options* options,
   const mln_completion* completion, mln_test_render_fixture* fixture,
   mln_test_backend_attach_fn attach_target, uint32_t driver
@@ -383,7 +406,7 @@ mln_status mln_test_render_fixture_start_attach(
   mln_map map, const mln_render_session_attach_options* options,
   const mln_completion* completion, mln_test_render_fixture* fixture
 ) {
-  return start_attach(
+  return mln_test_render_fixture_start_attach_with(
     map, options, completion, fixture, mln_test_backend_attach_borrowed,
     mln_test_backend_driver()
   );
@@ -393,7 +416,7 @@ mln_status mln_test_render_fixture_start_offscreen_attach(
   mln_map map, const mln_render_session_attach_options* options,
   const mln_completion* completion, mln_test_render_fixture* fixture
 ) {
-  return start_attach(
+  return mln_test_render_fixture_start_attach_with(
     map, options, completion, fixture, attach_offscreen,
     MLN_RENDER_DRIVER_CORE_WORKER
   );

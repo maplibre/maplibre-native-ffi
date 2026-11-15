@@ -7,7 +7,10 @@ public extension AcquiredFrameHandle {
   /// Gives up an acquired frame without saying when your GPU stops reading it.
   ///
   /// Because your GPU may still read the frame's texture, the session never
-  /// renders into that texture again.
+  /// renders into that texture again, even when
+  /// `RenderSessionHandle.setTarget()` gives it the texture again, until
+  /// `RenderSessionHandle.releaseTarget()` releases the ring. A view that is
+  /// open on the frame keeps the frame's sync objects in place until it ends.
   ///
   /// See `mln_acquired_frame_discard` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -71,11 +74,11 @@ public extension AcquiredFrameHandle {
 public extension AcquiredFrameHandle {
   /// Gives an acquired frame back to the session once you're done reading it.
   ///
-  /// `consumerCompletion` says when your GPU work that reads the texture
-  /// finishes. Pass `GpuSyncKind.cpuComplete` when that work has already
-  /// finished. The session waits for that point before it renders into the
-  /// texture again. If that wait fails, such as for an OpenGL fence outside the
-  /// session's share group, the session fails.
+  /// `consumerCompletion` says when your GPU work on the texture, and on its
+  /// depth texture, finishes. Pass `GpuSyncKind.cpuComplete` when that work has
+  /// already finished. The session waits for that point before it renders into
+  /// the textures again. If that wait fails, such as for an OpenGL fence
+  /// outside the session's share group, the session fails.
   ///
   /// See `mln_acquired_frame_release` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

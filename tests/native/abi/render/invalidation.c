@@ -710,8 +710,7 @@ static void a_frame_shows_feature_state_moved_between_features(void) {
 
 // The backends whose renderer counts frames and draws per render pass:
 // WebGPU, Metal, and Vulkan.
-#if defined(MLN_FFI_TEST_BACKEND_WEBGPU) || \
-  defined(MLN_FFI_TEST_BACKEND_METAL) || defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#if defined(MLN_FFI_TEST_BACKEND_METAL) || defined(MLN_FFI_TEST_BACKEND_VULKAN)
 #define COUNTS_DRAWS_PER_FRAME 1
 #endif
 

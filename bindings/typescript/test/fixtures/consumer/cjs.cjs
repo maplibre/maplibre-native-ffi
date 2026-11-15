@@ -3,7 +3,7 @@
 const { cVersion, RuntimeHandle } = require("@maplibre/native-ffi");
 
 void RuntimeHandle.create()
-  .then((runtime) => runtime.release())
+  .release()
   .then(() => {
     console.log(`loaded C API version ${cVersion()}`);
   });

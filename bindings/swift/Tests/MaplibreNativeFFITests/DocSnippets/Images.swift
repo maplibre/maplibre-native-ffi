@@ -28,10 +28,11 @@ private func images(runtime: RuntimeHandle) async throws {
   // #endregion style
 
   // #region attach
-  let session = try map.attachOffscreen(
-    descriptor: OffscreenDescriptor(
+  // With no device, the session creates its own.
+  let session = try map.attach(
+    target: .offscreen(OffscreenTarget(
       logicalSize: LogicalSize(width: 800, height: 600)
-    ),
+    )),
     // The library renders on its own thread.
     options: RenderSessionAttachOptions(driver: .coreWorker)
   )

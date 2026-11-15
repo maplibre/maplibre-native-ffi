@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-#MISE description="Test the Python binding against a native preset's install."
-#MISE extends="ffi:preset"
+#MISE description="Test the Python binding against a native preset's install, with one of its render backends."
+#MISE extends="ffi:test"
 #MISE depends=[{ task = ":_install", args = ["{{usage.preset}}"] }]
 #MISE env={ MLN_FFI_MUSL_TEST_IMAGE = "python:{{vars.python_version}}-alpine3.24" }
 #MISE shell="bash"
 set -euo pipefail
 
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 if [[ "$usage_preset" == android-* ]]; then
   exec mise run :_test-android "$usage_preset"
 fi
-if [[ "$usage_preset" == macos-x64-* ]]; then
+if [[ "$usage_preset" == macos-x64 ]]; then
   python=$(MISE_DATA_DIR="$MISE_MONOREPO_ROOT/build/toolchains/mise-macos-x64" \
     MISE_ARCH=x64 MISE_NO_HOOKS=1 mise exec --no-deps python -- python -c 'import sys; print(sys.executable)')
   venv="$MISE_MONOREPO_ROOT/build/$usage_preset/python-test"
@@ -19,7 +20,7 @@ if [[ "$usage_preset" == macos-x64-* ]]; then
   MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
     exec "$venv/bin/python" -m pytest
 fi
-if [[ "$usage_preset" == linux-*-riscv64-* ]]; then
+if [[ "$usage_preset" == linux-*-riscv64 ]]; then
   target=${usage_preset#linux-}
   root=$("$MISE_MONOREPO_ROOT/tools/devices/linux-root" "${target%%-*}" riscv64)
   python="$root/usr/bin/python3"

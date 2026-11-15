@@ -45,10 +45,6 @@ const files: Record<string, Files> = {
     import: "default",
     eager: true,
   }),
-  rust: import.meta.glob(
-    "../../bindings/rust/crates/maplibre-native-ffi/examples/*.rs",
-    { query: "?raw", import: "default", eager: true },
-  ),
   swift: import.meta.glob("../../bindings/swift/Tests/*/DocSnippets/*.swift", {
     query: "?raw",
     import: "default",

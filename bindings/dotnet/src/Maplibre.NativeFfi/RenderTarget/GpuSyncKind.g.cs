@@ -38,7 +38,9 @@ public enum GpuSyncKind : uint
     VulkanTimelineSemaphore = 3,
 
     /// <summary>
-    /// <c>handle</c> is a sync file descriptor.
+    /// <c>handle</c> is a sync file descriptor. A descriptor of -1, as Vulkan
+    /// exports for a semaphore that has already signaled, counts as
+    /// <c>GpuSyncKind.CpuComplete</c>.
     /// </summary>
     SyncFd = 4,
 

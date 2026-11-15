@@ -69,6 +69,11 @@ typedef struct mln_test_graphics_context {
   // loader that created the handles above.
   void* MLN_TEST_GRAPHICS_NULLABLE vulkan_get_instance_proc_addr;
   void* MLN_TEST_GRAPHICS_NULLABLE vulkan_get_device_proc_addr;
+  // Vulkan: the names of the device extensions that vulkan_device enabled, or
+  // none when the instance and device are the caller's.
+  const char* MLN_TEST_GRAPHICS_NONNULL const* MLN_TEST_GRAPHICS_NULLABLE
+    vulkan_device_extensions;
+  uint32_t vulkan_device_extension_count;
   // EGL: EGLDisplay, and an EGLConfig with EGL_PBUFFER_BIT and OpenGL ES 3.
   void* MLN_TEST_GRAPHICS_NULLABLE egl_display;
   void* MLN_TEST_GRAPHICS_NULLABLE egl_config;
@@ -104,12 +109,23 @@ typedef struct mln_test_graphics_texture_info {
 } mln_test_graphics_texture_info;
 
 // A presentation surface that a surface descriptor can name. Only the fields
-// of the surface's backend are set; the rest are zero.
+// of the surface's backend and platform are set; the rest are zero.
 typedef struct mln_test_graphics_surface_info {
   // Vulkan: VkSurfaceKHR bit pattern, presentable from the context's queue.
+  // Zero on Android, where the window takes one surface: the library's. On
+  // OpenHarmony, a headless surface, since the emulator's driver presents to
+  // no window.
   uint64_t vulkan_surface;
   // Metal: CAMetalLayer* on the context's device.
   void* MLN_TEST_GRAPHICS_NULLABLE metal_layer;
+  // Vulkan and WGL on Windows: the HWND of the surface's window.
+  void* MLN_TEST_GRAPHICS_NULLABLE win32_window;
+  // Vulkan and EGL on Android: an ANativeWindow* that the context's queue can
+  // present to. Nothing presents to it until the library does.
+  void* MLN_TEST_GRAPHICS_NULLABLE android_window;
+  // EGL on OpenHarmony: an OHNativeWindow* that nothing presents to until the
+  // library does.
+  void* MLN_TEST_GRAPHICS_NULLABLE ohos_window;
   // EGL: a pbuffer EGLSurface on the context's config. WGL: the HDC of a
   // hidden window with the context's pixel format.
   void* MLN_TEST_GRAPHICS_NULLABLE opengl_surface;
@@ -237,6 +253,27 @@ MLN_TEST_GRAPHICS_API bool mln_test_graphics_texture_get_info(
 MLN_TEST_GRAPHICS_API bool mln_test_graphics_texture_read_rgba8(
   mln_test_graphics_texture* MLN_TEST_GRAPHICS_NONNULL texture,
   uint8_t* MLN_TEST_GRAPHICS_NONNULL pixels, size_t size
+);
+
+// Creates a width x height depth and stencil texture that a borrowed ring can
+// carry beside a color texture: VK_FORMAT_D32_SFLOAT_S8_UINT, whose view has
+// both aspects, and whose info names
+// VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL as the final layout. Only a
+// Vulkan graphics object makes one. Destroy it with
+// mln_test_graphics_texture_destroy().
+MLN_TEST_GRAPHICS_API mln_test_graphics_texture* MLN_TEST_GRAPHICS_NULLABLE
+mln_test_graphics_depth_texture_create(
+  mln_test_graphics* MLN_TEST_GRAPHICS_NONNULL graphics, uint32_t width,
+  uint32_t height
+);
+
+// Copies the depth of a depth texture into `depths`, one value per pixel, row 0
+// of the texture first, under the same conditions as
+// mln_test_graphics_texture_read_rgba8(). `count` must be at least width *
+// height.
+MLN_TEST_GRAPHICS_API bool mln_test_graphics_depth_texture_read(
+  mln_test_graphics_texture* MLN_TEST_GRAPHICS_NONNULL texture,
+  float* MLN_TEST_GRAPHICS_NONNULL depths, size_t count
 );
 
 // Creates a width x height presentation surface with no window on screen.

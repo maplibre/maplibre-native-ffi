@@ -11,6 +11,10 @@ internal actual object UpcallStubs {
     Jni.upcallStub("customGeometrySourceOptionsFetchTile")
   actual val customGeometrySourceOptionsCancelTile: Long =
     Jni.upcallStub("customGeometrySourceOptionsCancelTile")
+  actual val customLayerHostPrerender: Long = Jni.upcallStub("customLayerHostPrerender")
+  actual val customLayerHostRender: Long = Jni.upcallStub("customLayerHostRender")
+  actual val customLayerHostDeinitialize: Long = Jni.upcallStub("customLayerHostDeinitialize")
+  actual val customLayerHostContextLost: Long = Jni.upcallStub("customLayerHostContextLost")
   actual val customVectorSourceOptionsFetchTile: Long =
     Jni.upcallStub("customVectorSourceOptionsFetchTile")
   actual val customVectorSourceOptionsCancelTile: Long =
@@ -20,9 +24,9 @@ internal actual object UpcallStubs {
   actual val runtimeEventHandlerCallback: Long = Jni.upcallStub("runtimeEventHandlerCallback")
   actual val resourceProviderCallback: Long = Jni.upcallStub("resourceProviderCallback")
   actual val resourceTransformCallback: Long = Jni.upcallStub("resourceTransformCallback")
-  actual val wakeCallback: Long = Jni.upcallStub("wakeCallback")
   actual val queueLockLock: Long = Jni.upcallStub("queueLockLock")
   actual val queueLockUnlock: Long = Jni.upcallStub("queueLockUnlock")
+  actual val wakeCallback: Long = Jni.upcallStub("wakeCallback")
   actual val cameraTransitionHandlerCallback: Long =
     Jni.upcallStub("cameraTransitionHandlerCallback")
 }

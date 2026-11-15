@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Packs the OHPM facade and the backends that the OpenHarmony presets name:
+# Packs the OHPM facade and the runtime of the OpenHarmony presets named:
 #
 #   pack-ohpm.sh [--version <version>] <out dir> <preset>...
 #
-# A user installs @maplibre/native-ffi and one backend package. The facade
-# holds the ArkTS entry and the addon's type declarations. A backend HAR
-# holds the addon, shared C library, and shared C++ runtime for every ABI
-# that its presets name, plus the C headers and native licenses.
+# A user installs @maplibre/native-ffi and @maplibre/native-ffi-runtime. The
+# facade holds the ArkTS entry and the addon's type declarations. The runtime
+# HAR holds the addon, shared C library, and shared C++ runtime for the ABI of
+# each preset named, plus the C headers and native licenses. The C library
+# carries every backend of the platform.
 set -euo pipefail
 
 usage="usage: pack-ohpm.sh [--version <version>] <out dir> <preset>..."
@@ -40,24 +41,16 @@ mkdir -p "$out"
 prepare_package() {
   local kind=$1 name=$2 package="$staging/$1/package"
   mkdir -p "$package/src/main"
+  # OHPM rejects a package whose README has no line that installs it, so the
+  # README installs both packages.
   cp "$binding/ohpm/package/README.md" "$binding/ohpm/package/CHANGELOG.md" \
     "$binding/../../LICENSE" "$package/"
-  # OHPM rejects a package whose README has no line that installs it. The
-  # README installs the OpenGL backend, so the Vulkan one's swaps the backends.
-  if [[ $kind == vulkan ]]; then
-    sed -e 's/native-ffi-opengl/native-ffi-@backend@/g' \
-      -e 's/native-ffi-vulkan/native-ffi-opengl/g' \
-      -e 's/native-ffi-@backend@/native-ffi-vulkan/g' \
-      -e 's/For Vulkan, replace/For OpenGL, replace/' \
-      -e 's/the OpenGL package/the Vulkan package/' \
-      "$binding/ohpm/package/README.md" >"$package/README.md"
-  fi
   jq --arg name "$name" --arg version "$version" --arg kind "$kind" \
     --argjson api "$api" '
       .name = $name | .version = $version | .compatibleSdkVersion = $api
       | if $kind == "facade" then del(.nativeComponents)
         else del(.main, .dependencies)
-          | .description = ("The " + $kind + " backend of @maplibre/native-ffi on OpenHarmony.")
+          | .description = "The native runtime of @maplibre/native-ffi on OpenHarmony, with every backend of the platform."
           | .nativeComponents[].compatibleSdkVersion = $api
         end' "$binding/ohpm/oh-package.json" >"$package/oh-package.json5"
   jq --arg kind "$kind" --argjson api "$api" '
@@ -81,26 +74,24 @@ cp -R "$binding/ohpm/package/src/main/cpp" "$facade/src/main/"
 
 for preset in "$@"; do
   case "$preset" in
-    ohos-arm64-egl) abi=arm64-v8a backend=opengl ;;
-    ohos-arm64-vulkan) abi=arm64-v8a backend=vulkan ;;
-    ohos-x64-egl) abi=x86_64 backend=opengl ;;
-    ohos-x64-vulkan) abi=x86_64 backend=vulkan ;;
+    ohos-arm64) abi=arm64-v8a ;;
+    ohos-x64) abi=x86_64 ;;
     *)
       echo "error: $preset has no OHPM package; only OpenHarmony presets do" >&2
       exit 2
       ;;
   esac
-  package="$staging/$backend/package"
+  package="$staging/runtime/package"
   if [[ ! -d $package ]]; then
-    prepare_package "$backend" "@maplibre/native-ffi-$backend"
+    prepare_package runtime @maplibre/native-ffi-runtime
   fi
   install="$binding/native/build/$preset/install"
   mkdir -p "$package/libs/$abi"
   cp "$install/libmaplibre_native_ffi.so" "$install/libmaplibre-native-c.so" \
     "$install/libc++_shared.so" "$package/libs/$abi/"
   cp -R "$install/include" "$install/licenses" "$package/"
-  mkdir -p "$staging/$backend/inventories"
-  cp "$install/sbom/maplibre-native-ffi.cdx.json" "$staging/$backend/inventories/$preset.json"
+  mkdir -p "$staging/runtime/inventories"
+  cp "$install/sbom/maplibre-native-ffi.cdx.json" "$staging/runtime/inventories/$preset.json"
 done
 
 for package in "$staging"/*/package; do

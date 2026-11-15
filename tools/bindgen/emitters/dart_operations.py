@@ -83,7 +83,7 @@ def lower_function(
     match plan.shape:
         case "discard" | "release" | "answer":
             code = consumed(plan, method)
-        case "thread_start" | "owned" | "call":
+        case "owned" | "call":
             public, result = returned(plan, values, method)
             if plan.absence:
                 public += "?"

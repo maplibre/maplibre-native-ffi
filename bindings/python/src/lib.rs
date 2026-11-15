@@ -3,9 +3,9 @@
 #[path = "maplibre_core/mod.rs"]
 mod maplibre_core;
 
+use maplibre_core::Error;
 use maplibre_core::handle::NativeHandle;
-use maplibre_core::{Error, Status};
-use maplibre_native_ffi_sys as sys;
+use maplibre_native_ffi_python_sys as sys;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBytes, PyDict, PyList};
 use std::ffi::{c_char, c_void};
@@ -332,7 +332,7 @@ fn py_command(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<P
 /// The error a failed completion raises, with the generation that a failed
 /// map command published.
 fn completion_error(py: Python<'_>, result: &sys::mln_completion_result) -> PyResult<Py<PyAny>> {
-    let error = map_error(Error::from_status_and_diagnostic(
+    let error = map_error(Error::new(
         result.status,
         copy_completion_diagnostic(result),
     ));
@@ -361,11 +361,11 @@ fn completion_value<T: Copy>(result: &sys::mln_completion_result) -> PyResult<T>
 }
 
 fn invalid_state_error(diagnostic: impl Into<String>) -> PyErr {
-    map_error(Error::new(Status::InvalidState, diagnostic))
+    map_error(Error::new(sys::MLN_STATUS_INVALID_STATE, diagnostic))
 }
 
 fn native_error(diagnostic: impl Into<String>) -> PyErr {
-    map_error(Error::new(Status::NativeError, diagnostic))
+    map_error(Error::new(sys::MLN_STATUS_NATIVE_ERROR, diagnostic))
 }
 
 #[pymodule]

@@ -5,23 +5,23 @@
 #MISE shell="bash"
 set -euo pipefail
 
-runtime_backend=
+# The runtime KLIB embeds the platform's static archive, so it builds for the
+# presets of the native runtime's targets. A web preset's runtime packs its
+# browser package.
+runtime_target=
 tasks=()
 case "$usage_preset" in
-  android-arm-egl) kotlin_target=androidNativeArm32; runtime_backend=opengl ;;
-  android-arm-vulkan) kotlin_target=androidNativeArm32; runtime_backend=vulkan ;;
-  android-arm64-egl) kotlin_target=androidNativeArm64; runtime_backend=opengl ;;
-  android-arm64-vulkan) kotlin_target=androidNativeArm64; runtime_backend=vulkan ;;
-  android-x86-egl) kotlin_target=androidNativeX86; runtime_backend=opengl ;;
-  android-x86-vulkan) kotlin_target=androidNativeX86; runtime_backend=vulkan ;;
-  android-x64-egl) kotlin_target=androidNativeX64; runtime_backend=opengl ;;
-  android-x64-vulkan) kotlin_target=androidNativeX64; runtime_backend=vulkan ;;
-  linux-gnu-x64-egl) kotlin_target=linuxX64; runtime_backend=opengl; tasks+=(:bindings:kotlin:jvmJar) ;;
-  linux-gnu-x64-vulkan) kotlin_target=linuxX64; runtime_backend=vulkan; tasks+=(:bindings:kotlin:jvmJar) ;;
-  macos-arm64-*) kotlin_target=macosArm64; tasks+=(:bindings:kotlin:jvmJar) ;;
-  macos-x64-metal) kotlin_target=macosX64; runtime_backend=metal ;;
-  windows-x64-*) kotlin_target=mingwX64; tasks+=(:bindings:kotlin:jvmJar) ;;
-  linux-gnu-arm64-* | windows-arm64-* | mingw-*) kotlin_target=; tasks+=(:bindings:kotlin:jvmJar) ;;
+  android-arm) kotlin_target=androidNativeArm32; runtime_target=$kotlin_target ;;
+  android-arm64) kotlin_target=androidNativeArm64; runtime_target=$kotlin_target ;;
+  android-x86) kotlin_target=androidNativeX86; runtime_target=$kotlin_target ;;
+  android-x64) kotlin_target=androidNativeX64; runtime_target=$kotlin_target ;;
+  linux-gnu-x64) kotlin_target=linuxX64; runtime_target=$kotlin_target; tasks+=(:bindings:kotlin:jvmJar) ;;
+  macos-arm64) kotlin_target=macosArm64; runtime_target=$kotlin_target; tasks+=(:bindings:kotlin:jvmJar) ;;
+  macos-x64) kotlin_target=macosX64; runtime_target=$kotlin_target ;;
+  windows-x64) kotlin_target=mingwX64; tasks+=(:bindings:kotlin:jvmJar) ;;
+  linux-gnu-arm64 | windows-arm64 | mingw-*) kotlin_target=; tasks+=(:bindings:kotlin:jvmJar) ;;
+  web-wasm32-webgl) kotlin_target=; tasks+=(:bindings:kotlin:compileKotlinWasmJs :bindings:kotlin:runtimes:webgl:wasmJsProcessResources) ;;
+  web-wasm32-webgpu) kotlin_target=; tasks+=(:bindings:kotlin:compileKotlinWasmJs :bindings:kotlin:runtimes:webgpu:wasmJsProcessResources) ;;
   *)
     echo "Unsupported Kotlin build preset: $usage_preset" >&2
     exit 2
@@ -31,9 +31,7 @@ gradle_args=(-Pmaplibre.localBuild="build/$usage_preset/install")
 if [[ -n "$kotlin_target" ]]; then
   tasks+=(":bindings:kotlin:${kotlin_target}Klib")
 fi
-# The runtime KLIB embeds the backend-specific static archive, so it only
-# builds for a preset whose backend has a matching runtime publication.
-if [[ -n "$runtime_backend" ]]; then
-  tasks+=(":bindings:kotlin:runtimes:${runtime_backend}:${kotlin_target}Klib")
+if [[ -n "$runtime_target" ]]; then
+  tasks+=(":bindings:kotlin:runtimes:native:${runtime_target}Klib")
 fi
 exec ./gradlew "${gradle_args[@]}" "${tasks[@]}"

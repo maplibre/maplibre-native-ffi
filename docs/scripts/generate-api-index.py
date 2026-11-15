@@ -40,7 +40,6 @@ BINDINGS = (
     "gobject",
     "kotlin",
     "python",
-    "rust",
     "swift",
     "zig",
 )
@@ -199,37 +198,6 @@ def python_links() -> Link:
     return lambda name: f"maplibre_native_ffi.html#{name}" if name in ids else None
 
 
-def rust_links() -> Link:
-    crate = REFERENCE / "rust" / "maplibre_native_ffi"
-    kinds = ("struct", "enum", "type", "trait", "fn", "constant")
-    members = ("method", "variant", "structfield", "associatedconstant", "tymethod")
-
-    def page(item: str) -> str | None:
-        return next(
-            (
-                f"{kind}.{item}.html"
-                for kind in kinds
-                if (crate / f"{kind}.{item}.html").is_file()
-            ),
-            None,
-        )
-
-    def link(name: str) -> str | None:
-        item, _, member = name.partition("::")
-        found = page(item)
-        if found is None or not member:
-            return found and f"maplibre_native_ffi/{found}"
-        ids = anchors(crate / found)
-        member = member.removeprefix("r#")
-        anchor = next(
-            (f"{kind}.{member}" for kind in members if f"{kind}.{member}" in ids),
-            None,
-        )
-        return anchor and f"maplibre_native_ffi/{found}#{anchor}"
-
-    return link
-
-
 def swift_links() -> Link:
     index = json.loads((REFERENCE / "swift" / "index" / "index.json").read_text())
     root = "/documentation/maplibrenativeffi/"
@@ -317,7 +285,6 @@ LINKS: dict[str, Callable[[], Link]] = {
     "go": go_links,
     "kotlin": kotlin_links,
     "python": python_links,
-    "rust": rust_links,
     "swift": swift_links,
     "typescript": typescript_links,
 }

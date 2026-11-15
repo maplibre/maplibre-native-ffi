@@ -5,22 +5,23 @@
 import {
   AwaitableWake,
   FrameDemandFlag,
+  GpuDeviceHandle,
   type LogicalExtent,
   type LogicalSize,
   type MapHandle,
-  OpenGlClientApi,
-  type OpenGlContextDescriptorData,
-  OpenGlContextOwnership,
+  type OpenGlContextDescriptor,
   OpenGlContextProviderFlag,
   openGlSupportedContextProviderMask,
+  RenderBackend,
   RenderBackendFlag,
   RenderDriverKind,
+  type QueueLock,
   type RenderFrameResult,
   RenderResult,
   type RenderSessionAttachOptions,
   type RenderSessionHandle,
+  type RenderTarget,
   supportedRenderBackendMask,
-  WebGlContextKind,
 } from "../../src/index.ts";
 import {
   bounded,
@@ -29,7 +30,7 @@ import {
   teardown,
   turn,
 } from "./harness.ts";
-import { capabilities } from "./host-capabilities.ts";
+import { capabilities, type TestCanvas } from "./host-capabilities.ts";
 
 interface GraphicsContext {
   readonly graphics: bigint;
@@ -48,7 +49,7 @@ interface GraphicsContext {
   readonly vulkanGetInstanceProcAddr: bigint;
   readonly vulkanGetDeviceProcAddr: bigint;
   readonly webGlContext: number;
-  readonly webGpuDevice: bigint;
+  readonly webGpuDevice: number;
 }
 
 interface ProbeAddresses {
@@ -61,15 +62,14 @@ interface ProbeAddresses {
 
 /**
  * A texture from the test graphics, and the handles that a borrowed texture
- * descriptor names. Only the fields of the build's backend are set.
+ * descriptor names. Only the fields of the backend under test are set.
  */
 interface TestTexture {
   readonly texture: bigint;
   readonly vulkanImage: bigint;
   readonly vulkanImageView: bigint;
   readonly metalTexture: bigint;
-  readonly webGpuTexture: bigint;
-  readonly webGpuTextureView: bigint;
+  readonly webGpuTexture: number;
   readonly width: number;
   readonly height: number;
   readonly format: number;
@@ -90,9 +90,9 @@ interface GraphicsAddon {
 const addon = capabilities.testGraphics() as GraphicsAddon;
 
 /**
- * The backend that this build renders through, by its test graphics number.
- * The browser's test graphics create a WebGL context or import a WebGPU
- * device from the page for the browser's two.
+ * The test graphics number of each backend, with OpenGL named by its context
+ * provider. The browser's test graphics create a WebGL context or lend the
+ * page's WebGPU device for the browser's two.
  */
 const backends = {
   metal: 1,
@@ -104,48 +104,86 @@ const backends = {
 } as const;
 export type Backend = keyof typeof backends;
 
-function buildBackend(): Backend {
-  const mask = supportedRenderBackendMask();
-  if ((mask & RenderBackendFlag.metal) !== 0) {
-    return "metal";
+/** The library's flag for each backend that a test task can name. */
+const backendFlags: Readonly<Record<string, RenderBackendFlag>> = {
+  metal: RenderBackendFlag.metal,
+  vulkan: RenderBackendFlag.vulkan,
+  opengl: RenderBackendFlag.openGl,
+  webgpu: RenderBackendFlag.webGpu,
+};
+
+/**
+ * The backend under test, which the host names, with OpenGL named by the
+ * library's context provider. A library carries several backends, so a
+ * session draws with this one rather than the library's default.
+ */
+function testBackend(): Backend {
+  const named = capabilities.testBackend();
+  if (!named) {
+    throw new Error("MLN_FFI_TEST_BACKEND must name the backend under test");
   }
-  if ((mask & RenderBackendFlag.vulkan) !== 0) {
-    return "vulkan";
+  const flag = backendFlags[named];
+  if (flag === undefined) {
+    throw new Error(`${named} is no render backend`);
   }
-  if ((mask & RenderBackendFlag.webGpu) !== 0) {
-    return "webgpu";
+  if ((supportedRenderBackendMask() & flag) === 0) {
+    throw new Error(`the library lacks the ${named} backend under test`);
+  }
+  if (named !== "opengl") {
+    return named as Backend;
   }
   const providers = openGlSupportedContextProviderMask();
-  if (
-    (mask & RenderBackendFlag.openGl) !== 0 &&
-    (providers & OpenGlContextProviderFlag.wgl) !== 0
-  ) {
+  if ((providers & OpenGlContextProviderFlag.wgl) !== 0) {
     return "wgl";
   }
-  if (
-    (mask & RenderBackendFlag.openGl) !== 0 &&
-    (providers & OpenGlContextProviderFlag.webGl) !== 0
-  ) {
+  if ((providers & OpenGlContextProviderFlag.webGl) !== 0) {
     return "webgl";
   }
-  if (
-    (mask & RenderBackendFlag.openGl) !== 0 &&
-    (providers & OpenGlContextProviderFlag.egl) !== 0
-  ) {
+  if ((providers & OpenGlContextProviderFlag.egl) !== 0) {
     return "egl";
   }
   throw new Error(
-    `no test graphics backend serves render backend mask ${mask} with OpenGL context provider mask ${providers}`,
+    `no test graphics backend serves OpenGL context provider mask ${providers}`,
   );
 }
 
-export const backend = buildBackend();
+let chosen: Backend | undefined;
 
 /**
- * Browser texture targets take only the caller-graphics-thread driver, so this
- * thread services every borrowed session there.
+ * The backend under test. The host may learn it only once the suite runs,
+ * so the first case to need it reads it.
  */
-const browser = backend === "webgl" || backend === "webgpu";
+export function backend(): Backend {
+  chosen ??= testBackend();
+  return chosen;
+}
+
+/** The library's value for the backend under test. */
+export function renderBackend(): RenderBackend {
+  switch (backend()) {
+    case "metal":
+      return RenderBackend.metal;
+    case "vulkan":
+      return RenderBackend.vulkan;
+    case "webgpu":
+      return RenderBackend.webGpu;
+    default:
+      return RenderBackend.openGl;
+  }
+}
+
+/** Whether the backend under test draws with OpenGL. */
+function drawsWithOpenGl(): boolean {
+  const current = backend();
+  return current === "egl" || current === "wgl" || current === "webgl";
+}
+
+/**
+ * mln-rs's browser build renders into canvases only, so a browser's sessions
+ * present to canvases of the page's, which the host's webCanvas lends, and
+ * the page reads their pixels.
+ */
+const browser = capabilities.host === "browser";
 
 export const renderSize = 32;
 export const renderLogicalSize = {
@@ -157,21 +195,78 @@ export const renderExtent: LogicalExtent = {
   scaleFactor: 1,
 };
 
-/** Creates the build's graphics object, which a teardown destroys. */
+/** Creates a graphics object of the backend under test, which a teardown destroys. */
 function openGraphics(): GraphicsContext {
-  const context = addon.create(backends[backend]);
+  const context = addon.create(backends[backend()]);
   teardown(() => addon.destroy(context.graphics));
   return context;
 }
 
 /**
- * Attaches a texture that the test graphics create, which a teardown destroys,
- * so release the session in a teardown registered after this call. An OpenGL
- * session shares the graphics object's context, which must be current on the
- * calling thread.
+ * Wraps the graphics object's device, or its OpenGL context, in a GPU device
+ * that a teardown releases. Vulkan takes `queueLock`, the lock on the queue
+ * that the graphics object submits to.
+ */
+function wrapDevice(
+  context: GraphicsContext,
+  queueLock?: QueueLock,
+): GpuDeviceHandle {
+  let device: GpuDeviceHandle;
+  const current = backend();
+  if (current === "webgpu") {
+    device = GpuDeviceHandle.wrapWebGpu({ device: context.webGpuDevice });
+  } else if (current === "metal") {
+    device = GpuDeviceHandle.wrapMetal({ device: context.metalDevice });
+  } else if (current === "vulkan") {
+    device = GpuDeviceHandle.wrapVulkan({
+      context: {
+        instance: context.vulkanInstance,
+        physicalDevice: context.vulkanPhysicalDevice,
+        device: context.vulkanDevice,
+        graphicsQueue: context.vulkanQueue,
+        graphicsQueueFamilyIndex: context.vulkanQueueFamilyIndex,
+        getInstanceProcAddr: context.vulkanGetInstanceProcAddr,
+        getDeviceProcAddr: context.vulkanGetDeviceProcAddr,
+      },
+      queueLock,
+    });
+  } else {
+    const openGl: OpenGlContextDescriptor =
+      current === "webgl"
+        ? { kind: "webGl", value: { context: context.webGlContext } }
+        : current === "wgl"
+          ? {
+              kind: "wgl",
+              value: {
+                deviceContext: context.wglDeviceContext,
+                shareContext: context.wglContext,
+                getProcAddress: context.getProcAddress,
+              },
+            }
+          : {
+              kind: "egl",
+              value: {
+                display: context.eglDisplay,
+                config: context.eglConfig,
+                shareContext: context.eglContext,
+                getProcAddress: context.getProcAddress,
+              },
+            };
+    device = GpuDeviceHandle.wrapOpenGl(openGl);
+  }
+  teardown(() => device.release());
+  return device;
+}
+
+/**
+ * Attaches a texture that the test graphics create on `device`, which a
+ * teardown destroys, so release the session in a teardown registered after
+ * this call. An OpenGL session shares the graphics object's context, which
+ * must be current on the calling thread.
  */
 function attachBorrowedTexture(
   context: GraphicsContext,
+  device: GpuDeviceHandle,
   map: MapHandle,
   options: RenderSessionAttachOptions,
 ): RenderSessionHandle {
@@ -182,120 +277,99 @@ function attachBorrowedTexture(
     physicalWidth: texture.width,
     physicalHeight: texture.height,
   };
-  if (backend === "webgpu") {
-    return map.attachWebGpuBorrowedTexture(
-      {
+  let target: RenderTarget;
+  const current = backend();
+  if (current === "webgpu") {
+    target = {
+      kind: "webGpuBorrowedTextures",
+      value: {
         ...ring,
-        context: { device: context.webGpuDevice },
-        textures: [
-          {
-            texture: texture.webGpuTexture,
-            textureView: texture.webGpuTextureView,
-          },
-        ],
-        format: texture.format,
+        textures: [{ texture: texture.webGpuTexture }],
+        format: "rgba8unorm",
       },
-      options,
-    );
-  }
-  if (backend === "metal") {
-    return map.attachMetalBorrowedTexture(
-      {
+    };
+  } else if (current === "metal") {
+    target = {
+      kind: "metalBorrowedTextures",
+      value: { ...ring, textures: [{ texture: texture.metalTexture }] },
+    };
+  } else if (current === "vulkan") {
+    target = {
+      kind: "vulkanBorrowedTextures",
+      value: {
         ...ring,
-        textures: [{ texture: texture.metalTexture }],
-      },
-      options,
-    );
-  }
-  if (backend === "vulkan") {
-    return map.attachVulkanBorrowedTexture(
-      {
-        ...ring,
-        context: {
-          instance: context.vulkanInstance,
-          physicalDevice: context.vulkanPhysicalDevice,
-          device: context.vulkanDevice,
-          graphicsQueue: context.vulkanQueue,
-          graphicsQueueFamilyIndex: context.vulkanQueueFamilyIndex,
-          getInstanceProcAddr: context.vulkanGetInstanceProcAddr,
-          getDeviceProcAddr: context.vulkanGetDeviceProcAddr,
-        },
         textures: [
           { image: texture.vulkanImage, imageView: texture.vulkanImageView },
         ],
         format: texture.format,
         finalLayout: texture.vulkanFinalLayout,
       },
-      options,
-    );
+    };
+  } else {
+    target = {
+      kind: "openGlBorrowedTextures",
+      value: {
+        ...ring,
+        textures: [{ texture: texture.openGlTexture }],
+        target: texture.openGlTarget,
+      },
+    };
   }
-  const data: OpenGlContextDescriptorData =
-    backend === "webgl"
-      ? {
-          kind: "webGl",
-          value: {
-            kind: WebGlContextKind.existing,
-            context: context.webGlContext,
-          },
-        }
-      : backend === "wgl"
-        ? {
-            kind: "wgl",
-            value: {
-              deviceContext: context.wglDeviceContext,
-              shareContext: context.wglContext,
-              getProcAddress: context.getProcAddress,
-            },
-          }
-        : {
-            kind: "egl",
-            value: {
-              display: context.eglDisplay,
-              config: context.eglConfig,
-              shareContext: context.eglContext,
-              clientApi: OpenGlClientApi.gles,
-              getProcAddress: context.getProcAddress,
-            },
-          };
-  return map.attachOpenGlBorrowedTexture(
-    {
-      ...ring,
-      context: { ownership: OpenGlContextOwnership.shared, data },
-      textures: [{ texture: texture.openGlTexture }],
-      target: texture.openGlTarget,
-    },
-    options,
-  );
+  return map.attach(target, device, options);
 }
 
 /**
- * Attaches an offscreen session that a core worker drives, with `options` in
- * place of the defaults, and releases the session in a teardown.
+ * The target of a session on a device of its own: offscreen, or in a browser
+ * a canvas, which a teardown closes.
+ */
+function ownTarget(): { target: RenderTarget; canvas?: TestCanvas } {
+  if (!browser) {
+    return {
+      target: { kind: "offscreen", value: { logicalSize: renderLogicalSize } },
+    };
+  }
+  const canvas = capabilities.webCanvas!(renderSize);
+  teardown(() => canvas.close());
+  return {
+    target: {
+      kind: "webCanvas",
+      value: { logicalSize: renderLogicalSize, canvas: canvas.handle },
+    },
+    canvas,
+  };
+}
+
+/**
+ * Attaches `target` on a device of the backend under test, which the session
+ * keeps until it ends. A browser module carries one backend, whose device
+ * the session creates.
+ */
+function attachOwn(
+  map: MapHandle,
+  target: RenderTarget,
+  options: RenderSessionAttachOptions,
+): RenderSessionHandle {
+  if (browser) {
+    return map.attach(target, undefined, options);
+  }
+  const device = GpuDeviceHandle.create({ backend: renderBackend() });
+  try {
+    return map.attach(target, device, options);
+  } finally {
+    device.release();
+  }
+}
+
+/**
+ * Attaches an offscreen session, or in a browser a canvas, that a core worker
+ * drives, with `options` in place of the defaults, and releases the session
+ * in a teardown.
  */
 export function attachSession(
   map: MapHandle,
   options: Partial<RenderSessionAttachOptions>,
 ): RenderSessionHandle {
-  const session = map.attachOffscreen(
-    { logicalSize: renderLogicalSize },
-    { driver: RenderDriverKind.coreWorker, ...options },
-  );
-  teardown(() => releaseSession(session));
-  return session;
-}
-
-/**
- * Attaches a borrowed Vulkan texture that a core worker drives, with `options`
- * in place of the defaults, and releases the session in a teardown.
- */
-export function attachVulkanSession(
-  map: MapHandle,
-  options: Partial<RenderSessionAttachOptions>,
-): RenderSessionHandle {
-  if (backend !== "vulkan") {
-    throw new Error(`a ${backend} build has no Vulkan textures`);
-  }
-  const session = attachBorrowedTexture(openGraphics(), map, {
+  const session = attachOwn(map, ownTarget().target, {
     driver: RenderDriverKind.coreWorker,
     ...options,
   });
@@ -304,20 +378,50 @@ export function attachVulkanSession(
 }
 
 /**
- * Starts attaching a borrowed texture that this thread drives, and releases
- * the session in a teardown. The attach finishes only as this thread services
- * the session.
+ * Attaches a borrowed Vulkan texture that a core worker drives, on a device
+ * that wraps the test graphics' device with `queueLock`, which the session
+ * alone holds, and releases the session in a teardown.
+ */
+export function attachVulkanSession(
+  map: MapHandle,
+  queueLock: QueueLock,
+): RenderSessionHandle {
+  if (backend() !== "vulkan") {
+    throw new Error(`a ${backend()} session has no Vulkan textures`);
+  }
+  const context = openGraphics();
+  const device = wrapDevice(context, queueLock);
+  const session = attachBorrowedTexture(context, device, map, {
+    driver: RenderDriverKind.coreWorker,
+  });
+  // The session keeps the device, and the device the queue lock, until the
+  // session ends.
+  device.release();
+  teardown(() => releaseSession(session));
+  return session;
+}
+
+/**
+ * Starts attaching a borrowed texture, or in a browser a canvas, that this
+ * thread drives, and releases the session in a teardown. The attach finishes
+ * only as this thread services the session.
  */
 export function attachCallerSession(map: MapHandle): RenderSessionHandle {
+  if (browser) {
+    const session = map.attach(ownTarget().target, undefined, {
+      driver: RenderDriverKind.callerGraphicsThread,
+    });
+    teardown(() => releaseSession(session, true));
+    return session;
+  }
   const context = openGraphics();
-  const openGl = backend === "egl" || backend === "wgl" || backend === "webgl";
-  if (openGl && !addon.makeCurrent(context.graphics)) {
+  if (drawsWithOpenGl() && !addon.makeCurrent(context.graphics)) {
     throw new Error("the test graphics context could not be made current");
   }
-  const session = attachBorrowedTexture(context, map, {
+  const session = attachBorrowedTexture(context, wrapDevice(context), map, {
     driver: RenderDriverKind.callerGraphicsThread,
   });
-  teardown(() => releaseSession(session));
+  teardown(() => releaseSession(session, true));
   return session;
 }
 
@@ -369,12 +473,23 @@ export class NativeProbe implements ProbeAddresses {
  * Abandons a session, then disposes it. A session that the case detached,
  * abandoned, or disposed already has nothing left to abandon, and a second
  * dispose does nothing.
+ *
+ * A session that this thread services keeps its graphics objects after the
+ * abandon until its next service, so a `serviced` session is serviced once
+ * more before the teardowns that destroy the device it renders on.
  */
-function releaseSession(session: RenderSessionHandle): void {
+function releaseSession(session: RenderSessionHandle, serviced = false): void {
   try {
     session.abandon();
   } catch {
     // Native code reports what the session has already given up.
+  }
+  if (serviced) {
+    try {
+      session.serviceDriverWork();
+    } catch {
+      // The service of an abandoned session reports that it ended.
+    }
   }
   session.dispose();
 }
@@ -423,6 +538,8 @@ export class TestSession {
   readonly wake: AwaitableWake;
   readonly #serviced: boolean;
   #token = 0n;
+  /** A browser canvas's center pixel, as the last frame left it. */
+  #pixel: number[] | undefined;
 
   private constructor(
     session: RenderSessionHandle,
@@ -434,42 +551,98 @@ export class TestSession {
     this.#serviced = serviced;
   }
 
-  /** Attaches an offscreen worker session on `map`, released by a teardown. */
-  static async offscreen(map: MapHandle): Promise<TestSession> {
+  /**
+   * Attaches a session on a device of its own, which `driver` drives:
+   * offscreen, or in a browser a canvas, whose center pixel each frame wake
+   * reads in the task that presented the frame. A teardown releases it.
+   */
+  static async #own(
+    map: MapHandle,
+    driver: RenderDriverKind,
+  ): Promise<TestSession> {
     const wake = new AwaitableWake();
-    const session = attachSession(map, {
-      frameWake: { callback: wake.wake },
+    const { target, canvas } = ownTarget();
+    let attached: TestSession | undefined;
+    const serviced = driver === RenderDriverKind.callerGraphicsThread;
+    const session = attachOwn(map, target, {
+      driver,
+      frameWake: {
+        callback: () => {
+          if (canvas !== undefined && attached !== undefined) {
+            attached.#pixel = canvas.centerPixel();
+          }
+          wake.wake();
+        },
+      },
+      driverWorkWake: serviced ? { callback: wake.wake } : undefined,
     });
-    const attached = new TestSession(session, wake, false);
+    teardown(() => releaseSession(session, serviced));
+    attached = new TestSession(session, wake, serviced);
     await attached.settle(session.ready, "the attachment");
     return attached;
   }
 
   /**
-   * Attaches a texture of the test graphics on `map`, released by a teardown.
-   * Browser and OpenGL textures take only a caller session, whatever `driver`
-   * asks for.
+   * Attaches an offscreen worker session on `map`, or in a browser a canvas,
+   * released by a teardown.
+   */
+  static offscreen(map: MapHandle): Promise<TestSession> {
+    return TestSession.#own(map, RenderDriverKind.coreWorker);
+  }
+
+  /**
+   * Attaches a session that this thread services: a texture of the test
+   * graphics, or in a browser a canvas. A teardown releases it.
+   */
+  static serviced(map: MapHandle): Promise<TestSession> {
+    return browser
+      ? TestSession.#own(map, RenderDriverKind.callerGraphicsThread)
+      : TestSession.borrowed(map, "caller");
+  }
+
+  /**
+   * The RGBA bytes of the center pixel of the last frame: a readback, or in
+   * a browser what the canvas showed.
+   */
+  async centerPixel(): Promise<number[]> {
+    if (browser) {
+      if (this.#pixel === undefined) {
+        throw new Error("the canvas presented no frame");
+      }
+      return this.#pixel;
+    }
+    const image = await this.settle(this.session.readTexture(), "the readback");
+    if (image.info.width !== renderSize || image.info.height !== renderSize) {
+      throw new Error(
+        `the readback is ${image.info.width}x${image.info.height}, not ${renderSize}x${renderSize}`,
+      );
+    }
+    return centerPixel(image);
+  }
+
+  /**
+   * Attaches a texture of the test graphics on `map`, released by a teardown,
+   * for a host that has `borrowedTextures`. OpenGL textures take only a
+   * caller session, whatever `driver` asks for.
    */
   static async borrowed(
     map: MapHandle,
     driver: "worker" | "caller" = "worker",
   ): Promise<TestSession> {
     const context = openGraphics();
-    const openGl =
-      backend === "egl" || backend === "wgl" || backend === "webgl";
-    const serviced = driver === "caller" || browser || openGl;
-    if (openGl && !addon.makeCurrent(context.graphics)) {
+    const serviced = driver === "caller" || drawsWithOpenGl();
+    if (drawsWithOpenGl() && !addon.makeCurrent(context.graphics)) {
       throw new Error("the test graphics context could not be made current");
     }
     const wake = new AwaitableWake();
-    const session = attachBorrowedTexture(context, map, {
+    const session = attachBorrowedTexture(context, wrapDevice(context), map, {
       driver: serviced
         ? RenderDriverKind.callerGraphicsThread
         : RenderDriverKind.coreWorker,
       frameWake: { callback: wake.wake },
       driverWorkWake: serviced ? { callback: wake.wake } : undefined,
     });
-    teardown(() => releaseSession(session));
+    teardown(() => releaseSession(session, serviced));
     const attached = new TestSession(session, wake, serviced);
     await attached.settle(session.ready, "the attachment");
     return attached;
@@ -552,7 +725,7 @@ export class TestSession {
 }
 
 /** The RGBA bytes of the center pixel of a tightly sized readback. */
-export function centerPixel(image: {
+function centerPixel(image: {
   readonly data: Uint8Array;
   readonly info: { readonly width: number; readonly stride: number };
 }): number[] {

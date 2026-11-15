@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # Runs a FreeBSD test executable in this checkout's FreeBSD virtual machine,
 # where the dynamic loader and graphics implementation share the ABI that the
-# executable targets. See tools/devices/freebsd-host. The executable gets
+# executable targets. See tools/devices/freebsd-host. The drivers are set up for
+# MLN_FFI_TEST_BACKEND, vulkan or opengl, and the executable gets
 # MLN_FFI_DEVICE_TIMEOUT seconds, or 300.
 set -euo pipefail
 
 preset=${1:?usage: run-freebsd-test.sh <preset> [executable [arguments...]]}
+backend=${MLN_FFI_TEST_BACKEND:?MLN_FFI_TEST_BACKEND must name the backend under test}
 shift
 if [[ $# -eq 0 ]]; then
-  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_native_abi_tests"
+  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_native_abi_tests_$backend"
 fi
 
 if [[ "$1" == */* && ! -x "$1" ]]; then
@@ -20,15 +22,15 @@ if [[ "$1" == */* && "$1" != /* ]]; then
   set -- "$PWD/$1" "${@:2}"
 fi
 
-case "$preset" in
+case "$backend" in
   # llvmpipe's rasterizer threads can unlock a freed mutex in Mesa 26.2, which
   # segfaults on FreeBSD, so llvmpipe draws on the calling thread.
-  *-egl) drivers=(LP_NUM_THREADS=0) ;;
+  opengl) drivers=(LP_NUM_THREADS=0) ;;
   # Mesa installs hardware drivers beside the software one, so the loader is
   # pointed at lavapipe alone.
-  *-vulkan) drivers=(VK_DRIVER_FILES=/usr/local/share/vulkan/icd.d/lvp_icd.x86_64.json) ;;
+  vulkan) drivers=(VK_DRIVER_FILES=/usr/local/share/vulkan/icd.d/lvp_icd.x86_64.json) ;;
   *)
-    echo "Unsupported FreeBSD test preset: $preset" >&2
+    echo "Unsupported FreeBSD test backend: $backend" >&2
     exit 2
     ;;
 esac
@@ -45,6 +47,7 @@ for argument in \
   LIBGL_ALWAYS_SOFTWARE=true \
   "MLN_TEST_TIMEOUT_SCALE=${MLN_TEST_TIMEOUT_SCALE:-3}" \
   "MLN_FFI_TEST_FIXTURE_DIR=$MISE_MONOREPO_ROOT/tests/native/fixtures" \
+  "MLN_FFI_TEST_BACKEND=$backend" \
   ${drivers[@]+"${drivers[@]}"} \
   timeout "${MLN_FFI_DEVICE_TIMEOUT:-300}" \
   "$@"; do

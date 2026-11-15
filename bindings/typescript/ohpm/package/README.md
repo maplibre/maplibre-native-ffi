@@ -5,16 +5,15 @@
 The C API embeds the
 [MapLibre Native](https://github.com/maplibre/maplibre-native) map renderer.
 
-Install the binding and one backend:
+Install the binding and its native runtime:
 
 ```bash
 ohpm install @maplibre/native-ffi
-ohpm install @maplibre/native-ffi-opengl
+ohpm install @maplibre/native-ffi-runtime
 ```
 
-For Vulkan, replace `@maplibre/native-ffi-opengl` with
-`@maplibre/native-ffi-vulkan`. Keep both packages on the same version. Code
-imports from the binding whatever the backend:
+The runtime carries the native library with every backend that OpenHarmony has:
+Vulkan and OpenGL ES. Keep both packages on the same version.
 
 ```ts
 import { RuntimeHandle } from "@maplibre/native-ffi";
@@ -23,18 +22,17 @@ const runtime = await RuntimeHandle.create();
 ```
 
 An application's native module can use the same C library as the ArkTS binding.
-After installing the OpenGL package, link it from the module's `CMakeLists.txt`
-(adjust the path to your module's `oh_modules`):
+Link it from the module's `CMakeLists.txt` (adjust the path to your module's
+`oh_modules`):
 
 ```cmake
-set(maplibre "${CMAKE_CURRENT_SOURCE_DIR}/../../../oh_modules/@maplibre/native-ffi-opengl")
+set(maplibre "${CMAKE_CURRENT_SOURCE_DIR}/../../../oh_modules/@maplibre/native-ffi-runtime")
 target_include_directories(my_module PRIVATE "${maplibre}/include")
 target_link_libraries(my_module PRIVATE
   "${maplibre}/libs/${OHOS_ARCH}/libmaplibre-native-c.so")
 ```
 
-The headers are included with `#include <maplibre_native_c.h>`. Install only one
-backend package in an application.
+The headers are included with `#include <maplibre_native_c.h>`.
 
 - [Install](https://maplibre.org/maplibre-native-ffi/install/typescript/#openharmony)
 - [Guides](https://maplibre.org/maplibre-native-ffi/guides/create-a-map/)

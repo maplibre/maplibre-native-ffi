@@ -38,33 +38,14 @@ internal object Jni {
   @JvmStatic external fun androidInit(context: Any, diagnostic: Long): Int
 
   /**
-   * Calls `mln_map_attach_android_surface` with the descriptor at [descriptor], which names its
-   * window by this thread's JNIEnv and [surface].
+   * Returns a reference of the caller's own to the `ANativeWindow*` behind the
+   * `android.view.Surface` [surface], or 0 when it has no window. Release it with
+   * [nativeWindowRelease].
    */
-  @JvmStatic
-  external fun mapAttachAndroidSurface(
-    map: Long,
-    descriptor: Long,
-    surface: Any,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    diagnostic: Long,
-  ): Int
+  @JvmStatic external fun nativeWindowFromSurface(surface: Any): Long
 
-  /**
-   * Calls `mln_render_session_set_android_surface_target` with the replacement at [replacement],
-   * which names its window by this thread's JNIEnv and [surface].
-   */
-  @JvmStatic
-  external fun renderSessionSetAndroidSurfaceTarget(
-    session: Long,
-    replacement: Long,
-    surface: Any,
-    completion: Long,
-    diagnostic: Long,
-  ): Int
+  /** Releases a reference to the `ANativeWindow*` at [window]. */
+  @JvmStatic external fun nativeWindowRelease(window: Long)
 
   /**
    * Returns an `android.hardware.HardwareBuffer` that holds its own reference to the

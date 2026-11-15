@@ -52,7 +52,7 @@ public class EventsAndLogsTest {
 
   @Test(timeout = SnippetFixture.TEST_TIMEOUT_MS)
   public void eventsAndLogs() throws Exception {
-    RuntimeHandle runtime = RuntimeHandle.create(null).join();
+    RuntimeHandle runtime = RuntimeHandle.create(null);
     try {
       // #region handler
       // Runs on a library thread.

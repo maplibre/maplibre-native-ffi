@@ -20,10 +20,15 @@ namespace Maplibre.NativeFfi;
 /// The kinds of <c>GpuSync</c> that <c>AcquiredFrameHandle.Release()</c>
 /// accepts. They depend on the target and on what the device supports.
 /// </param>
+/// <param name="ExportKind">
+/// How an exported ring shares its textures, which says which getter gets an
+/// acquired frame's texture, or <c>GpuExportKind.None</c> for another target.
+/// </param>
 public readonly partial record struct RenderSessionCapabilities(
     RenderDriverKind Driver,
     uint TextureRingDepth,
     RenderSessionCapabilityFlag Flags,
     GpuSyncKind ProducerSyncKind,
-    GpuSyncKindFlag ConsumerSyncKinds
+    GpuSyncKindFlag ConsumerSyncKinds,
+    GpuExportKind ExportKind
 );

@@ -4,11 +4,7 @@
 // its Promise, which the addon calls when the realm dispatches the completion,
 // never inside the submitting call.
 
-import type {
-  CompletionHeader,
-  NativeCompletion,
-  NativeThreadStart,
-} from "./addon.ts";
+import type { CompletionHeader, NativeCompletion } from "./addon.ts";
 import { MaplibreError } from "./errors.ts";
 import { awaitNative } from "./realm.ts";
 
@@ -123,39 +119,6 @@ export function query<T>(start: Start): Promise<T> {
       return value as T;
     }),
   );
-}
-
-/**
- * A call that runs on a thread of its own, because it waits for a thread to
- * start, which a browser page cannot do. It resolves with the owner of the
- * handle that the call created, and rejects with a {@link MaplibreError} for a
- * failed status.
- */
-export function threadStart<T>(
-  start: (settle: NativeThreadStart) => void,
-  adopt: (handle: bigint) => T,
-): Promise<T> {
-  // A submission that throws rejects the Promise, as the executor's throw.
-  return new Promise<T>((resolve, reject) => {
-    const done = awaitNative();
-    try {
-      start((status, handle, diagnostic) => {
-        done();
-        if (status !== 0) {
-          reject(new MaplibreError(status, diagnostic));
-          return;
-        }
-        try {
-          resolve(adopt(handle));
-        } catch (error) {
-          reject(error);
-        }
-      });
-    } catch (error) {
-      done();
-      throw error;
-    }
-  });
 }
 
 /**

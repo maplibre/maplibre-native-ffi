@@ -2,6 +2,14 @@
 #include "generated_callbacks.h"
 extern void mlnGoCallbackRelease(void*);
 void binding_release(void* p) { mlnGoCallbackRelease(p); }
+extern void mlnGo_mln_queue_lock_lock(void* user_data);
+void binding_mln_queue_lock_lock(void* user_data) {
+  mlnGo_mln_queue_lock_lock((void*)user_data);
+}
+extern void mlnGo_mln_queue_lock_unlock(void* user_data);
+void binding_mln_queue_lock_unlock(void* user_data) {
+  mlnGo_mln_queue_lock_unlock((void*)user_data);
+}
 extern void mlnGo_mln_log_handler_callback(
   void* user_data, mln_log_severity severity, mln_log_event event, int64_t code,
   mln_buffer_view message
@@ -37,6 +45,34 @@ void binding_mln_custom_geometry_source_options_cancel_tile(
   mlnGo_mln_custom_geometry_source_options_cancel_tile(
     (void*)user_data, map, source_id, tile_id
   );
+}
+extern void mlnGo_mln_custom_layer_host_prerender(
+  void* user_data, mln_custom_layer_prerender_parameters* parameters
+);
+void binding_mln_custom_layer_host_prerender(
+  void* user_data, const mln_custom_layer_prerender_parameters* parameters
+) {
+  mlnGo_mln_custom_layer_host_prerender(
+    (void*)user_data, (mln_custom_layer_prerender_parameters*)parameters
+  );
+}
+extern void mlnGo_mln_custom_layer_host_render(
+  void* user_data, mln_custom_layer_render_parameters* parameters
+);
+void binding_mln_custom_layer_host_render(
+  void* user_data, const mln_custom_layer_render_parameters* parameters
+) {
+  mlnGo_mln_custom_layer_host_render(
+    (void*)user_data, (mln_custom_layer_render_parameters*)parameters
+  );
+}
+extern void mlnGo_mln_custom_layer_host_deinitialize(void* user_data);
+void binding_mln_custom_layer_host_deinitialize(void* user_data) {
+  mlnGo_mln_custom_layer_host_deinitialize((void*)user_data);
+}
+extern void mlnGo_mln_custom_layer_host_context_lost(void* user_data);
+void binding_mln_custom_layer_host_context_lost(void* user_data) {
+  mlnGo_mln_custom_layer_host_context_lost((void*)user_data);
 }
 extern void mlnGo_mln_custom_vector_source_options_fetch_tile(
   void* user_data, mln_map map, mln_buffer_view source_id,
@@ -75,14 +111,6 @@ void binding_mln_camera_transition_handler_callback(
 extern void mlnGo_mln_wake_callback(void* user_data);
 void binding_mln_wake_callback(void* user_data) {
   mlnGo_mln_wake_callback((void*)user_data);
-}
-extern void mlnGo_mln_queue_lock_lock(void* user_data);
-void binding_mln_queue_lock_lock(void* user_data) {
-  mlnGo_mln_queue_lock_lock((void*)user_data);
-}
-extern void mlnGo_mln_queue_lock_unlock(void* user_data);
-void binding_mln_queue_lock_unlock(void* user_data) {
-  mlnGo_mln_queue_lock_unlock((void*)user_data);
 }
 extern void mlnGo_mln_resource_request_cancel_handler_callback(
   void* user_data, mln_resource_request handle

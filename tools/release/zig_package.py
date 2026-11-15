@@ -3,7 +3,8 @@
 The package holds the files that the repository's build.zig.zon lists in
 `.paths`, at the same paths, and the release pin. Its manifest carries the
 release version and declares each native archive as a lazy dependency, which
-build.zig selects by target and backend.
+build.zig selects by target. Each native archive carries every backend of its
+platform.
 """
 
 from __future__ import annotations

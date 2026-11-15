@@ -4,7 +4,7 @@ description: Set up a machine, build and test, and work on other targets.
 sidebar:
   order: 1
 # Scope: what a maintainer runs or installs by hand to set up, build, test,
-# change the engine, use CI, and release. Leave out what the tooling does on its
+# change mln-rs, use CI, and release. Leave out what the tooling does on its
 # own, uncommon cases, and commands that upstream projects document.
 ---
 
@@ -13,11 +13,12 @@ sidebar:
 Most development happens on Linux and macOS. CI tests Windows, but the local
 Windows setup gets little use and may be broken.
 
-[mise](https://mise.jdx.dev/) manages the toolchain. Install it, then run
-`mise trust` and `mise bootstrap --yes`. On Ubuntu and Fedora, bootstrap also
-installs the system packages. On other Linux distributions, install the
-equivalents of the packages in `.config/mise.linux.toml`. On macOS, install
-Xcode 26. On Windows, install these first:
+[mise](https://mise.jdx.dev/) manages the toolchain, including the pinned Rust
+toolchain and its cross-compilation targets, which build the library. Install
+it, then run `mise trust` and `mise bootstrap --yes`. On Ubuntu and Fedora,
+bootstrap also installs the system packages. On other Linux distributions,
+install the equivalents of the packages in `.config/mise.linux.toml`. On macOS,
+install Xcode 26. On Windows, install these first:
 
 ```powershell
 winget install --exact --id Git.Git
@@ -28,30 +29,59 @@ winget install --exact --id Microsoft.VisualStudio.2022.BuildTools --override "-
 
 ## Everyday commands
 
-`mise run test` builds the native library for this machine and runs its C tests.
-`mise run //bindings/<lang>:test` tests one binding against that build. Pass a
-preset name to build for another target, such as `linux-gnu-x64-vulkan` or
-`macos-arm64-metal`. `CMakePresets.json` lists them.
+`mise run test` builds the native library for this machine and runs its C tests
+for each render backend that it carries. `mise run //bindings/<lang>:test` tests
+one binding against that build, with the platform's default backend. Pass a
+preset name to build for another target, such as `linux-gnu-x64` or
+`macos-arm64`, and a backend after it to test that one, such as
+`mise run test linux-gnu-x64 opengl`. `CMakePresets.json` lists the presets.
 
-After you change a header, run `mise run bindings:generate`. `mise run check`
-runs the linters, and `mise run fix` fixes what it can; the pre-commit hook does
-the same for staged files. `mise run //docs:dev` serves this site.
-`mise tasks --all` lists everything else.
+The library is [mln-rs](https://github.com/louwers/mln-rs), the Rust port of
+MapLibre Native, which the `third_party/mln-rs` submodule vendors. A preset's
+build runs Cargo on mln-rs's `mln-rs-c` package for the preset's Rust target,
+into `build/cargo`, which every preset shares, with the Cargo features of every
+render backend that the platform's package carries: Vulkan and OpenGL off Apple
+platforms, and Metal on them. A release build takes a few minutes, most of it in
+link-time optimization.
+
+After you change a header, run `mise run bindings:generate`. `include/` is the
+source of truth for the C API, and mln-rs keeps a copy in
+`crates/mln_c/include`. Configuring a preset fails while the two differ, so
+bring mln-rs's copy in line in the same change, with a patch until mln-rs takes
+it.
+
+`mise run check` runs the linters, and `mise run fix` fixes what it can; the
+pre-commit hook does the same for staged files. `mise run //docs:dev` serves
+this site. `mise tasks --all` lists everything else.
 
 ## Other targets
 
-### Android, OpenHarmony, and Emscripten
+### Android and OpenHarmony
 
 These SDKs are large, so they're opt-in. Install one with
-`mise -E android install`, `-E ohos`, or `-E emscripten`, and pass the same `-E`
-to every later command, or set `MISE_ENV`. After an NDK update, run
-`mise run clean <preset>` for each Android preset.
+`mise -E android install` or `-E ohos`, and pass the same `-E` to every later
+command, or set `MISE_ENV`. After an NDK update, run `mise run clean <preset>`
+for each Android preset.
 
-The browser example in `examples/browser`, which the site serves as its live
-demo, loads the TypeScript binding's browser modules. Build them with
-`mise -E emscripten run //bindings/typescript:build emscripten-wasm32-webgl`,
-and again for `emscripten-wasm32-webgpu`, then serve the example with
-`mise run //examples/browser:dev`. The release puts it in the site.
+### The browser
+
+The `web-wasm32-webgpu` and `web-wasm32-webgl` presets each build mln-rs's
+browser package with one backend, so that a page downloads only the one it draws
+with: a wasm-bindgen module for `wasm32-unknown-unknown`, built with mln-rs's
+own `just c-web` recipe. Their tools come with `-E web`:
+`mise -E web run build web-wasm32-webgpu` installs the package under
+`share/maplibre-native-c/web`. The package has no C to link, so the C suites
+don't run for it: `mise -E web run test <preset>` runs mln-rs's browser check
+against it in headless Chromium, and
+`mise -E web run //bindings/kotlin:test:wasm <preset>` runs the Kotlin/Wasm
+suite. The module runs on the thread that loads it, with no threads of its own
+and no cross-origin isolation, and starts Web Workers for its tile work.
+
+The TypeScript binding compiles its Node-API C with the library into a browser
+module of its own (`bindings/typescript/web`), over a Node-API that it
+implements in Rust: `mise -E web run //bindings/typescript:test <preset>` runs
+its suite in headless Chromium. The browser example in `examples/browser`, which
+the site serves as its live demo, loads those modules.
 
 ### Emulators and simulators
 
@@ -68,9 +98,9 @@ The Windows presets build on Linux. `mise -E msvc install` downloads the MSVC
 runtime and the Windows SDK, and accepts
 [Microsoft's license](https://go.microsoft.com/fwlink/?LinkId=2086102) for them.
 Install Proton Experimental from Steam, then run tests with
-`mise -E msvc run test windows-x64-vulkan`. Proton's launcher gives the prefix
-the fonts, ICU, and DXVK that .NET and WPF need. To use another Wine, set `WINE`
-to its executable. Wine isn't Windows: when results differ, Windows CI is right.
+`mise -E msvc run test windows-x64`. Proton's launcher gives the prefix the
+fonts, ICU, and DXVK that .NET and WPF need. To use another Wine, set `WINE` to
+its executable. Wine isn't Windows: when results differ, Windows CI is right.
 
 ### MinGW
 
@@ -82,7 +112,7 @@ pacman -S --needed mingw-w64-x86_64-clang mingw-w64-x86_64-llvm mingw-w64-x86_64
 ```
 
 Then run tasks from PowerShell with `-E msys2`, such as
-`mise -E msys2 run test mingw-x64-wgl`. Set `MLN_FFI_MSYS2_ROOT` if the MINGW64
+`mise -E msys2 run test mingw-x64`. Set `MLN_FFI_MSYS2_ROOT` if the MINGW64
 prefix isn't `C:/msys64/mingw64`.
 
 ### FreeBSD
@@ -115,11 +145,12 @@ a commit with itself, which should give no verdicts. Pass a preset and the same
 `-E` as for the tests to run on another target. Emulators and software
 rasterizers don't show what a device costs.
 
-## Change the engine
+## Change mln-rs
 
-Each patch in `patches/maplibre-native/` is a change we also send upstream.
-Start it with why it's needed and a link to the upstream issue. Once you open
-the upstream pull request, add `Upstream:` and its link.
+Each patch in `patches/mln-rs/` is a change we also send to mln-rs. Start it
+with why it's needed and a link to the mln-rs issue. Once you open the mln-rs
+pull request, add `Upstream:` and its link. When mln-rs merges a change, update
+the submodule to a commit that has it and delete the patch.
 
 `mise deps` resets the submodule and applies the patches in filename order. Any
 edit in the submodule that isn't in a patch is lost.
@@ -129,11 +160,10 @@ diff:
 
 ```bash
 mise deps
-git -C third_party/maplibre-native add -A
-git -C third_party/maplibre-native commit -m baseline
-# edit third_party/maplibre-native
-git -C third_party/maplibre-native diff --ignore-submodules \
-  > patches/maplibre-native/0067-short-name.patch
+git -C third_party/mln-rs add -A
+git -C third_party/mln-rs commit -m baseline
+# edit third_party/mln-rs
+git -C third_party/mln-rs diff > patches/mln-rs/0002-short-name.patch
 # write the header above the diff
 mise deps
 ```
@@ -146,12 +176,14 @@ To edit an existing patch:
 3. Make your change, and save the diff over the patch.
 4. Run `mise deps` to check that the later patches still apply.
 
-Test a patch with upstream's tests in its `test/` tree. Build and run them as
-the
-[MapLibre Native docs](https://maplibre.org/maplibre-native/docs/book/platforms/linux/index.html)
-explain, after you initialize the submodules they need, such as `googletest`,
-which `mise deps` skips. CI doesn't run these tests, so list the ones you ran in
+Test a patch with mln-rs's own tests, which `cargo test` runs from
+`third_party/mln-rs`. CI doesn't run these tests, so list the ones you ran in
 the pull request.
+
+To update mln-rs, check out the commit in the submodule, run `mise deps` to
+reapply the patches, and run the C tests. mln-rs runs a copy of the ABI suite in
+`tools/c-abi-test`, which it passes completely, so the lists here hold only the
+exit programs and the platforms that its copy doesn't run.
 
 ## CI
 
@@ -172,7 +204,7 @@ repository root, since the testbox copies the current directory.
 ```bash
 blacksmith auth login
 blacksmith testbox warmup .github/workflows/blacksmith-testbox-linux-x64.yml --job linux-x64 --ref <branch>
-blacksmith testbox run --id <id> "mise run test linux-gnu-x64-egl"
+blacksmith testbox run --id <id> "mise run test linux-gnu-x64 opengl"
 ```
 
 Builds fail on the testbox unless you prefix them with

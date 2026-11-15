@@ -22,4 +22,8 @@ public sealed class VulkanTextureFrameView
     public NativePointer Device => scope.Active(value).Device;
     public uint Format => value.Format;
     public uint Layout => value.Layout;
+    public ulong DepthImage => scope.Active(value).DepthImage;
+    public ulong DepthImageView => scope.Active(value).DepthImageView;
+    public uint DepthFormat => value.DepthFormat;
+    public uint DepthLayout => value.DepthLayout;
 }

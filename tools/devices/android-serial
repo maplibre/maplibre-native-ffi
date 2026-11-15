@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Prints the serial of a device matching an Android preset or ABI.
-# ANDROID_SERIAL wins; otherwise devices-cli boots this worktree's emulator.
+# Prints the serial of a device matching an Android preset or ABI, for the
+# backend that MLN_FFI_TEST_BACKEND names, if any. ANDROID_SERIAL wins;
+# otherwise devices-cli boots this worktree's emulator.
 set -euo pipefail
 
 usage="usage: tools/devices/android-serial <preset-or-abi> [--api <api>]"
@@ -8,18 +9,18 @@ target=${1:-}
 api=${MLN_FFI_ANDROID_EMULATOR_API:-}
 variant=()
 case "$target" in
-  android-arm-*) abi=armeabi-v7a ;;
-  android-arm64-*) abi=arm64-v8a ;;
-  android-x86-*) abi=x86 ;;
-  android-x64-*) abi=x86_64 ;;
+  android-arm) abi=armeabi-v7a ;;
+  android-arm64) abi=arm64-v8a ;;
+  android-x86) abi=x86 ;;
+  android-x64) abi=x86_64 ;;
   *) abi=$target ;;
 esac
-# API 30 is the last Google APIs x86 image. The x64 EGL suite exercises
-# the library's oldest supported API; other targets use the shared level.
+# API 30 is the last Google APIs x86 image. The x64 OpenGL ES suites exercise
+# the library's oldest supported API; other suites use the shared level.
 if [[ "$abi" == x86 ]]; then
   api=30
   variant=(--variant google_apis)
-elif [[ "$target" == android-x64-egl ]]; then
+elif [[ "$target" == android-x64 && "${MLN_FFI_TEST_BACKEND:-}" == opengl ]]; then
   api=26
 fi
 if (($# == 3)) && [[ "$2" == --api ]]; then

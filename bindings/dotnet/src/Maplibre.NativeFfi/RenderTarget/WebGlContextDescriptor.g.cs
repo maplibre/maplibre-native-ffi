@@ -3,24 +3,22 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// The WebGL context or canvas that a render session uses.
+/// The WebGL2 context that an OpenGL device wraps.
 /// </summary>
 /// <remarks>
 /// See <c>mln_web_gl_context_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Context">
-/// Your <c>EMSCRIPTEN_WEBGL_CONTEXT_HANDLE</c>, for an existing context.
-/// </param>
-/// <param name="CanvasSelector">
-/// The canvas's CSS selector, for a transferred canvas.
-/// </param>
-public readonly partial record struct WebGlContextDescriptor(
-    WebGlContextKind Kind,
-    int Context,
-    string CanvasSelector
-)
+public readonly partial record struct WebGlContextDescriptor
 {
-    public WebGlContextDescriptor()
-        : this(default, default, "") { }
+    [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+    public WebGlContextDescriptor(uint Context)
+    {
+        this.Context = Context;
+    }
+
+    /// <summary>
+    /// Your <c>WebGL2RenderingContext</c>.
+    /// </summary>
+    public required uint Context { get; init; }
 }

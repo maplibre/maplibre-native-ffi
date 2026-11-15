@@ -5,7 +5,7 @@
 swift.platform = "ubuntu24.04"
 
 [vars]
-host_native_preset = "linux-gnu-{{ arch() }}-vulkan"
+host_native_preset = "linux-gnu-{{ arch() }}"
 # Highest glibc release our published Linux natives may require. The zig
 # toolchain sets this from MLN_FFI_ZIG_GLIBC rather than from the build host,
 # so change it together with cmake/toolchains/zig.cmake. RISC-V and LoongArch
@@ -65,8 +65,8 @@ description = "Verify a built Linux native requires no glibc newer than the floo
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = '''
 case "$usage_preset" in
-  *-riscv64-*) floor="{{vars.glibc_floor_riscv64}}" ;;
-  *-loongarch64-*) floor="{{vars.glibc_floor_loongarch64}}" ;;
+  *-riscv64) floor="{{vars.glibc_floor_riscv64}}" ;;
+  *-loongarch64) floor="{{vars.glibc_floor_loongarch64}}" ;;
   *) floor="{{vars.glibc_floor}}" ;;
 esac
 tools/lint/check-glibc-floor.sh "$floor" "$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so"

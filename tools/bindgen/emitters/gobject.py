@@ -1739,7 +1739,7 @@ def render(emitter: Emitter) -> dict[str, str]:
         + "\nG_END_DECLS\n\n#endif\n",
         f"{SOURCE}/maplibre-native-ffi-handles.c": HEADER
         + '#include "maplibre-native-ffi-handles.h"\n\n'
-        + "#include <maplibre_native_c.h>\n#include <maplibre_native_c/plugin.h>\n#include <string.h>\n\n"
+        + "#include <maplibre_native_c.h>\n#include <string.h>\n\n"
         + '#include "maplibre-native-ffi-handles-private.h"\n'
         + '#include "maplibre-native-ffi-private.h"\n'
         + '#include "maplibre-native-ffi-values-private.h"\n\n'

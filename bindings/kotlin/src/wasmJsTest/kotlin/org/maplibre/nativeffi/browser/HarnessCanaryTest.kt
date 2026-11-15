@@ -15,7 +15,7 @@ import org.maplibre.nativeffi.runSuspendTest
 class HarnessCanaryTest {
   @Test
   fun aFailureAfterANativeRoundTripFailsTheRun() = runSuspendTest {
-    val runtime = RuntimeHandle.create(RuntimeOptions()).await()
+    val runtime = RuntimeHandle.create(RuntimeOptions())
     runtime.release().awaitWithin("the runtime release")
     fail("HarnessCanaryTest fails on purpose")
   }

@@ -18,7 +18,7 @@ class VcpkgRegistryTest(unittest.TestCase):
         root = pathlib.Path(temporary.name)
         self.assets = root / "assets"
         self.assets.mkdir()
-        self.archive = self.assets / f"{PORT}-linux-gnu-x64-egl.tar.gz"
+        self.archive = self.assets / f"{PORT}-linux-gnu-x64.tar.gz"
         self.archive.write_bytes(b"native archive")
         digest = hashlib.sha256(self.archive.read_bytes()).hexdigest()
         (self.assets / "SHA256SUMS").write_text(f"{digest}  {self.archive.name}\n")
@@ -87,7 +87,6 @@ class VcpkgRegistryTest(unittest.TestCase):
         self.assertIn(hashlib.sha512(self.archive.read_bytes()).hexdigest(), selections)
         self.assertIn('"${VCPKG_CMAKE_SYSTEM_NAME}" STREQUAL "Linux"', selections)
         self.assertIn('VCPKG_TARGET_ARCHITECTURE STREQUAL "x64"', selections)
-        self.assertIn('backend STREQUAL "opengl"', selections)
 
     def test_an_archive_that_does_not_match_the_release_checksum_fails(self) -> None:
         self.archive.write_bytes(b"corrupted")
@@ -104,23 +103,23 @@ class VcpkgRegistryTest(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "already names another port tree"):
             self.publish("0.202610.0")
 
-    def test_no_renderer_or_multiple_renderers_fail_before_downloading(self) -> None:
+    def test_a_triplet_without_an_archive_fails_before_downloading(self) -> None:
         self.publish("0.202610.0")
-        for features in ("", "opengl;vulkan"):
-            with self.subTest(features=features):
-                result = subprocess.run(
-                    [
-                        "cmake",
-                        f"-DFEATURES={features}",
-                        "-P",
-                        str(self.tree / f"ports/{PORT}/portfile.cmake"),
-                    ],
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                )
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn("renderer feature", result.stderr)
+        result = subprocess.run(
+            [
+                "cmake",
+                "-DVCPKG_CMAKE_SYSTEM_NAME=Darwin",
+                "-DVCPKG_TARGET_ARCHITECTURE=arm64",
+                "-DTARGET_TRIPLET=arm64-osx",
+                "-P",
+                str(self.tree / f"ports/{PORT}/portfile.cmake"),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("No maplibre-native-c archive for arm64-osx", result.stderr)
 
 
 if __name__ == "__main__":

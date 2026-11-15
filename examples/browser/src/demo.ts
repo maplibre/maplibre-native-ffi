@@ -1,56 +1,67 @@
 // The demo page: a continuous map on a full-page canvas, which the pointer,
-// the wheel, and the keyboard move. Each backend's page supplies how a session
-// attaches to the canvas, and everything else is shared.
+// the wheel, and the keyboard move. A Web Worker runs the map
+// (map-worker.ts) and presents to the canvas, which the page transfers to it.
+// Each backend's page serves the browser module of its backend beside it, and
+// everything else is shared.
 
 import {
-  CameraUpdateMode,
   type CameraDelta,
   type CameraOptions,
-  FrameDemandFlag,
   GesturePhase,
-  loadModule,
-  type LogicalSize,
-  type MapHandle,
-  MapMode,
-  type RenderSessionHandle,
-  RenderResult,
-  RuntimeEventFlag,
-  RuntimeEventType,
-  RuntimeHandle,
   type ScreenPoint,
 } from "@maplibre/native-ffi";
 
-import fallbackFontFaces from "../../fallback-font-faces.json";
 import type { Comparison } from "./compare.ts";
 import { addCollapse, addStylePicker, showAttributions } from "./panel.ts";
+import type { FromWorker, ToWorker, View } from "./protocol.ts";
 import { defaultStyle, type Style, styles } from "./styles.ts";
 
 import "./demo.css";
 
-/** How a backend's page attaches a session to the canvas. */
+/** A backend's page. */
 export interface Backend {
   readonly id: "webgl" | "webgpu";
-  /**
-   * Gets what the backend needs from the browser, and returns how a session
-   * attaches to `canvas` once the module loads. Throws when the browser can't
-   * run the backend.
-   */
-  prepare(canvas: HTMLCanvasElement): Promise<Attach>;
+  /** Throws when the browser can't run the backend. */
+  check(): Promise<void>;
 }
 
-/**
- * Attaches a session that presents to the canvas. `wakes` deliver the
- * session's wakes to the page.
- */
-export type Attach = (
-  map: MapHandle,
-  logicalSize: LogicalSize,
-  wakes: Wakes,
-) => RenderSessionHandle;
+/** The map in the Web Worker, as the page reaches it. */
+export class RemoteMap {
+  readonly #worker: Worker;
+  /** The camera and its limits, as the map last reported them. */
+  view: View | undefined;
 
-export interface Wakes {
-  readonly frame: () => void;
-  readonly driverWork: () => void;
+  constructor(worker: Worker) {
+    this.#worker = worker;
+  }
+
+  #post(message: ToWorker, transfer: Transferable[] = []): void {
+    this.#worker.postMessage(message, transfer);
+  }
+
+  start(message: Extract<ToWorker, { type: "start" }>): void {
+    this.#post(message, [message.canvas]);
+  }
+
+  resize(size: { width: number; height: number }): void {
+    this.#post({ type: "resize", size });
+  }
+
+  applyCameraDelta(delta: CameraDelta): void {
+    this.#post({ type: "cameraDelta", delta });
+  }
+
+  jumpTo(camera: CameraOptions): void {
+    this.#post({ type: "jumpTo", camera });
+  }
+
+  cancelCameraTransitions(): void {
+    this.#post({ type: "cancelCameraTransitions" });
+  }
+
+  setStyle(style: Style): void {
+    this.#post({ type: "setStyle", styleId: style.id });
+  }
 }
 
 const status = document.querySelector<HTMLElement>("#status")!;
@@ -118,151 +129,77 @@ export function run(backend: Backend): void {
 }
 
 async function start(backend: Backend): Promise<void> {
-  if (!crossOriginIsolated) {
-    // On a first visit, coi-serviceworker installs its worker and reloads the
-    // page, which the worker then isolates. A page that is still here after a
-    // while has no worker to wait for.
-    showStatus("Preparing the page…");
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-    throw new Error(
-      "This page isn't cross-origin isolated, so it can't share memory with the map's threads. Reload to try again.",
-    );
-  }
-  const attach = await backend.prepare(canvas);
+  await backend.check();
   showStatus("Loading the library…");
-  // Each backend's page serves its own build of the module beside it.
-  await loadModule(new URL("maplibre_native_ffi.mjs", location.href));
-  const runtime = await RuntimeHandle.create();
-
-  const map = runtime.createMap({
-    initialExtent: { ...logicalSize(), scaleFactor },
-    mapMode: MapMode.continuous,
-    eventMask:
-      RuntimeEventFlag.mapStyleLoaded |
-      RuntimeEventFlag.mapLoadingFailed |
-      RuntimeEventFlag.mapRenderError |
-      RuntimeEventFlag.mapSourceChanged |
-      RuntimeEventFlag.mapCameraIsChanging |
-      RuntimeEventFlag.mapCameraDidChange,
-    // Fonts for the scripts that the styles' glyphs can't shape, which the
-    // map loads only when a label needs one.
-    fallbackFontFaces: JSON.stringify(fallbackFontFaces),
+  const worker = new Worker(new URL("./map-worker.ts", import.meta.url), {
+    type: "module",
   });
-  runtime.discarding.setEventHandler({
-    callback: (events) => {
-      for (const event of events) {
-        if (event.source !== map.id) continue;
-        switch (event.type) {
-          case RuntimeEventType.mapStyleLoaded:
-            showStatus("");
-            updateAttributions(map);
-            break;
-          case RuntimeEventType.mapSourceChanged:
-            // A source's attribution arrives with its TileJSON.
-            updateAttributions(map);
-            break;
-          case RuntimeEventType.mapLoadingFailed:
-            showError(event.message, { fatal: false });
-            break;
-          case RuntimeEventType.mapRenderError:
-            showError(event.message);
-            break;
-          case RuntimeEventType.mapCameraIsChanging:
-            comparison?.nativeCameraChanged();
-            break;
-          case RuntimeEventType.mapCameraDidChange:
-            comparison?.nativeCameraChanged();
-            scheduleHashUpdate(map);
-            break;
-        }
-      }
-    },
+  const map = new RemoteMap(worker);
+  worker.addEventListener("error", (event) => {
+    showError(event.message || "The map's Web Worker failed.");
   });
-  await map.ready;
-  map.discarding.updateCamera({
-    mode: CameraUpdateMode.jump,
+  worker.addEventListener("message", ({ data }: MessageEvent<FromWorker>) => {
+    switch (data.type) {
+      case "status":
+        showStatus(data.message);
+        break;
+      case "error":
+        showError(data.message, { fatal: data.fatal });
+        break;
+      case "attributions":
+        showAttributions(data.attributions);
+        break;
+      case "ready":
+        map.view = data.view;
+        styledMap = map;
+        addGestures(map);
+        addCompareToggle(map);
+        break;
+      case "camera":
+        map.view = data.view;
+        comparison?.nativeCameraChanged();
+        if (data.settled) scheduleHashUpdate(map);
+        break;
+    }
+  });
+  showStyleTheme(style);
+  showAttributions([]);
+  showStatus(`Loading ${style.name}…`);
+  // The worker's session sizes the canvas's drawing buffer to the map's size
+  // at its scale factor; the page sizes the element.
+  map.start({
+    type: "start",
+    // Each backend's page serves its own build of the module beside it.
+    module: new URL("maplibre_native_ffi.js", location.href).href,
+    canvas: canvas.transferControlToOffscreen(),
+    size: logicalSize(),
+    scaleFactor,
     camera: cameraFromHash() ?? {
       center: { latitude: 48.8584, longitude: 2.2945 },
       zoom: 15.5,
       bearing: -30,
       pitch: 55,
     },
+    styleId: style.id,
   });
-  styledMap = map;
-  setStyle(map, style);
-
-  let session: RenderSessionHandle | undefined;
-  // The binding calls both wakes on this thread. The session runs its
-  // graphics work here too, when the page services it.
-  const wakes: Wakes = {
-    frame: () => drainFrameResults(),
-    driverWork: () => session?.serviceDriverWork(),
-  };
-
-  function demandFrame(): void {
-    session?.demandFrame({ flags: FrameDemandFlag.waitForUpdate });
-  }
-
-  function drainFrameResults(): void {
-    const results = session?.drainFrameResults() ?? [];
-    if (results.length === 0) return;
-    if (
-      results.some(({ disposition }) => disposition === RenderResult.failed)
-    ) {
-      showError("The map failed to render a frame.");
-    } else {
-      requestAnimationFrame(demandFrame);
-    }
-  }
-
-  session = attach(map, sizeCanvas(), wakes);
-  await session.ready;
-  demandFrame();
-
-  new ResizeObserver(() => {
-    session?.discarding.resize(sizeCanvas());
-  }).observe(canvas);
-
-  addGestures(map);
-  addCompareToggle(map);
+  new ResizeObserver(() => map.resize(logicalSize())).observe(canvas);
   canvas.focus();
 }
 
-// The map, once it has taken its first style. The user can pick a style before
-// then, and the map starts with the latest pick.
-let styledMap: MapHandle | undefined;
+// The map, once it shows on the canvas. The user can pick a style before then,
+// and the map takes the latest pick.
+let styledMap: RemoteMap | undefined;
 
 function pickStyle(picked: Style): void {
   style = picked;
   setSearchParam("style", style === defaultStyle ? null : style.id);
   showStyleTheme(style);
   if (styledMap === undefined) return;
-  setStyle(styledMap, style);
-  comparison?.setStyle(style);
-}
-
-function setStyle(map: MapHandle, style: Style): void {
-  showStyleTheme(style);
   showAttributions([]);
   // This replaces the last style's error, if it had one.
   showStatus(`Loading ${style.name}…`);
-  if (style.url !== undefined) map.discarding.setStyleUrl(style.url);
-  else map.discarding.setStyleJson(style.json);
-}
-
-// Counts the attribution reads, so a slow read doesn't show the attributions
-// of a style the map has replaced.
-let attributionRead = 0;
-
-function updateAttributions(map: MapHandle): void {
-  const read = ++attributionRead;
-  map
-    .listStyleSources()
-    .then((sources) => {
-      if (read !== attributionRead) return;
-      showAttributions(sources.map((source) => source.attribution));
-    })
-    .catch((error: unknown) => console.error(error));
+  styledMap.setStyle(style);
+  comparison?.setStyle(style);
 }
 
 // The comparison with MapLibre GL JS, while the page shows it. The page loads
@@ -270,7 +207,7 @@ function updateAttributions(map: MapHandle): void {
 
 let comparison: Comparison | undefined;
 
-function addCompareToggle(map: MapHandle): void {
+function addCompareToggle(map: RemoteMap): void {
   const toggle = document.querySelector<HTMLInputElement>("#compare")!;
   const update = async () => {
     setSearchParam("compare", toggle.checked ? "" : null);
@@ -315,17 +252,6 @@ function logicalSize(): { width: number; height: number } {
   };
 }
 
-/**
- * Sizes the canvas's drawing buffer to its logical size at the map's scale
- * factor, and returns the logical size.
- */
-function sizeCanvas(): { width: number; height: number } {
-  const size = logicalSize();
-  canvas.width = Math.round(size.width * scaleFactor);
-  canvas.height = Math.round(size.height * scaleFactor);
-  return size;
-}
-
 // The camera, as #zoom/latitude/longitude/bearing/pitch, so a link or a
 // switch of backend keeps the view.
 
@@ -346,10 +272,11 @@ function cameraFromHash(): CameraOptions | undefined {
 
 let hashUpdate: ReturnType<typeof setTimeout> | undefined;
 
-function scheduleHashUpdate(map: MapHandle): void {
+function scheduleHashUpdate(map: RemoteMap): void {
   clearTimeout(hashUpdate);
   hashUpdate = setTimeout(() => {
-    const { center, zoom, bearing, pitch } = map.getSnapshot().view.camera;
+    if (map.view === undefined) return;
+    const { center, zoom, bearing, pitch } = map.view.camera;
     const hash = [
       zoom.toFixed(2),
       center.latitude.toFixed(5),
@@ -381,7 +308,7 @@ interface Motion {
 // the gesture's motion over this window.
 const velocityWindowMs = 100;
 
-function addGestures(map: MapHandle): void {
+function addGestures(map: RemoteMap): void {
   const pointers = new Map<number, ScreenPoint>();
   let rotating = false;
   // The gesture's motion over the window before its latest move, oldest first.
@@ -389,7 +316,7 @@ function addGestures(map: MapHandle): void {
   // The latest pinch's center, which its zoom and turn keep in place.
   let anchor: ScreenPoint | undefined;
 
-  const apply = (delta: CameraDelta) => map.discarding.applyCameraDelta(delta);
+  const apply = (delta: CameraDelta) => map.applyCameraDelta(delta);
 
   const point = (event: MouseEvent): ScreenPoint => {
     const bounds = canvas.getBoundingClientRect();

@@ -1,7 +1,8 @@
 // The page entry of the browser suite.
 //
-// The page loads the test module first, and then the cases, whose support
-// modules read the loaded module as they evaluate. It runs every case that the
+// The page loads the test module, the browser module with the suite's native
+// probe, and then the cases, whose support modules read the loaded module as
+// they evaluate. It runs every case that the
 // harness schedules for the browser in order, prints each outcome to the
 // console, and reports the run to scripts/run-browser-test.mjs.
 
@@ -21,9 +22,13 @@ function report(status: number, output: string): void {
 try {
   // A call before the load throws, which a case checks once the module loads.
   let error: unknown;
-  await RuntimeHandle.create().catch((thrown: unknown) => (error = thrown));
+  try {
+    RuntimeHandle.create();
+  } catch (thrown) {
+    error = thrown;
+  }
   (globalThis as { mlnTsBeforeLoad?: unknown }).mlnTsBeforeLoad = error;
-  await loadModule(new URL("maplibre_native_ffi_test.mjs", location.href));
+  await loadModule(new URL("maplibre_native_ffi.js", location.href));
   await import("../suite.ts");
   const { execute, scheduled } = await import("../support/harness.ts");
   const failures: string[] = [];

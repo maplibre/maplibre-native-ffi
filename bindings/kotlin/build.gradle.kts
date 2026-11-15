@@ -40,9 +40,13 @@ val packagedNativePlatforms =
     .map { it.lineSequence().toSet() }
 
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
-val androidBackend =
-  AndroidTarget.parseBackend(
-    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND),
+// The render backend that the Android device suite tests, which reaches the suite as an
+// instrumentation argument.
+val androidTestBackend =
+  AndroidTarget.parseTestBackend(
+    providers
+      .gradleProperty("maplibre.android.testBackend")
+      .getOrElse(AndroidTarget.DEFAULT_TEST_BACKEND),
   )
 val androidTargets =
   AndroidTarget.parseAbis(
@@ -72,8 +76,8 @@ kotlin {
   macosX64()
   mingwX64()
 
-  // The browser target runs on the page, which never blocks, and calls the Emscripten module that
-  // bindings/kotlin/wasm links. Karma serves that module; see karma.config.d.
+  // The browser target calls the raw C exports of the browser package that a web preset builds, on
+  // the thread that loads it, which never blocks. Karma serves that package; see karma.config.d.
   @OptIn(ExperimentalWasmDsl::class)
   wasmJs { browser { testTask { useKarma { useChromeHeadless() } } } }
 
@@ -119,6 +123,7 @@ kotlin {
     withDeviceTestBuilder { sourceSetTreeName = "test" }
       .configure {
         instrumentationRunner = "org.maplibre.nativeffi.MaplibreTestRunner"
+        instrumentationRunnerArguments["mlnTestBackend"] = androidTestBackend
         execution = "HOST"
       }
 
@@ -140,7 +145,7 @@ kotlin {
   }
 
   targets.withType<KotlinNativeTarget>().configureEach {
-    // A test links or loads the local build's install for the platform's default backend.
+    // A test links or loads the local build's install for the platform.
     val install = nativeInstall(kotlinNativeTargetPlatform(name))
     install.prefix?.let(::MaplibreNativeCArtifact)?.let { maplibreNativeC ->
       binaries.all {
@@ -263,8 +268,7 @@ kotlin {
     if (graphicsCompiler != null) {
       val linksDl = name.startsWith("linux")
       val linksGdi = name == "mingwX64"
-      val vulkanHeaders =
-        rootProject.file("third_party/maplibre-native/vendor/Vulkan-Headers/include")
+      val vulkanHeaders = rootProject.file("third_party/Vulkan-Headers/include")
       val objectFile = layout.buildDirectory.file("graphics-test/$name/graphics.o")
       val compileGraphics =
         tasks.register<Exec>("compileTestGraphics${name.replaceFirstChar { it.uppercase() }}") {
@@ -306,7 +310,7 @@ kotlin {
       dependencies {
         implementation(kotlin("test"))
         implementation(libs.androidx.test.runner)
-        implementation(project(":bindings:kotlin:runtimes:$androidBackend"))
+        implementation(project(":bindings:kotlin:runtimes:native"))
       }
     }
 
@@ -424,6 +428,20 @@ val jvmInstall =
   }
 val verifyJvmLocalBuild = registerLocalBuildVerification("verifyJvmLocalBuild", jvmInstall)
 
+// The render backend under test, which the test tasks pass on. One install serves every backend,
+// so the backend is an input of its own, and a run for another backend reruns the suite.
+val testBackend = providers.environmentVariable("MLN_FFI_TEST_BACKEND").orElse("")
+
+tasks.withType<Test>().configureEach {
+  inputs.property("maplibreTestBackend", testBackend)
+  environment("MLN_FFI_TEST_BACKEND", testBackend.get())
+}
+
+tasks.withType<KotlinNativeTest>().configureEach {
+  inputs.property("maplibreTestBackend", testBackend)
+  environment("MLN_FFI_TEST_BACKEND", testBackend.get())
+}
+
 class TestClasspathArguments(@get:Classpath val classpath: FileCollection) :
   CommandLineArgumentProvider {
   override fun asArguments() = listOf("-Dorg.maplibre.nativeffi.test.classpath=${classpath.asPath}")
@@ -457,19 +475,15 @@ tasks.register<Sync>("jvmDeviceTestClasspath") {
   from(test.output.allOutputs) { into("classes") }
 }
 
-// The wasm suite runs in headless Chromium against the browser module that bindings/kotlin/wasm
-// links. The mise test:wasm task passes that module's directory, its render backend, and the
-// Chromium to run. The canary run selects only HarnessCanaryTest, which fails on purpose; every
-// other run leaves it out. On WebGPU, headless Chromium loses every WebGPU device of a page once a
-// WebGPU canvas renders, and later adapter requests resolve to null. CanvasSurfaceTest therefore
-// runs on a page of its own there: the canvas run selects only it, and the main run leaves it out.
+// The wasm suite runs in headless Chromium against the browser package of a web preset. The mise
+// test:wasm task passes the directory that holds the package and the runtime's module object, its
+// render backend, and the Chromium to run. The canary run selects only HarnessCanaryTest, which
+// fails on purpose; every other run leaves it out.
 val wasmModuleDir = providers.gradleProperty("maplibre.wasm.moduleDir")
 val wasmRenderBackend = providers.gradleProperty("maplibre.wasm.renderBackend")
 val wasmChromium = providers.gradleProperty("maplibre.wasm.chromium")
 val wasmCanary =
   providers.gradleProperty("maplibre.wasm.canary").map(String::toBoolean).getOrElse(false)
-val wasmCanvasRun =
-  providers.gradleProperty("maplibre.wasm.canvasRun").map(String::toBoolean).getOrElse(false)
 
 tasks.named<KotlinJsTest>("wasmJsBrowserTest") {
   val moduleDir = wasmModuleDir.orNull?.let(rootProject::file)
@@ -492,12 +506,6 @@ tasks.named<KotlinJsTest>("wasmJsBrowserTest") {
   filter.apply {
     if (wasmCanary) includeTestsMatching("org.maplibre.nativeffi.browser.HarnessCanaryTest")
     else excludeTestsMatching("org.maplibre.nativeffi.browser.HarnessCanaryTest")
-    if (renderBackend == "webgpu" && !wasmCanary) {
-      val canvasTest = "org.maplibre.nativeffi.render.CanvasSurfaceTest"
-      if (wasmCanvasRun) includeTestsMatching(canvasTest) else excludeTestsMatching(canvasTest)
-      // A --tests filter may select tests of only one of the two runs.
-      isFailOnNoMatchingTests = false
-    }
   }
 }
 
@@ -531,11 +539,11 @@ val checkAndroidApiFloor =
 
 tasks.register("androidBuild") {
   group = "build"
-  description = "Builds the Android binding and selected native runtime AAR."
+  description = "Builds the Android binding and native runtime AARs."
   dependsOn(
     "packageAndroidNativeLibraries",
     "assembleAndroidMain",
     checkAndroidApiFloor,
-    ":bindings:kotlin:runtimes:$androidBackend:assembleAndroidMain",
+    ":bindings:kotlin:runtimes:native:assembleAndroidMain",
   )
 }

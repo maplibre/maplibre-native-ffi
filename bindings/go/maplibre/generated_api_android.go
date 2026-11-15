@@ -6,14 +6,13 @@ package maplibre
 /*
 #include <stdlib.h>
 #include <stdbool.h>
-#include "maplibre_native_c/plugin.h"
 #include "generated_callbacks.h"
 */
 import "C"
 import "unsafe"
 
-// WithAndroidHardwareBuffer gets the Android hardware buffer of an acquired
-// frame.
+// WithAndroidHardwareBuffer gets the Android hardware buffer of an exported
+// ring's acquired frame.
 //
 // Wait for AcquiredFrameHandle.WithProducerSync() before you read the buffer.
 // Once you release or discard the frame, the session may render into the buffer
@@ -21,9 +20,11 @@ import "unsafe"
 // buffer's memory, but not its contents.
 //
 // See mln_acquired_frame_get_android_hardware_buffer in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 //
 // Errors:
+//   - StatusUnsupported when the session's ring shares its textures in another
+//     way.
 //   - StatusTargetLost when the session failed, or you detached, abandoned, or
 //     disposed it.
 func (receiver *AcquiredFrameHandle) WithAndroidHardwareBuffer(callback func(AndroidHardwareBufferFrameView) error) error {
@@ -35,32 +36,6 @@ func (receiver *AcquiredFrameHandle) WithAndroidHardwareBuffer(callback func(And
 		return int32(C.mln_acquired_frame_get_android_hardware_buffer(C.mln_acquired_frame(raw), &outFrame, diagnostic))
 	}, func(scope *bindingScope) AndroidHardwareBufferFrameView {
 		return AndroidHardwareBufferFrameView{value: copyAndroidHardwareBufferFrame(outFrame), scope: scope}
-	})
-}
-
-// AndroidFramePacerCreate creates a frame pacer that follows the display
-// through the calling thread's AChoreographer.
-//
-// Call it on a thread with an ALooper, such as the app's main thread, and keep
-// that thread running its looper while sessions use the pacer.
-//
-// AChoreographer can stop while the phone's display is off, even while a
-// Surface on another display, such as an Android Auto projection, still shows
-// the map. The pacer then keeps demanding frames from a timer on the looper,
-// within the frame rate limit, until vsyncs arrive again.
-//
-// See mln_android_frame_pacer_create in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
-//
-// Errors:
-//   - StatusInvalidState when the calling thread has no ALooper.
-func AndroidFramePacerCreate(options *FramePacerOptions) (*FramePacerHandle, error) {
-	var outPacer C.mln_frame_pacer
-	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_android_frame_pacer_create(bindingStoreOptional(options, arena, nativeFramePacerOptions), &outPacer, diagnostic))
-	}, func(arena *bindingArena) *FramePacerHandle {
-		adopted := adoptFramePacerHandle(uint64(outPacer), nil)
-		return adopted
 	})
 }
 
@@ -76,120 +51,4 @@ func InitAndroid(jniEnv uintptr, context uintptr) error {
 	return bindingDo(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_android_init(unsafe.Pointer(C.binding_address(C.uintptr_t(jniEnv))), unsafe.Pointer(C.binding_address(C.uintptr_t(context))), diagnostic))
 	})
-}
-
-// AttachAndroidHardwareBufferRing creates a session that renders the map into a
-// ring of Android hardware buffers that the library allocates.
-//
-// Acquire each frame with RenderSessionHandle.AcquireFrame(), and get its
-// buffer with AcquiredFrameHandle.WithAndroidHardwareBuffer().
-// RenderSessionHandle.Resize() gives the ring new buffers of the new size.
-//
-// A Vulkan build renders with device, or, when device is null, with a device
-// that the library creates. An OpenGL build uses an EGL context on the default
-// display, and device must be null. Attach with RenderDriverKindCoreWorker.
-//
-// To show the buffers through Android's UI, such as with
-// Bitmap.wrapHardwareBuffer, attach without GPUSyncKindFlagSyncFd in
-// RenderSessionAttachOptions.ProducerSyncKinds, so that each frame finishes
-// before you acquire it. Keep each frame acquired until the next one replaces
-// it on screen, then release it with GPUSyncKindCPUComplete. Give the ring 3
-// buffers, so the session can render while you hold two frames.
-//
-// See mln_map_attach_android_hardware_buffer_ring in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
-//
-// Errors:
-//   - StatusUnsupported when Android is older than 8.0, API level 26, or when
-//     the graphics context can't render into hardware buffers: the Vulkan
-//     device lacks VK_ANDROID_external_memory_android_hardware_buffer, or the
-//     EGL display lacks EGL_ANDROID_get_native_client_buffer or
-//     EGL_ANDROID_image_native_buffer.
-//   - StatusNativeError when the library can't create its Vulkan device or
-//     initialize the default EGL display.
-func (receiver *MapHandle) AttachAndroidHardwareBufferRing(descriptor AndroidHardwareBufferRingDescriptor, device *VulkanDeviceHandle, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_android_hardware_buffer_ring(C.mln_map(raw), bindingStore(nativeAndroidHardwareBufferRingDescriptor(descriptor, arena), arena), C.mln_vulkan_device(arena.leaseOptional(device.owner())), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// AttachAndroidSurface creates a session that presents the map to an Android
-// window, with a graphics context that the library creates.
-//
-// A Vulkan build presents with device, or, when device is null, with a device
-// that the library creates. An OpenGL build uses an EGL context on the default
-// display, and device must be null. Attach with RenderDriverKindCoreWorker.
-//
-// When the platform destroys the window, such as in
-// SurfaceHolder.Callback.surfaceDestroyed, release the target with
-// RenderSessionHandle.ReleaseTarget(), or give the session a new window with
-// RenderSessionHandle.SetAndroidSurfaceTarget(), without waiting for that to
-// complete. The session keeps its own reference to the window and stays usable
-// for the next window. A frame to the destroyed window finishes with
-// RenderResultTargetNotReady, or with RenderResultRendered if the window went
-// away while the frame was presenting.
-//
-// See mln_map_attach_android_surface in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
-//
-// Errors:
-//   - StatusInvalidArgument when surface has no window, such as after the
-//     platform destroyed it.
-//   - StatusUnsupported when you created device without
-//     VulkanDeviceOptions.Presentation.
-//   - StatusUnsupported when the GPU or the Vulkan loader can't present.
-//   - StatusNativeError when the library can't create the graphics context or
-//     the window's surface.
-func (receiver *MapHandle) AttachAndroidSurface(descriptor AndroidSurfaceDescriptor, device *VulkanDeviceHandle, options RenderSessionAttachOptions) (session *RenderSessionHandle, ready *Future[struct{}], err error) {
-	var outSession C.mln_render_session
-	result, err := bindingStartWith(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_attach_android_surface(C.mln_map(raw), bindingStore(nativeAndroidSurfaceDescriptor(descriptor, arena), arena), C.mln_vulkan_device(arena.leaseOptional(device.owner())), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) struct {
-		session *RenderSessionHandle
-		ready   *Future[struct{}]
-	} {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return struct {
-			session *RenderSessionHandle
-			ready   *Future[struct{}]
-		}{adopted, future}
-	})
-	return result.session, result.ready, err
-}
-
-// SetAndroidSurfaceTarget replaces the Android window that the session presents
-// to.
-//
-// Use it to give the session a window again after
-// RenderSessionHandle.ReleaseTarget(), to move it to another window, or to
-// resize it. Once the replacement completes, the session no longer uses the old
-// window.
-//
-// See mln_render_session_set_android_surface_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html
-//
-// Errors:
-//   - StatusInvalidArgument when surface has no window, such as after the
-//     platform destroyed it.
-//   - StatusUnsupported when, in a Vulkan build, the new window needs a
-//     different color format or pre-rotation support than the old one. Attach a
-//     new session instead.
-//   - StatusNativeError when the library can't create the window's surface.
-func (receiver *RenderSessionHandle) SetAndroidSurfaceTarget(replacement AndroidSurfaceReplacement) (*Future[struct{}], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_android_surface_target(C.mln_render_session(raw), bindingStore(nativeAndroidSurfaceReplacement(replacement, arena), arena), completion, diagnostic))
-	}, completionUnit)
 }

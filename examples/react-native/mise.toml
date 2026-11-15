@@ -10,7 +10,7 @@ run = "pnpm exec react-native start"
 description = "Build the C library for ARM64 Android, then build the React Native example and run it on the connected device or emulator."
 usage = 'arg "[args]..." var=#true help="Options for react-native run-android, such as --device <serial>"'
 tools = { "core:java" = "{{vars.java_version}}" }
-depends = [{ task = "//:build", args = ["android-arm64-egl"] }]
+depends = [{ task = "//:build", args = ["android-arm64"] }]
 run = 'pnpm exec react-native run-android --no-packager ${usage_args:-}'
 
 [tasks.ios]
@@ -18,7 +18,7 @@ description = "Build the C library for the iOS simulator, then build the React N
 # CocoaPods installs the app's native dependencies.
 tools = { "core:ruby" = "3.4.12", "gem:cocoapods" = "1.16.2" }
 usage = 'arg "[args]..." var=#true help="Options for react-native run-ios, such as --udid <udid>"'
-depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
+depends = [{ task = "//:build", args = ["ios-simulator-arm64"] }]
 run = '''
 ../../bindings/typescript/react-native/scripts/stage.sh
 (cd ios && pod install)
@@ -50,7 +50,7 @@ esac
 [tasks.build-ios]
 description = "Build the C library for the iOS simulator, then build the React Native example's release app for it, unsigned."
 tools = { "core:ruby" = "3.4.12", "gem:cocoapods" = "1.16.2" }
-depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
+depends = [{ task = "//:build", args = ["ios-simulator-arm64"] }]
 run = '''
 ../../bindings/typescript/react-native/scripts/stage.sh
 (cd ios && pod install)

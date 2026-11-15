@@ -47,3 +47,6 @@ internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit
   }
   return { Thread.setDefaultUncaughtExceptionHandler(previous) }
 }
+
+internal actual fun testBackendName(): String? =
+  System.getenv("MLN_FFI_TEST_BACKEND")?.takeIf(String::isNotEmpty)

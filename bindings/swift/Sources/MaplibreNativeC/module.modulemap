@@ -3,9 +3,4 @@
 module MaplibreNativeC [system] {
   umbrella header "include/maplibre_native_c.h"
   export *
-
-  explicit module Plugin {
-    header "include/plugin.h"
-    export *
-  }
 }

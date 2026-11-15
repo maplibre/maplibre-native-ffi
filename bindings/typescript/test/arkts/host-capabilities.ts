@@ -87,7 +87,8 @@ function inbox(): { push(message: unknown): void; next(): Promise<unknown> } {
 /**
  * An @ohos.worker realm that runs the bundle's realm entry, or its consumer
  * entry for the load scenario, which loads the packed package instead of the
- * sources.
+ * sources. A worker's modules are its own, so the realm gets this realm's
+ * `process.env` along with its data.
  */
 function realmSpawn(data: unknown): Realm {
   const entry =
@@ -99,7 +100,7 @@ function realmSpawn(data: unknown): Realm {
   });
   realm.onmessage = (event) => messages.push(event.data);
   realm.onerror = (error) => messages.push({ error: error.message });
-  realm.postMessage(data);
+  realm.postMessage({ env: { ...process.env }, data });
   return {
     next: () => messages.next(),
     post: (message) => realm.postMessage(message),
@@ -137,7 +138,10 @@ export const capabilities: Capabilities = {
   httpOrigin,
   realmSpawn,
   forcedGc: () => ArkTools.forceFullGC(),
+  borrowedTextures: true,
   testGraphics: () => testGraphics,
+  // The runner takes the backend from `aa test -s backend`.
+  testBackend: () => process.env.MLN_FFI_TEST_BACKEND,
   // An application process does not end when its event loop empties, so no
   // timer holds it.
   unrefTimer: () => {},

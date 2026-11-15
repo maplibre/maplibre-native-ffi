@@ -8,11 +8,8 @@ from maplibre_native_ffi import _native
 from support import result
 
 RUNTIMES = (
-    "maplibre_native_ffi_runtime_opengl",
-    "maplibre_native_ffi_runtime_metal",
-    "maplibre_native_ffi_runtime_vulkan",
-    "maplibre_native_ffi_runtime_opengl_mingw",
-    "maplibre_native_ffi_runtime_vulkan_mingw",
+    "maplibre_native_ffi_runtime",
+    "maplibre_native_ffi_runtime_mingw",
 )
 
 

@@ -146,6 +146,27 @@ final class CameraUpdateMode extends _Enum {
   };
 }
 
+/// How a graphics API's clip space holds depth.
+///
+/// See `mln_clip_depth_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class ClipDepthRange extends _Enum {
+  const ClipDepthRange.fromRawValue(super.rawValue);
+
+  /// Clip z runs from 0 to w, as in Metal, Vulkan, WebGPU, Direct3D, and OpenGL
+  /// with `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`.
+  static const zeroToOne = ClipDepthRange.fromRawValue(1);
+
+  /// Clip z runs from -w to w, as in OpenGL by default.
+  static const negativeOneToOne = ClipDepthRange.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'ClipDepthRange.zeroToOne',
+    2 => 'ClipDepthRange.negativeOneToOne',
+    _ => 'ClipDepthRange($rawValue)',
+  };
+}
+
 /// How the map keeps the camera within the world or within its bounds.
 ///
 /// See `mln_constrain_mode` in the
@@ -170,6 +191,36 @@ final class ConstrainMode extends _Enum {
     3 => 'ConstrainMode.screen',
     _ => 'ConstrainMode($rawValue)',
   };
+}
+
+/// A format of depth and stencil textures, as a bit in a set.
+///
+/// See `mln_depth_stencil_format_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class DepthStencilFormatFlag extends _Flags<DepthStencilFormatFlag> {
+  const DepthStencilFormatFlag.fromRawValue(super.rawValue);
+
+  /// 24-bit normalized depth and 8-bit stencil: VK_FORMAT_D24_UNORM_S8_UINT,
+  /// MTLPixelFormatDepth24Unorm_Stencil8, GL_DEPTH24_STENCIL8, or
+  /// WGPUTextureFormat_Depth24PlusStencil8 (`depth24plus-stencil8`).
+  static const depth24Stencil8 = DepthStencilFormatFlag.fromRawValue(1);
+
+  /// 32-bit float depth and 8-bit stencil: VK_FORMAT_D32_SFLOAT_S8_UINT,
+  /// MTLPixelFormatDepth32Float_Stencil8, GL_DEPTH32F_STENCIL8, or
+  /// WGPUTextureFormat_Depth32FloatStencil8 (`depth32float-stencil8`).
+  static const depth32FloatStencil8 = DepthStencilFormatFlag.fromRawValue(2);
+
+  /// No flags.
+  static const none = DepthStencilFormatFlag.fromRawValue(0);
+  @override
+  DepthStencilFormatFlag _of(int rawValue) =>
+      DepthStencilFormatFlag.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('DepthStencilFormatFlag', const {
+    0: 'none',
+    1: 'depth24Stencil8',
+    2: 'depth32FloatStencil8',
+  });
 }
 
 /// How a frame demand behaves.
@@ -239,6 +290,70 @@ final class GesturePhase extends _Enum {
   };
 }
 
+/// A way to share a texture's memory with another API or process.
+///
+/// See `mln_gpu_export_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class GpuExportKind extends _Enum {
+  const GpuExportKind.fromRawValue(super.rawValue);
+
+  /// The texture isn't shared.
+  static const none = GpuExportKind.fromRawValue(0);
+
+  /// An `IOSurfaceRef`.
+  static const ioSurface = GpuExportKind.fromRawValue(1);
+
+  /// A Linux dmabuf, as file descriptors with a DRM format and modifier.
+  static const dmaBuf = GpuExportKind.fromRawValue(2);
+
+  /// An `AHardwareBuffer*`.
+  static const androidHardwareBuffer = GpuExportKind.fromRawValue(3);
+
+  /// A DXGI shared texture's NT handle.
+  static const dxgiSharedHandle = GpuExportKind.fromRawValue(4);
+
+  /// A Vulkan or OpenGL opaque memory file descriptor.
+  static const opaqueFd = GpuExportKind.fromRawValue(5);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'GpuExportKind.none',
+    1 => 'GpuExportKind.ioSurface',
+    2 => 'GpuExportKind.dmaBuf',
+    3 => 'GpuExportKind.androidHardwareBuffer',
+    4 => 'GpuExportKind.dxgiSharedHandle',
+    5 => 'GpuExportKind.opaqueFd',
+    _ => 'GpuExportKind($rawValue)',
+  };
+}
+
+/// A way to share a texture's memory, as a bit in a set.
+///
+/// See `mln_gpu_export_kind_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class GpuExportKindFlag extends _Flags<GpuExportKindFlag> {
+  const GpuExportKindFlag.fromRawValue(super.rawValue);
+  static const ioSurface = GpuExportKindFlag.fromRawValue(1);
+  static const dmaBuf = GpuExportKindFlag.fromRawValue(2);
+  static const androidHardwareBuffer = GpuExportKindFlag.fromRawValue(4);
+  static const dxgiSharedHandle = GpuExportKindFlag.fromRawValue(8);
+  static const opaqueFd = GpuExportKindFlag.fromRawValue(16);
+
+  /// No flags.
+  static const none = GpuExportKindFlag.fromRawValue(0);
+  @override
+  GpuExportKindFlag _of(int rawValue) =>
+      GpuExportKindFlag.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('GpuExportKindFlag', const {
+    0: 'none',
+    1: 'ioSurface',
+    2: 'dmaBuf',
+    4: 'androidHardwareBuffer',
+    8: 'dxgiSharedHandle',
+    16: 'opaqueFd',
+  });
+}
+
 /// How one side waits for the other's GPU work on a shared texture.
 ///
 /// A sync file descriptor or an OpenGL fence signals once, so when
@@ -265,7 +380,9 @@ final class GpuSyncKind extends _Enum {
   /// `handle` is a `VkSemaphore`. Wait until it reaches `value`.
   static const vulkanTimelineSemaphore = GpuSyncKind.fromRawValue(3);
 
-  /// `handle` is a sync file descriptor.
+  /// `handle` is a sync file descriptor. A descriptor of -1, as Vulkan exports
+  /// for a semaphore that has already signaled, counts as
+  /// `GpuSyncKind.cpuComplete`.
   static const syncFd = GpuSyncKind.fromRawValue(4);
 
   /// `handle` is an `MTLSharedEvent`. Wait until it reaches `value`.
@@ -583,26 +700,6 @@ final class OpenGlClientApi extends _Enum {
   };
 }
 
-/// Whether a render session's OpenGL context shares objects with yours.
-///
-/// See `mln_open_gl_context_ownership` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class OpenGlContextOwnership extends _Enum {
-  const OpenGlContextOwnership.fromRawValue(super.rawValue);
-
-  /// The session's context shares objects with your `share_context`.
-  static const shared = OpenGlContextOwnership.fromRawValue(0);
-
-  /// The session's context shares objects with no other context.
-  static const dedicated = OpenGlContextOwnership.fromRawValue(1);
-  @override
-  String toString() => switch (rawValue) {
-    0 => 'OpenGlContextOwnership.shared',
-    1 => 'OpenGlContextOwnership.dedicated',
-    _ => 'OpenGlContextOwnership($rawValue)',
-  };
-}
-
 /// An OpenGL context platform, as a bit in a set.
 ///
 /// See `mln_open_gl_context_provider_flag` in the
@@ -668,6 +765,26 @@ final class RenderAbandonDisposition extends _Enum {
     0 => 'RenderAbandonDisposition.clean',
     1 => 'RenderAbandonDisposition.quarantined',
     _ => 'RenderAbandonDisposition($rawValue)',
+  };
+}
+
+/// A render backend.
+///
+/// See `mln_render_backend` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+final class RenderBackend extends _Enum {
+  const RenderBackend.fromRawValue(super.rawValue);
+  static const metal = RenderBackend.fromRawValue(1);
+  static const vulkan = RenderBackend.fromRawValue(2);
+  static const openGl = RenderBackend.fromRawValue(3);
+  static const webGpu = RenderBackend.fromRawValue(4);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'RenderBackend.metal',
+    2 => 'RenderBackend.vulkan',
+    3 => 'RenderBackend.openGl',
+    4 => 'RenderBackend.webGpu',
+    _ => 'RenderBackend($rawValue)',
   };
 }
 
@@ -821,6 +938,56 @@ final class RenderSessionState extends _Enum {
     6 => 'RenderSessionState.abandoned',
     _ => 'RenderSessionState($rawValue)',
   };
+}
+
+/// A render target kind, as a bit in a set.
+///
+/// See `mln_render_target_kind_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class RenderTargetKindFlag extends _Flags<RenderTargetKindFlag> {
+  const RenderTargetKindFlag.fromRawValue(super.rawValue);
+  static const offscreen = RenderTargetKindFlag.fromRawValue(1);
+  static const metalLayer = RenderTargetKindFlag.fromRawValue(2);
+  static const win32Window = RenderTargetKindFlag.fromRawValue(4);
+  static const xlibWindow = RenderTargetKindFlag.fromRawValue(8);
+  static const waylandSurface = RenderTargetKindFlag.fromRawValue(16);
+  static const androidWindow = RenderTargetKindFlag.fromRawValue(32);
+  static const ohosWindow = RenderTargetKindFlag.fromRawValue(64);
+  static const vulkanSurface = RenderTargetKindFlag.fromRawValue(512);
+  static const openGlSurface = RenderTargetKindFlag.fromRawValue(1024);
+  static const metalBorrowedTextures = RenderTargetKindFlag.fromRawValue(2048);
+  static const vulkanBorrowedTextures = RenderTargetKindFlag.fromRawValue(4096);
+  static const openGlBorrowedTextures = RenderTargetKindFlag.fromRawValue(8192);
+  static const webGpuBorrowedTextures = RenderTargetKindFlag.fromRawValue(
+    16384,
+  );
+  static const exportedRing = RenderTargetKindFlag.fromRawValue(32768);
+  static const webCanvas = RenderTargetKindFlag.fromRawValue(65536);
+
+  /// No flags.
+  static const none = RenderTargetKindFlag.fromRawValue(0);
+  @override
+  RenderTargetKindFlag _of(int rawValue) =>
+      RenderTargetKindFlag.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('RenderTargetKindFlag', const {
+    0: 'none',
+    1: 'offscreen',
+    2: 'metalLayer',
+    4: 'win32Window',
+    8: 'xlibWindow',
+    16: 'waylandSurface',
+    32: 'androidWindow',
+    64: 'ohosWindow',
+    512: 'vulkanSurface',
+    1024: 'openGlSurface',
+    2048: 'metalBorrowedTextures',
+    4096: 'vulkanBorrowedTextures',
+    8192: 'openGlBorrowedTextures',
+    16384: 'webGpuBorrowedTextures',
+    32768: 'exportedRing',
+    65536: 'webCanvas',
+  });
 }
 
 /// Why a resource request failed.
@@ -1035,17 +1202,15 @@ final class RuntimeEventFlag extends _Flags<RuntimeEventFlag> {
   static const offlineRegionResponseError = RuntimeEventFlag.fromRawValue(
     262144,
   );
-  static const offlineRegionTileCountLimitExceeded =
-      RuntimeEventFlag.fromRawValue(524288);
-  static const mapGlyphsRequested = RuntimeEventFlag.fromRawValue(1048576);
-  static const mapGlyphsLoaded = RuntimeEventFlag.fromRawValue(2097152);
-  static const mapGlyphsError = RuntimeEventFlag.fromRawValue(4194304);
-  static const mapSpriteRequested = RuntimeEventFlag.fromRawValue(8388608);
-  static const mapSpriteLoaded = RuntimeEventFlag.fromRawValue(16777216);
-  static const mapSpriteError = RuntimeEventFlag.fromRawValue(33554432);
-  static const allMapEvents = RuntimeEventFlag.fromRawValue(66191358);
-  static const allRuntimeEvents = RuntimeEventFlag.fromRawValue(917504);
-  static const all = RuntimeEventFlag.fromRawValue(67108862);
+  static const mapGlyphsRequested = RuntimeEventFlag.fromRawValue(524288);
+  static const mapGlyphsLoaded = RuntimeEventFlag.fromRawValue(1048576);
+  static const mapGlyphsError = RuntimeEventFlag.fromRawValue(2097152);
+  static const mapSpriteRequested = RuntimeEventFlag.fromRawValue(4194304);
+  static const mapSpriteLoaded = RuntimeEventFlag.fromRawValue(8388608);
+  static const mapSpriteError = RuntimeEventFlag.fromRawValue(16777216);
+  static const allMapEvents = RuntimeEventFlag.fromRawValue(33161214);
+  static const allRuntimeEvents = RuntimeEventFlag.fromRawValue(393216);
+  static const all = RuntimeEventFlag.fromRawValue(33554430);
   @override
   RuntimeEventFlag _of(int rawValue) => RuntimeEventFlag.fromRawValue(rawValue);
   @override
@@ -1069,16 +1234,15 @@ final class RuntimeEventFlag extends _Flags<RuntimeEventFlag> {
     65536: 'mapSourceChanged',
     131072: 'offlineRegionStatusChanged',
     262144: 'offlineRegionResponseError',
-    524288: 'offlineRegionTileCountLimitExceeded',
-    1048576: 'mapGlyphsRequested',
-    2097152: 'mapGlyphsLoaded',
-    4194304: 'mapGlyphsError',
-    8388608: 'mapSpriteRequested',
-    16777216: 'mapSpriteLoaded',
-    33554432: 'mapSpriteError',
-    66191358: 'allMapEvents',
-    917504: 'allRuntimeEvents',
-    67108862: 'all',
+    524288: 'mapGlyphsRequested',
+    1048576: 'mapGlyphsLoaded',
+    2097152: 'mapGlyphsError',
+    4194304: 'mapSpriteRequested',
+    8388608: 'mapSpriteLoaded',
+    16777216: 'mapSpriteError',
+    33161214: 'allMapEvents',
+    393216: 'allRuntimeEvents',
+    33554430: 'all',
   });
 }
 
@@ -1145,19 +1309,12 @@ final class RuntimeEventType extends _Enum {
 
   /// A resource that the region needs failed to download.
   static const offlineRegionResponseError = RuntimeEventType.fromRawValue(18);
-
-  /// The region's download became inactive because the cache file's offline
-  /// regions hold as many tiles from MapLibre's demo tile server as the limit
-  /// allows. Only tiles of sources with a `maplibre://` URL count toward the
-  /// limit.
-  static const offlineRegionTileCountLimitExceeded =
-      RuntimeEventType.fromRawValue(19);
-  static const mapGlyphsRequested = RuntimeEventType.fromRawValue(20);
-  static const mapGlyphsLoaded = RuntimeEventType.fromRawValue(21);
-  static const mapGlyphsError = RuntimeEventType.fromRawValue(22);
-  static const mapSpriteRequested = RuntimeEventType.fromRawValue(23);
-  static const mapSpriteLoaded = RuntimeEventType.fromRawValue(24);
-  static const mapSpriteError = RuntimeEventType.fromRawValue(25);
+  static const mapGlyphsRequested = RuntimeEventType.fromRawValue(19);
+  static const mapGlyphsLoaded = RuntimeEventType.fromRawValue(20);
+  static const mapGlyphsError = RuntimeEventType.fromRawValue(21);
+  static const mapSpriteRequested = RuntimeEventType.fromRawValue(22);
+  static const mapSpriteLoaded = RuntimeEventType.fromRawValue(23);
+  static const mapSpriteError = RuntimeEventType.fromRawValue(24);
   @override
   String toString() => switch (rawValue) {
     1 => 'RuntimeEventType.mapCameraWillChange',
@@ -1178,13 +1335,12 @@ final class RuntimeEventType extends _Enum {
     16 => 'RuntimeEventType.mapSourceChanged',
     17 => 'RuntimeEventType.offlineRegionStatusChanged',
     18 => 'RuntimeEventType.offlineRegionResponseError',
-    19 => 'RuntimeEventType.offlineRegionTileCountLimitExceeded',
-    20 => 'RuntimeEventType.mapGlyphsRequested',
-    21 => 'RuntimeEventType.mapGlyphsLoaded',
-    22 => 'RuntimeEventType.mapGlyphsError',
-    23 => 'RuntimeEventType.mapSpriteRequested',
-    24 => 'RuntimeEventType.mapSpriteLoaded',
-    25 => 'RuntimeEventType.mapSpriteError',
+    19 => 'RuntimeEventType.mapGlyphsRequested',
+    20 => 'RuntimeEventType.mapGlyphsLoaded',
+    21 => 'RuntimeEventType.mapGlyphsError',
+    22 => 'RuntimeEventType.mapSpriteRequested',
+    23 => 'RuntimeEventType.mapSpriteLoaded',
+    24 => 'RuntimeEventType.mapSpriteError',
     _ => 'RuntimeEventType($rawValue)',
   };
 }
@@ -1493,11 +1649,11 @@ final class ViewportMode extends _Enum {
 /// image on your side before you read it. You don't need to release it back.
 ///
 /// See `mln_vulkan_image_owner` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class VulkanImageOwner extends _Enum {
   const VulkanImageOwner.fromRawValue(super.rawValue);
 
-  /// The image stays with the queue family of `graphics_queue_family_index`.
+  /// The image stays with the queue family of the device's queue.
   static const graphicsQueue = VulkanImageOwner.fromRawValue(0);
 
   /// Each frame releases the image to VK_QUEUE_FAMILY_EXTERNAL.
@@ -1514,32 +1670,10 @@ final class VulkanImageOwner extends _Enum {
   };
 }
 
-/// How a render session gets its WebGL context.
-///
-/// See `mln_web_gl_context_kind` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class WebGlContextKind extends _Enum {
-  const WebGlContextKind.fromRawValue(super.rawValue);
-
-  /// The session uses a context that you created with
-  /// `emscripten_webgl_create_context()`.
-  static const existing = WebGlContextKind.fromRawValue(0);
-
-  /// The library transfers the canvas that `canvas_selector` names to a worker
-  /// and creates the context there.
-  static const transferredCanvas = WebGlContextKind.fromRawValue(1);
-  @override
-  String toString() => switch (rawValue) {
-    0 => 'WebGlContextKind.existing',
-    1 => 'WebGlContextKind.transferredCanvas',
-    _ => 'WebGlContextKind($rawValue)',
-  };
-}
-
-/// The Android hardware buffer of an acquired frame.
+/// The Android hardware buffer of an exported ring's acquired frame.
 ///
 /// See `mln_android_hardware_buffer_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class AndroidHardwareBufferFrame extends _Value {
   const AndroidHardwareBufferFrame({
     this.width = 0,
@@ -1573,7 +1707,7 @@ final class AndroidHardwareBufferFrame extends _Value {
 /// Where one plane of a dmabuf keeps its data.
 ///
 /// See `mln_dma_buf_plane` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class DmaBufPlane extends _Value {
   const DmaBufPlane({this.fd = 0, this.offset = 0, this.stride = 0});
 
@@ -1594,10 +1728,10 @@ final class DmaBufPlane extends _Value {
       _describe('DmaBufPlane', const ['fd', 'offset', 'stride']);
 }
 
-/// The dmabuf of an acquired frame.
+/// The dmabuf of an exported ring's acquired frame.
 ///
 /// See `mln_dma_buf_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class DmaBufFrame extends _Value {
   DmaBufFrame({
     this.width = 0,
@@ -1644,10 +1778,10 @@ final class DmaBufFrame extends _Value {
   ]);
 }
 
-/// The DXGI shared texture of an acquired frame.
+/// The DXGI shared texture of an exported ring's acquired frame.
 ///
 /// See `mln_dxgi_shared_texture_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class DxgiSharedTextureFrame extends _Value {
   const DxgiSharedTextureFrame({
     this.width = 0,
@@ -1690,10 +1824,10 @@ final class DxgiSharedTextureFrame extends _Value {
   ]);
 }
 
-/// The IOSurface of an acquired frame.
+/// The IOSurface of an exported ring's acquired frame.
 ///
 /// See `mln_io_surface_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class IoSurfaceFrame extends _Value {
   const IoSurfaceFrame({
     this.width = 0,
@@ -1726,6 +1860,10 @@ final class IoSurfaceFrame extends _Value {
 
 /// The Metal texture of an acquired frame.
 ///
+/// The depth members are set when the frame has a depth texture: one of a
+/// borrowed ring's `depth_textures`, or an exported ring's with
+/// `RenderSessionAttachOptions.keepDepth`. Otherwise they are zero.
+///
 /// See `mln_metal_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalTextureFrame extends _Value {
@@ -1737,6 +1875,8 @@ final class MetalTextureFrame extends _Value {
     this.texture = NativePointer.nullPointer,
     this.device = NativePointer.nullPointer,
     this.pixelFormat = 0,
+    this.depthTexture = NativePointer.nullPointer,
+    this.depthPixelFormat = 0,
   });
   final int width;
   final int height;
@@ -1754,6 +1894,12 @@ final class MetalTextureFrame extends _Value {
   /// The texture's MTLPixelFormat.
   final int pixelFormat;
 
+  /// The MTLTexture that holds the frame's depth and stencil.
+  final NativePointer depthTexture;
+
+  /// The depth texture's MTLPixelFormat.
+  final int depthPixelFormat;
+
   @override
   List<Object?> get _members => [
     width,
@@ -1763,6 +1909,8 @@ final class MetalTextureFrame extends _Value {
     texture,
     device,
     pixelFormat,
+    depthTexture,
+    depthPixelFormat,
   ];
   @override
   String toString() => _describe('MetalTextureFrame', const [
@@ -1773,10 +1921,119 @@ final class MetalTextureFrame extends _Value {
     'texture',
     'device',
     'pixelFormat',
+    'depthTexture',
+    'depthPixelFormat',
+  ]);
+}
+
+/// The memory of an exported ring's acquired frame, as an opaque file
+/// descriptor.
+///
+/// The memory holds a 2D Vulkan image of `format`, with one mip level, one
+/// layer, optimal tiling, and the usage VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+/// VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT, which a
+/// Vulkan image that imports it has too. In OpenGL, import it with
+/// glImportMemoryFdEXT() and GL_HANDLE_TYPE_OPAQUE_FD_EXT, and make the texture
+/// with GL_TEXTURE_TILING_EXT set to GL_OPTIMAL_TILING_EXT and
+/// glTexStorageMem2DEXT() at offset 0. Each frame leaves the image in
+/// VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
+///
+/// With `RenderSessionAttachOptions.keepDepth`, on a device whose
+/// `GpuDeviceCapabilities.depthExportKinds` has `GpuExportKind.opaqueFd`, the
+/// depth members share the memory of the frame's depth image in the same way.
+/// Otherwise `depth_fd` is -1 and the others are zero. The depth image is 2D,
+/// of `depth_format`, with one mip level, one layer, optimal tiling, and the
+/// usage VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+/// VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT. Each frame
+/// leaves it in VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
+/// In OpenGL, make its texture with the internal format that
+/// `DepthStencilFormatFlag` names for `depth_format`.
+///
+/// See `mln_opaque_fd_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class OpaqueFdFrame extends _Value {
+  const OpaqueFdFrame({
+    this.width = 0,
+    this.height = 0,
+    this.scaleFactor = 0,
+    this.slot = 0,
+    this.fd = 0,
+    this.allocationSize = 0,
+    this.dedicated = false,
+    this.format = 0,
+    this.depthFd = 0,
+    this.depthAllocationSize = 0,
+    this.depthDedicated = false,
+    this.depthFormat = 0,
+  });
+  final int width;
+  final int height;
+  final double scaleFactor;
+
+  /// The texture's index in the ring.
+  final int slot;
+
+  /// The file descriptor of the image's memory.
+  final int fd;
+
+  /// The size of the memory in bytes.
+  final int allocationSize;
+
+  /// Whether the memory is the image's own, which an import says, such as with
+  /// GL_DEDICATED_MEMORY_OBJECT_EXT.
+  final bool dedicated;
+
+  /// The image's `VkFormat`: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8.
+  final int format;
+
+  /// The file descriptor of the depth image's memory.
+  final int depthFd;
+
+  /// The size of the depth image's memory in bytes.
+  final int depthAllocationSize;
+
+  /// Whether the memory is the depth image's own.
+  final bool depthDedicated;
+
+  /// The depth image's `VkFormat`.
+  final int depthFormat;
+
+  @override
+  List<Object?> get _members => [
+    width,
+    height,
+    scaleFactor,
+    slot,
+    fd,
+    allocationSize,
+    dedicated,
+    format,
+    depthFd,
+    depthAllocationSize,
+    depthDedicated,
+    depthFormat,
+  ];
+  @override
+  String toString() => _describe('OpaqueFdFrame', const [
+    'width',
+    'height',
+    'scaleFactor',
+    'slot',
+    'fd',
+    'allocationSize',
+    'dedicated',
+    'format',
+    'depthFd',
+    'depthAllocationSize',
+    'depthDedicated',
+    'depthFormat',
   ]);
 }
 
 /// The OpenGL texture of an acquired frame.
+///
+/// The depth members are set when the frame has a depth texture, as for
+/// `MetalTextureFrame`. Otherwise they are zero.
 ///
 /// See `mln_open_gl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -1788,6 +2045,8 @@ final class OpenGlTextureFrame extends _Value {
     this.slot = 0,
     this.texture = 0,
     this.target = 0,
+    this.depthTexture = 0,
+    this.depthInternalFormat = 0,
   });
   final int width;
   final int height;
@@ -1798,6 +2057,13 @@ final class OpenGlTextureFrame extends _Value {
   final int texture;
   final int target;
 
+  /// The `GL_TEXTURE_2D` texture that holds the frame's depth and stencil.
+  final int depthTexture;
+
+  /// The depth texture's internal format, such as GL_DEPTH24_STENCIL8, or zero
+  /// for a borrowed ring's.
+  final int depthInternalFormat;
+
   @override
   List<Object?> get _members => [
     width,
@@ -1806,6 +2072,8 @@ final class OpenGlTextureFrame extends _Value {
     slot,
     texture,
     target,
+    depthTexture,
+    depthInternalFormat,
   ];
   @override
   String toString() => _describe('OpenGlTextureFrame', const [
@@ -1815,6 +2083,8 @@ final class OpenGlTextureFrame extends _Value {
     'slot',
     'texture',
     'target',
+    'depthTexture',
+    'depthInternalFormat',
   ]);
 }
 
@@ -2299,6 +2569,136 @@ final class MapView extends _Value {
   ]);
 }
 
+/// A vector in four dimensions, such as a point in homogeneous coordinates.
+///
+/// See `mln_vec4` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class Vec4 extends _Value {
+  const Vec4({this.x = 0, this.y = 0, this.z = 0, this.w = 0});
+  final double x;
+  final double y;
+  final double z;
+  final double w;
+
+  @override
+  List<Object?> get _members => [x, y, z, w];
+  @override
+  String toString() => _describe('Vec4', const ['x', 'y', 'z', 'w']);
+}
+
+/// A 4×4 matrix, by its columns: it takes a vector to `x` times the vector's x,
+/// plus `y` times its y, `z` times its z, and `w` times its w. In memory it is
+/// 16 doubles in column-major order, as OpenGL, Metal, Vulkan, and WebGPU
+/// shaders take a matrix.
+///
+/// See `mln_mat4` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class Mat4 extends _Value {
+  const Mat4({
+    this.x = const Vec4(),
+    this.y = const Vec4(),
+    this.z = const Vec4(),
+    this.w = const Vec4(),
+  });
+  final Vec4 x;
+  final Vec4 y;
+  final Vec4 z;
+  final Vec4 w;
+
+  @override
+  List<Object?> get _members => [x, y, z, w];
+  @override
+  String toString() => _describe('Mat4', const ['x', 'y', 'z', 'w']);
+}
+
+/// Where a frame drew the map, and the depth that it wrote there.
+///
+/// World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at
+/// 180° east, and on past both into the copies of the world beside the first. y
+/// runs from 0 at the north edge of the Mercator world, about 85.05° north, to
+/// 1 at its south edge. z is the altitude in meters above sea level, at the
+/// scale of the heights of the map's 3D layers, and the map draws its ground at
+/// 0.
+///
+/// `matrix` takes a world point to the clip coordinates where the frame drew
+/// it, with the camera's padding, roll, field of view, and center altitude, and
+/// the map's viewport and projection mode. Clip y points up, as the map draws
+/// with OpenGL, Metal, and WebGPU. The map negates clip y with Vulkan, so
+/// negate it there too. At high zooms, single precision can't tell nearby world
+/// points apart: subtract an origin near your geometry from its coordinates in
+/// double precision, and fold the origin into the matrix, before you convert to
+/// float.
+///
+/// Clip z follows `clip_depth_range`, the convention of the device's graphics
+/// API. With the API's default depth range of 0 to 1, a fragment that you draw
+/// through `matrix` gets the depth that the map's 3D layers, such as fill
+/// extrusions, wrote at the same place: 0 at `near_distance` from the camera,
+/// up to `far_depth` at `far_distance`. Depth-tested against the frame's depth,
+/// your fragments hide behind the map's 3D layers where those stand in front of
+/// them.
+///
+/// The frame's depth starts at 1. The map's 3D layers write the depth of each
+/// of their fragments. A 2D layer below every 3D layer of the style that draws
+/// opaque fragments, such as an opaque fill, writes one depth over all of them,
+/// wherever they are: the higher the layer, the lower its depth, and every one
+/// between `far_depth` and 1. Backgrounds, translucent fragments, and the 2D
+/// layers above a 3D layer, such as labels, write no depth. So what you draw
+/// through `matrix`, even on the ground, lies in front of every 2D layer.
+///
+/// While `globe` is true, the frame drew the map onto a globe, and its 2D
+/// layers wrote no depth. `matrix` then is the map's Mercator one, which
+/// doesn't place points on the globe.
+///
+/// See `mln_frame_projection` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class FrameProjection extends _Value {
+  const FrameProjection({
+    this.matrix = const Mat4(),
+    required this.clipDepthRange,
+    this.nearDistance = 0,
+    this.farDistance = 0,
+    this.farDepth = 0,
+    this.globe = false,
+  });
+  final Mat4 matrix;
+  final ClipDepthRange clipDepthRange;
+
+  /// The distance from the camera to the plane where the depth that you get
+  /// through `matrix` is 0, along the camera's view. Like `far_distance`, it is
+  /// in pixels of the map at the camera's zoom, where the world is 512 × 2^zoom
+  /// pixels wide.
+  final double nearDistance;
+
+  /// The distance to the plane where the depth is `far_depth`.
+  final double farDistance;
+
+  /// The depth at `far_distance`, below 1.
+  final double farDepth;
+
+  /// Whether the frame drew the map as a globe, alone or blending into
+  /// Mercator.
+  final bool globe;
+
+  @override
+  List<Object?> get _members => [
+    matrix,
+    clipDepthRange,
+    nearDistance,
+    farDistance,
+    farDepth,
+    globe,
+  ];
+  @override
+  String toString() => _describe('FrameProjection', const [
+    'matrix',
+    'clipDepthRange',
+    'nearDistance',
+    'farDistance',
+    'farDepth',
+    'globe',
+  ]);
+}
+
 /// How one frame demand finished.
 ///
 /// See `mln_render_frame_result` in the
@@ -2312,6 +2712,7 @@ final class RenderFrameResult extends _Value {
     this.frameGeneration = 0,
     this.needsRepaint = false,
     this.view = const MapView(),
+    required this.frameProjection,
     this.mode = const RenderMode.fromRawValue(0),
   });
   final RenderResult disposition;
@@ -2327,6 +2728,10 @@ final class RenderFrameResult extends _Value {
 
   /// The camera and extent that a rendered frame shows.
   final MapView view;
+
+  /// Where a rendered frame drew the map, for drawing into its frame with
+  /// depth. All zero for a demand that rendered nothing.
+  final FrameProjection frameProjection;
   final RenderMode mode;
 
   @override
@@ -2338,6 +2743,7 @@ final class RenderFrameResult extends _Value {
     frameGeneration,
     needsRepaint,
     view,
+    frameProjection,
     mode,
   ];
   @override
@@ -2349,11 +2755,15 @@ final class RenderFrameResult extends _Value {
     'frameGeneration',
     'needsRepaint',
     'view',
+    'frameProjection',
     'mode',
   ]);
 }
 
 /// The Vulkan image of an acquired frame.
+///
+/// The depth members are set when the frame has a depth image, as for
+/// `MetalTextureFrame`. Otherwise they are zero.
 ///
 /// See `mln_vulkan_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2368,6 +2778,10 @@ final class VulkanTextureFrame extends _Value {
     this.device = NativePointer.nullPointer,
     this.format = 0,
     this.layout = 0,
+    this.depthImage = 0,
+    this.depthImageView = 0,
+    this.depthFormat = 0,
+    this.depthLayout = 0,
   });
   final int width;
   final int height;
@@ -2391,6 +2805,18 @@ final class VulkanTextureFrame extends _Value {
   /// The VkImageLayout that the frame left the image in.
   final int layout;
 
+  /// The VkImage that holds the frame's depth and stencil.
+  final int depthImage;
+
+  /// A VkImageView of the depth image's depth and stencil aspects.
+  final int depthImageView;
+
+  /// The depth image's VkFormat.
+  final int depthFormat;
+
+  /// The VkImageLayout that the frame left the depth image in.
+  final int depthLayout;
+
   @override
   List<Object?> get _members => [
     width,
@@ -2402,6 +2828,10 @@ final class VulkanTextureFrame extends _Value {
     device,
     format,
     layout,
+    depthImage,
+    depthImageView,
+    depthFormat,
+    depthLayout,
   ];
   @override
   String toString() => _describe('VulkanTextureFrame', const [
@@ -2414,33 +2844,11 @@ final class VulkanTextureFrame extends _Value {
     'device',
     'format',
     'layout',
+    'depthImage',
+    'depthImageView',
+    'depthFormat',
+    'depthLayout',
   ]);
-}
-
-/// Options for creating a frame pacer.
-///
-/// See `mln_frame_pacer_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-final class FramePacerOptions extends _Value {
-  const FramePacerOptions({this.maximumFramesPerSecond});
-
-  /// The most frames per second that the pacer demands, greater than zero. The
-  /// pacer skips display refreshes to stay within it. By default, it can demand
-  /// frames at every refresh.
-  final int? maximumFramesPerSecond;
-
-  /// A copy of this value with the given members replaced.
-  FramePacerOptions copyWith({int? maximumFramesPerSecond}) =>
-      FramePacerOptions(
-        maximumFramesPerSecond:
-            maximumFramesPerSecond ?? this.maximumFramesPerSecond,
-      );
-
-  @override
-  List<Object?> get _members => [maximumFramesPerSecond];
-  @override
-  String toString() =>
-      _describe('FramePacerOptions', const ['maximumFramesPerSecond']);
 }
 
 /// A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
@@ -2480,6 +2888,570 @@ final class LogicalSize extends _Value {
   List<Object?> get _members => [width, height];
   @override
   String toString() => _describe('LogicalSize', const ['width', 'height']);
+}
+
+/// Options for creating a frame pacer, or for `FramePacerHandle.setOptions()`.
+///
+/// See `mln_frame_pacer_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+final class FramePacerOptions extends _Value {
+  const FramePacerOptions({
+    this.maximumFramesPerSecond,
+    this.unlimitedFramesPerSecond = false,
+  });
+
+  /// The most frames per second that the pacer demands, greater than zero. The
+  /// pacer skips display refreshes to stay within it. By default, it can demand
+  /// frames at every refresh.
+  final int? maximumFramesPerSecond;
+
+  /// Removes the frame rate limit, so the pacer can demand frames at every
+  /// display refresh, as it does by default.
+  final bool unlimitedFramesPerSecond;
+
+  /// A copy of this value with the given members replaced.
+  FramePacerOptions copyWith({
+    int? maximumFramesPerSecond,
+    bool? unlimitedFramesPerSecond,
+  }) => FramePacerOptions(
+    maximumFramesPerSecond:
+        maximumFramesPerSecond ?? this.maximumFramesPerSecond,
+    unlimitedFramesPerSecond:
+        unlimitedFramesPerSecond ?? this.unlimitedFramesPerSecond,
+  );
+
+  @override
+  List<Object?> get _members => [
+    maximumFramesPerSecond,
+    unlimitedFramesPerSecond,
+  ];
+  @override
+  String toString() => _describe('FramePacerOptions', const [
+    'maximumFramesPerSecond',
+    'unlimitedFramesPerSecond',
+  ]);
+}
+
+/// Your lock on a Vulkan queue that you and the render sessions of a GPU device
+/// all submit to.
+///
+/// A session holds the lock only while it submits or presents to the queue, or
+/// submits the empty batch that drains its work from the queue. It never holds
+/// the lock while it waits. Set both `lock` and `unlock`, or neither when you
+/// don't submit to the queue yourself.
+///
+/// Don't hold the lock while you call the library.
+///
+/// It can run on a library thread, and it can't call the library.
+///
+/// See `mln_queue_lock` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class QueueLock {
+  /// Creates a native registration from [lock], [unlock], [userData], and
+  /// [releaseUserData], which native code in the host supplies. The binding
+  /// copies them unchanged.
+  ///
+  /// The first call that carries the registration consumes it, and a later
+  /// call throws an invalid-state error. Native code releases the context
+  /// of a call that it accepts, and the binding calls [releaseUserData] for
+  /// a call that native code does not accept.
+  QueueLock.native({
+    required NativePointer lock,
+    required NativePointer unlock,
+    NativePointer userData = NativePointer.nullPointer,
+    NativePointer releaseUserData = NativePointer.nullPointer,
+  }) {
+    nativeRegistrations[this] = NativeRegistration(
+      [lock, unlock],
+      userData,
+      releaseUserData,
+    );
+  }
+}
+
+/// Options for `GpuDeviceHandle.create()`.
+///
+/// Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
+/// `adapter_luid`. Without one, the device prefers a discrete GPU. An OpenGL
+/// device takes none of them: it renders on the GPU that the platform picks.
+///
+/// See `mln_gpu_device_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+final class GpuDeviceOptions extends _Value {
+  GpuDeviceOptions({
+    this.backend,
+    this.adapterIndex,
+    Uint8List? adapterUuid,
+    Uint8List? adapterLuid,
+    this.openGlClientApi,
+    this.openGlSingleContext,
+    this.queueLock,
+  }) : adapterUuid = adapterUuid == null
+           ? null
+           : Uint8List.fromList(adapterUuid).asUnmodifiableView(),
+       adapterLuid = adapterLuid == null
+           ? null
+           : Uint8List.fromList(adapterLuid).asUnmodifiableView();
+
+  /// The backend that the device renders with. By default, the platform's own:
+  /// Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has
+  /// no Vulkan driver, and in a browser the build's one backend: WebGPU or
+  /// OpenGL (WebGL2).
+  final RenderBackend? backend;
+
+  /// The GPU to use, as an index into the backend's list of GPUs. OpenGL's list
+  /// holds one GPU: the one that its display renders on.
+  final int? adapterIndex;
+
+  /// The 16-byte UUID of the GPU to use: Vulkan's
+  /// `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes one.
+  final Uint8List? adapterUuid;
+
+  /// The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
+  /// which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a
+  /// Vulkan device takes one.
+  final Uint8List? adapterLuid;
+
+  /// The OpenGL API that an OpenGL device renders with. An EGL device defaults
+  /// to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too on Linux and
+  /// FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its default, and a
+  /// WebGL device only `OpenGlClientApi.gles`, its default.
+  final OpenGlClientApi? openGlClientApi;
+
+  /// Whether the sessions of an EGL device take turns in one OpenGL context
+  /// instead of having one each.
+  final bool? openGlSingleContext;
+
+  /// Your lock on a Vulkan device's queue, when you submit to the queue that
+  /// `GpuDeviceHandle.getVulkanContext()` reports. Only a Vulkan device takes
+  /// one.
+  final QueueLock? queueLock;
+
+  /// A copy of this value with the given members replaced.
+  GpuDeviceOptions copyWith({
+    RenderBackend? backend,
+    int? adapterIndex,
+    Uint8List? adapterUuid,
+    Uint8List? adapterLuid,
+    OpenGlClientApi? openGlClientApi,
+    bool? openGlSingleContext,
+    QueueLock? queueLock,
+  }) => GpuDeviceOptions(
+    backend: backend ?? this.backend,
+    adapterIndex: adapterIndex ?? this.adapterIndex,
+    adapterUuid: adapterUuid ?? this.adapterUuid,
+    adapterLuid: adapterLuid ?? this.adapterLuid,
+    openGlClientApi: openGlClientApi ?? this.openGlClientApi,
+    openGlSingleContext: openGlSingleContext ?? this.openGlSingleContext,
+    queueLock: queueLock ?? this.queueLock,
+  );
+
+  @override
+  List<Object?> get _members => [
+    backend,
+    adapterIndex,
+    adapterUuid,
+    adapterLuid,
+    openGlClientApi,
+    openGlSingleContext,
+    queueLock,
+  ];
+  @override
+  String toString() => _describe('GpuDeviceOptions', const [
+    'backend',
+    'adapterIndex',
+    'adapterUuid',
+    'adapterLuid',
+    'openGlClientApi',
+    'openGlSingleContext',
+    'queueLock',
+  ]);
+}
+
+/// What a GPU device can do.
+///
+/// See `mln_gpu_device_capabilities` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+final class GpuDeviceCapabilities extends _Value {
+  const GpuDeviceCapabilities({
+    required this.backend,
+    this.targetKinds = RenderTargetKindFlag.none,
+    this.exportKinds = GpuExportKindFlag.none,
+    this.syncKinds = GpuSyncKindFlag.none,
+    this.depthStencilFormats = DepthStencilFormatFlag.none,
+    this.depthExportKinds = GpuExportKindFlag.none,
+  });
+  final RenderBackend backend;
+
+  /// The kinds of `RenderTarget` that sessions on the device render to.
+  final RenderTargetKindFlag targetKinds;
+
+  /// The ways that the device can share the textures of an exported ring. A
+  /// kind is here only once the device has exported a texture of it, so a
+  /// driver that offers an extension but can't allocate the memory reports no
+  /// kind of it.
+  final GpuExportKindFlag exportKinds;
+
+  /// The kinds of `GpuSync` that the device can signal and wait on.
+  final GpuSyncKindFlag syncKinds;
+
+  /// The formats of the depth textures that a borrowed ring takes.
+  final DepthStencilFormatFlag depthStencilFormats;
+
+  /// The kinds of `export_kinds` whose rings also share each frame's depth
+  /// texture, with `RenderSessionAttachOptions.keepDepth`. An IOSurface or a
+  /// dmabuf holds no depth format, so only `GpuExportKind.opaqueFd` can be
+  /// here.
+  final GpuExportKindFlag depthExportKinds;
+
+  @override
+  List<Object?> get _members => [
+    backend,
+    targetKinds,
+    exportKinds,
+    syncKinds,
+    depthStencilFormats,
+    depthExportKinds,
+  ];
+  @override
+  String toString() => _describe('GpuDeviceCapabilities', const [
+    'backend',
+    'targetKinds',
+    'exportKinds',
+    'syncKinds',
+    'depthStencilFormats',
+    'depthExportKinds',
+  ]);
+}
+
+/// The Vulkan device and queue that a render session uses.
+///
+/// Keep these objects alive until a detach or release of the session completes,
+/// or an abandon of it returns.
+///
+/// See `mln_vulkan_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class VulkanContextDescriptor extends _Value {
+  const VulkanContextDescriptor({
+    required this.instance,
+    required this.physicalDevice,
+    required this.device,
+    required this.graphicsQueue,
+    this.graphicsQueueFamilyIndex = 0,
+    this.getInstanceProcAddr = NativePointer.nullPointer,
+    this.getDeviceProcAddr = NativePointer.nullPointer,
+  });
+
+  /// A `VkInstance`.
+  final NativePointer instance;
+
+  /// A `VkPhysicalDevice`.
+  final NativePointer physicalDevice;
+
+  /// A `VkDevice`.
+  final NativePointer device;
+
+  /// A `VkQueue` from `graphics_queue_family_index` that supports graphics. If
+  /// you submit to it too, give the device your `QueueLock`.
+  final NativePointer graphicsQueue;
+  final int graphicsQueueFamilyIndex;
+
+  /// Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's.
+  final NativePointer getInstanceProcAddr;
+
+  /// Your `vkGetDeviceProcAddr`, or null to look it up from the instance.
+  final NativePointer getDeviceProcAddr;
+
+  /// A copy of this value with the given members replaced.
+  VulkanContextDescriptor copyWith({
+    NativePointer? instance,
+    NativePointer? physicalDevice,
+    NativePointer? device,
+    NativePointer? graphicsQueue,
+    int? graphicsQueueFamilyIndex,
+    NativePointer? getInstanceProcAddr,
+    NativePointer? getDeviceProcAddr,
+  }) => VulkanContextDescriptor(
+    instance: instance ?? this.instance,
+    physicalDevice: physicalDevice ?? this.physicalDevice,
+    device: device ?? this.device,
+    graphicsQueue: graphicsQueue ?? this.graphicsQueue,
+    graphicsQueueFamilyIndex:
+        graphicsQueueFamilyIndex ?? this.graphicsQueueFamilyIndex,
+    getInstanceProcAddr: getInstanceProcAddr ?? this.getInstanceProcAddr,
+    getDeviceProcAddr: getDeviceProcAddr ?? this.getDeviceProcAddr,
+  );
+
+  @override
+  List<Object?> get _members => [
+    instance,
+    physicalDevice,
+    device,
+    graphicsQueue,
+    graphicsQueueFamilyIndex,
+    getInstanceProcAddr,
+    getDeviceProcAddr,
+  ];
+  @override
+  String toString() => _describe('VulkanContextDescriptor', const [
+    'instance',
+    'physicalDevice',
+    'device',
+    'graphicsQueue',
+    'graphicsQueueFamilyIndex',
+    'getInstanceProcAddr',
+    'getDeviceProcAddr',
+  ]);
+}
+
+/// The Vulkan objects of a device, as `GpuDeviceHandle.getVulkanContext()`
+/// reports them.
+///
+/// See `mln_gpu_device_vulkan_context_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+final class GpuDeviceVulkanContextResult extends _Value {
+  const GpuDeviceVulkanContextResult({required this.context});
+  final VulkanContextDescriptor context;
+
+  @override
+  List<Object?> get _members => [context];
+  @override
+  String toString() =>
+      _describe('GpuDeviceVulkanContextResult', const ['context']);
+}
+
+/// Your Metal device and command queue, for `GpuDeviceHandle.wrapMetal()`.
+///
+/// See `mln_metal_device_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+final class MetalDeviceDescriptor extends _Value {
+  const MetalDeviceDescriptor({
+    required this.device,
+    this.commandQueue = NativePointer.nullPointer,
+  });
+
+  /// Your `MTLDevice`.
+  final NativePointer device;
+
+  /// Your `MTLCommandQueue` on `device`, or null for a queue of the library's.
+  /// With your queue, borrowed rings can use `GpuSyncKind.queueOrder`.
+  final NativePointer commandQueue;
+
+  /// A copy of this value with the given members replaced.
+  MetalDeviceDescriptor copyWith({
+    NativePointer? device,
+    NativePointer? commandQueue,
+  }) => MetalDeviceDescriptor(
+    device: device ?? this.device,
+    commandQueue: commandQueue ?? this.commandQueue,
+  );
+
+  @override
+  List<Object?> get _members => [device, commandQueue];
+  @override
+  String toString() =>
+      _describe('MetalDeviceDescriptor', const ['device', 'commandQueue']);
+}
+
+/// Your WGL context, which each session's context shares objects with.
+///
+/// See `mln_wgl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class WglContextDescriptor extends _Value {
+  const WglContextDescriptor({
+    required this.deviceContext,
+    required this.shareContext,
+    this.getProcAddress = NativePointer.nullPointer,
+  });
+
+  /// An `HDC` with the pixel format of `share_context`.
+  final NativePointer deviceContext;
+
+  /// Your `HGLRC`.
+  final NativePointer shareContext;
+
+  /// Your `wglGetProcAddress`, or null to use the system's.
+  final NativePointer getProcAddress;
+
+  /// A copy of this value with the given members replaced.
+  WglContextDescriptor copyWith({
+    NativePointer? deviceContext,
+    NativePointer? shareContext,
+    NativePointer? getProcAddress,
+  }) => WglContextDescriptor(
+    deviceContext: deviceContext ?? this.deviceContext,
+    shareContext: shareContext ?? this.shareContext,
+    getProcAddress: getProcAddress ?? this.getProcAddress,
+  );
+
+  @override
+  List<Object?> get _members => [deviceContext, shareContext, getProcAddress];
+  @override
+  String toString() => _describe('WglContextDescriptor', const [
+    'deviceContext',
+    'shareContext',
+    'getProcAddress',
+  ]);
+}
+
+/// Your EGL context, which each session's context shares objects with.
+///
+/// Each session makes its context on `display` with `config` and the client API
+/// and version of `share_context`.
+///
+/// See `mln_egl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class EglContextDescriptor extends _Value {
+  const EglContextDescriptor({
+    required this.display,
+    required this.config,
+    required this.shareContext,
+    this.getProcAddress = NativePointer.nullPointer,
+  });
+
+  /// An `EGLDisplay`, which you initialized.
+  final NativePointer display;
+
+  /// The `EGLConfig` of `share_context`.
+  final NativePointer config;
+
+  /// Your `EGLContext`.
+  final NativePointer shareContext;
+
+  /// Your `eglGetProcAddress`, or null to use the system's.
+  final NativePointer getProcAddress;
+
+  /// A copy of this value with the given members replaced.
+  EglContextDescriptor copyWith({
+    NativePointer? display,
+    NativePointer? config,
+    NativePointer? shareContext,
+    NativePointer? getProcAddress,
+  }) => EglContextDescriptor(
+    display: display ?? this.display,
+    config: config ?? this.config,
+    shareContext: shareContext ?? this.shareContext,
+    getProcAddress: getProcAddress ?? this.getProcAddress,
+  );
+
+  @override
+  List<Object?> get _members => [display, config, shareContext, getProcAddress];
+  @override
+  String toString() => _describe('EglContextDescriptor', const [
+    'display',
+    'config',
+    'shareContext',
+    'getProcAddress',
+  ]);
+}
+
+/// The WebGL2 context that an OpenGL device wraps.
+///
+/// See `mln_web_gl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class WebGlContextDescriptor extends _Value {
+  const WebGlContextDescriptor({required this.context});
+
+  /// Your `WebGL2RenderingContext`.
+  final int context;
+
+  /// A copy of this value with the given members replaced.
+  WebGlContextDescriptor copyWith({int? context}) =>
+      WebGlContextDescriptor(context: context ?? this.context);
+
+  @override
+  List<Object?> get _members => [context];
+  @override
+  String toString() => _describe('WebGlContextDescriptor', const ['context']);
+}
+
+/// Your OpenGL context, for `GpuDeviceHandle.wrapOpenGl()`: the root of the
+/// share group that the device's sessions join.
+///
+/// See `mln_open_gl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+sealed class OpenGlContextDescriptor {
+  const OpenGlContextDescriptor._();
+  const factory OpenGlContextDescriptor.wgl(WglContextDescriptor value) =
+      OpenGlContextDescriptorWgl;
+  const factory OpenGlContextDescriptor.egl(EglContextDescriptor value) =
+      OpenGlContextDescriptorEgl;
+  const factory OpenGlContextDescriptor.webGl(WebGlContextDescriptor value) =
+      OpenGlContextDescriptorWebGl;
+}
+
+final class OpenGlContextDescriptorWgl extends OpenGlContextDescriptor {
+  const OpenGlContextDescriptorWgl(this.value) : super._();
+  final WglContextDescriptor value;
+  @override
+  bool operator ==(Object other) =>
+      other is OpenGlContextDescriptorWgl && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class OpenGlContextDescriptorEgl extends OpenGlContextDescriptor {
+  const OpenGlContextDescriptorEgl(this.value) : super._();
+  final EglContextDescriptor value;
+  @override
+  bool operator ==(Object other) =>
+      other is OpenGlContextDescriptorEgl && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class OpenGlContextDescriptorWebGl extends OpenGlContextDescriptor {
+  const OpenGlContextDescriptorWebGl(this.value) : super._();
+  final WebGlContextDescriptor value;
+  @override
+  bool operator ==(Object other) =>
+      other is OpenGlContextDescriptorWebGl && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+/// Your Vulkan device and queue, for `GpuDeviceHandle.wrapVulkan()`.
+///
+/// See `mln_vulkan_device_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+final class VulkanDeviceDescriptor extends _Value {
+  VulkanDeviceDescriptor({
+    required this.context,
+    this.queueLock,
+    List<String> enabledExtensions = const [],
+  }) : enabledExtensions = List.unmodifiable(enabledExtensions);
+  final VulkanContextDescriptor context;
+
+  /// Your lock on `context.graphics_queue`, when you submit to it yourself.
+  /// Give every device that wraps the queue the same lock.
+  final QueueLock? queueLock;
+
+  /// The names of the device extensions that you enabled on `context.device`,
+  /// such as "VK_KHR_external_semaphore_fd". Vulkan offers no way to ask a
+  /// device which extensions it has, so the device offers the export kinds and
+  /// `GpuSyncKind.syncFd` only when the extensions that they need are listed
+  /// here, and none of them when the list is empty.
+  final List<String> enabledExtensions;
+
+  /// A copy of this value with the given members replaced.
+  VulkanDeviceDescriptor copyWith({
+    VulkanContextDescriptor? context,
+    QueueLock? queueLock,
+    List<String>? enabledExtensions,
+  }) => VulkanDeviceDescriptor(
+    context: context ?? this.context,
+    queueLock: queueLock ?? this.queueLock,
+    enabledExtensions: enabledExtensions ?? this.enabledExtensions,
+  );
+
+  @override
+  List<Object?> get _members => [context, queueLock, enabledExtensions];
+  @override
+  String toString() => _describe('VulkanDeviceDescriptor', const [
+    'context',
+    'queueLock',
+    'enabledExtensions',
+  ]);
 }
 
 /// A point in the Web Mercator projection, in meters.
@@ -2600,6 +3572,50 @@ final class CustomGeometrySourceOptions {
 
   /// Whether to wrap geometry that crosses the antimeridian.
   final bool? wrap;
+}
+
+/// The callbacks of a custom layer, which draws with your own GPU commands in
+/// the map's frame.
+///
+/// A session runs the callbacks only when it can hand you its commands as one
+/// of `CustomLayerRenderParametersPass`'s variants, so a session on another
+/// backend, such as WebGPU outside a browser, doesn't draw the layer. Nor does
+/// a browser WebGPU session yet: the library's WebGPU (wgpu) exposes no command
+/// encoder or render pass to hand you. Leave unset the callbacks that you don't
+/// need.
+///
+/// Runs on the thread that runs the session's graphics work: a library thread,
+/// or yours with `RenderDriverKind.callerGraphicsThread`. It can't call the
+/// library.
+///
+/// It can't call the library.
+///
+/// See `mln_custom_layer_host` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+final class CustomLayerHost {
+  /// Creates a native registration from [prerender], [render],
+  /// [deinitialize], [contextLost], [userData], and [releaseUserData],
+  /// which native code in the host supplies. The binding copies them
+  /// unchanged.
+  ///
+  /// The first call that carries the registration consumes it, and a later
+  /// call throws an invalid-state error. Native code releases the context
+  /// of a call that it accepts, and the binding calls [releaseUserData] for
+  /// a call that native code does not accept.
+  CustomLayerHost.native({
+    required NativePointer prerender,
+    required NativePointer render,
+    required NativePointer deinitialize,
+    required NativePointer contextLost,
+    NativePointer userData = NativePointer.nullPointer,
+    NativePointer releaseUserData = NativePointer.nullPointer,
+  }) {
+    nativeRegistrations[this] = NativeRegistration(
+      [prerender, render, deinitialize, contextLost],
+      userData,
+      releaseUserData,
+    );
+  }
 }
 
 /// The callbacks and options of a custom vector source.
@@ -3311,50 +4327,1101 @@ final class CameraDelta extends _Value {
   ]);
 }
 
-/// A ring of Android hardware buffers that the library allocates, for
-/// `MapHandle.attachAndroidHardwareBufferRing()`.
+/// An image that the session allocates, renders at the map's scale factor, and
+/// reads back with `RenderSessionHandle.readTexture()`.
 ///
-/// Each buffer has the map's size in pixels, `logical_size` times the map's
-/// scale factor, and the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its
-/// usage is AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
-/// AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `usage`.
-///
-/// See `mln_android_hardware_buffer_ring_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-final class AndroidHardwareBufferRingDescriptor extends _Value {
-  const AndroidHardwareBufferRingDescriptor({
-    required this.logicalSize,
-    required this.bufferCount,
-    this.usage = 0,
-  });
+/// See `mln_offscreen_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class OffscreenTarget extends _Value {
+  const OffscreenTarget({required this.logicalSize});
   final LogicalSize logicalSize;
 
-  /// How many buffers the ring has, from 1 to 8.
-  final int bufferCount;
+  /// A copy of this value with the given members replaced.
+  OffscreenTarget copyWith({LogicalSize? logicalSize}) =>
+      OffscreenTarget(logicalSize: logicalSize ?? this.logicalSize);
 
-  /// More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
-  /// AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
-  final int usage;
+  @override
+  List<Object?> get _members => [logicalSize];
+  @override
+  String toString() => _describe('OffscreenTarget', const ['logicalSize']);
+}
+
+/// A `CAMetalLayer` to present to.
+///
+/// The session sets the layer's device, pixel format, and drawable size.
+///
+/// See `mln_metal_layer_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class MetalLayerTarget extends _Value {
+  const MetalLayerTarget({required this.logicalSize, required this.layer});
+  final LogicalSize logicalSize;
+
+  /// Your `CAMetalLayer*`.
+  final NativePointer layer;
 
   /// A copy of this value with the given members replaced.
-  AndroidHardwareBufferRingDescriptor copyWith({
+  MetalLayerTarget copyWith({LogicalSize? logicalSize, NativePointer? layer}) =>
+      MetalLayerTarget(
+        logicalSize: logicalSize ?? this.logicalSize,
+        layer: layer ?? this.layer,
+      );
+
+  @override
+  List<Object?> get _members => [logicalSize, layer];
+  @override
+  String toString() =>
+      _describe('MetalLayerTarget', const ['logicalSize', 'layer']);
+}
+
+/// A Win32 window to present to.
+///
+/// On an OpenGL device, the session sets the window's pixel format, so don't
+/// set one yourself. While the window is minimized, frame demands finish with
+/// `RenderResult.targetNotReady`.
+///
+/// See `mln_win32_window_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class Win32WindowTarget extends _Value {
+  const Win32WindowTarget({required this.logicalSize, required this.window});
+  final LogicalSize logicalSize;
+
+  /// Your `HWND`.
+  final NativePointer window;
+
+  /// A copy of this value with the given members replaced.
+  Win32WindowTarget copyWith({
     LogicalSize? logicalSize,
-    int? bufferCount,
-    int? usage,
-  }) => AndroidHardwareBufferRingDescriptor(
+    NativePointer? window,
+  }) => Win32WindowTarget(
     logicalSize: logicalSize ?? this.logicalSize,
-    bufferCount: bufferCount ?? this.bufferCount,
-    usage: usage ?? this.usage,
+    window: window ?? this.window,
   );
 
   @override
-  List<Object?> get _members => [logicalSize, bufferCount, usage];
+  List<Object?> get _members => [logicalSize, window];
   @override
-  String toString() => _describe('AndroidHardwareBufferRingDescriptor', const [
+  String toString() =>
+      _describe('Win32WindowTarget', const ['logicalSize', 'window']);
+}
+
+/// An X11 window to present to, through Xlib.
+///
+/// Keep the display connected until the session's detach completes.
+///
+/// See `mln_xlib_window_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class XlibWindowTarget extends _Value {
+  const XlibWindowTarget({
+    required this.logicalSize,
+    required this.display,
+    required this.window,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your `Display*`.
+  final NativePointer display;
+
+  /// Your `Window`, on `display`.
+  final int window;
+
+  /// A copy of this value with the given members replaced.
+  XlibWindowTarget copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? display,
+    int? window,
+  }) => XlibWindowTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    display: display ?? this.display,
+    window: window ?? this.window,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, display, window];
+  @override
+  String toString() =>
+      _describe('XlibWindowTarget', const ['logicalSize', 'display', 'window']);
+}
+
+/// A Wayland surface to present to.
+///
+/// Keep the display connected until the session's detach completes. On an
+/// OpenGL device, if you also use EGL on the display, initialize it before you
+/// attach.
+///
+/// See `mln_wayland_surface_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class WaylandSurfaceTarget extends _Value {
+  const WaylandSurfaceTarget({
+    required this.logicalSize,
+    required this.display,
+    required this.surface,
+  });
+  final LogicalSize logicalSize;
+
+  /// Your `wl_display*`.
+  final NativePointer display;
+
+  /// Your `wl_surface*`, on `display`.
+  final NativePointer surface;
+
+  /// A copy of this value with the given members replaced.
+  WaylandSurfaceTarget copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? display,
+    NativePointer? surface,
+  }) => WaylandSurfaceTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    display: display ?? this.display,
+    surface: surface ?? this.surface,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, display, surface];
+  @override
+  String toString() => _describe('WaylandSurfaceTarget', const [
     'logicalSize',
-    'bufferCount',
-    'usage',
+    'display',
+    'surface',
   ]);
+}
+
+/// An Android window to present to.
+///
+/// The session takes its own reference to the window, so you can release yours
+/// once the call returns. When the platform destroys the window, such as in
+/// `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+/// `RenderSessionHandle.releaseTarget()`, or give the session another window
+/// with `RenderSessionHandle.setTarget()`, without waiting for that to
+/// complete. A frame to the destroyed window finishes with
+/// `RenderResult.targetNotReady`, or with `RenderResult.rendered` if the window
+/// went away while the frame was presenting.
+///
+/// See `mln_android_window_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class AndroidWindowTarget extends _Value {
+  const AndroidWindowTarget({required this.logicalSize, required this.window});
+  final LogicalSize logicalSize;
+
+  /// Your `ANativeWindow*`.
+  final NativePointer window;
+
+  /// A copy of this value with the given members replaced.
+  AndroidWindowTarget copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? window,
+  }) => AndroidWindowTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    window: window ?? this.window,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, window];
+  @override
+  String toString() =>
+      _describe('AndroidWindowTarget', const ['logicalSize', 'window']);
+}
+
+/// An OpenHarmony window to present to.
+///
+/// The session takes its own reference to the window, so you can release yours
+/// once the call returns. When the platform destroys the window, such as in an
+/// `XComponent`'s `onSurfaceDestroyed` callback, release the target or give the
+/// session another window without waiting, as for an Android window.
+///
+/// See `mln_ohos_window_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class OhosWindowTarget extends _Value {
+  const OhosWindowTarget({required this.logicalSize, required this.window});
+  final LogicalSize logicalSize;
+
+  /// Your `OHNativeWindow*`.
+  final NativePointer window;
+
+  /// A copy of this value with the given members replaced.
+  OhosWindowTarget copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? window,
+  }) => OhosWindowTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    window: window ?? this.window,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, window];
+  @override
+  String toString() =>
+      _describe('OhosWindowTarget', const ['logicalSize', 'window']);
+}
+
+/// Your Vulkan surface to present to.
+///
+/// Make it with the instance of the Vulkan device that you attach on. The
+/// device's queue family must support presenting to the surface. The session
+/// creates the swapchain, and destroys it but not the surface.
+///
+/// See `mln_vulkan_surface_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class VulkanSurfaceTarget extends _Value {
+  const VulkanSurfaceTarget({required this.logicalSize, required this.surface});
+  final LogicalSize logicalSize;
+
+  /// Your `VkSurfaceKHR`.
+  final int surface;
+
+  /// A copy of this value with the given members replaced.
+  VulkanSurfaceTarget copyWith({LogicalSize? logicalSize, int? surface}) =>
+      VulkanSurfaceTarget(
+        logicalSize: logicalSize ?? this.logicalSize,
+        surface: surface ?? this.surface,
+      );
+
+  @override
+  List<Object?> get _members => [logicalSize, surface];
+  @override
+  String toString() =>
+      _describe('VulkanSurfaceTarget', const ['logicalSize', 'surface']);
+}
+
+/// Your OpenGL surface to present to, with the context that
+/// `GpuDeviceHandle.wrapOpenGl()` wrapped.
+///
+/// The session makes its context current on the surface for each frame, and
+/// swaps the surface's buffers to present.
+///
+/// See `mln_open_gl_surface_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class OpenGlSurfaceTarget extends _Value {
+  const OpenGlSurfaceTarget({required this.logicalSize, required this.surface});
+  final LogicalSize logicalSize;
+
+  /// Your `EGLSurface` on the context's display, with its config, or your `HDC`
+  /// with the context's pixel format.
+  final NativePointer surface;
+
+  /// A copy of this value with the given members replaced.
+  OpenGlSurfaceTarget copyWith({
+    LogicalSize? logicalSize,
+    NativePointer? surface,
+  }) => OpenGlSurfaceTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    surface: surface ?? this.surface,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, surface];
+  @override
+  String toString() =>
+      _describe('OpenGlSurfaceTarget', const ['logicalSize', 'surface']);
+}
+
+/// A Metal texture of a borrowed ring.
+///
+/// See `mln_metal_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class MetalBorrowedTexture extends _Value {
+  const MetalBorrowedTexture({required this.texture});
+
+  /// Your `MTLTexture`.
+  final NativePointer texture;
+
+  /// A copy of this value with the given members replaced.
+  MetalBorrowedTexture copyWith({NativePointer? texture}) =>
+      MetalBorrowedTexture(texture: texture ?? this.texture);
+
+  @override
+  List<Object?> get _members => [texture];
+  @override
+  String toString() => _describe('MetalBorrowedTexture', const ['texture']);
+}
+
+/// A ring of your Metal textures to render into, on the Metal device that you
+/// attach on.
+///
+/// `physical_width` and `physical_height` give the textures' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. The textures
+/// must all have that size, the device's `MTLDevice`, one pixel format, one
+/// sample, and `MTLTextureUsageRenderTarget`. The ring holds up to
+/// `textureRingMaxDepth` distinct textures.
+///
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, renders the map's
+/// depth and stencil into it, and stores them. They must have the size of
+/// `textures`, one pixel format of `GpuDeviceCapabilities.depthStencilFormats`,
+/// one sample, `MTLTextureUsageRenderTarget`, and a storage mode other than
+/// `MTLStorageModeMemoryless`.
+///
+/// See `mln_metal_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class MetalBorrowedTexturesTarget extends _Value {
+  MetalBorrowedTexturesTarget({
+    required this.logicalSize,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<MetalBorrowedTexture> textures,
+    List<MetalBorrowedTexture> depthTextures = const [],
+  }) : textures = List.unmodifiable(textures),
+       depthTextures = List.unmodifiable(depthTextures);
+  final LogicalSize logicalSize;
+  final int physicalWidth;
+  final int physicalHeight;
+  final List<MetalBorrowedTexture> textures;
+  final List<MetalBorrowedTexture> depthTextures;
+
+  /// A copy of this value with the given members replaced.
+  MetalBorrowedTexturesTarget copyWith({
+    LogicalSize? logicalSize,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<MetalBorrowedTexture>? textures,
+    List<MetalBorrowedTexture>? depthTextures,
+  }) => MetalBorrowedTexturesTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+    depthTextures: depthTextures ?? this.depthTextures,
+  );
+
+  @override
+  List<Object?> get _members => [
+    logicalSize,
+    physicalWidth,
+    physicalHeight,
+    textures,
+    depthTextures,
+  ];
+  @override
+  String toString() => _describe('MetalBorrowedTexturesTarget', const [
+    'logicalSize',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+    'depthTextures',
+  ]);
+}
+
+/// A Vulkan image of a borrowed ring.
+///
+/// See `mln_vulkan_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class VulkanBorrowedTexture extends _Value {
+  const VulkanBorrowedTexture({required this.image, required this.imageView});
+
+  /// Your `VkImage`.
+  final int image;
+
+  /// A 2D `VkImageView` of `image` with one mip level and one layer.
+  final int imageView;
+
+  /// A copy of this value with the given members replaced.
+  VulkanBorrowedTexture copyWith({int? image, int? imageView}) =>
+      VulkanBorrowedTexture(
+        image: image ?? this.image,
+        imageView: imageView ?? this.imageView,
+      );
+
+  @override
+  List<Object?> get _members => [image, imageView];
+  @override
+  String toString() =>
+      _describe('VulkanBorrowedTexture', const ['image', 'imageView']);
+}
+
+/// A ring of your Vulkan images to render into, on the Vulkan device that you
+/// attach on.
+///
+/// `physical_width` and `physical_height` give the images' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. Each image
+/// must have that size, `format`, and `VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT`,
+/// and belong to the device's `VkDevice`. The ring holds up to
+/// `textureRingMaxDepth` distinct images.
+///
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, renders the map's
+/// depth and stencil into it, stores them, and leaves it in
+/// `depth_final_layout`, with `owner` as for the color image. They must have
+/// the size of `textures`, `depth_format`, one sample, and
+/// `VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT`, and their views both the
+/// depth and the stencil aspect.
+///
+/// See `mln_vulkan_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class VulkanBorrowedTexturesTarget extends _Value {
+  VulkanBorrowedTexturesTarget({
+    required this.logicalSize,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<VulkanBorrowedTexture> textures,
+    required this.format,
+    required this.finalLayout,
+    this.owner = const VulkanImageOwner.fromRawValue(0),
+    List<VulkanBorrowedTexture> depthTextures = const [],
+    this.depthFormat = 0,
+    this.depthFinalLayout = 0,
+  }) : textures = List.unmodifiable(textures),
+       depthTextures = List.unmodifiable(depthTextures);
+  final LogicalSize logicalSize;
+  final int physicalWidth;
+  final int physicalHeight;
+  final List<VulkanBorrowedTexture> textures;
+
+  /// The images' `VkFormat`.
+  final int format;
+
+  /// The `VkImageLayout` that each frame leaves its image in.
+  final int finalLayout;
+  final VulkanImageOwner owner;
+  final List<VulkanBorrowedTexture> depthTextures;
+
+  /// The depth images' `VkFormat`, of
+  /// `GpuDeviceCapabilities.depthStencilFormats`.
+  final int depthFormat;
+
+  /// The `VkImageLayout` that each frame leaves its depth image in.
+  final int depthFinalLayout;
+
+  /// A copy of this value with the given members replaced.
+  VulkanBorrowedTexturesTarget copyWith({
+    LogicalSize? logicalSize,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<VulkanBorrowedTexture>? textures,
+    int? format,
+    int? finalLayout,
+    VulkanImageOwner? owner,
+    List<VulkanBorrowedTexture>? depthTextures,
+    int? depthFormat,
+    int? depthFinalLayout,
+  }) => VulkanBorrowedTexturesTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+    format: format ?? this.format,
+    finalLayout: finalLayout ?? this.finalLayout,
+    owner: owner ?? this.owner,
+    depthTextures: depthTextures ?? this.depthTextures,
+    depthFormat: depthFormat ?? this.depthFormat,
+    depthFinalLayout: depthFinalLayout ?? this.depthFinalLayout,
+  );
+
+  @override
+  List<Object?> get _members => [
+    logicalSize,
+    physicalWidth,
+    physicalHeight,
+    textures,
+    format,
+    finalLayout,
+    owner,
+    depthTextures,
+    depthFormat,
+    depthFinalLayout,
+  ];
+  @override
+  String toString() => _describe('VulkanBorrowedTexturesTarget', const [
+    'logicalSize',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+    'format',
+    'finalLayout',
+    'owner',
+    'depthTextures',
+    'depthFormat',
+    'depthFinalLayout',
+  ]);
+}
+
+/// An OpenGL texture of a borrowed ring.
+///
+/// See `mln_open_gl_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class OpenGlBorrowedTexture extends _Value {
+  const OpenGlBorrowedTexture({required this.texture});
+
+  /// Your texture name.
+  final int texture;
+
+  /// A copy of this value with the given members replaced.
+  OpenGlBorrowedTexture copyWith({int? texture}) =>
+      OpenGlBorrowedTexture(texture: texture ?? this.texture);
+
+  @override
+  List<Object?> get _members => [texture];
+  @override
+  String toString() => _describe('OpenGlBorrowedTexture', const ['texture']);
+}
+
+/// A ring of your OpenGL textures to render into, on an OpenGL device that
+/// `GpuDeviceHandle.wrapOpenGl()` made from your context.
+///
+/// `physical_width` and `physical_height` give the textures' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. Each texture
+/// must be in your context's share group, with RGBA8 storage of that size. The
+/// ring holds up to `textureRingMaxDepth` distinct textures.
+///
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, and renders the map's
+/// depth and stencil into it. They must be `GL_TEXTURE_2D` textures in the
+/// share group, with storage of the size of `textures` in a format of
+/// `GpuDeviceCapabilities.depthStencilFormats`.
+///
+/// See `mln_open_gl_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class OpenGlBorrowedTexturesTarget extends _Value {
+  OpenGlBorrowedTexturesTarget({
+    required this.logicalSize,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<OpenGlBorrowedTexture> textures,
+    required this.target,
+    List<OpenGlBorrowedTexture> depthTextures = const [],
+  }) : textures = List.unmodifiable(textures),
+       depthTextures = List.unmodifiable(depthTextures);
+  final LogicalSize logicalSize;
+  final int physicalWidth;
+  final int physicalHeight;
+  final List<OpenGlBorrowedTexture> textures;
+
+  /// The textures' target. It must be `GL_TEXTURE_2D`.
+  final int target;
+  final List<OpenGlBorrowedTexture> depthTextures;
+
+  /// A copy of this value with the given members replaced.
+  OpenGlBorrowedTexturesTarget copyWith({
+    LogicalSize? logicalSize,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<OpenGlBorrowedTexture>? textures,
+    int? target,
+    List<OpenGlBorrowedTexture>? depthTextures,
+  }) => OpenGlBorrowedTexturesTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+    target: target ?? this.target,
+    depthTextures: depthTextures ?? this.depthTextures,
+  );
+
+  @override
+  List<Object?> get _members => [
+    logicalSize,
+    physicalWidth,
+    physicalHeight,
+    textures,
+    target,
+    depthTextures,
+  ];
+  @override
+  String toString() => _describe('OpenGlBorrowedTexturesTarget', const [
+    'logicalSize',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+    'target',
+    'depthTextures',
+  ]);
+}
+
+/// A WebGPU texture of a borrowed ring.
+///
+/// See `mln_web_gpu_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class WebGpuBorrowedTexture extends _Value {
+  const WebGpuBorrowedTexture({required this.texture});
+
+  /// Your `GPUTexture`.
+  final int texture;
+
+  /// A copy of this value with the given members replaced.
+  WebGpuBorrowedTexture copyWith({int? texture}) =>
+      WebGpuBorrowedTexture(texture: texture ?? this.texture);
+
+  @override
+  List<Object?> get _members => [texture];
+  @override
+  String toString() => _describe('WebGpuBorrowedTexture', const ['texture']);
+}
+
+/// A ring of your WebGPU textures to render into, on a WebGPU device that wraps
+/// yours.
+///
+/// `physical_width` and `physical_height` give the textures' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. Each texture
+/// must be 2D with that size, `format`, one layer, one mip level, one sample,
+/// and `GPUTextureUsage.RENDER_ATTACHMENT`. The ring holds up to
+/// `textureRingMaxDepth` distinct textures.
+///
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, renders the map's
+/// depth and stencil into it, and stores them. They must be 2D with the size of
+/// `textures`, `depth_format`, one layer, one mip level, one sample, and
+/// `GPUTextureUsage.RENDER_ATTACHMENT`.
+///
+/// See `mln_web_gpu_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class WebGpuBorrowedTexturesTarget extends _Value {
+  WebGpuBorrowedTexturesTarget({
+    required this.logicalSize,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<WebGpuBorrowedTexture> textures,
+    required this.format,
+    List<WebGpuBorrowedTexture> depthTextures = const [],
+    this.depthFormat = '',
+  }) : textures = List.unmodifiable(textures),
+       depthTextures = List.unmodifiable(depthTextures);
+  final LogicalSize logicalSize;
+  final int physicalWidth;
+  final int physicalHeight;
+  final List<WebGpuBorrowedTexture> textures;
+
+  /// The textures' `GPUTextureFormat`, such as `rgba8unorm`.
+  final String format;
+  final List<WebGpuBorrowedTexture> depthTextures;
+
+  /// The depth textures' `GPUTextureFormat`, of
+  /// `GpuDeviceCapabilities.depthStencilFormats`.
+  final String depthFormat;
+
+  /// A copy of this value with the given members replaced.
+  WebGpuBorrowedTexturesTarget copyWith({
+    LogicalSize? logicalSize,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<WebGpuBorrowedTexture>? textures,
+    String? format,
+    List<WebGpuBorrowedTexture>? depthTextures,
+    String? depthFormat,
+  }) => WebGpuBorrowedTexturesTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+    format: format ?? this.format,
+    depthTextures: depthTextures ?? this.depthTextures,
+    depthFormat: depthFormat ?? this.depthFormat,
+  );
+
+  @override
+  List<Object?> get _members => [
+    logicalSize,
+    physicalWidth,
+    physicalHeight,
+    textures,
+    format,
+    depthTextures,
+    depthFormat,
+  ];
+  @override
+  String toString() => _describe('WebGpuBorrowedTexturesTarget', const [
+    'logicalSize',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+    'format',
+    'depthTextures',
+    'depthFormat',
+  ]);
+}
+
+/// A DRM format and modifier that you can import.
+///
+/// See `mln_dma_buf_format` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class DmaBufFormat extends _Value {
+  const DmaBufFormat({this.fourcc = 0, this.modifier = 0});
+
+  /// A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
+  final int fourcc;
+
+  /// A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR.
+  final int modifier;
+
+  /// A copy of this value with the given members replaced.
+  DmaBufFormat copyWith({int? fourcc, int? modifier}) => DmaBufFormat(
+    fourcc: fourcc ?? this.fourcc,
+    modifier: modifier ?? this.modifier,
+  );
+
+  @override
+  List<Object?> get _members => [fourcc, modifier];
+  @override
+  String toString() => _describe('DmaBufFormat', const ['fourcc', 'modifier']);
+}
+
+/// A ring of textures that the session allocates on its device and shares with
+/// you, in one of the ways that you can import.
+///
+/// Each texture has the size in pixels of `logical_size` at the map's scale
+/// factor. `RenderSessionHandle.resize()` gives the ring textures of the new
+/// size, and a frame that you hold keeps its texture of the old size until you
+/// release or discard it.
+///
+/// The ring shares its textures in the first kind of `export_kinds` that the
+/// device exports, in this order, and `RenderSessionCapabilities.exportKind`
+/// reports it:
+///
+/// - `GpuExportKind.ioSurface`: IOSurfaces of the pixel format
+///   kCVPixelFormatType_32BGRA, which Metal names MTLPixelFormatBGRA8Unorm. Get
+///   each frame's surface with `AcquiredFrameHandle.withIoSurface()`.
+/// - `GpuExportKind.androidHardwareBuffer`: hardware buffers of the format
+///   AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, with the usage
+///   AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+///   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
+///   `android_hardware_buffer_usage`. Get each frame's buffer with
+///   `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
+/// - `GpuExportKind.dxgiSharedHandle`: D3D11 textures of the format
+///   DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
+///   resources and render targets. Open them on a D3D11 or D3D12 device of the
+///   same adapter, which you pick with `GpuDeviceOptions.adapterLuid`. Get each
+///   frame's texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+/// - `GpuExportKind.dmaBuf`: dmabufs of a format and modifier from
+///   `dma_buf_formats`. Get each frame's buffer with
+///   `AcquiredFrameHandle.withDmaBuf()`.
+/// - `GpuExportKind.opaqueFd`: the memory of Vulkan images, which only a Vulkan
+///   device or an OpenGL context with GL_EXT_memory_object_fd on the same GPU
+///   and driver imports. To pick the GPU, create the device with
+///   `GpuDeviceOptions.adapterUuid` set to your context's GL_DEVICE_UUID_EXT.
+///   Get each frame's memory with `AcquiredFrameHandle.withOpaqueFd()`.
+///
+/// `GpuDeviceCapabilities.exportKinds` reports the kinds that a device exports.
+/// Attach with `RenderDriverKind.coreWorker`. Without a device, the session
+/// renders on the first of the platform's backends whose device exports one of
+/// `export_kinds`.
+///
+/// Each frame hands over with `GpuSyncKind.cpuComplete` or with the sync kind
+/// that crosses APIs on its platform: `GpuSyncKind.metalSharedEvent` for an
+/// IOSurface, and `GpuSyncKind.syncFd` for the others, where the device has
+/// them. For a reader that waits on neither, such as a Wayland compositor
+/// without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
+/// out of `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
+/// finishes before you acquire it, and release each frame only once the reader
+/// is done with its texture. Give the ring 3 textures, so the session can
+/// render while you hold two frames.
+///
+/// See `mln_exported_ring_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class ExportedRingTarget extends _Value {
+  ExportedRingTarget({
+    required this.logicalSize,
+    required this.textureCount,
+    required this.exportKinds,
+    List<DmaBufFormat> dmaBufFormats = const [],
+    this.androidHardwareBufferUsage = 0,
+  }) : dmaBufFormats = List.unmodifiable(dmaBufFormats);
+  final LogicalSize logicalSize;
+
+  /// How many textures the ring has, from 1 to `textureRingMaxDepth`.
+  final int textureCount;
+
+  /// The ways of sharing a texture that you can import.
+  final GpuExportKindFlag exportKinds;
+
+  /// The dmabuf formats and modifiers that you import, most preferred first,
+  /// such as those that eglQueryDmaBufModifiersEXT() reports. A ring exports
+  /// dmabufs only of one of them. The library renders only DRM_FORMAT_ABGR8888
+  /// and DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
+  /// format has, such as a plane of compression metadata, and the library takes
+  /// any such modifier that its GPU can render into and share. The library
+  /// takes no implicit modifier: it skips DRM_FORMAT_MOD_INVALID, so a list of
+  /// only that one gets no dmabuf.
+  final List<DmaBufFormat> dmaBufFormats;
+
+  /// More `AHARDWAREBUFFER_USAGE_*` bits that your reads of a hardware buffer
+  /// need, such as AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+  final int androidHardwareBufferUsage;
+
+  /// A copy of this value with the given members replaced.
+  ExportedRingTarget copyWith({
+    LogicalSize? logicalSize,
+    int? textureCount,
+    GpuExportKindFlag? exportKinds,
+    List<DmaBufFormat>? dmaBufFormats,
+    int? androidHardwareBufferUsage,
+  }) => ExportedRingTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    textureCount: textureCount ?? this.textureCount,
+    exportKinds: exportKinds ?? this.exportKinds,
+    dmaBufFormats: dmaBufFormats ?? this.dmaBufFormats,
+    androidHardwareBufferUsage:
+        androidHardwareBufferUsage ?? this.androidHardwareBufferUsage,
+  );
+
+  @override
+  List<Object?> get _members => [
+    logicalSize,
+    textureCount,
+    exportKinds,
+    dmaBufFormats,
+    androidHardwareBufferUsage,
+  ];
+  @override
+  String toString() => _describe('ExportedRingTarget', const [
+    'logicalSize',
+    'textureCount',
+    'exportKinds',
+    'dmaBufFormats',
+    'androidHardwareBufferUsage',
+  ]);
+}
+
+/// A canvas to present to.
+///
+/// The session makes the canvas's "webgpu" or "webgl2" context with the
+/// device's backend, and sets the canvas's size to `logical_size` at the map's
+/// scale factor. Attached without a device, it renders with the build's
+/// backend: a WebGPU build asks the browser for a device, and attaches once it
+/// has one. For an OpenGL device that wraps your WebGL2 context, the canvas
+/// must be the context's own.
+///
+/// See `mln_web_canvas_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class WebCanvasTarget extends _Value {
+  const WebCanvasTarget({
+    required this.logicalSize,
+    required this.canvas,
+    this.format = '',
+  });
+  final LogicalSize logicalSize;
+
+  /// An `OffscreenCanvas`, such as one from
+  /// `HTMLCanvasElement.transferControlToOffscreen()` that you posted to the
+  /// library's Web Worker, or an `HTMLCanvasElement` when the library runs on
+  /// the page's thread.
+  final int canvas;
+
+  /// For a WebGPU device, the `GPUTextureFormat` to configure the canvas with,
+  /// such as `bgra8unorm`. Empty for a format that the device's adapter
+  /// prefers.
+  final String format;
+
+  /// A copy of this value with the given members replaced.
+  WebCanvasTarget copyWith({
+    LogicalSize? logicalSize,
+    int? canvas,
+    String? format,
+  }) => WebCanvasTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    canvas: canvas ?? this.canvas,
+    format: format ?? this.format,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, canvas, format];
+  @override
+  String toString() =>
+      _describe('WebCanvasTarget', const ['logicalSize', 'canvas', 'format']);
+}
+
+/// What a render session renders into: one kind of target, and its descriptor.
+///
+/// Every target has a size in logical pixels, which sets the map's size. The
+/// session renders it at the map's scale factor. A borrowed or exported ring
+/// hands each frame to you: acquire it with
+/// `RenderSessionHandle.acquireFrame()`, and release it with your GPU's
+/// synchronization once you have read it.
+///
+/// The session uses the objects that the descriptor names until a replacement
+/// or release of the target completes, a detach or release of the session
+/// completes, or an abandon of it returns, except as a kind's descriptor says.
+/// A window target presents without waiting for the display, so demand at most
+/// one frame per display refresh.
+///
+/// See `mln_render_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+sealed class RenderTarget {
+  const RenderTarget._();
+  const factory RenderTarget.offscreen(OffscreenTarget value) =
+      RenderTargetOffscreen;
+  const factory RenderTarget.metalLayer(MetalLayerTarget value) =
+      RenderTargetMetalLayer;
+  const factory RenderTarget.win32Window(Win32WindowTarget value) =
+      RenderTargetWin32Window;
+  const factory RenderTarget.xlibWindow(XlibWindowTarget value) =
+      RenderTargetXlibWindow;
+  const factory RenderTarget.waylandSurface(WaylandSurfaceTarget value) =
+      RenderTargetWaylandSurface;
+  const factory RenderTarget.androidWindow(AndroidWindowTarget value) =
+      RenderTargetAndroidWindow;
+  const factory RenderTarget.ohosWindow(OhosWindowTarget value) =
+      RenderTargetOhosWindow;
+  const factory RenderTarget.vulkanSurface(VulkanSurfaceTarget value) =
+      RenderTargetVulkanSurface;
+  const factory RenderTarget.openGlSurface(OpenGlSurfaceTarget value) =
+      RenderTargetOpenGlSurface;
+  const factory RenderTarget.metalBorrowedTextures(
+    MetalBorrowedTexturesTarget value,
+  ) = RenderTargetMetalBorrowedTextures;
+  const factory RenderTarget.vulkanBorrowedTextures(
+    VulkanBorrowedTexturesTarget value,
+  ) = RenderTargetVulkanBorrowedTextures;
+  const factory RenderTarget.openGlBorrowedTextures(
+    OpenGlBorrowedTexturesTarget value,
+  ) = RenderTargetOpenGlBorrowedTextures;
+  const factory RenderTarget.webGpuBorrowedTextures(
+    WebGpuBorrowedTexturesTarget value,
+  ) = RenderTargetWebGpuBorrowedTextures;
+  const factory RenderTarget.exportedRing(ExportedRingTarget value) =
+      RenderTargetExportedRing;
+  const factory RenderTarget.webCanvas(WebCanvasTarget value) =
+      RenderTargetWebCanvas;
+}
+
+final class RenderTargetOffscreen extends RenderTarget {
+  const RenderTargetOffscreen(this.value) : super._();
+  final OffscreenTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetOffscreen && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetMetalLayer extends RenderTarget {
+  const RenderTargetMetalLayer(this.value) : super._();
+  final MetalLayerTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetMetalLayer && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetWin32Window extends RenderTarget {
+  const RenderTargetWin32Window(this.value) : super._();
+  final Win32WindowTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetWin32Window && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetXlibWindow extends RenderTarget {
+  const RenderTargetXlibWindow(this.value) : super._();
+  final XlibWindowTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetXlibWindow && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetWaylandSurface extends RenderTarget {
+  const RenderTargetWaylandSurface(this.value) : super._();
+  final WaylandSurfaceTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetWaylandSurface && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetAndroidWindow extends RenderTarget {
+  const RenderTargetAndroidWindow(this.value) : super._();
+  final AndroidWindowTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetAndroidWindow && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetOhosWindow extends RenderTarget {
+  const RenderTargetOhosWindow(this.value) : super._();
+  final OhosWindowTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetOhosWindow && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetVulkanSurface extends RenderTarget {
+  const RenderTargetVulkanSurface(this.value) : super._();
+  final VulkanSurfaceTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetVulkanSurface && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetOpenGlSurface extends RenderTarget {
+  const RenderTargetOpenGlSurface(this.value) : super._();
+  final OpenGlSurfaceTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetOpenGlSurface && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetMetalBorrowedTextures extends RenderTarget {
+  const RenderTargetMetalBorrowedTextures(this.value) : super._();
+  final MetalBorrowedTexturesTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetMetalBorrowedTextures && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetVulkanBorrowedTextures extends RenderTarget {
+  const RenderTargetVulkanBorrowedTextures(this.value) : super._();
+  final VulkanBorrowedTexturesTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetVulkanBorrowedTextures && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetOpenGlBorrowedTextures extends RenderTarget {
+  const RenderTargetOpenGlBorrowedTextures(this.value) : super._();
+  final OpenGlBorrowedTexturesTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetOpenGlBorrowedTextures && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetWebGpuBorrowedTextures extends RenderTarget {
+  const RenderTargetWebGpuBorrowedTextures(this.value) : super._();
+  final WebGpuBorrowedTexturesTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetWebGpuBorrowedTextures && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetExportedRing extends RenderTarget {
+  const RenderTargetExportedRing(this.value) : super._();
+  final ExportedRingTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetExportedRing && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetWebCanvas extends RenderTarget {
+  const RenderTargetWebCanvas(this.value) : super._();
+  final WebCanvasTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetWebCanvas && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
 }
 
 /// Tells the caller that work is ready for it.
@@ -3403,39 +5470,6 @@ final class Wake {
   final WakeCallback? callback;
 }
 
-/// Your lock on a Vulkan queue that you and a render session both submit to.
-///
-/// The session holds the lock only while it submits or presents to the queue.
-/// Set both `lock` and `unlock`, or neither when you don't submit to the queue
-/// yourself.
-///
-/// It can run on a library thread, and it can't call the library.
-///
-/// See `mln_queue_lock` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class QueueLock {
-  /// Creates a native registration from [lock], [unlock], [userData], and
-  /// [releaseUserData], which native code in the host supplies. The binding
-  /// copies them unchanged.
-  ///
-  /// The first call that carries the registration consumes it, and a later
-  /// call throws an invalid-state error. Native code releases the context
-  /// of a call that it accepts, and the binding calls [releaseUserData] for
-  /// a call that native code does not accept.
-  QueueLock.native({
-    required NativePointer lock,
-    required NativePointer unlock,
-    NativePointer userData = NativePointer.nullPointer,
-    NativePointer releaseUserData = NativePointer.nullPointer,
-  }) {
-    nativeRegistrations[this] = NativeRegistration(
-      [lock, unlock],
-      userData,
-      releaseUserData,
-    );
-  }
-}
-
 /// Options for attaching a render session to a map.
 ///
 /// See `mln_render_session_attach_options` in the
@@ -3447,19 +5481,24 @@ final class RenderSessionAttachOptions extends _Value {
     this.frameWake = const Wake(),
     this.redrawWake = const Wake(),
     this.driverWorkWake = const Wake(),
-    this.queueLock,
+    this.keepDepth = false,
   });
 
   /// The thread that runs the session's graphics work, which depends on the
   /// target:
   ///
-  /// - `RenderDriverKind.callerGraphicsThread` for a shared or dedicated EGL or
-  ///   WGL context, an existing WebGL context, or a browser's WebGPU device.
-  /// - `RenderDriverKind.coreWorker` for a transferred WebGL canvas, an
-  ///   Android, OpenHarmony, or Win32 window, a Wayland surface, a ring of
-  ///   Android hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces,
-  ///   or an offscreen session.
-  /// - Either one for another Metal or Vulkan target.
+  /// - `RenderDriverKind.callerGraphicsThread` for a borrowed ring of WebGPU
+  ///   textures.
+  /// - `RenderDriverKind.coreWorker` for an offscreen target, a window, or an
+  ///   exported ring.
+  /// - Either one for a web canvas. In a browser both run on the thread that
+  ///   loaded the library: `RenderDriverKind.coreWorker` in the library's own
+  ///   tasks, and `RenderDriverKind.callerGraphicsThread` when you service the
+  ///   session.
+  /// - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
+  ///   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
+  ///   these on `RenderDriverKind.coreWorker` only, and fails an attach with
+  ///   `RenderDriverKind.callerGraphicsThread` then.
   ///
   /// An attach with another driver fails with `Status.unsupported`.
   ///
@@ -3486,11 +5525,22 @@ final class RenderSessionAttachOptions extends _Value {
 
   /// Called when a session driven by `RenderDriverKind.callerGraphicsThread`
   /// has work for `mln_render_session_service_driver_work()`. It isn't called
-  /// again until a service runs.
+  /// again until a service runs. It's never called on your graphics thread
+  /// during a service: the service runs the work that comes while it runs, so
+  /// you can call `mln_render_session_service_driver_work()` from the wake.
   final Wake driverWorkWake;
 
-  /// Your lock on the Vulkan queue, when you submit to it yourself.
-  final QueueLock? queueLock;
+  /// Whether an exported ring keeps the depth and stencil of each frame for
+  /// you, so that you can draw into the frame depth-tested against the map, as
+  /// `FrameProjection` says. The getter of the device's API, such as
+  /// `AcquiredFrameHandle.withVulkanTexture()`, gets a frame's depth texture on
+  /// the device, and `AcquiredFrameHandle.withOpaqueFd()` shares it across APIs
+  /// when `GpuDeviceCapabilities.depthExportKinds` has the ring's kind. Keeping
+  /// depth costs memory bandwidth, most on tile-based GPUs. A borrowed ring
+  /// keeps depth in the textures that you give it instead, and the other
+  /// targets keep none, so an attach to them with `keep_depth` fails with
+  /// `Status.unsupported`.
+  final bool keepDepth;
 
   /// A copy of this value with the given members replaced.
   RenderSessionAttachOptions copyWith({
@@ -3499,14 +5549,14 @@ final class RenderSessionAttachOptions extends _Value {
     Wake? frameWake,
     Wake? redrawWake,
     Wake? driverWorkWake,
-    QueueLock? queueLock,
+    bool? keepDepth,
   }) => RenderSessionAttachOptions(
     driver: driver ?? this.driver,
     producerSyncKinds: producerSyncKinds ?? this.producerSyncKinds,
     frameWake: frameWake ?? this.frameWake,
     redrawWake: redrawWake ?? this.redrawWake,
     driverWorkWake: driverWorkWake ?? this.driverWorkWake,
-    queueLock: queueLock ?? this.queueLock,
+    keepDepth: keepDepth ?? this.keepDepth,
   );
 
   @override
@@ -3516,7 +5566,7 @@ final class RenderSessionAttachOptions extends _Value {
     frameWake,
     redrawWake,
     driverWorkWake,
-    queueLock,
+    keepDepth,
   ];
   @override
   String toString() => _describe('RenderSessionAttachOptions', const [
@@ -3525,987 +5575,8 @@ final class RenderSessionAttachOptions extends _Value {
     'frameWake',
     'redrawWake',
     'driverWorkWake',
-    'queueLock',
+    'keepDepth',
   ]);
-}
-
-/// An Android window to present to, for `MapHandle.attachAndroidSurface()`.
-///
-/// Name the window by `window`, or by `jni_env` and `surface`. The session
-/// takes its own reference to the window, so you can release yours once the
-/// call returns.
-///
-/// See `mln_android_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-final class AndroidSurfaceDescriptor extends _Value {
-  const AndroidSurfaceDescriptor({
-    required this.logicalSize,
-    this.window = NativePointer.nullPointer,
-    this.jniEnv = NativePointer.nullPointer,
-    this.surface = NativePointer.nullPointer,
-  });
-  final LogicalSize logicalSize;
-
-  /// Your `ANativeWindow*`, or null to name the window by `surface`.
-  final NativePointer window;
-
-  /// The calling thread's `JNIEnv*`, with `surface`.
-  final NativePointer jniEnv;
-
-  /// An `android.view.Surface`, with `jni_env`.
-  final NativePointer surface;
-
-  /// A copy of this value with the given members replaced.
-  AndroidSurfaceDescriptor copyWith({
-    LogicalSize? logicalSize,
-    NativePointer? window,
-    NativePointer? jniEnv,
-    NativePointer? surface,
-  }) => AndroidSurfaceDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    window: window ?? this.window,
-    jniEnv: jniEnv ?? this.jniEnv,
-    surface: surface ?? this.surface,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, window, jniEnv, surface];
-  @override
-  String toString() => _describe('AndroidSurfaceDescriptor', const [
-    'logicalSize',
-    'window',
-    'jniEnv',
-    'surface',
-  ]);
-}
-
-/// A DRM format and modifier that you can import.
-///
-/// See `mln_dma_buf_format` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
-final class DmaBufFormat extends _Value {
-  const DmaBufFormat({this.fourcc = 0, this.modifier = 0});
-
-  /// A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
-  final int fourcc;
-
-  /// A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR.
-  final int modifier;
-
-  /// A copy of this value with the given members replaced.
-  DmaBufFormat copyWith({int? fourcc, int? modifier}) => DmaBufFormat(
-    fourcc: fourcc ?? this.fourcc,
-    modifier: modifier ?? this.modifier,
-  );
-
-  @override
-  List<Object?> get _members => [fourcc, modifier];
-  @override
-  String toString() => _describe('DmaBufFormat', const ['fourcc', 'modifier']);
-}
-
-/// A ring of dmabufs that the library allocates, for
-/// `MapHandle.attachDmaBufRing()`.
-///
-/// Each buffer has the map's size in pixels and a format and modifier from
-/// `formats`. The library renders only DRM_FORMAT_ABGR8888 and
-/// DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its
-/// format has, such as a plane of compression metadata, and the library takes
-/// any such modifier that its GPU can render into and share.
-///
-/// See `mln_dma_buf_ring_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
-final class DmaBufRingDescriptor extends _Value {
-  DmaBufRingDescriptor({
-    required this.logicalSize,
-    required this.bufferCount,
-    required List<DmaBufFormat> formats,
-  }) : formats = List.unmodifiable(formats);
-  final LogicalSize logicalSize;
-
-  /// How many buffers the ring has, from 1 to 8.
-  final int bufferCount;
-
-  /// The formats and modifiers that your reader imports, most preferred first,
-  /// such as those that eglQueryDmaBufModifiersEXT() reports.
-  final List<DmaBufFormat> formats;
-
-  /// A copy of this value with the given members replaced.
-  DmaBufRingDescriptor copyWith({
-    LogicalSize? logicalSize,
-    int? bufferCount,
-    List<DmaBufFormat>? formats,
-  }) => DmaBufRingDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    bufferCount: bufferCount ?? this.bufferCount,
-    formats: formats ?? this.formats,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, bufferCount, formats];
-  @override
-  String toString() => _describe('DmaBufRingDescriptor', const [
-    'logicalSize',
-    'bufferCount',
-    'formats',
-  ]);
-}
-
-/// A ring of DXGI shared textures that the library allocates, for
-/// `MapHandle.attachDxgiSharedTextureRing()`.
-///
-/// Each texture is a D3D11 2D texture with the map's size in pixels and the
-/// format DXGI_FORMAT_B8G8R8A8_UNORM. It binds as a shader resource and a
-/// render target, and is shared through an NT handle.
-///
-/// See `mln_dxgi_shared_texture_ring_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-final class DxgiSharedTextureRingDescriptor extends _Value {
-  const DxgiSharedTextureRingDescriptor({
-    required this.logicalSize,
-    required this.textureCount,
-  });
-  final LogicalSize logicalSize;
-
-  /// How many textures the ring has, from 1 to 8.
-  final int textureCount;
-
-  /// A copy of this value with the given members replaced.
-  DxgiSharedTextureRingDescriptor copyWith({
-    LogicalSize? logicalSize,
-    int? textureCount,
-  }) => DxgiSharedTextureRingDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    textureCount: textureCount ?? this.textureCount,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, textureCount];
-  @override
-  String toString() => _describe('DxgiSharedTextureRingDescriptor', const [
-    'logicalSize',
-    'textureCount',
-  ]);
-}
-
-/// The Metal device that a render session uses.
-///
-/// See `mln_metal_context_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class MetalContextDescriptor extends _Value {
-  const MetalContextDescriptor({this.device = NativePointer.nullPointer});
-
-  /// An `MTLDevice`.
-  final NativePointer device;
-
-  /// A copy of this value with the given members replaced.
-  MetalContextDescriptor copyWith({NativePointer? device}) =>
-      MetalContextDescriptor(device: device ?? this.device);
-
-  @override
-  List<Object?> get _members => [device];
-  @override
-  String toString() => _describe('MetalContextDescriptor', const ['device']);
-}
-
-/// A ring of IOSurfaces that the library allocates, for
-/// `MapHandle.attachIoSurfaceRing()`.
-///
-/// Each surface has the map's size in pixels, `logical_size` times the map's
-/// scale factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal
-/// names MTLPixelFormatBGRA8Unorm.
-///
-/// See `mln_io_surface_ring_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
-final class IoSurfaceRingDescriptor extends _Value {
-  const IoSurfaceRingDescriptor({
-    required this.logicalSize,
-    required this.bufferCount,
-    this.context = const MetalContextDescriptor(),
-  });
-  final LogicalSize logicalSize;
-
-  /// How many surfaces the ring has, from 1 to 8.
-  final int bufferCount;
-
-  /// The MTLDevice to render with. A null device picks the system's default.
-  final MetalContextDescriptor context;
-
-  /// A copy of this value with the given members replaced.
-  IoSurfaceRingDescriptor copyWith({
-    LogicalSize? logicalSize,
-    int? bufferCount,
-    MetalContextDescriptor? context,
-  }) => IoSurfaceRingDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    bufferCount: bufferCount ?? this.bufferCount,
-    context: context ?? this.context,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, bufferCount, context];
-  @override
-  String toString() => _describe('IoSurfaceRingDescriptor', const [
-    'logicalSize',
-    'bufferCount',
-    'context',
-  ]);
-}
-
-/// A Metal texture of a borrowed ring.
-///
-/// See `mln_metal_borrowed_texture` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalBorrowedTexture extends _Value {
-  const MetalBorrowedTexture({required this.texture});
-
-  /// Your MTLTexture.
-  final NativePointer texture;
-
-  /// A copy of this value with the given members replaced.
-  MetalBorrowedTexture copyWith({NativePointer? texture}) =>
-      MetalBorrowedTexture(texture: texture ?? this.texture);
-
-  @override
-  List<Object?> get _members => [texture];
-  @override
-  String toString() => _describe('MetalBorrowedTexture', const ['texture']);
-}
-
-/// A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`.
-///
-/// `logical_size` sets the map's size. `physical_width` and `physical_height`
-/// give the textures' size in pixels, which is usually `logical_size` times the
-/// map's scale factor. The textures must all have that size, one device, one
-/// pixel format, one sample, and MTLTextureUsageRenderTarget. The ring holds up
-/// to `textureRingMaxDepth` distinct textures.
-///
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
-///
-/// See `mln_metal_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalBorrowedTextureDescriptor extends _Value {
-  MetalBorrowedTextureDescriptor({
-    required this.logicalSize,
-    required this.physicalWidth,
-    required this.physicalHeight,
-    required List<MetalBorrowedTexture> textures,
-    this.commandQueue = NativePointer.nullPointer,
-  }) : textures = List.unmodifiable(textures);
-  final LogicalSize logicalSize;
-  final int physicalWidth;
-  final int physicalHeight;
-  final List<MetalBorrowedTexture> textures;
-
-  /// Your MTLCommandQueue on the textures' device, or null for a queue of the
-  /// session's own. With your queue, frames can use `GpuSyncKind.queueOrder`.
-  final NativePointer commandQueue;
-
-  /// A copy of this value with the given members replaced.
-  MetalBorrowedTextureDescriptor copyWith({
-    LogicalSize? logicalSize,
-    int? physicalWidth,
-    int? physicalHeight,
-    List<MetalBorrowedTexture>? textures,
-    NativePointer? commandQueue,
-  }) => MetalBorrowedTextureDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    physicalWidth: physicalWidth ?? this.physicalWidth,
-    physicalHeight: physicalHeight ?? this.physicalHeight,
-    textures: textures ?? this.textures,
-    commandQueue: commandQueue ?? this.commandQueue,
-  );
-
-  @override
-  List<Object?> get _members => [
-    logicalSize,
-    physicalWidth,
-    physicalHeight,
-    textures,
-    commandQueue,
-  ];
-  @override
-  String toString() => _describe('MetalBorrowedTextureDescriptor', const [
-    'logicalSize',
-    'physicalWidth',
-    'physicalHeight',
-    'textures',
-    'commandQueue',
-  ]);
-}
-
-/// A Metal layer to render to, for `MapHandle.attachMetalSurface()`.
-///
-/// The session sets the layer's device, pixel format, and drawable size. It
-/// uses the layer until a replacement or release of the target completes, a
-/// detach or release of the session completes, or an abandon of it returns.
-///
-/// See `mln_metal_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-final class MetalSurfaceDescriptor extends _Value {
-  const MetalSurfaceDescriptor({
-    required this.logicalSize,
-    this.context = const MetalContextDescriptor(),
-    required this.layer,
-  });
-  final LogicalSize logicalSize;
-
-  /// The MTLDevice to render with. A null device picks the system's default.
-  final MetalContextDescriptor context;
-
-  /// Your CAMetalLayer.
-  final NativePointer layer;
-
-  /// A copy of this value with the given members replaced.
-  MetalSurfaceDescriptor copyWith({
-    LogicalSize? logicalSize,
-    MetalContextDescriptor? context,
-    NativePointer? layer,
-  }) => MetalSurfaceDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    context: context ?? this.context,
-    layer: layer ?? this.layer,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, context, layer];
-  @override
-  String toString() => _describe('MetalSurfaceDescriptor', const [
-    'logicalSize',
-    'context',
-    'layer',
-  ]);
-}
-
-/// The image that `MapHandle.attachOffscreen()` renders. The session renders it
-/// at the map's scale factor.
-///
-/// See `mln_offscreen_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-final class OffscreenDescriptor extends _Value {
-  const OffscreenDescriptor({required this.logicalSize});
-  final LogicalSize logicalSize;
-
-  /// A copy of this value with the given members replaced.
-  OffscreenDescriptor copyWith({LogicalSize? logicalSize}) =>
-      OffscreenDescriptor(logicalSize: logicalSize ?? this.logicalSize);
-
-  @override
-  List<Object?> get _members => [logicalSize];
-  @override
-  String toString() => _describe('OffscreenDescriptor', const ['logicalSize']);
-}
-
-/// The WGL objects that a render session makes its OpenGL context from.
-///
-/// See `mln_wgl_context_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class WglContextDescriptor extends _Value {
-  const WglContextDescriptor({
-    required this.deviceContext,
-    this.shareContext = NativePointer.nullPointer,
-    this.getProcAddress = NativePointer.nullPointer,
-  });
-
-  /// An `HDC`.
-  final NativePointer deviceContext;
-
-  /// Your `HGLRC`, for a shared context.
-  final NativePointer shareContext;
-
-  /// Your `wglGetProcAddress`, or null to use the system's.
-  final NativePointer getProcAddress;
-
-  /// A copy of this value with the given members replaced.
-  WglContextDescriptor copyWith({
-    NativePointer? deviceContext,
-    NativePointer? shareContext,
-    NativePointer? getProcAddress,
-  }) => WglContextDescriptor(
-    deviceContext: deviceContext ?? this.deviceContext,
-    shareContext: shareContext ?? this.shareContext,
-    getProcAddress: getProcAddress ?? this.getProcAddress,
-  );
-
-  @override
-  List<Object?> get _members => [deviceContext, shareContext, getProcAddress];
-  @override
-  String toString() => _describe('WglContextDescriptor', const [
-    'deviceContext',
-    'shareContext',
-    'getProcAddress',
-  ]);
-}
-
-/// The EGL objects that a render session makes its OpenGL context from.
-///
-/// See `mln_egl_context_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class EglContextDescriptor extends _Value {
-  const EglContextDescriptor({
-    required this.display,
-    required this.config,
-    this.shareContext = NativePointer.nullPointer,
-    this.clientApi = const OpenGlClientApi.fromRawValue(0),
-    this.getProcAddress = NativePointer.nullPointer,
-  });
-
-  /// An `EGLDisplay`.
-  final NativePointer display;
-
-  /// An `EGLConfig`.
-  final NativePointer config;
-
-  /// Your `EGLContext`, for a shared context.
-  final NativePointer shareContext;
-
-  /// The API of a dedicated context. A shared context uses the API of yours.
-  final OpenGlClientApi clientApi;
-
-  /// Your `eglGetProcAddress`, or null to use the system's.
-  final NativePointer getProcAddress;
-
-  /// A copy of this value with the given members replaced.
-  EglContextDescriptor copyWith({
-    NativePointer? display,
-    NativePointer? config,
-    NativePointer? shareContext,
-    OpenGlClientApi? clientApi,
-    NativePointer? getProcAddress,
-  }) => EglContextDescriptor(
-    display: display ?? this.display,
-    config: config ?? this.config,
-    shareContext: shareContext ?? this.shareContext,
-    clientApi: clientApi ?? this.clientApi,
-    getProcAddress: getProcAddress ?? this.getProcAddress,
-  );
-
-  @override
-  List<Object?> get _members => [
-    display,
-    config,
-    shareContext,
-    clientApi,
-    getProcAddress,
-  ];
-  @override
-  String toString() => _describe('EglContextDescriptor', const [
-    'display',
-    'config',
-    'shareContext',
-    'clientApi',
-    'getProcAddress',
-  ]);
-}
-
-/// The WebGL context or canvas that a render session uses.
-///
-/// See `mln_web_gl_context_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class WebGlContextDescriptor extends _Value {
-  const WebGlContextDescriptor({
-    this.kind = const WebGlContextKind.fromRawValue(0),
-    this.context = 0,
-    this.canvasSelector = '',
-  });
-  final WebGlContextKind kind;
-
-  /// Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
-  final int context;
-
-  /// The canvas's CSS selector, for a transferred canvas.
-  final String canvasSelector;
-
-  /// A copy of this value with the given members replaced.
-  WebGlContextDescriptor copyWith({
-    WebGlContextKind? kind,
-    int? context,
-    String? canvasSelector,
-  }) => WebGlContextDescriptor(
-    kind: kind ?? this.kind,
-    context: context ?? this.context,
-    canvasSelector: canvasSelector ?? this.canvasSelector,
-  );
-
-  @override
-  List<Object?> get _members => [kind, context, canvasSelector];
-  @override
-  String toString() => _describe('WebGlContextDescriptor', const [
-    'kind',
-    'context',
-    'canvasSelector',
-  ]);
-}
-
-/// How a render session gets the OpenGL context that it renders with.
-///
-/// Keep the objects that it names alive until a detach or release of the
-/// session completes, or an abandon of it returns.
-///
-/// See `mln_open_gl_context_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class OpenGlContextDescriptor {
-  const OpenGlContextDescriptor({
-    this.ownership = const OpenGlContextOwnership.fromRawValue(0),
-    required this.data,
-  });
-  final OpenGlContextOwnership ownership;
-  final OpenGlContextDescriptorData data;
-}
-
-sealed class OpenGlContextDescriptorData {
-  const OpenGlContextDescriptorData._();
-}
-
-final class OpenGlContextDescriptorDataWgl extends OpenGlContextDescriptorData {
-  const OpenGlContextDescriptorDataWgl(this.value) : super._();
-  final WglContextDescriptor value;
-}
-
-final class OpenGlContextDescriptorDataEgl extends OpenGlContextDescriptorData {
-  const OpenGlContextDescriptorDataEgl(this.value) : super._();
-  final EglContextDescriptor value;
-}
-
-final class OpenGlContextDescriptorDataWebGl
-    extends OpenGlContextDescriptorData {
-  const OpenGlContextDescriptorDataWebGl(this.value) : super._();
-  final WebGlContextDescriptor value;
-}
-
-/// An OpenGL texture of a borrowed ring.
-///
-/// See `mln_open_gl_borrowed_texture` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class OpenGlBorrowedTexture extends _Value {
-  const OpenGlBorrowedTexture({required this.texture});
-
-  /// Your texture name.
-  final int texture;
-
-  /// A copy of this value with the given members replaced.
-  OpenGlBorrowedTexture copyWith({int? texture}) =>
-      OpenGlBorrowedTexture(texture: texture ?? this.texture);
-
-  @override
-  List<Object?> get _members => [texture];
-  @override
-  String toString() => _describe('OpenGlBorrowedTexture', const ['texture']);
-}
-
-/// A ring of your OpenGL textures, for
-/// `MapHandle.attachOpenGlBorrowedTexture()`.
-///
-/// `logical_size` sets the map's size. `physical_width` and `physical_height`
-/// give the textures' size in pixels, which is usually `logical_size` times the
-/// map's scale factor. The context must use `OpenGlContextOwnership.shared`.
-/// Each texture must be in your context's share group, with storage of that
-/// size. The ring holds up to `textureRingMaxDepth` distinct textures.
-///
-/// The session uses the textures until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
-///
-/// See `mln_open_gl_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class OpenGlBorrowedTextureDescriptor extends _Value {
-  OpenGlBorrowedTextureDescriptor({
-    required this.logicalSize,
-    required this.physicalWidth,
-    required this.physicalHeight,
-    required this.context,
-    required List<OpenGlBorrowedTexture> textures,
-    required this.target,
-  }) : textures = List.unmodifiable(textures);
-  final LogicalSize logicalSize;
-  final int physicalWidth;
-  final int physicalHeight;
-  final OpenGlContextDescriptor context;
-  final List<OpenGlBorrowedTexture> textures;
-
-  /// The textures' target. It must be GL_TEXTURE_2D.
-  final int target;
-
-  /// A copy of this value with the given members replaced.
-  OpenGlBorrowedTextureDescriptor copyWith({
-    LogicalSize? logicalSize,
-    int? physicalWidth,
-    int? physicalHeight,
-    OpenGlContextDescriptor? context,
-    List<OpenGlBorrowedTexture>? textures,
-    int? target,
-  }) => OpenGlBorrowedTextureDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    physicalWidth: physicalWidth ?? this.physicalWidth,
-    physicalHeight: physicalHeight ?? this.physicalHeight,
-    context: context ?? this.context,
-    textures: textures ?? this.textures,
-    target: target ?? this.target,
-  );
-
-  @override
-  List<Object?> get _members => [
-    logicalSize,
-    physicalWidth,
-    physicalHeight,
-    context,
-    textures,
-    target,
-  ];
-  @override
-  String toString() => _describe('OpenGlBorrowedTextureDescriptor', const [
-    'logicalSize',
-    'physicalWidth',
-    'physicalHeight',
-    'context',
-    'textures',
-    'target',
-  ]);
-}
-
-/// An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()`.
-///
-/// The session uses the surface until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
-///
-/// See `mln_open_gl_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-final class OpenGlSurfaceDescriptor extends _Value {
-  const OpenGlSurfaceDescriptor({
-    required this.logicalSize,
-    required this.context,
-    this.surface = NativePointer.nullPointer,
-  });
-  final LogicalSize logicalSize;
-  final OpenGlContextDescriptor context;
-
-  /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
-  final NativePointer surface;
-
-  /// A copy of this value with the given members replaced.
-  OpenGlSurfaceDescriptor copyWith({
-    LogicalSize? logicalSize,
-    OpenGlContextDescriptor? context,
-    NativePointer? surface,
-  }) => OpenGlSurfaceDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    context: context ?? this.context,
-    surface: surface ?? this.surface,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, context, surface];
-  @override
-  String toString() => _describe('OpenGlSurfaceDescriptor', const [
-    'logicalSize',
-    'context',
-    'surface',
-  ]);
-}
-
-/// The Vulkan device and queue that a render session uses.
-///
-/// Keep these objects alive until a detach or release of the session completes,
-/// or an abandon of it returns.
-///
-/// See `mln_vulkan_context_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class VulkanContextDescriptor extends _Value {
-  const VulkanContextDescriptor({
-    required this.instance,
-    required this.physicalDevice,
-    required this.device,
-    required this.graphicsQueue,
-    this.graphicsQueueFamilyIndex = 0,
-    this.getInstanceProcAddr = NativePointer.nullPointer,
-    this.getDeviceProcAddr = NativePointer.nullPointer,
-  });
-
-  /// A `VkInstance`.
-  final NativePointer instance;
-
-  /// A `VkPhysicalDevice`.
-  final NativePointer physicalDevice;
-
-  /// A `VkDevice`.
-  final NativePointer device;
-
-  /// A `VkQueue` from `graphics_queue_family_index` that supports graphics. If
-  /// you submit to it too, set `RenderSessionAttachOptions.queueLock`.
-  final NativePointer graphicsQueue;
-  final int graphicsQueueFamilyIndex;
-
-  /// Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's.
-  final NativePointer getInstanceProcAddr;
-
-  /// Your `vkGetDeviceProcAddr`, or null to look it up from the instance.
-  final NativePointer getDeviceProcAddr;
-
-  /// A copy of this value with the given members replaced.
-  VulkanContextDescriptor copyWith({
-    NativePointer? instance,
-    NativePointer? physicalDevice,
-    NativePointer? device,
-    NativePointer? graphicsQueue,
-    int? graphicsQueueFamilyIndex,
-    NativePointer? getInstanceProcAddr,
-    NativePointer? getDeviceProcAddr,
-  }) => VulkanContextDescriptor(
-    instance: instance ?? this.instance,
-    physicalDevice: physicalDevice ?? this.physicalDevice,
-    device: device ?? this.device,
-    graphicsQueue: graphicsQueue ?? this.graphicsQueue,
-    graphicsQueueFamilyIndex:
-        graphicsQueueFamilyIndex ?? this.graphicsQueueFamilyIndex,
-    getInstanceProcAddr: getInstanceProcAddr ?? this.getInstanceProcAddr,
-    getDeviceProcAddr: getDeviceProcAddr ?? this.getDeviceProcAddr,
-  );
-
-  @override
-  List<Object?> get _members => [
-    instance,
-    physicalDevice,
-    device,
-    graphicsQueue,
-    graphicsQueueFamilyIndex,
-    getInstanceProcAddr,
-    getDeviceProcAddr,
-  ];
-  @override
-  String toString() => _describe('VulkanContextDescriptor', const [
-    'instance',
-    'physicalDevice',
-    'device',
-    'graphicsQueue',
-    'graphicsQueueFamilyIndex',
-    'getInstanceProcAddr',
-    'getDeviceProcAddr',
-  ]);
-}
-
-/// A Vulkan image of a borrowed ring.
-///
-/// See `mln_vulkan_borrowed_texture` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class VulkanBorrowedTexture extends _Value {
-  const VulkanBorrowedTexture({required this.image, required this.imageView});
-
-  /// Your VkImage.
-  final int image;
-
-  /// A 2D VkImageView of `image` with one mip level and one layer.
-  final int imageView;
-
-  /// A copy of this value with the given members replaced.
-  VulkanBorrowedTexture copyWith({int? image, int? imageView}) =>
-      VulkanBorrowedTexture(
-        image: image ?? this.image,
-        imageView: imageView ?? this.imageView,
-      );
-
-  @override
-  List<Object?> get _members => [image, imageView];
-  @override
-  String toString() =>
-      _describe('VulkanBorrowedTexture', const ['image', 'imageView']);
-}
-
-/// A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`.
-///
-/// `logical_size` sets the map's size. `physical_width` and `physical_height`
-/// give the images' size in pixels, which is usually `logical_size` times the
-/// map's scale factor. Each image must have that size, `format`, and
-/// VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device. The
-/// ring holds up to `textureRingMaxDepth` distinct images.
-///
-/// The session uses the images until a replacement or release of the target
-/// completes, a detach or release of the session completes, or an abandon of it
-/// returns.
-///
-/// See `mln_vulkan_borrowed_texture_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class VulkanBorrowedTextureDescriptor extends _Value {
-  VulkanBorrowedTextureDescriptor({
-    required this.logicalSize,
-    required this.physicalWidth,
-    required this.physicalHeight,
-    required this.context,
-    required List<VulkanBorrowedTexture> textures,
-    required this.format,
-    required this.finalLayout,
-    this.owner = const VulkanImageOwner.fromRawValue(0),
-  }) : textures = List.unmodifiable(textures);
-  final LogicalSize logicalSize;
-  final int physicalWidth;
-  final int physicalHeight;
-  final VulkanContextDescriptor context;
-  final List<VulkanBorrowedTexture> textures;
-
-  /// The images' VkFormat.
-  final int format;
-
-  /// The VkImageLayout that each frame leaves its image in.
-  final int finalLayout;
-  final VulkanImageOwner owner;
-
-  /// A copy of this value with the given members replaced.
-  VulkanBorrowedTextureDescriptor copyWith({
-    LogicalSize? logicalSize,
-    int? physicalWidth,
-    int? physicalHeight,
-    VulkanContextDescriptor? context,
-    List<VulkanBorrowedTexture>? textures,
-    int? format,
-    int? finalLayout,
-    VulkanImageOwner? owner,
-  }) => VulkanBorrowedTextureDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    physicalWidth: physicalWidth ?? this.physicalWidth,
-    physicalHeight: physicalHeight ?? this.physicalHeight,
-    context: context ?? this.context,
-    textures: textures ?? this.textures,
-    format: format ?? this.format,
-    finalLayout: finalLayout ?? this.finalLayout,
-    owner: owner ?? this.owner,
-  );
-
-  @override
-  List<Object?> get _members => [
-    logicalSize,
-    physicalWidth,
-    physicalHeight,
-    context,
-    textures,
-    format,
-    finalLayout,
-    owner,
-  ];
-  @override
-  String toString() => _describe('VulkanBorrowedTextureDescriptor', const [
-    'logicalSize',
-    'physicalWidth',
-    'physicalHeight',
-    'context',
-    'textures',
-    'format',
-    'finalLayout',
-    'owner',
-  ]);
-}
-
-/// A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()`.
-///
-/// The device must have VK_KHR_swapchain enabled, and the queue family of
-/// `graphics_queue_family_index` must support presenting to the surface. The
-/// session creates the swapchain. It uses the surface until a replacement or
-/// release of the target completes, a detach or release of the session
-/// completes, or an abandon of it returns.
-///
-/// See `mln_vulkan_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-final class VulkanSurfaceDescriptor extends _Value {
-  const VulkanSurfaceDescriptor({
-    required this.logicalSize,
-    required this.context,
-    required this.surface,
-  });
-  final LogicalSize logicalSize;
-  final VulkanContextDescriptor context;
-
-  /// Your VkSurfaceKHR.
-  final int surface;
-
-  /// A copy of this value with the given members replaced.
-  VulkanSurfaceDescriptor copyWith({
-    LogicalSize? logicalSize,
-    VulkanContextDescriptor? context,
-    int? surface,
-  }) => VulkanSurfaceDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    context: context ?? this.context,
-    surface: surface ?? this.surface,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, context, surface];
-  @override
-  String toString() => _describe('VulkanSurfaceDescriptor', const [
-    'logicalSize',
-    'context',
-    'surface',
-  ]);
-}
-
-/// A Wayland surface to present to, for `MapHandle.attachWaylandSurface()`.
-///
-/// See `mln_wayland_surface_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
-final class WaylandSurfaceDescriptor extends _Value {
-  const WaylandSurfaceDescriptor({
-    required this.logicalSize,
-    required this.display,
-    required this.surface,
-  });
-  final LogicalSize logicalSize;
-
-  /// Your `wl_display*`.
-  final NativePointer display;
-
-  /// Your `wl_surface*`, on `display`.
-  final NativePointer surface;
-
-  /// A copy of this value with the given members replaced.
-  WaylandSurfaceDescriptor copyWith({
-    LogicalSize? logicalSize,
-    NativePointer? display,
-    NativePointer? surface,
-  }) => WaylandSurfaceDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    display: display ?? this.display,
-    surface: surface ?? this.surface,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, display, surface];
-  @override
-  String toString() => _describe('WaylandSurfaceDescriptor', const [
-    'logicalSize',
-    'display',
-    'surface',
-  ]);
-}
-
-/// A Win32 window to present to, for `MapHandle.attachWin32Window()`.
-///
-/// See `mln_win32_window_descriptor` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-final class Win32WindowDescriptor extends _Value {
-  const Win32WindowDescriptor({
-    required this.logicalSize,
-    required this.window,
-  });
-  final LogicalSize logicalSize;
-
-  /// Your `HWND`.
-  final NativePointer window;
-
-  /// A copy of this value with the given members replaced.
-  Win32WindowDescriptor copyWith({
-    LogicalSize? logicalSize,
-    NativePointer? window,
-  }) => Win32WindowDescriptor(
-    logicalSize: logicalSize ?? this.logicalSize,
-    window: window ?? this.window,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, window];
-  @override
-  String toString() =>
-      _describe('Win32WindowDescriptor', const ['logicalSize', 'window']);
 }
 
 /// Options for finding the camera that fits an area.
@@ -5664,52 +6735,6 @@ final class CameraUpdate extends _Value {
   ]);
 }
 
-/// Options for `OffscreenDeviceHandle.create()`.
-///
-/// See `mln_offscreen_device_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-final class OffscreenDeviceOptions extends _Value {
-  const OffscreenDeviceOptions({
-    this.adapterIndex,
-    this.singleContext,
-    this.clientApi,
-  });
-
-  /// The GPU to use, as an index into the platform's list of GPUs.
-  final int? adapterIndex;
-
-  /// Whether the device's sessions take turns in one OpenGL context instead of
-  /// having one each. Only an EGL device reads it.
-  final bool? singleContext;
-
-  /// The OpenGL API that the device's sessions render with. An EGL device
-  /// defaults to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too on
-  /// Linux and FreeBSD. A WGL device takes only `OpenGlClientApi.gl`, its
-  /// default, and a WebGL device only `OpenGlClientApi.gles`, its default.
-  /// Other devices take neither.
-  final OpenGlClientApi? clientApi;
-
-  /// A copy of this value with the given members replaced.
-  OffscreenDeviceOptions copyWith({
-    int? adapterIndex,
-    bool? singleContext,
-    OpenGlClientApi? clientApi,
-  }) => OffscreenDeviceOptions(
-    adapterIndex: adapterIndex ?? this.adapterIndex,
-    singleContext: singleContext ?? this.singleContext,
-    clientApi: clientApi ?? this.clientApi,
-  );
-
-  @override
-  List<Object?> get _members => [adapterIndex, singleContext, clientApi];
-  @override
-  String toString() => _describe('OffscreenDeviceOptions', const [
-    'adapterIndex',
-    'singleContext',
-    'clientApi',
-  ]);
-}
-
 /// The outcome of `RenderSessionHandle.abandon()`.
 ///
 /// See `mln_render_abandon_result` in the
@@ -5763,6 +6788,7 @@ final class RenderSessionCapabilities extends _Value {
     this.flags = RenderSessionCapabilityFlag.none,
     this.producerSyncKind = const GpuSyncKind.fromRawValue(0),
     this.consumerSyncKinds = GpuSyncKindFlag.none,
+    this.exportKind = const GpuExportKind.fromRawValue(0),
   });
   final RenderDriverKind driver;
 
@@ -5778,6 +6804,10 @@ final class RenderSessionCapabilities extends _Value {
   /// depend on the target and on what the device supports.
   final GpuSyncKindFlag consumerSyncKinds;
 
+  /// How an exported ring shares its textures, which says which getter gets an
+  /// acquired frame's texture, or `GpuExportKind.none` for another target.
+  final GpuExportKind exportKind;
+
   @override
   List<Object?> get _members => [
     driver,
@@ -5785,6 +6815,7 @@ final class RenderSessionCapabilities extends _Value {
     flags,
     producerSyncKind,
     consumerSyncKinds,
+    exportKind,
   ];
   @override
   String toString() => _describe('RenderSessionCapabilities', const [
@@ -5793,6 +6824,7 @@ final class RenderSessionCapabilities extends _Value {
     'flags',
     'producerSyncKind',
     'consumerSyncKinds',
+    'exportKind',
   ]);
 }
 
@@ -6115,372 +7147,6 @@ final class TextureReadbackResult extends _Value {
       _describe('TextureReadbackResult', const ['data', 'info']);
 }
 
-/// A new Android window for `RenderSessionHandle.setAndroidSurfaceTarget()`.
-///
-/// Name the window by `window`, or by `jni_env` and `surface`. The session
-/// takes its own reference to the window, so you can release yours once the
-/// call returns.
-///
-/// See `mln_android_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-final class AndroidSurfaceReplacement extends _Value {
-  const AndroidSurfaceReplacement({
-    required this.logicalSize,
-    this.window = NativePointer.nullPointer,
-    this.jniEnv = NativePointer.nullPointer,
-    this.surface = NativePointer.nullPointer,
-  });
-  final LogicalSize logicalSize;
-
-  /// Your `ANativeWindow*`, or null to name the window by `surface`.
-  final NativePointer window;
-
-  /// The calling thread's `JNIEnv*`, with `surface`.
-  final NativePointer jniEnv;
-
-  /// An `android.view.Surface`, with `jni_env`.
-  final NativePointer surface;
-
-  /// A copy of this value with the given members replaced.
-  AndroidSurfaceReplacement copyWith({
-    LogicalSize? logicalSize,
-    NativePointer? window,
-    NativePointer? jniEnv,
-    NativePointer? surface,
-  }) => AndroidSurfaceReplacement(
-    logicalSize: logicalSize ?? this.logicalSize,
-    window: window ?? this.window,
-    jniEnv: jniEnv ?? this.jniEnv,
-    surface: surface ?? this.surface,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, window, jniEnv, surface];
-  @override
-  String toString() => _describe('AndroidSurfaceReplacement', const [
-    'logicalSize',
-    'window',
-    'jniEnv',
-    'surface',
-  ]);
-}
-
-/// New Metal textures for a borrowed ring, for
-/// `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
-///
-/// The members and the textures follow the rules of
-/// `MetalBorrowedTextureDescriptor`. The ring keeps its depth, device, and
-/// command queue, so give it as many textures as it attached with, on the same
-/// device.
-///
-/// See `mln_metal_borrowed_texture_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalBorrowedTextureReplacement extends _Value {
-  MetalBorrowedTextureReplacement({
-    required this.logicalSize,
-    required this.physicalWidth,
-    required this.physicalHeight,
-    required List<MetalBorrowedTexture> textures,
-  }) : textures = List.unmodifiable(textures);
-  final LogicalSize logicalSize;
-  final int physicalWidth;
-  final int physicalHeight;
-  final List<MetalBorrowedTexture> textures;
-
-  /// A copy of this value with the given members replaced.
-  MetalBorrowedTextureReplacement copyWith({
-    LogicalSize? logicalSize,
-    int? physicalWidth,
-    int? physicalHeight,
-    List<MetalBorrowedTexture>? textures,
-  }) => MetalBorrowedTextureReplacement(
-    logicalSize: logicalSize ?? this.logicalSize,
-    physicalWidth: physicalWidth ?? this.physicalWidth,
-    physicalHeight: physicalHeight ?? this.physicalHeight,
-    textures: textures ?? this.textures,
-  );
-
-  @override
-  List<Object?> get _members => [
-    logicalSize,
-    physicalWidth,
-    physicalHeight,
-    textures,
-  ];
-  @override
-  String toString() => _describe('MetalBorrowedTextureReplacement', const [
-    'logicalSize',
-    'physicalWidth',
-    'physicalHeight',
-    'textures',
-  ]);
-}
-
-/// A new Metal layer for `RenderSessionHandle.setMetalSurfaceTarget()`.
-///
-/// The session renders to it with the device that it attached with. It uses the
-/// layer until a replacement or release of the target completes, a detach or
-/// release of the session completes, or an abandon of it returns.
-///
-/// See `mln_metal_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-final class MetalSurfaceReplacement extends _Value {
-  const MetalSurfaceReplacement({
-    required this.logicalSize,
-    required this.layer,
-  });
-  final LogicalSize logicalSize;
-
-  /// Your CAMetalLayer.
-  final NativePointer layer;
-
-  /// A copy of this value with the given members replaced.
-  MetalSurfaceReplacement copyWith({
-    LogicalSize? logicalSize,
-    NativePointer? layer,
-  }) => MetalSurfaceReplacement(
-    logicalSize: logicalSize ?? this.logicalSize,
-    layer: layer ?? this.layer,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, layer];
-  @override
-  String toString() =>
-      _describe('MetalSurfaceReplacement', const ['logicalSize', 'layer']);
-}
-
-/// New OpenGL textures for a borrowed ring, for
-/// `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
-///
-/// The members and the textures follow the rules of
-/// `OpenGlBorrowedTextureDescriptor`. The ring keeps its depth, context, and
-/// texture target, so give it as many textures as it attached with, in the same
-/// share group.
-///
-/// See `mln_open_gl_borrowed_texture_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class OpenGlBorrowedTextureReplacement extends _Value {
-  OpenGlBorrowedTextureReplacement({
-    required this.logicalSize,
-    required this.physicalWidth,
-    required this.physicalHeight,
-    required List<OpenGlBorrowedTexture> textures,
-  }) : textures = List.unmodifiable(textures);
-  final LogicalSize logicalSize;
-  final int physicalWidth;
-  final int physicalHeight;
-  final List<OpenGlBorrowedTexture> textures;
-
-  /// A copy of this value with the given members replaced.
-  OpenGlBorrowedTextureReplacement copyWith({
-    LogicalSize? logicalSize,
-    int? physicalWidth,
-    int? physicalHeight,
-    List<OpenGlBorrowedTexture>? textures,
-  }) => OpenGlBorrowedTextureReplacement(
-    logicalSize: logicalSize ?? this.logicalSize,
-    physicalWidth: physicalWidth ?? this.physicalWidth,
-    physicalHeight: physicalHeight ?? this.physicalHeight,
-    textures: textures ?? this.textures,
-  );
-
-  @override
-  List<Object?> get _members => [
-    logicalSize,
-    physicalWidth,
-    physicalHeight,
-    textures,
-  ];
-  @override
-  String toString() => _describe('OpenGlBorrowedTextureReplacement', const [
-    'logicalSize',
-    'physicalWidth',
-    'physicalHeight',
-    'textures',
-  ]);
-}
-
-/// A new OpenGL surface for `RenderSessionHandle.setOpenGlSurfaceTarget()`.
-///
-/// The session presents to it with the context that it attached with. It uses
-/// the surface until a replacement or release of the target completes, a detach
-/// or release of the session completes, or an abandon of it returns.
-///
-/// See `mln_open_gl_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-final class OpenGlSurfaceReplacement extends _Value {
-  const OpenGlSurfaceReplacement({
-    required this.logicalSize,
-    this.surface = NativePointer.nullPointer,
-  });
-  final LogicalSize logicalSize;
-
-  /// Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
-  /// leave it null.
-  final NativePointer surface;
-
-  /// A copy of this value with the given members replaced.
-  OpenGlSurfaceReplacement copyWith({
-    LogicalSize? logicalSize,
-    NativePointer? surface,
-  }) => OpenGlSurfaceReplacement(
-    logicalSize: logicalSize ?? this.logicalSize,
-    surface: surface ?? this.surface,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, surface];
-  @override
-  String toString() =>
-      _describe('OpenGlSurfaceReplacement', const ['logicalSize', 'surface']);
-}
-
-/// New Vulkan images for a borrowed ring, for
-/// `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
-///
-/// The members and the images follow the rules of
-/// `VulkanBorrowedTextureDescriptor`. The ring keeps its depth, context,
-/// `format`, `final_layout`, and `owner`, so give it as many images as it
-/// attached with, in that format, on the same device.
-///
-/// See `mln_vulkan_borrowed_texture_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class VulkanBorrowedTextureReplacement extends _Value {
-  VulkanBorrowedTextureReplacement({
-    required this.logicalSize,
-    required this.physicalWidth,
-    required this.physicalHeight,
-    required List<VulkanBorrowedTexture> textures,
-  }) : textures = List.unmodifiable(textures);
-  final LogicalSize logicalSize;
-  final int physicalWidth;
-  final int physicalHeight;
-  final List<VulkanBorrowedTexture> textures;
-
-  /// A copy of this value with the given members replaced.
-  VulkanBorrowedTextureReplacement copyWith({
-    LogicalSize? logicalSize,
-    int? physicalWidth,
-    int? physicalHeight,
-    List<VulkanBorrowedTexture>? textures,
-  }) => VulkanBorrowedTextureReplacement(
-    logicalSize: logicalSize ?? this.logicalSize,
-    physicalWidth: physicalWidth ?? this.physicalWidth,
-    physicalHeight: physicalHeight ?? this.physicalHeight,
-    textures: textures ?? this.textures,
-  );
-
-  @override
-  List<Object?> get _members => [
-    logicalSize,
-    physicalWidth,
-    physicalHeight,
-    textures,
-  ];
-  @override
-  String toString() => _describe('VulkanBorrowedTextureReplacement', const [
-    'logicalSize',
-    'physicalWidth',
-    'physicalHeight',
-    'textures',
-  ]);
-}
-
-/// A new Vulkan surface for `RenderSessionHandle.setVulkanSurfaceTarget()`.
-///
-/// The session presents to it with the context that it attached with, so the
-/// queue family of that context's `graphics_queue_family_index` must support
-/// presenting to the surface. It uses the surface until a replacement or
-/// release of the target completes, a detach or release of the session
-/// completes, or an abandon of it returns.
-///
-/// See `mln_vulkan_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-final class VulkanSurfaceReplacement extends _Value {
-  const VulkanSurfaceReplacement({
-    required this.logicalSize,
-    required this.surface,
-  });
-  final LogicalSize logicalSize;
-
-  /// Your VkSurfaceKHR.
-  final int surface;
-
-  /// A copy of this value with the given members replaced.
-  VulkanSurfaceReplacement copyWith({LogicalSize? logicalSize, int? surface}) =>
-      VulkanSurfaceReplacement(
-        logicalSize: logicalSize ?? this.logicalSize,
-        surface: surface ?? this.surface,
-      );
-
-  @override
-  List<Object?> get _members => [logicalSize, surface];
-  @override
-  String toString() =>
-      _describe('VulkanSurfaceReplacement', const ['logicalSize', 'surface']);
-}
-
-/// A new Wayland surface for `RenderSessionHandle.setWaylandSurfaceTarget()`.
-///
-/// See `mln_wayland_surface_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
-final class WaylandSurfaceReplacement extends _Value {
-  const WaylandSurfaceReplacement({
-    required this.logicalSize,
-    required this.surface,
-  });
-  final LogicalSize logicalSize;
-
-  /// Your `wl_surface*`, on the display that the session attached with.
-  final NativePointer surface;
-
-  /// A copy of this value with the given members replaced.
-  WaylandSurfaceReplacement copyWith({
-    LogicalSize? logicalSize,
-    NativePointer? surface,
-  }) => WaylandSurfaceReplacement(
-    logicalSize: logicalSize ?? this.logicalSize,
-    surface: surface ?? this.surface,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, surface];
-  @override
-  String toString() =>
-      _describe('WaylandSurfaceReplacement', const ['logicalSize', 'surface']);
-}
-
-/// A new Win32 window for `RenderSessionHandle.setWin32WindowTarget()`.
-///
-/// See `mln_win32_window_replacement` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-final class Win32WindowReplacement extends _Value {
-  const Win32WindowReplacement({
-    required this.logicalSize,
-    required this.window,
-  });
-  final LogicalSize logicalSize;
-
-  /// Your `HWND`.
-  final NativePointer window;
-
-  /// A copy of this value with the given members replaced.
-  Win32WindowReplacement copyWith({
-    LogicalSize? logicalSize,
-    NativePointer? window,
-  }) => Win32WindowReplacement(
-    logicalSize: logicalSize ?? this.logicalSize,
-    window: window ?? this.window,
-  );
-
-  @override
-  List<Object?> get _members => [logicalSize, window];
-  @override
-  String toString() =>
-      _describe('Win32WindowReplacement', const ['logicalSize', 'window']);
-}
-
 /// The answer to a resource request.
 ///
 /// See `mln_resource_response` in the
@@ -6666,10 +7332,12 @@ final class MapOptions extends _Value {
     this.eventMask,
     this.tileCacheEnabled,
     this.fallbackFontFaces = '',
+    this.systemFontsEnabled,
   });
 
-  /// The map's first size, and its scale factor. The scale factor stays fixed
-  /// for the map's life, and every render session of the map renders at it.
+  /// The map's first size, and its scale factor. Render sessions of the map
+  /// render at its scale factor. `MapHandle.resize()` changes both, or
+  /// `RenderSessionHandle.resize()` while a render session is attached.
   final LogicalExtent initialExtent;
   final MapMode mapMode;
 
@@ -6688,8 +7356,17 @@ final class MapOptions extends _Value {
   /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
   /// font files, each an object with a `url` and an optional `unicode-range`,
   /// as in a font face of a style's `font-faces`, which every font stack uses
-  /// after the style's own font faces. Empty for none.
+  /// after the style's own font faces. Empty for the system's fonts, unless
+  /// `system_fonts_enabled` is false.
   final String fallbackFontFaces;
+
+  /// Whether the map falls back to the system's fonts for CJK and the scripts
+  /// that need complex shaping when `fallback_font_faces` is empty: fonts that
+  /// the platform's font matcher picks for the user's preferred languages.
+  /// Without it, the map does. The first map that uses them waits for them to
+  /// be found. In the browser, the browser draws CJK glyphs in its sans-serif
+  /// font instead, where `fallback_font_faces` doesn't cover them.
+  final bool? systemFontsEnabled;
 
   /// A copy of this value with the given members replaced.
   MapOptions copyWith({
@@ -6699,6 +7376,7 @@ final class MapOptions extends _Value {
     RuntimeEventFlag? eventMask,
     bool? tileCacheEnabled,
     String? fallbackFontFaces,
+    bool? systemFontsEnabled,
   }) => MapOptions(
     initialExtent: initialExtent ?? this.initialExtent,
     mapMode: mapMode ?? this.mapMode,
@@ -6706,6 +7384,7 @@ final class MapOptions extends _Value {
     eventMask: eventMask ?? this.eventMask,
     tileCacheEnabled: tileCacheEnabled ?? this.tileCacheEnabled,
     fallbackFontFaces: fallbackFontFaces ?? this.fallbackFontFaces,
+    systemFontsEnabled: systemFontsEnabled ?? this.systemFontsEnabled,
   );
 
   @override
@@ -6716,6 +7395,7 @@ final class MapOptions extends _Value {
     eventMask,
     tileCacheEnabled,
     fallbackFontFaces,
+    systemFontsEnabled,
   ];
   @override
   String toString() => _describe('MapOptions', const [
@@ -6725,6 +7405,7 @@ final class MapOptions extends _Value {
     'eventMask',
     'tileCacheEnabled',
     'fallbackFontFaces',
+    'systemFontsEnabled',
   ]);
 }
 
@@ -7230,30 +7911,6 @@ final class RuntimeEventOfflineRegionResponseError extends _Value {
   );
 }
 
-/// The details of `RuntimeEventType.offlineRegionTileCountLimitExceeded`.
-///
-/// See `mln_runtime_event_offline_region_tile_count_limit` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventOfflineRegionTileCountLimit extends _Value {
-  const RuntimeEventOfflineRegionTileCountLimit({
-    this.regionId = 0,
-    this.limit = 0,
-  });
-  final int regionId;
-
-  /// The number of demo server tiles that the cache file's offline regions may
-  /// hold together.
-  final int limit;
-
-  @override
-  List<Object?> get _members => [regionId, limit];
-  @override
-  String toString() => _describe(
-    'RuntimeEventOfflineRegionTileCountLimit',
-    const ['regionId', 'limit'],
-  );
-}
-
 /// The details of a glyph event.
 ///
 /// The event covers the glyphs from `first` to `last`, both included.
@@ -7373,12 +8030,6 @@ final class RuntimeEventPayloadOfflineRegionResponseError
     extends RuntimeEventPayload {
   const RuntimeEventPayloadOfflineRegionResponseError(this.value) : super._();
   final RuntimeEventOfflineRegionResponseError value;
-}
-
-final class RuntimeEventPayloadOfflineRegionTileCountLimit
-    extends RuntimeEventPayload {
-  const RuntimeEventPayloadOfflineRegionTileCountLimit(this.value) : super._();
-  final RuntimeEventOfflineRegionTileCountLimit value;
 }
 
 final class RuntimeEventPayloadGlyphs extends RuntimeEventPayload {
@@ -7909,80 +8560,15 @@ final class StyleExpressionInfo extends _Value {
   ]);
 }
 
-/// Options for `VulkanDeviceHandle.create()`.
-///
-/// See `mln_vulkan_device_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
-final class VulkanDeviceOptions extends _Value {
-  VulkanDeviceOptions({
-    this.presentation,
-    Uint8List? deviceUuid,
-    Uint8List? deviceLuid,
-  }) : deviceUuid = deviceUuid == null
-           ? null
-           : Uint8List.fromList(deviceUuid).asUnmodifiableView(),
-       deviceLuid = deviceLuid == null
-           ? null
-           : Uint8List.fromList(deviceLuid).asUnmodifiableView();
-
-  /// Whether the device can present to a window. The instance then enables
-  /// VK_KHR_surface and the platform's surface extensions, and the device
-  /// enables VK_KHR_swapchain. Defaults to false.
-  final bool? presentation;
-
-  /// The 16-byte `deviceUUID` of the GPU to use, as
-  /// `VkPhysicalDeviceIDProperties` reports it.
-  final Uint8List? deviceUuid;
-
-  /// The 8-byte `deviceLUID` of the GPU to use, as
-  /// `VkPhysicalDeviceIDProperties` reports it. On Windows, this is the GPU's
-  /// DXGI adapter LUID.
-  final Uint8List? deviceLuid;
-
-  /// A copy of this value with the given members replaced.
-  VulkanDeviceOptions copyWith({
-    bool? presentation,
-    Uint8List? deviceUuid,
-    Uint8List? deviceLuid,
-  }) => VulkanDeviceOptions(
-    presentation: presentation ?? this.presentation,
-    deviceUuid: deviceUuid ?? this.deviceUuid,
-    deviceLuid: deviceLuid ?? this.deviceLuid,
-  );
-
-  @override
-  List<Object?> get _members => [presentation, deviceUuid, deviceLuid];
-  @override
-  String toString() => _describe('VulkanDeviceOptions', const [
-    'presentation',
-    'deviceUuid',
-    'deviceLuid',
-  ]);
-}
-
-/// A Vulkan device's context, as `VulkanDeviceHandle.getContext()` reports it.
-///
-/// See `mln_vulkan_device_context_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
-final class VulkanDeviceContextResult extends _Value {
-  const VulkanDeviceContextResult({required this.context});
-  final VulkanContextDescriptor context;
-
-  @override
-  List<Object?> get _members => [context];
-  @override
-  String toString() =>
-      _describe('VulkanDeviceContextResult', const ['context']);
-}
-
 /// The size of a diagnostic message in bytes, with its terminator.
 ///
 /// See `MLN_DIAGNOSTIC_MESSAGE_CAPACITY` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 const int diagnosticMessageCapacity = 4096;
 
-/// The token of the frame results that a session adds when it renders an image
-/// for `MapHandle.requestStillImage()`. Your own demands can't use it.
+/// The token of the frame results of the demand that a session holds for an
+/// image of `MapHandle.requestStillImage()`, which says how that demand runs.
+/// Your own demands can't use it.
 ///
 /// See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

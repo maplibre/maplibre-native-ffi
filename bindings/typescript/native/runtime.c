@@ -5,8 +5,11 @@
 
 #include "runtime.h"
 
-#ifdef __EMSCRIPTEN__
-#include <emnapi.h>
+#ifdef __wasm__
+// The browser module's extension of Node-API (bindings/typescript/web): writes
+// the copy in the module's memory that napi_create_arraybuffer() gave out into
+// the buffer.
+napi_status mln_napi_sync_arraybuffer(napi_env env, napi_value arraybuffer);
 #endif
 
 struct mln_ts_allocation {
@@ -497,10 +500,10 @@ napi_value mln_ts_bytes(napi_env env, const void* data, size_t size) {
   }
   if (size > 0) {
     memcpy(target, data, size);
-#ifdef __EMSCRIPTEN__
-    // emnapi's data pointer is a copy of the buffer in the module's memory,
+#ifdef __wasm__
+    // A buffer's memory isn't the module's, so the data pointer is a copy,
     // which the sync writes into the buffer.
-    if (emnapi_sync_memory(env, false, &buffer, 0, size) != napi_ok) {
+    if (mln_napi_sync_arraybuffer(env, buffer) != napi_ok) {
       return NULL;
     }
 #endif
@@ -543,21 +546,6 @@ napi_value mln_ts_missing_value(napi_env env) {
   napi_throw_error(env, NULL, "the completion carried no value");
   return NULL;
 }
-
-#ifdef __EMSCRIPTEN__
-// emnapi enters a WebAssembly module through napi_register_wasm_v1, and asks it
-// for the Node-API version that it targets. The entry is weak, so the browser
-// suite's test module can register the addon with test exports beside it.
-NAPI_MODULE_EXPORT napi_value
-napi_register_module_v1(napi_env env, napi_value exports);
-NAPI_MODULE_EXPORT __attribute__((weak)) napi_value
-napi_register_wasm_v1(napi_env env, napi_value exports) {
-  return napi_register_module_v1(env, exports);
-}
-NAPI_MODULE_EXPORT int32_t node_api_module_get_api_version_v1(void) {
-  return NAPI_VERSION;
-}
-#endif
 
 #ifdef __OHOS__
 // OpenHarmony registers modules by library name rather than through the

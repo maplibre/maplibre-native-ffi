@@ -249,7 +249,7 @@ test(
     });
     teardown(() => origin.close());
     const fixture = await openRuntime({ provider: nothingClaimed });
-    // OpenHarmony refuses header transforms, so the request arrives there
+    // The browser refuses header transforms, so the request arrives there
     // with no transformed header.
     await setHeaderTransform(fixture.runtime, {
       rules: [

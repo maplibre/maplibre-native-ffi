@@ -4,11 +4,6 @@ package("maplibre-native-c")
     set_license("BSD-2-Clause")
     set_kind("library")
 
-    add_configs("backend", {
-        description = "Render backend (defaults to the platform's backend)",
-        default = "default", type = "string",
-        values = {"default", "egl", "vulkan", "wgl", "metal", "webgl", "webgpu"}
-    })
     add_configs("libc", {
         description = "Linux C library", default = "gnu", type = "string",
         values = {"gnu", "musl"}
@@ -24,7 +19,7 @@ package("maplibre-native-c")
         import("core.project.config")
         local platforms = {
             macosx = "macos", windows = "windows", android = "android",
-            harmony = "ohos", bsd = "freebsd", wasm = "emscripten",
+            harmony = "ohos", bsd = "freebsd",
             iphoneos = "ios", appletvos = "tvos", applexros = "visionos"
         }
         local platform = platforms[package:plat()]
@@ -45,19 +40,8 @@ package("maplibre-native-c")
         }
         local arch = architectures[package:arch()]
         assert(arch, "unsupported architecture: " .. package:arch())
-        local backend = package:config("backend")
-        if backend == "default" then
-            if package:is_plat("macosx", "iphoneos", "appletvos", "applexros") then
-                backend = "metal"
-            elseif package:is_plat("windows") then
-                backend = "wgl"
-            elseif package:is_plat("wasm") then
-                backend = "webgl"
-            else
-                backend = "egl"
-            end
-        end
-        local preset = platform .. "-" .. arch .. "-" .. backend
+        -- An archive carries every render backend of its platform.
+        local preset = platform .. "-" .. arch
         local selected
         for _, url in ipairs(package:urls()) do
             if package:url_alias(url) == preset then
@@ -78,28 +62,4 @@ package("maplibre-native-c")
                 os.cp(directory, package:installdir())
             end
         end
-    end)
-
-    on_fetch(function (package, opt)
-        if opt.system or not package:is_plat("wasm") then
-            return
-        end
-        local prefix = package:installdir()
-        if not os.isdir(path.join(prefix, "include")) then
-            return
-        end
-        import("core.base.json")
-        local artifact = json.loadfile(path.join(prefix, "share/maplibre-native-c/artifact.json"))
-        local pc = io.readfile(path.join(prefix, "share/pkgconfig/maplibre-native-c.pc"))
-        local cflags = pc:match("Cflags: [^\n]*"):gsub("Cflags: ", ""):gsub("%-I[^ ]+", "")
-        return {
-            version = package:version_str(),
-            includedirs = {path.join(prefix, "include")},
-            linkdirs = {path.join(prefix, "lib")},
-            links = {"maplibre-native-c", "mln_ffi_platform"},
-            defines = {"MLN_STATIC"},
-            syslinks = artifact.link.libraries,
-            cxflags = os.argv(cflags),
-            ldflags = io.readfile(path.join(prefix, "share/maplibre-native-c/emscripten-link-flags.txt")):split("\n", {plain = true, trim = true})
-        }
     end)

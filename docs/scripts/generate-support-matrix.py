@@ -9,7 +9,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "support-matrix.json"
 sys.path.insert(0, str(REPO_ROOT))
 
-from tools.ci import plan
+from tools.ci import gaps, plan
 from tools.ci.gaps import (
     BACKEND_LABELS,
     BINDING_LABELS,
@@ -22,7 +22,6 @@ from tools.ci.gaps import (
     Target,
     gap,
     load_gaps,
-    target_from_preset,
 )
 from tools.ci.suites import LINUX_ARM64_KLIB, command_support, target_suites
 
@@ -39,23 +38,33 @@ def support_matrix() -> dict[str, Any]:
         if coverage.get((binding, target)) != "tested":
             coverage[(binding, target)] = status
 
+    # A target builds every backend's row at once, and tests each backend's on
+    # its own: a suite that names a backend tests that backend's row and builds
+    # the target's others, and one that names none reaches every row.
     for preset in plan.targets(presets):
-        target = target_from_preset(preset)
-        if gap("c", target, "build"):
+        if all(gap("c", target, "build") for target in gaps.cells(preset)):
             continue
-        native_tested = not gap("c", target, "test")
-        record("c", target, "tested" if native_tested else "build-only")
-        commands = [" ".join(suite.command) for suite in target_suites(preset)]
-        for command in commands:
+        for target in gaps.cells(preset):
+            native_tested = not gap("c", target, "test")
+            record("c", target, "tested" if native_tested else "build-only")
+        for suite in target_suites(preset):
+            command = " ".join(suite.command)
             for binding, status in command_support(command):
-                record(binding, target, status)
+                for target in gaps.cells(preset):
+                    if suite.backend and target != gaps.cell(preset, suite.backend):
+                        record(binding, target, "build-only")
+                    else:
+                        record(binding, target, status)
             if LINUX_ARM64_KLIB in command.split():
                 for other in plan.targets(presets):
                     if other.platform == "linux-gnu" and other.architecture == "arm64":
-                        record("kotlin-native", target_from_preset(other), "build-only")
+                        for target in gaps.cells(other):
+                            record("kotlin-native", target, "build-only")
 
     issue, entries = load_gaps()
-    built = {target_from_preset(preset) for preset in plan.targets(presets)}
+    built = {
+        target for preset in plan.targets(presets) for target in gaps.cells(preset)
+    }
     named = {target for entry in entries for target in entry.rows()}
     targets = sorted(built | named, key=Target.sort_key)
 

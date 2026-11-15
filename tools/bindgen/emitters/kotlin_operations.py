@@ -376,8 +376,6 @@ def operation(plan, values, native, *, discard=False):
     callback = kotlin_callbacks.operation(plan, values, native)
     if callback is not None:
         return callback
-    if plan.blocks and not (plan.owned_outputs and not plan.completion):
-        raise Unsupported(f"blocks={plan.blocks} needs one owned output")
     if plan.consumes:
         return lifecycle(plan, values, native)
     text = plan.caller_sized_text
@@ -632,8 +630,6 @@ def owned(plan, values, native):
     owners = receiver_arguments(plan)
     arguments.append("out")
     registered = any(values.needs_registration(p.value) for p in inputs)
-    if plan.blocks:
-        return thread_start(plan, values, native, head, arguments, create, handle)
     callbacks = "{ it.bindingCallbacks }" if registered else "null"
     drop = f"{{ it.{disposal_method(handle)}() }}"
     if registered:
@@ -661,33 +657,6 @@ def owned(plan, values, native):
         else:
             body = f"val out = {values.storage(slot)}; {native.checked(plan.function, arguments)}; {adopted}"
     return f"{head} nativeCall({owners}) {{ {encodings(plan)}{body} }}\n"
-
-
-def thread_start(plan, values, native, head, arguments, create, handle):
-    """A call that waits for a thread to start, whose owner a Completion
-    delivers.
-
-    A thread that a browser page starts runs only after the page yields, so
-    the result arrives once the call returns where the page cannot wait. The
-    call writes its own diagnostic, because other calls run while it waits.
-    """
-    if (
-        plan.receiver
-        or plan.absence
-        or any(values.needs_registration(p.value) for p in plan.inputs)
-    ):
-        raise Unsupported(f"blocks={plan.blocks} takes no receiver or registration")
-    slot = next(
-        p.type.pointee
-        for p in plan.function.parameters
-        if p.name == plan.owned_outputs[0].parameter
-    )
-    call = native.call(plan.function, [*arguments, "diagnostic"])
-    adopted = f"adopt(out, {disposal(handle)}) {create}"
-    body = f"val out = {values.storage(slot)}; threadStart({{ diagnostic -> {call} }}) {{ {adopted} }}"
-    signature, returns = head.rsplit(": ", 1)
-    head = f"{signature}: Completion<{returns.removesuffix(' =')}> ="
-    return f"{head} nativeThreadStart {{ {encodings(plan)}{body} }}\n"
 
 
 def lifecycle(plan, values, native):

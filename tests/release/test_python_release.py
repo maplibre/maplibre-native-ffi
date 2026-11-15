@@ -7,11 +7,10 @@ import tempfile
 import unittest
 
 from python_release import (
-    BACKENDS,
+    RUNTIMES,
     embed_wheel,
     pack,
     prepare,
-    runtime_metadata,
     stage_runtime_dlls,
 )
 from sbom import component, document, package_inventory
@@ -27,7 +26,7 @@ license-files = ["LICENSE"]
 
 RUNTIME = """\
 [project]
-name = "maplibre-native-ffi-runtime-{backend}"
+name = "{distribution}"
 version = "0.0.0"
 license = "BSD-2-Clause"
 license-files = ["LICENSE", "licenses/*"]
@@ -43,18 +42,15 @@ class PythonReleaseTest(unittest.TestCase):
         self.package = root / "package"
         self.package.mkdir()
         (self.package / "pyproject.toml").write_text(API)
-        for backend in BACKENDS:
-            runtime = self.package / "runtimes" / backend
+        for directory, distribution in RUNTIMES.items():
+            runtime = self.package / "runtimes" / directory
             runtime.mkdir(parents=True)
-            (runtime / "pyproject.toml").write_text(RUNTIME.format(backend=backend))
+            (runtime / "pyproject.toml").write_text(
+                RUNTIME.format(distribution=distribution)
+            )
         self.prefix = root / "prefix"
         (self.prefix / "share/maplibre-native-c/licenses").mkdir(parents=True)
         (self.prefix / "share/maplibre-native-c/licenses/icu.txt").write_text("ICU")
-
-    def describe(self, backend: str) -> None:
-        (self.prefix / "share/maplibre-native-c/artifact.json").write_text(
-            json.dumps({"platform": {"id": "macos-arm64"}, "backend": backend})
-        )
 
     def test_the_api_distribution_takes_the_version(self) -> None:
         prepare(self.package, "0.202610.2.dev202610221817")
@@ -75,16 +71,25 @@ class PythonReleaseTest(unittest.TestCase):
 
         prepare(self.package, "0.202610.2")
 
-    def test_rejects_a_backend_without_a_runtime(self) -> None:
-        self.describe("webgpu")
+    def test_every_runtime_has_a_distribution_in_the_repository(self) -> None:
+        source = pathlib.Path(__file__).resolve().parents[2] / "bindings/python"
+        self.assertEqual(
+            {
+                path.parent.name
+                for path in (source / "runtimes").glob("*/pyproject.toml")
+            },
+            set(RUNTIMES),
+        )
+        for directory, distribution in RUNTIMES.items():
+            self.assertIn(
+                f'name = "{distribution}"',
+                (source / "runtimes" / directory / "pyproject.toml").read_text(),
+            )
 
-        with self.assertRaisesRegex(SystemExit, "no Python runtime serves"):
-            runtime_metadata(self.package, self.prefix)
-
-    def test_an_msvc_runtime_carries_the_visual_cpp_dlls_beside_its_extension(
+    def test_a_windows_runtime_carries_its_dlls_beside_its_extension(
         self,
     ) -> None:
-        module = self.package / "runtimes/vulkan/python/maplibre_native_ffi_runtime"
+        module = self.package / "runtimes/native/python/maplibre_native_ffi_runtime"
         module.mkdir(parents=True)
         (module / "stale.dll").write_text("stale")
         (self.prefix / "bin").mkdir()
@@ -93,9 +98,25 @@ class PythonReleaseTest(unittest.TestCase):
             (self.prefix / "bin" / name).write_text(name)
 
         stage_runtime_dlls(module.parents[1], self.prefix, "windows-x64")
-        self.assertEqual(sorted(path.name for path in module.glob("*.dll")), [*dlls])
+        self.assertEqual(
+            sorted(path.name for path in module.glob("*.dll")),
+            sorted((*dlls, "maplibre-native-c.dll")),
+        )
 
         stage_runtime_dlls(module.parents[1], self.prefix, "windows-mingw-x64")
+        self.assertEqual(
+            [path.name for path in module.glob("*.dll")], ["maplibre-native-c.dll"]
+        )
+
+        # An LLVM MinGW package also carries the toolchain's unwinder.
+        (self.prefix / "bin" / "libunwind.dll").write_text("libunwind.dll")
+        stage_runtime_dlls(module.parents[1], self.prefix, "windows-mingw-arm64")
+        self.assertEqual(
+            sorted(path.name for path in module.glob("*.dll")),
+            ["libunwind.dll", "maplibre-native-c.dll"],
+        )
+
+        stage_runtime_dlls(module.parents[1], self.prefix, "linux-gnu-x64")
         self.assertEqual(list(module.glob("*.dll")), [])
 
     def test_rejects_a_version_outside_the_release_scheme(self) -> None:
@@ -120,8 +141,8 @@ class RuntimeWheelTest(unittest.TestCase):
             inputs.mkdir()
             tags = "cp312-abi3-win_amd64"
             names = (
-                "maplibre_native_ffi_runtime_opengl",
-                "maplibre_native_ffi_runtime_opengl_mingw",
+                "maplibre_native_ffi_runtime",
+                "maplibre_native_ffi_runtime_mingw",
             )
             for name in names:
                 stem = f"{name}-0.0.0"
@@ -157,7 +178,7 @@ class RuntimeWheelTest(unittest.TestCase):
             root = pathlib.Path(directory)
             inputs, output = root / "inputs", root / "output"
             inputs.mkdir()
-            name = "maplibre_native_ffi_runtime_opengl"
+            name = "maplibre_native_ffi_runtime"
             tags = "cp314-cp314-android_27_arm64_v8a"
             stem = f"{name}-0.0.0"
             wheel = inputs / f"{stem}-{tags}.whl"
@@ -165,7 +186,7 @@ class RuntimeWheelTest(unittest.TestCase):
                 f"{name}/_native.so": b"tested extension",
                 f"{stem}.dist-info/METADATA": (
                     b"Metadata-Version: 2.4\n"
-                    b"Name: maplibre-native-ffi-runtime-opengl\n"
+                    b"Name: maplibre-native-ffi-runtime\n"
                     b"Version: 0.0.0\nRequires-Dist: maplibre-native-ffi==0.0.0\n"
                 ),
                 f"{stem}.dist-info/WHEEL": f"Wheel-Version: 1.0\nTag: {tags}\n".encode(),
@@ -184,7 +205,7 @@ class RuntimeWheelTest(unittest.TestCase):
             ]
             vendor = component("dependency", "1.2.3", "MIT")
             inventory = package_inventory(
-                "maplibre-native-ffi-runtime-opengl",
+                "maplibre-native-ffi-runtime",
                 "0.0.0",
                 "pypi",
                 [document(native, [vendor], {native["bom-ref"]: {vendor["bom-ref"]}})],

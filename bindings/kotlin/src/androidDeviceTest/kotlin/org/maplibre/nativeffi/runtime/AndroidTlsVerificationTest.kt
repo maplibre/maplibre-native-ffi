@@ -20,8 +20,8 @@ import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
 
 /**
- * Native HTTPS verifies through the platform's HttpURLConnection, so a certificate that no trusted
- * root issued fails the handshake there.
+ * Native HTTPS goes through the platform's HttpURLConnection, so a certificate that no trusted root
+ * issued fails Android's own certificate path validation.
  */
 class AndroidTlsVerificationTest {
   @Test
@@ -37,7 +37,7 @@ class AndroidTlsVerificationTest {
             it.sourceType == RuntimeEventSourceType.MAP &&
               it.type == RuntimeEventType.MAP_LOADING_FAILED
           }
-        assertContains(failure.message, "SSLHandshakeException")
+        assertContains(failure.message, "CertPathValidatorException")
       }
     }
   }

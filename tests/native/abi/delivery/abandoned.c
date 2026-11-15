@@ -132,10 +132,8 @@ static void release_reports_each_abandoned_user_data_once(void) {
   mln_map parking = mln_test_create_map(runtime);
   mln_test_gate gate;
   mln_test_gate_init(&gate);
-  const mln_completion parked = mln_test_gate_completion(&gate);
-  MLN_TEST_OK(mln_map_set_debug_flags(parking, 0, &parked, NULL));
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_gate_wait_entered(&gate), "the runtime worker never parked"
+    mln_test_park_map_worker(parking, &gate), "the runtime worker never parked"
   );
   const mln_completion in_flight =
     mln_test_queue_completion(queue.handle, &pending);

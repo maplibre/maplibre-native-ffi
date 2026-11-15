@@ -13,28 +13,31 @@ static mln_status attach(
   mln_render_session* out_session, const mln_completion* completion
 ) {
   // A borrowed OpenGL texture needs the host's graphics thread, so the core
-  // worker renders offscreen instead.
+  // worker renders offscreen instead, on an OpenGL device rather than the
+  // library's default backend.
   if (options->driver == MLN_RENDER_DRIVER_CORE_WORKER) {
-    const mln_offscreen_descriptor descriptor = {
-      .size = sizeof(mln_offscreen_descriptor),
-      .logical_size = probe_size,
+    const mln_gpu_device_options device_options = {
+      .size = sizeof(mln_gpu_device_options),
+      .fields = MLN_GPU_DEVICE_OPTION_BACKEND,
+      .backend = MLN_RENDER_BACKEND_OPEN_GL,
     };
-    return mln_map_attach_offscreen(
-      map, &descriptor, options, MLN_HANDLE_NULL, out_session, completion, NULL
+    mln_gpu_device device = MLN_HANDLE_NULL;
+    const mln_status created =
+      mln_gpu_device_create(&device_options, &device, NULL);
+    if (created != MLN_STATUS_OK) return created;
+    const mln_render_target target = {
+      .size = sizeof(mln_render_target),
+      .kind = MLN_RENDER_TARGET_KIND_OFFSCREEN,
+      .data.offscreen = {.logical_size = probe_size},
+    };
+    const mln_status status = mln_map_attach(
+      map, &target, device, options, out_session, completion, NULL
     );
+    mln_gpu_device_release(device);
+    return status;
   }
-  const mln_open_gl_borrowed_texture entry = {
-    .texture = texture->opengl_texture
-  };
-  mln_open_gl_borrowed_texture_descriptor descriptor = {
-    .size = sizeof(mln_open_gl_borrowed_texture_descriptor)
-  };
-  descriptor.logical_size = probe_size;
-  descriptor.physical_width = texture->width;
-  descriptor.physical_height = texture->height;
-  descriptor.context = (mln_open_gl_context_descriptor){
+  const mln_open_gl_context_descriptor host = {
     .platform = MLN_OPEN_GL_CONTEXT_PLATFORM_EGL,
-    .ownership = MLN_OPEN_GL_CONTEXT_OWNERSHIP_SHARED,
     .data = {
       .egl = {
         .display = context->egl_display,
@@ -43,12 +46,29 @@ static mln_status attach(
       }
     },
   };
-  descriptor.textures = &entry;
-  descriptor.texture_count = 1;
-  descriptor.target = texture->opengl_target;
-  return mln_map_attach_open_gl_borrowed_texture(
-    map, &descriptor, options, out_session, completion, NULL
+  mln_gpu_device device = MLN_HANDLE_NULL;
+  const mln_status wrapped = mln_gpu_device_wrap_open_gl(&host, &device, NULL);
+  if (wrapped != MLN_STATUS_OK) return wrapped;
+  const mln_open_gl_borrowed_texture entry = {
+    .texture = texture->opengl_texture
+  };
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES,
+    .data.open_gl_borrowed_textures = {
+      .logical_size = probe_size,
+      .physical_width = texture->width,
+      .physical_height = texture->height,
+      .textures = &entry,
+      .texture_count = 1,
+      .target = texture->opengl_target,
+    },
+  };
+  const mln_status status = mln_map_attach(
+    map, &target, device, options, out_session, completion, NULL
   );
+  mln_gpu_device_release(device);
+  return status;
 }
 
 int main(void) {

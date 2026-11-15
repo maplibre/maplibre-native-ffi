@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex, MutexGuard};
 
-pub use maplibre_native_ffi_sys::NativeHandle;
+pub use maplibre_native_ffi_python_sys::NativeHandle;
 
 use std::io::Write;
 

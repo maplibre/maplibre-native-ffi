@@ -7,14 +7,6 @@
 #include "support/http_server.h"
 #endif
 
-// The browser and OpenHarmony transports cannot drop a transformed header when
-// a redirect changes origin, so they refuse the header transform.
-#if defined(__EMSCRIPTEN__) || defined(__OHOS__)
-#define MLN_TEST_HEADER_TRANSFORM_SUPPORTED 0
-#else
-#define MLN_TEST_HEADER_TRANSFORM_SUPPORTED 1
-#endif
-
 static const char empty_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
@@ -229,7 +221,6 @@ static void header_transform_with_zero_size(void* descriptor) {
   ((mln_http_header_transform*)descriptor)->size = 0;
 }
 
-#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
 static void header_transform_with_rules(void* descriptor) {
   static mln_http_header_rule rule;
   rule = (mln_http_header_rule){.size = sizeof(mln_http_header_rule)};
@@ -237,23 +228,13 @@ static void header_transform_with_rules(void* descriptor) {
   ((mln_http_header_transform*)descriptor)->rules = &rule;
   ((mln_http_header_transform*)descriptor)->rule_count = 1;
 }
-#endif
 
-// A transport that cannot drop a transformed header when a redirect changes
-// origin reports MLN_STATUS_UNSUPPORTED rather than leak the credential to the
-// redirect's destination.
 static const mln_test_validation_case header_transform_cases[] = {
-#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   {"a well-formed transform", NULL, MLN_STATUS_OK, NULL},
-#else
-  {"a well-formed transform", NULL, MLN_STATUS_UNSUPPORTED, NULL},
-#endif
   {"a zero size", header_transform_with_zero_size, MLN_STATUS_INVALID_ARGUMENT,
    "size"},
-#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   {"a callback with rules", header_transform_with_rules,
    MLN_STATUS_INVALID_ARGUMENT, "rules"},
-#endif
 };
 
 static void header_transform_registration_validates_its_descriptor(void) {
@@ -672,7 +653,6 @@ static void record_image_resource_kind(
   );
 }
 
-#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
 static mln_status record_image_header_kind(
   void* user_data, uint32_t kind, mln_buffer_view url_view,
   mln_http_header_transform_response* out_response
@@ -689,7 +669,6 @@ static mln_status record_image_header_kind(
   }
   return MLN_STATUS_OK;
 }
-#endif
 
 static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
   mln_test_http_server* server = mln_test_http_server_start(NULL, 0);
@@ -707,14 +686,12 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
     .user_data = &probe,
   };
   MLN_TEST_OK(mln_test_set_resource_transform(runtime, &transform));
-#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   const mln_http_header_transform header_transform = {
     .size = sizeof(mln_http_header_transform),
     .callback = record_image_header_kind,
     .user_data = &probe,
   };
   MLN_TEST_OK(mln_test_set_http_header_transform(runtime, &header_transform));
-#endif
 
   char overlay_url[256];
   mln_test_http_server_url(
@@ -740,7 +717,6 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
     MLN_RESOURCE_KIND_IMAGE, atomic_load(&probe.resource_kind)
   );
   TEST_ASSERT_TRUE(atomic_load(&probe.resource_url_terminated));
-#if MLN_TEST_HEADER_TRANSFORM_SUPPORTED
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_wait_for_flag(&probe.header_seen),
     "the header transform never saw the image request"
@@ -749,7 +725,6 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
     MLN_RESOURCE_KIND_IMAGE, atomic_load(&probe.header_kind)
   );
   TEST_ASSERT_TRUE(atomic_load(&probe.header_url_terminated));
-#endif
   TEST_ASSERT_TRUE(
     mln_test_http_server_wait_for_requests(server, overlay_path, 1)
   );
@@ -760,7 +735,7 @@ static void an_image_source_request_reaches_the_transforms_as_an_image(void) {
 
 #endif
 
-#if MLN_TEST_PLATFORM_HTTP && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+#if MLN_TEST_PLATFORM_HTTP
 
 static const char token_header[] = "X-Test-Token";
 static const char token_value[] = "secret-token";
@@ -989,7 +964,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_passed_through_request_reaches_the_rules);
   RUN_TEST(an_image_source_request_reaches_the_transforms_as_an_image);
 #endif
-#if MLN_TEST_PLATFORM_HTTP && MLN_TEST_HEADER_TRANSFORM_SUPPORTED
+#if MLN_TEST_PLATFORM_HTTP
   RUN_TEST(a_header_transform_adds_headers_until_cleared);
   RUN_TEST(a_header_transform_skips_requests_that_are_not_http);
   RUN_TEST(a_redirect_keeps_headers_only_within_the_origin);

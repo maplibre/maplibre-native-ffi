@@ -3,27 +3,69 @@
 //! display, and SDL has no frame clock for a window that it doesn't draw.
 //!
 //! On Wayland, a frame callback on the window's surface tells when the
-//! compositor wants the next frame. On Windows, `DwmFlush` waits for the
-//! desktop compositor's next frame. On macOS, the library's own frame pacer
-//! follows the display, and demands the frames itself.
+//! compositor wants the next frame. On X11, a thread waits out the display's
+//! refresh period. On Windows, `DwmFlush` waits for the desktop compositor's
+//! next frame. On macOS, the library's own frame pacer follows the display,
+//! and demands the frames itself.
 
 const std = @import("std");
 const builtin = @import("builtin");
 const maplibre = @import("maplibre_native_ffi");
 const c = @import("sdl");
+const MapView = @import("MapView.zig");
 
 /// The pacer of this platform. Each one, other than the library's, is ready
 /// for a demand at most once per refresh: `demanding` makes it wait for the
 /// next one, and it calls `wake` once it's ready again.
 pub const Pacer = switch (builtin.os.tag) {
-    .linux, .freebsd => WaylandPacer,
-    .windows => DwmPacer,
+    .linux, .freebsd => UnixPacer,
+    .windows => ThreadPacer,
     .macos => LibraryPacer,
     else => @compileError("unsupported platform"),
 };
 
 /// A function that wakes the event loop. Any thread can call it.
 pub const Wake = *const fn () void;
+
+/// A pacer for the window system that SDL drives the window through.
+const UnixPacer = union(enum) {
+    wayland: WaylandPacer,
+    x11: ThreadPacer,
+
+    pub fn init(self: *UnixPacer, window: *c.SDL_Window, wake: Wake) !void {
+        if (MapView.usesWayland()) {
+            self.* = .{ .wayland = undefined };
+            try self.wayland.init(window, wake);
+        } else {
+            self.* = .{ .x11 = undefined };
+            try self.x11.init(window, wake);
+        }
+    }
+
+    pub fn deinit(self: *UnixPacer) void {
+        switch (self.*) {
+            inline else => |*pacer| pacer.deinit(),
+        }
+    }
+
+    pub fn ready(self: *const UnixPacer) bool {
+        return switch (self.*) {
+            inline else => |*pacer| pacer.ready(),
+        };
+    }
+
+    pub fn demanding(self: *UnixPacer) void {
+        switch (self.*) {
+            inline else => |*pacer| pacer.demanding(),
+        }
+    }
+
+    pub fn skipped(self: *UnixPacer) void {
+        switch (self.*) {
+            inline else => |*pacer| pacer.skipped(),
+        }
+    }
+};
 
 /// A pacer that follows the compositor's frame callbacks.
 ///
@@ -123,10 +165,13 @@ const WaylandPacer = struct {
     }
 };
 
-/// A pacer that waits for the desktop compositor's frames on a thread of its
-/// own.
-const DwmPacer = struct {
-    extern "dwmapi" fn DwmFlush() callconv(.winapi) i32;
+/// A pacer that waits for the next refresh on a thread of its own: on Windows,
+/// for the desktop compositor's next frame, and elsewhere for the display's
+/// refresh period.
+const ThreadPacer = struct {
+    const dwm = struct {
+        extern "dwmapi" fn DwmFlush() callconv(.winapi) i32;
+    };
 
     thread: *c.SDL_Thread,
     demanded: *c.SDL_Semaphore,
@@ -136,7 +181,7 @@ const DwmPacer = struct {
     /// The display's refresh period, the least time between two frames.
     period_ns: u64,
 
-    pub fn init(self: *DwmPacer, window: *c.SDL_Window, wake: Wake) !void {
+    pub fn init(self: *ThreadPacer, window: *c.SDL_Window, wake: Wake) !void {
         const mode = c.SDL_GetCurrentDisplayMode(c.SDL_GetDisplayForWindow(window));
         const refresh_rate: f32 = if (mode != null and mode.*.refresh_rate > 0) mode.*.refresh_rate else 60;
         self.* = .{
@@ -149,31 +194,31 @@ const DwmPacer = struct {
         self.thread = c.SDL_CreateThread(run, "frame pacer", self) orelse return error.SdlFailed;
     }
 
-    pub fn deinit(self: *DwmPacer) void {
+    pub fn deinit(self: *ThreadPacer) void {
         self.stopping.store(true, .release);
         c.SDL_SignalSemaphore(self.demanded);
         c.SDL_WaitThread(self.thread, null);
         c.SDL_DestroySemaphore(self.demanded);
     }
 
-    pub fn ready(self: *const DwmPacer) bool {
+    pub fn ready(self: *const ThreadPacer) bool {
         return !self.waiting.load(.acquire);
     }
 
-    pub fn demanding(self: *DwmPacer) void {
+    pub fn demanding(self: *ThreadPacer) void {
         self.waiting.store(true, .release);
         c.SDL_SignalSemaphore(self.demanded);
     }
 
-    pub fn skipped(_: *DwmPacer) void {}
+    pub fn skipped(_: *ThreadPacer) void {}
 
     fn run(data: ?*anyopaque) callconv(.c) c_int {
-        const self: *DwmPacer = @ptrCast(@alignCast(data.?));
+        const self: *ThreadPacer = @ptrCast(@alignCast(data.?));
         var last = c.SDL_GetTicksNS();
         while (true) {
             c.SDL_WaitSemaphore(self.demanded);
             if (self.stopping.load(.acquire)) return 0;
-            _ = DwmFlush();
+            if (builtin.os.tag == .windows) _ = dwm.DwmFlush();
             // DwmFlush returns at once when nothing composes the desktop, as
             // under Wine, so then the pacer waits out the refresh period.
             const now = c.SDL_GetTicksNS();
@@ -190,7 +235,7 @@ const LibraryPacer = struct {
     pacer: maplibre.FramePacer,
 
     pub fn init(self: *LibraryPacer, _: *c.SDL_Window, _: Wake) !void {
-        self.* = .{ .pacer = try maplibre.appleFramePacerCreate(null, null) };
+        self.* = .{ .pacer = try maplibre.FramePacer.create(null, null) };
     }
 
     pub fn deinit(self: *LibraryPacer) void {

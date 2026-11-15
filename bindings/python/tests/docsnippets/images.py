@@ -28,10 +28,14 @@ def images(runtime: mln.RuntimeHandle) -> None:
     # #endregion style
 
     # #region attach
-    session = map_handle.attach_offscreen(
-        mln.OffscreenDescriptor(
-            logical_size=mln.LogicalSize(width=800, height=600)
+    # With no device, the session creates its own.
+    session = map_handle.attach(
+        mln.RenderTargetOffscreenVariant(
+            mln.OffscreenTarget(
+                logical_size=mln.LogicalSize(width=800, height=600)
+            )
         ),
+        None,
         # The library renders on its own thread.
         mln.RenderSessionAttachOptions(
             driver=mln.RenderDriverKind.CORE_WORKER

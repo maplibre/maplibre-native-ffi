@@ -106,7 +106,7 @@ class CommandTest(unittest.TestCase):
     def test_wrapper_preserves_the_desktop_session_path(self):
         console = Suite(
             "test",
-            ("mise", "run", "test", "windows-x64-vulkan"),
+            ("mise", "run", "test", "windows-x64", "vulkan"),
             {},
             "windows-console",
             "pwsh",
@@ -120,7 +120,7 @@ class CommandTest(unittest.TestCase):
                 "-Command",
                 (
                     "./ci/with-windows-console.ps1 -Command "
-                    "@('mise', 'run', 'test', 'windows-x64-vulkan'); exit $LASTEXITCODE"
+                    "@('mise', 'run', 'test', 'windows-x64', 'vulkan'); exit $LASTEXITCODE"
                 ),
             ],
         )

@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi
 
+import androidx.test.platform.app.InstrumentationRegistry
 import java.lang.ref.WeakReference
 
 internal actual class TestThread actual constructor(block: () -> Unit) {
@@ -35,3 +36,6 @@ internal actual suspend fun requestCollection() {
 }
 
 internal actual fun interceptUncaught(sink: (Throwable) -> Boolean): (() -> Unit)? = null
+
+internal actual fun testBackendName(): String? =
+  InstrumentationRegistry.getArguments().getString("mlnTestBackend")?.takeIf(String::isNotEmpty)

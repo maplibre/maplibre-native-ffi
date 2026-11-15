@@ -2,10 +2,9 @@
 
 The package's manifest takes its platforms and the binding's target from the
 repository's root Package.swift. The C library is the release's XCFramework on
-Apple platforms and one of its artifact bundles elsewhere, which the package's
-traits select by backend. A target that links whichever applies, with the
-system libraries that it needs, backs the binding and the `MaplibreNativeC`
-library product.
+Apple platforms and its artifact bundle elsewhere, each with every backend of
+its platform. A target that links whichever applies, with the system libraries
+that it needs, backs the binding and the `MaplibreNativeC` library product.
 """
 
 from __future__ import annotations
@@ -18,7 +17,7 @@ import tarfile
 from typing import TYPE_CHECKING
 
 from native_package_release import ARCHIVE_PREFIX, ARCHIVE_SUFFIX, XCFRAMEWORK_NAME
-from swift_artifact_bundle import ARTIFACTS, TRIPLES, bundle_name
+from swift_artifact_bundle import ARTIFACT, BUNDLE_NAME, TRIPLES
 
 if TYPE_CHECKING:
     from distribution import Release
@@ -35,15 +34,8 @@ LINKAGE = "MaplibreNativeCLinkage"
 APPLE_PLATFORMS = "[.macOS, .iOS, .macCatalyst, .tvOS, .visionOS]"
 # The Swift platform of each archive platform that an artifact bundle holds.
 SWIFT_PLATFORMS = {"linux-gnu": "linux", "android": "android", "windows": "windows"}
-# The trait that selects each backend's bundle.
-TRAITS = {"opengl": "OpenGL", "vulkan": "Vulkan"}
-TRAIT_DESCRIPTIONS = {
-    "opengl": "Render with OpenGL: EGL on Linux and Android, and WGL on Windows.",
-    "vulkan": "Render with Vulkan.",
-}
-DEFAULT_TRAIT = "DefaultBackend"
 PKG_CONFIG_LIBRARY = re.compile(r"(?:^|\s)-l(\S+)")
-OWN_LIBRARIES = {"maplibre-native-c", "mln_ffi_platform"}
+OWN_LIBRARIES = {"maplibre-native-c"}
 LINKAGE_SOURCE = """\
 // This target compiles nothing. It links the C library, and the system
 // libraries that the library needs, into whatever depends on it.
@@ -70,14 +62,12 @@ class Platforms:
     """What each Swift platform's archives say about linking them statically."""
 
     def __init__(self, release: Release) -> None:
-        self.backends: dict[str, set[str]] = {}
-        self.defaults: dict[str, str] = {}
         self.libraries: dict[str, list[str]] = {}
         for archive in sorted(
             release.assets.glob(f"{ARCHIVE_PREFIX}*{ARCHIVE_SUFFIX}")
         ):
             root = archive.name.removesuffix(ARCHIVE_SUFFIX)
-            platform = root.removeprefix(ARCHIVE_PREFIX).rpartition("-")[0]
+            platform = root.removeprefix(ARCHIVE_PREFIX)
             if platform not in TRIPLES:
                 continue
             with tarfile.open(archive, "r:gz") as source:
@@ -87,14 +77,7 @@ class Platforms:
                 pkg_config = source.extractfile(
                     f"{root}/share/pkgconfig/maplibre-native-c.pc"
                 ).read()
-            name = swift_platform(platform)
-            if descriptor["backend"] not in ARTIFACTS:
-                raise SystemExit(f"{archive.name} has no artifact bundle")
-            self.backends.setdefault(name, set()).add(descriptor["backend"])
-            default = descriptor["platform"]["defaultBackend"]
-            if self.defaults.setdefault(name, default) != default:
-                raise SystemExit(f"{archive.name} has another default backend")
-            libraries = self.libraries.setdefault(name, [])
+            libraries = self.libraries.setdefault(swift_platform(platform), [])
             (libs,) = re.findall(r"^Libs:(.*)$", pkg_config.decode(), re.MULTILINE)
             for library in [
                 *descriptor["link"]["libraries"],
@@ -103,13 +86,9 @@ class Platforms:
                 if library not in OWN_LIBRARIES and library not in libraries:
                     libraries.append(library)
 
-    def with_backend(self, backend: str, defaults: bool = False) -> str:
-        names = sorted(
-            name
-            for name, backends in self.backends.items()
-            if backend in backends and (not defaults or self.defaults[name] == backend)
-        )
-        return f"[{', '.join(f'.{name}' for name in names)}]"
+    def names(self) -> str:
+        """The Swift platforms, as a manifest's list of them."""
+        return f"[{', '.join(f'.{name}' for name in sorted(self.libraries))}]"
 
 
 def location(tree: pathlib.Path, release: Release, name: str) -> str | None:
@@ -153,29 +132,21 @@ def manifest(
                 f"condition: .when(platforms: {APPLE_PLATFORMS})),"
             )
             continue
-        backend = next(key for key, value in ARTIFACTS.items() if value == target)
-        for traits, defaults in ((TRAITS[backend], False), (DEFAULT_TRAIT, True)):
-            names = platforms.with_backend(backend, defaults)
-            if names == "[]":
-                if not defaults:
-                    raise SystemExit(f"no native archive describes {target}")
-                continue
-            dependencies.append(
-                f'      .target(\n        name: "{target}",\n'
-                f"        condition: .when(platforms: {names}, "
-                f'traits: ["{traits}"])\n      ),'
-            )
-    for name, default in sorted(platforms.defaults.items()):
-        if locations[ARTIFACTS[default]] is None:
-            raise SystemExit(f"no artifact bundle has {name}'s default backend")
+        names = platforms.names()
+        if names == "[]":
+            raise SystemExit(f"no native archive describes {target}")
+        dependencies.append(
+            f'      .target(\n        name: "{target}",\n'
+            f"        condition: .when(platforms: {names})\n      ),"
+        )
+    if platforms.libraries and locations[ARTIFACT] is None:
+        raise SystemExit(
+            f"the native archives for Swift's platforms need {BUNDLE_NAME}"
+        )
     linker_settings = "\n".join(
         f'      .linkedLibrary("{library}", .when(platforms: [.{name}])),'
         for name, libraries in sorted(platforms.libraries.items())
         for library in libraries
-    )
-    traits = "\n".join(
-        f'    .trait(name: "{TRAITS[backend]}", description: "{description}"),'
-        for backend, description in TRAIT_DESCRIPTIONS.items()
     )
     return f"""\
 {tools_version}
@@ -186,8 +157,8 @@ def manifest(
 import PackageDescription
 
 // The C library is the XCFramework on Apple platforms, and elsewhere the
-// artifact bundle of the backend that a trait selects. SwiftPM downloads every
-// binary target, whatever platform it builds for.
+// artifact bundle. Each carries every backend of its platform. SwiftPM downloads
+// every binary target, whatever platform it builds for.
 let targets: [Target] = [
 {chr(10).join(binaries)}
   .target(
@@ -210,23 +181,13 @@ let package = Package(
     .library(name: "MaplibreNativeFFI", targets: ["MaplibreNativeFFI"]),
     .library(name: "MaplibreNativeC", targets: ["{LINKAGE}"]),
   ],
-  traits: [
-{traits}
-    .trait(
-      name: "{DEFAULT_TRAIT}",
-      description: "Render with each platform's default backend."
-    ),
-    .default(enabledTraits: ["{DEFAULT_TRAIT}"]),
-  ],
   targets: targets
 )
 """
 
 
 def write(tree: pathlib.Path, release: Release, repository: pathlib.Path) -> None:
-    names = {"MaplibreNativeC": XCFRAMEWORK_NAME} | {
-        target: bundle_name(backend) for backend, target in ARTIFACTS.items()
-    }
+    names = {"MaplibreNativeC": XCFRAMEWORK_NAME, ARTIFACT: BUNDLE_NAME}
     if release.local and not any(
         (release.assets / name).exists() for name in names.values()
     ):

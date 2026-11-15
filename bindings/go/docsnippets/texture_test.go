@@ -54,32 +54,48 @@ func renderToTexture(
 	options := maplibre.RenderSessionAttachOptions{
 		Driver:    maplibre.RenderDriverKindCoreWorker,
 		FrameWake: maplibre.Wake{Callback: onFrameWake},
+	}
+	// #endregion attach-options
+
+	// #region attach-borrowed
+	// Your VkDevice and graphics queue.
+	device, err := maplibre.WrapVulkanGPUDevice(maplibre.VulkanDeviceDescriptor{
+		Context: vulkan,
 		// Only if your renderer also submits to the graphics queue, under
 		// the same mutex.
 		QueueLock: maplibre.QueueLock{
 			Lock: queue.Lock, Unlock: queue.Unlock,
 		},
-	}
-	// #endregion attach-options
-
-	// #region attach-borrowed
-	ring := maplibre.VulkanBorrowedTextureDescriptor{
-		// The map's size in logical pixels.
-		LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
-		// The size of your textures in device pixels.
-		PhysicalWidth:  1600,
-		PhysicalHeight: 1200,
-		Context:        vulkan,
-		// Your VkImage and VkImageView for each texture of the ring.
-		Textures: []maplibre.VulkanBorrowedTexture{
-			{Image: images[0], ImageView: views[0]},
-			{Image: images[1], ImageView: views[1]},
+		// The device extensions that you enabled on your VkDevice.
+		EnabledExtensions: []string{
+			"VK_KHR_swapchain",
+			"VK_KHR_external_semaphore_fd",
 		},
-		Format:      37, // VK_FORMAT_R8G8B8A8_UNORM
-		FinalLayout: 5,  // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+	})
+	if err != nil {
+		return err
 	}
 
-	borrowed, ready, err := m.AttachVulkanBorrowedTexture(ring, options)
+	ring := maplibre.RenderTargetVulkanBorrowedTexturesVariant{
+		Value: maplibre.VulkanBorrowedTexturesTarget{
+			// The map's size in logical pixels.
+			LogicalSize: maplibre.LogicalSize{Width: 800, Height: 600},
+			// The size of your textures in device pixels.
+			PhysicalWidth:  1600,
+			PhysicalHeight: 1200,
+			// Your VkImage and VkImageView for each texture of the ring.
+			Textures: []maplibre.VulkanBorrowedTexture{
+				{Image: images[0], ImageView: views[0]},
+				{Image: images[1], ImageView: views[1]},
+			},
+			Format:      37, // VK_FORMAT_R8G8B8A8_UNORM
+			FinalLayout: 5,  // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		},
+	}
+
+	borrowed, ready, err := m.Attach(ring, device, options)
+	// The session keeps the device until it detaches.
+	err = errors.Join(err, device.Release())
 	if err != nil {
 		return err
 	}
@@ -94,18 +110,22 @@ func renderToTexture(
 	}
 
 	// #region resize-borrowed
-	resized := maplibre.VulkanBorrowedTextureReplacement{
-		LogicalSize:    maplibre.LogicalSize{Width: 1024, Height: 768},
-		PhysicalWidth:  2048,
-		PhysicalHeight: 1536,
-		// Your new textures, at the new size.
-		Textures: []maplibre.VulkanBorrowedTexture{
-			{Image: newImages[0], ImageView: newViews[0]},
-			{Image: newImages[1], ImageView: newViews[1]},
+	resized := maplibre.RenderTargetVulkanBorrowedTexturesVariant{
+		Value: maplibre.VulkanBorrowedTexturesTarget{
+			LogicalSize:    maplibre.LogicalSize{Width: 1024, Height: 768},
+			PhysicalWidth:  2048,
+			PhysicalHeight: 1536,
+			// Your new textures, at the new size.
+			Textures: []maplibre.VulkanBorrowedTexture{
+				{Image: newImages[0], ImageView: newViews[0]},
+				{Image: newImages[1], ImageView: newViews[1]},
+			},
+			Format:      37,
+			FinalLayout: 5,
 		},
 	}
 
-	retargeted, err := session.SetVulkanBorrowedTextureTarget(resized)
+	retargeted, err := session.SetTarget(resized)
 	if err != nil {
 		return err
 	}

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Builds the ArkTS test HAP for an OpenHarmony preset, runs it on the emulator,
-# and fails unless every case passed and hypium ran as many cases as the
-# harness registered.
+# Builds the ArkTS test HAP for an OpenHarmony preset, runs it on the emulator
+# with one of the preset's render backends, and fails unless every case passed
+# and hypium ran as many cases as the harness registered.
 #
-#   test-arkts.sh <preset>
+#   test-arkts.sh <preset> <vulkan|opengl>
 #
 # The addon and the graphics test module must already be built for the
 # preset, which the binding's test task does first. The suite's HTTP origin
@@ -11,11 +11,13 @@
 # it.
 set -euo pipefail
 
-preset=${1:?usage: test-arkts.sh <preset>}
+usage="usage: test-arkts.sh <preset> <vulkan|opengl>"
+preset=${1:?$usage}
+backend=${2:?$usage}
 binding="$(cd "$(dirname "$0")/.." && pwd)"
 case "$preset" in
-  ohos-x64-*) abi=x86_64 ;;
-  ohos-arm64-*) abi=arm64-v8a ;;
+  ohos-x64) abi=x86_64 ;;
+  ohos-arm64) abi=arm64-v8a ;;
   *)
     echo "error: test-arkts.sh takes an OpenHarmony preset, not $preset" >&2
     exit 2
@@ -29,21 +31,16 @@ native_install="$(cd "$binding/../.." && pwd)/build/$preset/install"
 rm -rf "$work"
 mkdir -p "$work/ets" "$work/libs/$abi" "$work/ohpm"
 cp "$binding/test/arkts/TestAbility.ts" "$work/ets/TestAbility.ts"
-case "$preset" in
-  *-egl) backend=opengl ;;
-  *-vulkan) backend=vulkan ;;
-  *) echo "error: no OHPM backend for $preset" >&2; exit 2 ;;
-esac
 "$binding/scripts/pack-ohpm.sh" "$work/ohpm" "$preset"
 facade_har="$work/ohpm/native-ffi-0.0.0.har"
-backend_har="$work/ohpm/native-ffi-$backend-0.0.0.har"
-# The backend supplies the C headers and libraries; the facade supplies the
+runtime_har="$work/ohpm/native-ffi-runtime-0.0.0.har"
+# The runtime supplies the C headers and libraries; the facade supplies the
 # ArkTS entry that the consumer loads in its own realm.
-"$binding/scripts/verify-ohpm.sh" "$backend_har"
-mkdir -p "$work/ohpm/facade" "$work/ohpm/backend"
+"$binding/scripts/verify-ohpm.sh" "$runtime_har"
+mkdir -p "$work/ohpm/facade" "$work/ohpm/runtime"
 tar -xzf "$facade_har" -C "$work/ohpm/facade"
-tar -xzf "$backend_har" -C "$work/ohpm/backend"
-cp -R "$work/ohpm/backend/package/libs/." "$work/libs/"
+tar -xzf "$runtime_har" -C "$work/ohpm/runtime"
+cp -R "$work/ohpm/runtime/package/libs/." "$work/libs/"
 # One bundle with three entries: the hypium runner, a spawned realm, and a
 # spawned realm that loads the package's ArkTS entry.
 (
@@ -66,7 +63,7 @@ patch --batch --forward --fuzz=0 -p1 -d "$work/ets/hypium" \
 perl -pi -e 's#from "\@ohos/hypium"#from "./hypium/index"#' "$work/ets/TestRunner.js"
 cp "$build/libmaplibre_native_ffi_test_graphics.so" \
   "$native_install/lib/libmln_test_graphics.so" "$work/libs/$abi/"
-if [[ "$preset" == ohos-x64-vulkan ]]; then
+if [[ "$preset" == ohos-x64 && "$backend" == vulkan ]]; then
   cp "$("$binding/../../tools/devices/ohos-vulkan-driver")" "$work/libs/$abi/libvulkan.so"
 fi
 # The application requires the API floor that the package declares.
@@ -118,7 +115,7 @@ deadline=${MLN_FFI_ARKTS_TIMEOUT:-2400}
 ) &
 "${hdc[@]}" shell aa test -b "$bundle" -m entry_test \
   -s unittest /ets/TestRunner -s timeout 300000 \
-  -s origin "http://127.0.0.1:$port" |
+  -s origin "http://127.0.0.1:$port" -s backend "$backend" |
   tee "$report.raw"
 touch "$work/finished"
 # The device ends its lines with carriage returns.

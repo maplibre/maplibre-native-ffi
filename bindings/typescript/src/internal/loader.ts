@@ -1,9 +1,9 @@
 // Loads the addon on Node, Bun, and Deno.
 //
-// The application installs the facade and one backend package. The backend
+// The application installs the facade and one runtime package. The runtime
 // package depends on one addon package per platform, which the package
 // manager installs only on its own platform, so the loader resolves the
-// backend package first and the addon package from there. The names follow
+// runtime package first and the addon package from there. The names follow
 // scripts/pack.ts.
 
 import { createRequire } from "node:module";
@@ -13,9 +13,9 @@ import process from "node:process";
 import type { Addon } from "./addon.ts";
 
 const SCOPE = "@maplibre/native-ffi";
-const BACKENDS = ["opengl", "metal", "vulkan", "opengl-mingw", "vulkan-mingw"];
+const RUNTIMES = ["runtime", "runtime-mingw"];
 
-function addonPackage(backend: string): string {
+function addonPackage(runtime: string): string {
   let libc = process.platform === "linux" ? "-gnu" : "";
   // Deno publishes GNU Linux binaries; its getReport() needs --allow-sys.
   if (process.platform === "linux" && !("Deno" in globalThis)) {
@@ -24,20 +24,20 @@ function addonPackage(backend: string): string {
     };
     libc = report.header.glibcVersionRuntime ? "-gnu" : "-musl";
   }
-  return `${SCOPE}-${backend}-${process.platform}-${process.arch}${libc}`;
+  return `${SCOPE}-${runtime}-${process.platform}-${process.arch}${libc}`;
 }
 
 function isNotFound(error: unknown): boolean {
   return (error as { code?: unknown }).code === "MODULE_NOT_FOUND";
 }
 
-/** The manifest path of each backend package that is installed. */
-function installedBackends(
+/** The manifest path of each runtime package that is installed. */
+function installedRuntimes(
   require: ReturnType<typeof createRequire>,
 ): [string, string][] {
-  return BACKENDS.flatMap((backend): [string, string][] => {
+  return RUNTIMES.flatMap((runtime): [string, string][] => {
     try {
-      return [[backend, require.resolve(`${SCOPE}-${backend}/package.json`)]];
+      return [[runtime, require.resolve(`${SCOPE}-${runtime}/package.json`)]];
     } catch (error) {
       if (isNotFound(error)) {
         return [];
@@ -48,7 +48,7 @@ function installedBackends(
 }
 
 /**
- * Loads the addon of the one installed backend package.
+ * Loads the addon of the one installed runtime package.
  *
  * `MAPLIBRE_NATIVE_FFI_ADDON` is for the binding's own suites: it names an
  * addon file, relative to the working directory, to load instead.
@@ -59,27 +59,27 @@ export function loadAddon(): Addon {
   if (path) {
     return require(resolve(path)) as Addon;
   }
-  const installed = installedBackends(require);
+  const installed = installedRuntimes(require);
   if (installed.length === 0) {
-    const packages = BACKENDS.map((backend) => `${SCOPE}-${backend}`);
+    const packages = RUNTIMES.map((runtime) => `${SCOPE}-${runtime}`);
     throw new Error(
-      `no MapLibre Native backend package is installed; install one of ${packages.join(", ")}`,
+      `no MapLibre Native runtime package is installed; install one of ${packages.join(", ")}`,
     );
   }
   if (installed.length > 1) {
-    const packages = installed.map(([backend]) => `${SCOPE}-${backend}`);
+    const packages = installed.map(([runtime]) => `${SCOPE}-${runtime}`);
     throw new Error(
-      `${packages.join(" and ")} are installed; install exactly one backend package`,
+      `${packages.join(" and ")} are installed; install exactly one runtime package`,
     );
   }
-  const [backend, manifest] = installed[0]!;
-  const addon = `${addonPackage(backend)}/maplibre_native_ffi.node`;
+  const [runtime, manifest] = installed[0]!;
+  const addon = `${addonPackage(runtime)}/maplibre_native_ffi.node`;
   try {
     return createRequire(manifest)(addon) as Addon;
   } catch (error) {
     if (isNotFound(error)) {
       throw new Error(
-        `${SCOPE}-${backend} has no addon for ${process.platform}-${process.arch}, or its optional dependencies were not installed`,
+        `${SCOPE}-${runtime} has no addon for ${process.platform}-${process.arch}, or its optional dependencies were not installed`,
         { cause: error },
       );
     }

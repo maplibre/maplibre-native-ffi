@@ -90,7 +90,7 @@ def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
         harness.runtime.create_offline_region(unknown, b"")
     # Native saw the arm's tag and refused it; the binding passed it through.
     assert raised.value.status == mln.Status.INVALID_ARGUMENT
-    assert "definition type is invalid" in raised.value.diagnostic
+    assert "type 999" in raised.value.diagnostic
 
 
 def test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip(
@@ -245,6 +245,6 @@ def test_inputs_take_any_sequence_or_byte_buffer_and_require_their_subject(
     )
     with pytest.raises(TypeError, match="not str"):
         map_handle.camera_for_lat_lngs(typing.cast(typing.Any, "coordinates"))
-    # The logical size is the subject of a resize, which has no default.
+    # The logical extent is the subject of a resize, which has no default.
     with pytest.raises(TypeError):
         typing.cast(typing.Any, map_handle).resize()

@@ -7,7 +7,6 @@ import {
   RenderResult,
   type RenderSessionAttachOptions,
   type RenderSessionHandle,
-  type VulkanContextDescriptor,
 } from "../../src/index.ts";
 
 // Stand-ins for the host's display timer and session replacement.
@@ -55,9 +54,15 @@ function onFrameWake(): void {
 // #endregion frame-wake
 
 // #region resize
-function onWindowResized(width: number, height: number): void {
-  // The window's new size in logical pixels.
-  session.discarding.resize({ width, height });
+// Runs when the window changes size, or moves to a display with
+// another scale factor.
+function onWindowResized(
+  width: number,
+  height: number,
+  scaleFactor: number,
+): void {
+  // The window's new size in logical pixels, and its scale factor.
+  session.discarding.resize({ width, height, scaleFactor });
 }
 // #endregion resize
 
@@ -76,33 +81,42 @@ export async function surfaceLost(): Promise<void> {
 }
 
 export async function surfaceRestored(
+  display: bigint,
   newSurface: bigint,
 ): Promise<void> {
   // #region lost-surface
-  await session.setVulkanSurfaceTarget({
-    logicalSize: { width: 800, height: 600 },
-    surface: newSurface,
+  await session.setTarget({
+    kind: "waylandSurface",
+    value: {
+      logicalSize: { width: 800, height: 600 },
+      display,
+      surface: newSurface,
+    },
   });
   // #endregion lost-surface
 }
 
 export async function renderToWindow(
   map: MapHandle,
-  vulkan: VulkanContextDescriptor,
+  display: bigint,
   windowSurface: bigint,
 ): Promise<void> {
   // #region attach
-  session = map.attachVulkanSurface(
+  // With no device, the session creates one on the platform's own
+  // backend.
+  session = map.attach(
     {
-      // The window's size in logical pixels. The map's scale factor turns
-      // it into pixels.
-      logicalSize: { width: 800, height: 600 },
-      // Your VkInstance, VkPhysicalDevice,
-      // VkDevice, and graphics VkQueue.
-      context: vulkan,
-      // Your VkSurfaceKHR.
-      surface: windowSurface,
+      kind: "waylandSurface",
+      value: {
+        // The window's size in logical pixels. The map's scale factor
+        // turns it into pixels.
+        logicalSize: { width: 800, height: 600 },
+        // Your wl_display and wl_surface.
+        display,
+        surface: windowSurface,
+      },
     },
+    undefined,
     {
       driver: RenderDriverKind.coreWorker,
       redrawWake: { callback: onRedrawWake },
@@ -112,7 +126,7 @@ export async function renderToWindow(
   await session.ready;
   // #endregion attach
 
-  onWindowResized(1024, 768);
+  onWindowResized(1024, 768, 2);
 
   // #region service
   const graphicsThreadOptions: RenderSessionAttachOptions = {

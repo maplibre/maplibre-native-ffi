@@ -1,5 +1,4 @@
-# Exported functions that no C ABI test calls yet, one per line. Calls from
-# tests/native/internal do not count.
+# Exported functions that no C ABI test calls yet, one per line.
 # `mise run check-export-calls` fails when an exported function is uncalled and
 # missing here, and when a function listed here is called. This list only
 # shrinks: call a function from the ABI suite, then drop its line.

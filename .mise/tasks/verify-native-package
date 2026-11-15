@@ -9,9 +9,11 @@
   loader is enough to record `/opt/homebrew/opt/...`.
 - No graphics loader is linked or carried, since the host supplies its own.
   Android and OpenHarmony ship theirs with the platform.
-- The only headers are the C API's and MapLibre Native's plugin header.
+- The only headers are the C API's.
 - Each Apple library is stripped, with a matching dSYM beside it.
 - The relocatable CMake package links shared and complete static consumers.
+  A web package, which has no C library to link, carries the browser module
+  and its JavaScript glue instead.
 - A complete ELF archive keeps no COMDAT group, since a consumer's link would
   discard its private copy of a runtime in favor of the consumer's own.
 - A Windows DLL carries each Visual C++ runtime DLL it imports, since a host
@@ -96,8 +98,6 @@ PACKAGED_FRAMEWORK_BINARY = "MaplibreNativeC"
 HEADER_ROOTS = ("include", "Headers")
 # The umbrella header and the directory of domain headers.
 PACKAGED_HEADER_ENTRIES = frozenset({"maplibre_native_c.h", "maplibre_native_c"})
-# MapLibre Native's plugin header, at the path plugin.h includes it from.
-PACKAGED_PLUGIN_HEADER = pathlib.PurePath("mln/plugin/plugin_api.h")
 
 BUILD_HOST_PATH = "names a build-host path"
 PRIVATE_EXPORT = "exports a private symbol"
@@ -108,6 +108,7 @@ UNSTRIPPED = "keeps local symbols"
 MISSING_DSYM = "has no matching dSYM"
 COMDAT_GROUPS = "keeps COMDAT groups"
 MISSING_RUNTIME = "imports a runtime DLL it doesn't carry"
+MISSING_WEB_MODULE = "is missing from the web package"
 FOREIGN_RUNTIME = "is built for another architecture"
 REMEDIES = {
     BUILD_HOST_PATH: (
@@ -125,12 +126,11 @@ REMEDIES = {
         "and link the loader into the test harness only."
     ),
     VENDORED_LOADER: (
-        "The host supplies the graphics loader. Install a local stand-in "
-        "through the loader component, which stays out of the package."
+        "The host supplies the graphics loader. Leave it out of the package."
     ),
     VENDORED_HEADER: (
-        "Graphics headers come with the host's implementation. Install a local "
-        "stand-in through the loader component, which stays out of the package."
+        "Graphics headers come with the host's implementation. Leave them out "
+        "of the package."
     ),
     UNSTRIPPED: (
         "An Apple library's local symbols belong in its dSYM. CPack strips "
@@ -157,7 +157,18 @@ REMEDIES = {
         "Microsoft.VC*.CRT directory can hold one for code under emulation, "
         "so remove it from the architecture's MLN_FFI_MSVC_RUNTIME_DLLS list."
     ),
+    MISSING_WEB_MODULE: (
+        "A JavaScript host loads the C API from the module and its glue. "
+        "mln_ffi_add_web_package installs mln-rs's `just c-web` output under "
+        "share/maplibre-native-c/web."
+    ),
 }
+# The browser module and the glue that loads it, which a web package carries in
+# place of a C library.
+WEB_PACKAGE_FILES = (
+    "share/maplibre-native-c/web/maplibre_native_c.js",
+    "share/maplibre-native-c/web/maplibre_native_c_bg.wasm",
+)
 
 
 def run(command: list[str]) -> str:
@@ -311,11 +322,7 @@ def vendored_header(relative: pathlib.PurePath) -> bool:
     under_include = pathlib.PurePath(
         *(part.removeprefix("._") for part in parts[parts.index(root) + 1 :])
     )
-    if under_include.parts[0] in PACKAGED_HEADER_ENTRIES:
-        return False
-    return under_include != PACKAGED_PLUGIN_HEADER and not (
-        under_include.parts and under_include in PACKAGED_PLUGIN_HEADER.parents
-    )
+    return under_include.parts[0] not in PACKAGED_HEADER_ENTRIES
 
 
 def comdat_problems(archive: pathlib.Path) -> list[tuple[str, str]]:
@@ -453,9 +460,15 @@ def main() -> int:
                     (binary.name, kind, detail)
                     for kind, detail in dsym_problems(binary, pathlib.Path(directory))
                 )
-        verify_cmake_package(
-            root, pathlib.Path(directory) / f"maplibre-native-c-{preset}", preset
-        )
+        prefix = pathlib.Path(directory) / f"maplibre-native-c-{preset}"
+        if preset.startswith("web-"):
+            problems.extend(
+                (pathlib.PurePath(file).name, MISSING_WEB_MODULE, file)
+                for file in WEB_PACKAGE_FILES
+                if not (prefix / file).is_file()
+            )
+        else:
+            verify_cmake_package(root, prefix, preset)
 
     if not problems:
         return 0

@@ -277,11 +277,20 @@ static inline void probe_abandon(mln_render_session session) {
   );
 }
 
-// Renders on two maps of one runtime, one session on a core worker and one on
-// a host graphics thread. With frames still queued for both, it stops the
-// graphics thread, abandons both sessions, and returns the exit status at once,
-// leaving the runtime, the maps, the session handles, the wakes, the resource
-// provider, and the log callback live.
+static inline void probe_demand_frames(mln_render_session session) {
+  for (int frame = 0; frame < 64; frame += 1) {
+    probe_demand_frame(session);
+  }
+}
+
+// Renders on two maps of one runtime, one session on a core worker and then
+// one on a host graphics thread. With frames still queued for each, it
+// abandons the session, stopping the graphics thread first, and then returns
+// the exit status at once, leaving the runtime, the maps, the session handles,
+// the wakes, the resource provider, and the log callback live.
+//
+// The sessions render in turn, not at once: the OpenHarmony emulator's EGL
+// corrupts its llvmpipe contexts when two threads render at the same time.
 static inline int probe_exit_after_abandoning(
   uint32_t graphics_backend, probe_attach_fn attach
 ) {
@@ -293,16 +302,14 @@ static inline int probe_exit_after_abandoning(
     &core_worker, probe_create_map(runtime), graphics_backend, attach,
     MLN_RENDER_DRIVER_CORE_WORKER
   );
+  probe_demand_frames(core_worker.session);
+  // The core worker is mid-frame here; abandon waits out its call.
+  probe_abandon(core_worker.session);
   probe_attach_rendering(
     &caller_driven, probe_create_map(runtime), graphics_backend, attach,
     MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
   );
-  for (int frame = 0; frame < 64; frame += 1) {
-    probe_demand_frame(core_worker.session);
-    probe_demand_frame(caller_driven.session);
-  }
-  // The core worker is mid-frame here; abandon waits out its call.
-  probe_abandon(core_worker.session);
+  probe_demand_frames(caller_driven.session);
   probe_stop_driving(&caller_driven);
   probe_abandon(caller_driven.session);
   return 0;

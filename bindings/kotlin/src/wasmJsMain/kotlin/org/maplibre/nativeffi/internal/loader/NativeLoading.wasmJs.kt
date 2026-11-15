@@ -10,10 +10,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.await
 import org.maplibre.nativeffi.internal.c.C
-import org.maplibre.nativeffi.internal.c.DispatchedUpcalls
-import org.maplibre.nativeffi.internal.c.unsignedWord
-import org.maplibre.nativeffi.internal.call.ThreadStart
-import org.maplibre.nativeffi.internal.callback.contain
 import org.maplibre.nativeffi.internal.delivery.HostDelivery
 
 /**
@@ -42,7 +38,9 @@ internal class SharedLoad {
 }
 
 /**
- * The browser module that every generated call reaches through a `Symbol.for` global.
+ * The browser module that every generated call reaches through a `Symbol.for` global: the module
+ * object of the runtime package's `runtime.mjs`, whose `mln_*` functions are the module's raw C
+ * exports.
  *
  * Instantiating a module is asynchronous, so no call can load it on demand: `loadWasmModule` loads
  * it, and every call before then throws.
@@ -52,25 +50,18 @@ internal object ModuleLoader {
   var loaded: Boolean = false
     private set
 
-  suspend fun load(poolSize: Int?) = shared.await { loadOnce(poolSize) }
+  suspend fun load() = shared.await { loadOnce() }
 
-  private suspend fun loadOnce(poolSize: Int?) {
+  private suspend fun loadOnce() {
     try {
-      val module = instantiate(options(poolSize ?: 0)).await<JsAny>()
-      install(
-        module,
-        dispatch = { HostDelivery.wake() },
-        threadEnd = { token, status ->
-          contain("mln_wake_callback", Unit) { ThreadStart.deliver(token.toLong(), status) }
-        },
-        upcall = { site, arguments -> DispatchedUpcalls.run(site, unsignedWord(arguments)) },
-      )
+      val module = instantiate().await<JsAny>()
+      install(module) { name, arguments -> HostDelivery.upcall(name, arguments) }
       checkAbiVersion(C.mln_c_version().toUInt().toLong())
       HostDelivery.install()
       loaded = true
     } catch (failure: Throwable) {
       // A failed load drops the module's global, so a later call can load again. A module that
-      // instantiated keeps its heap and workers until the page unloads.
+      // instantiated keeps its memory until the page unloads.
       uninstall()
       throw failure
     }
@@ -102,23 +93,13 @@ internal actual fun ensureNativeLibrary() {
 internal actual fun loadNativeLibraryUnchecked() = ensureNativeLibrary()
 
 // KGP extracts this package from the selected runtime KLIB; the static import lets the bundler
-// follow the module's .wasm and pthread Worker references. A size of 0 selects the link's default.
-@JsModule("@maplibre/native-ffi-runtime")
-private external fun instantiate(options: JsAny): Promise<JsAny>
+// follow the package's module and the files that it loads beside it.
+@JsModule("@maplibre/native-ffi-runtime") private external fun instantiate(): Promise<JsAny>
 
-private fun options(poolSize: Int): JsAny = js("({ mlnPoolSize: poolSize })")
-
-private fun install(
-  module: JsAny,
-  dispatch: () -> Unit,
-  threadEnd: (Int, Int) -> Unit,
-  upcall: (Int, Int) -> Unit,
-): Unit =
+private fun install(module: JsAny, upcall: (String, JsAny) -> Unit): Unit =
   js(
     """{
-      module.mlnKwDispatch = dispatch;
-      module.mlnKwThreadEnd = threadEnd;
-      module.mlnKwUpcall = upcall;
+      module.mlnSetUpcallDispatcher(upcall);
       globalThis[Symbol.for('org.maplibre.nativeffi.c')] = module;
     }""",
   )

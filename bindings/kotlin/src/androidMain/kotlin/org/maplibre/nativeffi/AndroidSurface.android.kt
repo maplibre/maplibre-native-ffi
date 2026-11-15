@@ -5,84 +5,63 @@ package org.maplibre.nativeffi
 
 import android.view.Surface
 import org.maplibre.nativeffi.internal.c.Jni
-import org.maplibre.nativeffi.internal.call.*
-import org.maplibre.nativeffi.internal.lifecycle.*
 
 /**
- * Creates a session that presents the map to [surface]'s window, with a graphics context that the
- * library creates.
+ * Creates a session that presents the map to [surface]'s window.
  *
- * Works as the [attachAndroidSurface] that takes an [AndroidSurfaceDescriptor] does, including when
- * the platform destroys [surface].
+ * Works as [MapHandle.attach] with a [RenderTarget.AndroidWindow] of [surface]'s `ANativeWindow`
+ * does. The session takes its own reference to the window, so this call keeps none. When the
+ * platform destroys [surface], release the session's target or give it another surface without
+ * waiting, as [AndroidWindowTarget] says.
  *
  * Errors:
  * - `Status.INVALID_ARGUMENT` when [surface] has no window, such as after the platform destroyed
  *   it.
- * - The errors of the [attachAndroidSurface] that takes an [AndroidSurfaceDescriptor].
+ * - The errors of [MapHandle.attach].
  */
 public fun MapHandle.attachAndroidSurface(
   surface: Surface,
   logicalSize: LogicalSize,
-  device: VulkanDeviceHandle? = null,
+  device: GpuDeviceHandle? = null,
   options: RenderSessionAttachOptions,
 ): RenderSessionHandle =
-  nativeCall(this, binding) {
-    attach(
-      { out, completion ->
-        Jni.mapAttachAndroidSurface(
-          handle,
-          writeAndroidSurfaceDescriptor(
-            AndroidSurfaceDescriptor(
-              logicalSize,
-              NativePointer.NULL_POINTER,
-              NativePointer.NULL_POINTER,
-              NativePointer.NULL_POINTER,
-            ),
-          ),
-          surface,
-          device?.let { argument(it, it.binding) } ?: 0L,
-          writeRenderSessionAttachOptions(options),
-          out,
-          completion,
-          diagnostic,
-        )
-      },
-      GeneratedOwnerDisposal::renderSession,
-      { created, ready -> RenderSessionHandle.wrap(created, this@attachAndroidSurface, ready) },
-      { it.bindingCallbacks },
-      { it.dispose() },
-    )
+  withAndroidWindow(surface) { window ->
+    attach(androidWindow(logicalSize, window), device, options)
   }
 
 /**
- * Replaces the window that the session presents to with [surface]'s.
+ * Replaces the session's target with [surface]'s window.
  *
- * Works as the [setAndroidSurfaceTarget] that takes an [AndroidSurfaceReplacement] does.
+ * Works as [RenderSessionHandle.setTarget] with a [RenderTarget.AndroidWindow] of [surface]'s
+ * `ANativeWindow` does.
  *
  * Errors:
  * - `Status.INVALID_ARGUMENT` when [surface] has no window, such as after the platform destroyed
  *   it.
- * - The errors of the [setAndroidSurfaceTarget] that takes an [AndroidSurfaceReplacement].
+ * - The errors of [RenderSessionHandle.setTarget].
  */
 public fun RenderSessionHandle.setAndroidSurfaceTarget(
   surface: Surface,
   logicalSize: LogicalSize,
 ): Completion<Unit> =
-  nativeUnit(this, binding) {
-    check(
-      Jni.renderSessionSetAndroidSurfaceTarget(
-        handle,
-        writeAndroidSurfaceReplacement(
-          AndroidSurfaceReplacement(
-            logicalSize,
-            NativePointer.NULL_POINTER,
-            NativePointer.NULL_POINTER,
-            NativePointer.NULL_POINTER,
-          ),
-        ),
-        surface,
-        completion,
-        diagnostic,
-      ),
-    )
+  withAndroidWindow(surface) { window -> setTarget(androidWindow(logicalSize, window)) }
+
+private fun androidWindow(logicalSize: LogicalSize, window: Long): RenderTarget =
+  RenderTarget.AndroidWindow(AndroidWindowTarget(logicalSize, NativePointer.ofAddress(window)))
+
+/**
+ * Runs [block] with a reference of its own to [surface]'s `ANativeWindow`, which it releases once
+ * [block] returns.
+ */
+private inline fun <T> withAndroidWindow(surface: Surface, block: (Long) -> T): T {
+  Jni.ensureLoaded()
+  val window = Jni.nativeWindowFromSurface(surface)
+  if (window == 0L) {
+    throw MaplibreException(Status.INVALID_ARGUMENT, "the Surface has no window")
   }
+  try {
+    return block(window)
+  } finally {
+    Jni.nativeWindowRelease(window)
+  }
+}

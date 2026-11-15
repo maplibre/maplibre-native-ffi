@@ -9,3 +9,6 @@ import kotlinx.coroutines.newSingleThreadContext
 @OptIn(DelicateCoroutinesApi::class, ExperimentalCoroutinesApi::class)
 internal actual val testGraphicsThread: CoroutineDispatcher =
   newSingleThreadContext("maplibre-test-graphics")
+
+/** Only a browser presents to canvases: a session of its own renders offscreen here. */
+internal actual fun createTestCanvas(width: Int, height: Int): TestCanvas? = null

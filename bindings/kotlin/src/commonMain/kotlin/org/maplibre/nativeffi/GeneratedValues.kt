@@ -293,6 +293,52 @@ public class CameraUpdateMode(@get:JvmName("getRawValue") public val rawValue: U
 }
 
 /**
+ * How a graphics API's clip space holds depth.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_clip_depth_range` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public class ClipDepthRange(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "ZERO_TO_ONE"
+      2u -> "NEGATIVE_ONE_TO_ONE"
+      else -> "ClipDepthRange($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean = other is ClipDepthRange && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /**
+     * Clip z runs from 0 to w, as in Metal, Vulkan, WebGPU, Direct3D, and OpenGL with
+     * `glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE)`.
+     */
+    @JvmField public val ZERO_TO_ONE: ClipDepthRange = ClipDepthRange(ZERO_TO_ONE_VALUE)
+    /** The `rawValue` of [ZERO_TO_ONE]. */
+    public const val ZERO_TO_ONE_VALUE: UInt = 1u
+    /** Clip z runs from -w to w, as in OpenGL by default. */
+    @JvmField
+    public val NEGATIVE_ONE_TO_ONE: ClipDepthRange = ClipDepthRange(NEGATIVE_ONE_TO_ONE_VALUE)
+    /** The `rawValue` of [NEGATIVE_ONE_TO_ONE]. */
+    public const val NEGATIVE_ONE_TO_ONE_VALUE: UInt = 2u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): ClipDepthRange =
+      when (rawValue) {
+        ZERO_TO_ONE_VALUE -> ZERO_TO_ONE
+        NEGATIVE_ONE_TO_ONE_VALUE -> NEGATIVE_ONE_TO_ONE
+        else -> ClipDepthRange(rawValue)
+      }
+  }
+}
+
+/**
  * How the map keeps the camera within the world or within its bounds.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
@@ -341,6 +387,77 @@ public class ConstrainMode(@get:JvmName("getRawValue") public val rawValue: UInt
         WIDTH_AND_HEIGHT_VALUE -> WIDTH_AND_HEIGHT
         SCREEN_VALUE -> SCREEN
         else -> ConstrainMode(rawValue)
+      }
+  }
+}
+
+/**
+ * A format of depth and stencil textures, as a bit in a set.
+ *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
+ * See `mln_depth_stencil_format_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public class DepthStencilFormatFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  public infix fun or(other: DepthStencilFormatFlag): DepthStencilFormatFlag =
+    of(rawValue or other.rawValue)
+
+  public infix fun and(other: DepthStencilFormatFlag): DepthStencilFormatFlag =
+    of(rawValue and other.rawValue)
+
+  public operator fun contains(other: DepthStencilFormatFlag): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(1uL to "DEPTH24_STENCIL8", 2uL to "DEPTH32_FLOAT_STENCIL8"),
+    )
+
+  override fun equals(other: Any?): Boolean =
+    other is DepthStencilFormatFlag && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /** No flags. */
+    @JvmField public val NONE: DepthStencilFormatFlag = DepthStencilFormatFlag(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 0u
+    /**
+     * 24-bit normalized depth and 8-bit stencil: VK_FORMAT_D24_UNORM_S8_UINT,
+     * MTLPixelFormatDepth24Unorm_Stencil8, GL_DEPTH24_STENCIL8, or
+     * WGPUTextureFormat_Depth24PlusStencil8 (`depth24plus-stencil8`).
+     */
+    @JvmField
+    public val DEPTH24_STENCIL8: DepthStencilFormatFlag =
+      DepthStencilFormatFlag(DEPTH24_STENCIL8_VALUE)
+    /** The `rawValue` of [DEPTH24_STENCIL8]. */
+    public const val DEPTH24_STENCIL8_VALUE: UInt = 1u
+    /**
+     * 32-bit float depth and 8-bit stencil: VK_FORMAT_D32_SFLOAT_S8_UINT,
+     * MTLPixelFormatDepth32Float_Stencil8, GL_DEPTH32F_STENCIL8, or
+     * WGPUTextureFormat_Depth32FloatStencil8 (`depth32float-stencil8`).
+     */
+    @JvmField
+    public val DEPTH32_FLOAT_STENCIL8: DepthStencilFormatFlag =
+      DepthStencilFormatFlag(DEPTH32_FLOAT_STENCIL8_VALUE)
+    /** The `rawValue` of [DEPTH32_FLOAT_STENCIL8]. */
+    public const val DEPTH32_FLOAT_STENCIL8_VALUE: UInt = 2u
+
+    /**
+     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
+     */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): DepthStencilFormatFlag =
+      when (rawValue) {
+        NONE_VALUE -> NONE
+        DEPTH24_STENCIL8_VALUE -> DEPTH24_STENCIL8
+        DEPTH32_FLOAT_STENCIL8_VALUE -> DEPTH32_FLOAT_STENCIL8
+        else -> DepthStencilFormatFlag(rawValue)
       }
   }
 }
@@ -478,6 +595,150 @@ public class GesturePhase(@get:JvmName("getRawValue") public val rawValue: UInt)
 }
 
 /**
+ * A way to share a texture's memory with another API or process.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_gpu_export_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public class GpuExportKind(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "NONE"
+      1u -> "IO_SURFACE"
+      2u -> "DMA_BUF"
+      3u -> "ANDROID_HARDWARE_BUFFER"
+      4u -> "DXGI_SHARED_HANDLE"
+      5u -> "OPAQUE_FD"
+      else -> "GpuExportKind($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean = other is GpuExportKind && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /** The texture isn't shared. */
+    @JvmField public val NONE: GpuExportKind = GpuExportKind(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 0u
+    /** An `IOSurfaceRef`. */
+    @JvmField public val IO_SURFACE: GpuExportKind = GpuExportKind(IO_SURFACE_VALUE)
+    /** The `rawValue` of [IO_SURFACE]. */
+    public const val IO_SURFACE_VALUE: UInt = 1u
+    /** A Linux dmabuf, as file descriptors with a DRM format and modifier. */
+    @JvmField public val DMA_BUF: GpuExportKind = GpuExportKind(DMA_BUF_VALUE)
+    /** The `rawValue` of [DMA_BUF]. */
+    public const val DMA_BUF_VALUE: UInt = 2u
+    /** An `AHardwareBuffer*`. */
+    @JvmField
+    public val ANDROID_HARDWARE_BUFFER: GpuExportKind = GpuExportKind(ANDROID_HARDWARE_BUFFER_VALUE)
+    /** The `rawValue` of [ANDROID_HARDWARE_BUFFER]. */
+    public const val ANDROID_HARDWARE_BUFFER_VALUE: UInt = 3u
+    /** A DXGI shared texture's NT handle. */
+    @JvmField public val DXGI_SHARED_HANDLE: GpuExportKind = GpuExportKind(DXGI_SHARED_HANDLE_VALUE)
+    /** The `rawValue` of [DXGI_SHARED_HANDLE]. */
+    public const val DXGI_SHARED_HANDLE_VALUE: UInt = 4u
+    /** A Vulkan or OpenGL opaque memory file descriptor. */
+    @JvmField public val OPAQUE_FD: GpuExportKind = GpuExportKind(OPAQUE_FD_VALUE)
+    /** The `rawValue` of [OPAQUE_FD]. */
+    public const val OPAQUE_FD_VALUE: UInt = 5u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): GpuExportKind =
+      when (rawValue) {
+        NONE_VALUE -> NONE
+        IO_SURFACE_VALUE -> IO_SURFACE
+        DMA_BUF_VALUE -> DMA_BUF
+        ANDROID_HARDWARE_BUFFER_VALUE -> ANDROID_HARDWARE_BUFFER
+        DXGI_SHARED_HANDLE_VALUE -> DXGI_SHARED_HANDLE
+        OPAQUE_FD_VALUE -> OPAQUE_FD
+        else -> GpuExportKind(rawValue)
+      }
+  }
+}
+
+/**
+ * A way to share a texture's memory, as a bit in a set.
+ *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
+ * See `mln_gpu_export_kind_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public class GpuExportKindFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  public infix fun or(other: GpuExportKindFlag): GpuExportKindFlag = of(rawValue or other.rawValue)
+
+  public infix fun and(other: GpuExportKindFlag): GpuExportKindFlag =
+    of(rawValue and other.rawValue)
+
+  public operator fun contains(other: GpuExportKindFlag): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(
+        1uL to "IO_SURFACE",
+        2uL to "DMA_BUF",
+        4uL to "ANDROID_HARDWARE_BUFFER",
+        8uL to "DXGI_SHARED_HANDLE",
+        16uL to "OPAQUE_FD",
+      ),
+    )
+
+  override fun equals(other: Any?): Boolean =
+    other is GpuExportKindFlag && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /** No flags. */
+    @JvmField public val NONE: GpuExportKindFlag = GpuExportKindFlag(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 0u
+    @JvmField public val IO_SURFACE: GpuExportKindFlag = GpuExportKindFlag(IO_SURFACE_VALUE)
+    /** The `rawValue` of [IO_SURFACE]. */
+    public const val IO_SURFACE_VALUE: UInt = 1u
+    @JvmField public val DMA_BUF: GpuExportKindFlag = GpuExportKindFlag(DMA_BUF_VALUE)
+    /** The `rawValue` of [DMA_BUF]. */
+    public const val DMA_BUF_VALUE: UInt = 2u
+    @JvmField
+    public val ANDROID_HARDWARE_BUFFER: GpuExportKindFlag =
+      GpuExportKindFlag(ANDROID_HARDWARE_BUFFER_VALUE)
+    /** The `rawValue` of [ANDROID_HARDWARE_BUFFER]. */
+    public const val ANDROID_HARDWARE_BUFFER_VALUE: UInt = 4u
+    @JvmField
+    public val DXGI_SHARED_HANDLE: GpuExportKindFlag = GpuExportKindFlag(DXGI_SHARED_HANDLE_VALUE)
+    /** The `rawValue` of [DXGI_SHARED_HANDLE]. */
+    public const val DXGI_SHARED_HANDLE_VALUE: UInt = 8u
+    @JvmField public val OPAQUE_FD: GpuExportKindFlag = GpuExportKindFlag(OPAQUE_FD_VALUE)
+    /** The `rawValue` of [OPAQUE_FD]. */
+    public const val OPAQUE_FD_VALUE: UInt = 16u
+
+    /**
+     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
+     */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): GpuExportKindFlag =
+      when (rawValue) {
+        NONE_VALUE -> NONE
+        IO_SURFACE_VALUE -> IO_SURFACE
+        DMA_BUF_VALUE -> DMA_BUF
+        ANDROID_HARDWARE_BUFFER_VALUE -> ANDROID_HARDWARE_BUFFER
+        DXGI_SHARED_HANDLE_VALUE -> DXGI_SHARED_HANDLE
+        OPAQUE_FD_VALUE -> OPAQUE_FD
+        else -> GpuExportKindFlag(rawValue)
+      }
+  }
+}
+
+/**
  * How one side waits for the other's GPU work on a shared texture.
  *
  * A sync file descriptor or an OpenGL fence signals once, so when `AcquiredFrameHandle.release()`
@@ -528,7 +789,10 @@ public class GpuSyncKind(@get:JvmName("getRawValue") public val rawValue: UInt) 
     public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKind = GpuSyncKind(VULKAN_TIMELINE_SEMAPHORE_VALUE)
     /** The `rawValue` of [VULKAN_TIMELINE_SEMAPHORE]. */
     public const val VULKAN_TIMELINE_SEMAPHORE_VALUE: UInt = 3u
-    /** `handle` is a sync file descriptor. */
+    /**
+     * `handle` is a sync file descriptor. A descriptor of -1, as Vulkan exports for a semaphore
+     * that has already signaled, counts as `GpuSyncKind.CPU_COMPLETE`.
+     */
     @JvmField public val SYNC_FD: GpuSyncKind = GpuSyncKind(SYNC_FD_VALUE)
     /** The `rawValue` of [SYNC_FD]. */
     public const val SYNC_FD_VALUE: UInt = 4u
@@ -1275,49 +1539,6 @@ public class OpenGlClientApi(@get:JvmName("getRawValue") public val rawValue: UI
 }
 
 /**
- * Whether a render session's OpenGL context shares objects with yours.
- *
- * Later versions may add values; an unknown one keeps its `rawValue`.
- *
- * See `mln_open_gl_context_ownership` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public class OpenGlContextOwnership(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "SHARED"
-      1u -> "DEDICATED"
-      else -> "OpenGlContextOwnership($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is OpenGlContextOwnership && other.rawValue == rawValue
-
-  override fun hashCode(): Int = rawValue.hashCode()
-
-  public companion object {
-    /** The session's context shares objects with your `share_context`. */
-    @JvmField public val SHARED: OpenGlContextOwnership = OpenGlContextOwnership(SHARED_VALUE)
-    /** The `rawValue` of [SHARED]. */
-    public const val SHARED_VALUE: UInt = 0u
-    /** The session's context shares objects with no other context. */
-    @JvmField public val DEDICATED: OpenGlContextOwnership = OpenGlContextOwnership(DEDICATED_VALUE)
-    /** The `rawValue` of [DEDICATED]. */
-    public const val DEDICATED_VALUE: UInt = 1u
-
-    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
-    @JvmStatic
-    @JvmName("of")
-    public fun of(rawValue: UInt): OpenGlContextOwnership =
-      when (rawValue) {
-        SHARED_VALUE -> SHARED
-        DEDICATED_VALUE -> DEDICATED
-        else -> OpenGlContextOwnership(rawValue)
-      }
-  }
-}
-
-/**
  * An OpenGL context platform, as a bit in a set.
  *
  * Later versions may add flags; unknown bits keep their place in `rawValue`.
@@ -1465,6 +1686,56 @@ public class RenderAbandonDisposition(@get:JvmName("getRawValue") public val raw
         CLEAN_VALUE -> CLEAN
         QUARANTINED_VALUE -> QUARANTINED
         else -> RenderAbandonDisposition(rawValue)
+      }
+  }
+}
+
+/**
+ * A render backend.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_render_backend` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+public class RenderBackend(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "METAL"
+      2u -> "VULKAN"
+      3u -> "OPEN_GL"
+      4u -> "WEB_GPU"
+      else -> "RenderBackend($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean = other is RenderBackend && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    @JvmField public val METAL: RenderBackend = RenderBackend(METAL_VALUE)
+    /** The `rawValue` of [METAL]. */
+    public const val METAL_VALUE: UInt = 1u
+    @JvmField public val VULKAN: RenderBackend = RenderBackend(VULKAN_VALUE)
+    /** The `rawValue` of [VULKAN]. */
+    public const val VULKAN_VALUE: UInt = 2u
+    @JvmField public val OPEN_GL: RenderBackend = RenderBackend(OPEN_GL_VALUE)
+    /** The `rawValue` of [OPEN_GL]. */
+    public const val OPEN_GL_VALUE: UInt = 3u
+    @JvmField public val WEB_GPU: RenderBackend = RenderBackend(WEB_GPU_VALUE)
+    /** The `rawValue` of [WEB_GPU]. */
+    public const val WEB_GPU_VALUE: UInt = 4u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): RenderBackend =
+      when (rawValue) {
+        METAL_VALUE -> METAL
+        VULKAN_VALUE -> VULKAN
+        OPEN_GL_VALUE -> OPEN_GL
+        WEB_GPU_VALUE -> WEB_GPU
+        else -> RenderBackend(rawValue)
       }
   }
 }
@@ -1809,6 +2080,145 @@ public class RenderSessionState(@get:JvmName("getRawValue") public val rawValue:
         FAILED_VALUE -> FAILED
         ABANDONED_VALUE -> ABANDONED
         else -> RenderSessionState(rawValue)
+      }
+  }
+}
+
+/**
+ * A render target kind, as a bit in a set.
+ *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
+ * See `mln_render_target_kind_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public class RenderTargetKindFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  public infix fun or(other: RenderTargetKindFlag): RenderTargetKindFlag =
+    of(rawValue or other.rawValue)
+
+  public infix fun and(other: RenderTargetKindFlag): RenderTargetKindFlag =
+    of(rawValue and other.rawValue)
+
+  public operator fun contains(other: RenderTargetKindFlag): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(
+        1uL to "OFFSCREEN",
+        2uL to "METAL_LAYER",
+        4uL to "WIN32_WINDOW",
+        8uL to "XLIB_WINDOW",
+        16uL to "WAYLAND_SURFACE",
+        32uL to "ANDROID_WINDOW",
+        64uL to "OHOS_WINDOW",
+        512uL to "VULKAN_SURFACE",
+        1024uL to "OPEN_GL_SURFACE",
+        2048uL to "METAL_BORROWED_TEXTURES",
+        4096uL to "VULKAN_BORROWED_TEXTURES",
+        8192uL to "OPEN_GL_BORROWED_TEXTURES",
+        16384uL to "WEB_GPU_BORROWED_TEXTURES",
+        32768uL to "EXPORTED_RING",
+        65536uL to "WEB_CANVAS",
+      ),
+    )
+
+  override fun equals(other: Any?): Boolean =
+    other is RenderTargetKindFlag && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /** No flags. */
+    @JvmField public val NONE: RenderTargetKindFlag = RenderTargetKindFlag(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 0u
+    @JvmField public val OFFSCREEN: RenderTargetKindFlag = RenderTargetKindFlag(OFFSCREEN_VALUE)
+    /** The `rawValue` of [OFFSCREEN]. */
+    public const val OFFSCREEN_VALUE: UInt = 1u
+    @JvmField public val METAL_LAYER: RenderTargetKindFlag = RenderTargetKindFlag(METAL_LAYER_VALUE)
+    /** The `rawValue` of [METAL_LAYER]. */
+    public const val METAL_LAYER_VALUE: UInt = 2u
+    @JvmField
+    public val WIN32_WINDOW: RenderTargetKindFlag = RenderTargetKindFlag(WIN32_WINDOW_VALUE)
+    /** The `rawValue` of [WIN32_WINDOW]. */
+    public const val WIN32_WINDOW_VALUE: UInt = 4u
+    @JvmField public val XLIB_WINDOW: RenderTargetKindFlag = RenderTargetKindFlag(XLIB_WINDOW_VALUE)
+    /** The `rawValue` of [XLIB_WINDOW]. */
+    public const val XLIB_WINDOW_VALUE: UInt = 8u
+    @JvmField
+    public val WAYLAND_SURFACE: RenderTargetKindFlag = RenderTargetKindFlag(WAYLAND_SURFACE_VALUE)
+    /** The `rawValue` of [WAYLAND_SURFACE]. */
+    public const val WAYLAND_SURFACE_VALUE: UInt = 16u
+    @JvmField
+    public val ANDROID_WINDOW: RenderTargetKindFlag = RenderTargetKindFlag(ANDROID_WINDOW_VALUE)
+    /** The `rawValue` of [ANDROID_WINDOW]. */
+    public const val ANDROID_WINDOW_VALUE: UInt = 32u
+    @JvmField public val OHOS_WINDOW: RenderTargetKindFlag = RenderTargetKindFlag(OHOS_WINDOW_VALUE)
+    /** The `rawValue` of [OHOS_WINDOW]. */
+    public const val OHOS_WINDOW_VALUE: UInt = 64u
+    @JvmField
+    public val VULKAN_SURFACE: RenderTargetKindFlag = RenderTargetKindFlag(VULKAN_SURFACE_VALUE)
+    /** The `rawValue` of [VULKAN_SURFACE]. */
+    public const val VULKAN_SURFACE_VALUE: UInt = 512u
+    @JvmField
+    public val OPEN_GL_SURFACE: RenderTargetKindFlag = RenderTargetKindFlag(OPEN_GL_SURFACE_VALUE)
+    /** The `rawValue` of [OPEN_GL_SURFACE]. */
+    public const val OPEN_GL_SURFACE_VALUE: UInt = 1024u
+    @JvmField
+    public val METAL_BORROWED_TEXTURES: RenderTargetKindFlag =
+      RenderTargetKindFlag(METAL_BORROWED_TEXTURES_VALUE)
+    /** The `rawValue` of [METAL_BORROWED_TEXTURES]. */
+    public const val METAL_BORROWED_TEXTURES_VALUE: UInt = 2048u
+    @JvmField
+    public val VULKAN_BORROWED_TEXTURES: RenderTargetKindFlag =
+      RenderTargetKindFlag(VULKAN_BORROWED_TEXTURES_VALUE)
+    /** The `rawValue` of [VULKAN_BORROWED_TEXTURES]. */
+    public const val VULKAN_BORROWED_TEXTURES_VALUE: UInt = 4096u
+    @JvmField
+    public val OPEN_GL_BORROWED_TEXTURES: RenderTargetKindFlag =
+      RenderTargetKindFlag(OPEN_GL_BORROWED_TEXTURES_VALUE)
+    /** The `rawValue` of [OPEN_GL_BORROWED_TEXTURES]. */
+    public const val OPEN_GL_BORROWED_TEXTURES_VALUE: UInt = 8192u
+    @JvmField
+    public val WEB_GPU_BORROWED_TEXTURES: RenderTargetKindFlag =
+      RenderTargetKindFlag(WEB_GPU_BORROWED_TEXTURES_VALUE)
+    /** The `rawValue` of [WEB_GPU_BORROWED_TEXTURES]. */
+    public const val WEB_GPU_BORROWED_TEXTURES_VALUE: UInt = 16384u
+    @JvmField
+    public val EXPORTED_RING: RenderTargetKindFlag = RenderTargetKindFlag(EXPORTED_RING_VALUE)
+    /** The `rawValue` of [EXPORTED_RING]. */
+    public const val EXPORTED_RING_VALUE: UInt = 32768u
+    @JvmField public val WEB_CANVAS: RenderTargetKindFlag = RenderTargetKindFlag(WEB_CANVAS_VALUE)
+    /** The `rawValue` of [WEB_CANVAS]. */
+    public const val WEB_CANVAS_VALUE: UInt = 65536u
+
+    /**
+     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
+     */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): RenderTargetKindFlag =
+      when (rawValue) {
+        NONE_VALUE -> NONE
+        OFFSCREEN_VALUE -> OFFSCREEN
+        METAL_LAYER_VALUE -> METAL_LAYER
+        WIN32_WINDOW_VALUE -> WIN32_WINDOW
+        XLIB_WINDOW_VALUE -> XLIB_WINDOW
+        WAYLAND_SURFACE_VALUE -> WAYLAND_SURFACE
+        ANDROID_WINDOW_VALUE -> ANDROID_WINDOW
+        OHOS_WINDOW_VALUE -> OHOS_WINDOW
+        VULKAN_SURFACE_VALUE -> VULKAN_SURFACE
+        OPEN_GL_SURFACE_VALUE -> OPEN_GL_SURFACE
+        METAL_BORROWED_TEXTURES_VALUE -> METAL_BORROWED_TEXTURES
+        VULKAN_BORROWED_TEXTURES_VALUE -> VULKAN_BORROWED_TEXTURES
+        OPEN_GL_BORROWED_TEXTURES_VALUE -> OPEN_GL_BORROWED_TEXTURES
+        WEB_GPU_BORROWED_TEXTURES_VALUE -> WEB_GPU_BORROWED_TEXTURES
+        EXPORTED_RING_VALUE -> EXPORTED_RING
+        WEB_CANVAS_VALUE -> WEB_CANVAS
+        else -> RenderTargetKindFlag(rawValue)
       }
   }
 }
@@ -2298,13 +2708,12 @@ public class RuntimeEventFlag(@get:JvmName("getRawValue") public val rawValue: U
         65536uL to "MAP_SOURCE_CHANGED",
         131072uL to "OFFLINE_REGION_STATUS_CHANGED",
         262144uL to "OFFLINE_REGION_RESPONSE_ERROR",
-        524288uL to "OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED",
-        1048576uL to "MAP_GLYPHS_REQUESTED",
-        2097152uL to "MAP_GLYPHS_LOADED",
-        4194304uL to "MAP_GLYPHS_ERROR",
-        8388608uL to "MAP_SPRITE_REQUESTED",
-        16777216uL to "MAP_SPRITE_LOADED",
-        33554432uL to "MAP_SPRITE_ERROR",
+        524288uL to "MAP_GLYPHS_REQUESTED",
+        1048576uL to "MAP_GLYPHS_LOADED",
+        2097152uL to "MAP_GLYPHS_ERROR",
+        4194304uL to "MAP_SPRITE_REQUESTED",
+        8388608uL to "MAP_SPRITE_LOADED",
+        16777216uL to "MAP_SPRITE_ERROR",
       ),
     )
 
@@ -2398,44 +2807,39 @@ public class RuntimeEventFlag(@get:JvmName("getRawValue") public val rawValue: U
     /** The `rawValue` of [OFFLINE_REGION_RESPONSE_ERROR]. */
     public const val OFFLINE_REGION_RESPONSE_ERROR_VALUE: ULong = 262144uL
     @JvmField
-    public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventFlag =
-      RuntimeEventFlag(OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE)
-    /** The `rawValue` of [OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED]. */
-    public const val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE: ULong = 524288uL
-    @JvmField
     public val MAP_GLYPHS_REQUESTED: RuntimeEventFlag = RuntimeEventFlag(MAP_GLYPHS_REQUESTED_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_REQUESTED]. */
-    public const val MAP_GLYPHS_REQUESTED_VALUE: ULong = 1048576uL
+    public const val MAP_GLYPHS_REQUESTED_VALUE: ULong = 524288uL
     @JvmField
     public val MAP_GLYPHS_LOADED: RuntimeEventFlag = RuntimeEventFlag(MAP_GLYPHS_LOADED_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_LOADED]. */
-    public const val MAP_GLYPHS_LOADED_VALUE: ULong = 2097152uL
+    public const val MAP_GLYPHS_LOADED_VALUE: ULong = 1048576uL
     @JvmField
     public val MAP_GLYPHS_ERROR: RuntimeEventFlag = RuntimeEventFlag(MAP_GLYPHS_ERROR_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_ERROR]. */
-    public const val MAP_GLYPHS_ERROR_VALUE: ULong = 4194304uL
+    public const val MAP_GLYPHS_ERROR_VALUE: ULong = 2097152uL
     @JvmField
     public val MAP_SPRITE_REQUESTED: RuntimeEventFlag = RuntimeEventFlag(MAP_SPRITE_REQUESTED_VALUE)
     /** The `rawValue` of [MAP_SPRITE_REQUESTED]. */
-    public const val MAP_SPRITE_REQUESTED_VALUE: ULong = 8388608uL
+    public const val MAP_SPRITE_REQUESTED_VALUE: ULong = 4194304uL
     @JvmField
     public val MAP_SPRITE_LOADED: RuntimeEventFlag = RuntimeEventFlag(MAP_SPRITE_LOADED_VALUE)
     /** The `rawValue` of [MAP_SPRITE_LOADED]. */
-    public const val MAP_SPRITE_LOADED_VALUE: ULong = 16777216uL
+    public const val MAP_SPRITE_LOADED_VALUE: ULong = 8388608uL
     @JvmField
     public val MAP_SPRITE_ERROR: RuntimeEventFlag = RuntimeEventFlag(MAP_SPRITE_ERROR_VALUE)
     /** The `rawValue` of [MAP_SPRITE_ERROR]. */
-    public const val MAP_SPRITE_ERROR_VALUE: ULong = 33554432uL
+    public const val MAP_SPRITE_ERROR_VALUE: ULong = 16777216uL
     @JvmField public val ALL_MAP_EVENTS: RuntimeEventFlag = RuntimeEventFlag(ALL_MAP_EVENTS_VALUE)
     /** The `rawValue` of [ALL_MAP_EVENTS]. */
-    public const val ALL_MAP_EVENTS_VALUE: ULong = 66191358uL
+    public const val ALL_MAP_EVENTS_VALUE: ULong = 33161214uL
     @JvmField
     public val ALL_RUNTIME_EVENTS: RuntimeEventFlag = RuntimeEventFlag(ALL_RUNTIME_EVENTS_VALUE)
     /** The `rawValue` of [ALL_RUNTIME_EVENTS]. */
-    public const val ALL_RUNTIME_EVENTS_VALUE: ULong = 917504uL
+    public const val ALL_RUNTIME_EVENTS_VALUE: ULong = 393216uL
     @JvmField public val ALL: RuntimeEventFlag = RuntimeEventFlag(ALL_VALUE)
     /** The `rawValue` of [ALL]. */
-    public const val ALL_VALUE: ULong = 67108862uL
+    public const val ALL_VALUE: ULong = 33554430uL
 
     /**
      * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
@@ -2463,7 +2867,6 @@ public class RuntimeEventFlag(@get:JvmName("getRawValue") public val rawValue: U
         MAP_SOURCE_CHANGED_VALUE -> MAP_SOURCE_CHANGED
         OFFLINE_REGION_STATUS_CHANGED_VALUE -> OFFLINE_REGION_STATUS_CHANGED
         OFFLINE_REGION_RESPONSE_ERROR_VALUE -> OFFLINE_REGION_RESPONSE_ERROR
-        OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE -> OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
         MAP_GLYPHS_REQUESTED_VALUE -> MAP_GLYPHS_REQUESTED
         MAP_GLYPHS_LOADED_VALUE -> MAP_GLYPHS_LOADED
         MAP_GLYPHS_ERROR_VALUE -> MAP_GLYPHS_ERROR
@@ -2552,13 +2955,12 @@ public class RuntimeEventType(@get:JvmName("getRawValue") public val rawValue: U
       16u -> "MAP_SOURCE_CHANGED"
       17u -> "OFFLINE_REGION_STATUS_CHANGED"
       18u -> "OFFLINE_REGION_RESPONSE_ERROR"
-      19u -> "OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED"
-      20u -> "MAP_GLYPHS_REQUESTED"
-      21u -> "MAP_GLYPHS_LOADED"
-      22u -> "MAP_GLYPHS_ERROR"
-      23u -> "MAP_SPRITE_REQUESTED"
-      24u -> "MAP_SPRITE_LOADED"
-      25u -> "MAP_SPRITE_ERROR"
+      19u -> "MAP_GLYPHS_REQUESTED"
+      20u -> "MAP_GLYPHS_LOADED"
+      21u -> "MAP_GLYPHS_ERROR"
+      22u -> "MAP_SPRITE_REQUESTED"
+      23u -> "MAP_SPRITE_LOADED"
+      24u -> "MAP_SPRITE_ERROR"
       else -> "RuntimeEventType($rawValue)"
     }
 
@@ -2658,40 +3060,30 @@ public class RuntimeEventType(@get:JvmName("getRawValue") public val rawValue: U
       RuntimeEventType(OFFLINE_REGION_RESPONSE_ERROR_VALUE)
     /** The `rawValue` of [OFFLINE_REGION_RESPONSE_ERROR]. */
     public const val OFFLINE_REGION_RESPONSE_ERROR_VALUE: UInt = 18u
-    /**
-     * The region's download became inactive because the cache file's offline regions hold as many
-     * tiles from MapLibre's demo tile server as the limit allows. Only tiles of sources with a
-     * `maplibre://` URL count toward the limit.
-     */
-    @JvmField
-    public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType =
-      RuntimeEventType(OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE)
-    /** The `rawValue` of [OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED]. */
-    public const val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE: UInt = 19u
     @JvmField
     public val MAP_GLYPHS_REQUESTED: RuntimeEventType = RuntimeEventType(MAP_GLYPHS_REQUESTED_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_REQUESTED]. */
-    public const val MAP_GLYPHS_REQUESTED_VALUE: UInt = 20u
+    public const val MAP_GLYPHS_REQUESTED_VALUE: UInt = 19u
     @JvmField
     public val MAP_GLYPHS_LOADED: RuntimeEventType = RuntimeEventType(MAP_GLYPHS_LOADED_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_LOADED]. */
-    public const val MAP_GLYPHS_LOADED_VALUE: UInt = 21u
+    public const val MAP_GLYPHS_LOADED_VALUE: UInt = 20u
     @JvmField
     public val MAP_GLYPHS_ERROR: RuntimeEventType = RuntimeEventType(MAP_GLYPHS_ERROR_VALUE)
     /** The `rawValue` of [MAP_GLYPHS_ERROR]. */
-    public const val MAP_GLYPHS_ERROR_VALUE: UInt = 22u
+    public const val MAP_GLYPHS_ERROR_VALUE: UInt = 21u
     @JvmField
     public val MAP_SPRITE_REQUESTED: RuntimeEventType = RuntimeEventType(MAP_SPRITE_REQUESTED_VALUE)
     /** The `rawValue` of [MAP_SPRITE_REQUESTED]. */
-    public const val MAP_SPRITE_REQUESTED_VALUE: UInt = 23u
+    public const val MAP_SPRITE_REQUESTED_VALUE: UInt = 22u
     @JvmField
     public val MAP_SPRITE_LOADED: RuntimeEventType = RuntimeEventType(MAP_SPRITE_LOADED_VALUE)
     /** The `rawValue` of [MAP_SPRITE_LOADED]. */
-    public const val MAP_SPRITE_LOADED_VALUE: UInt = 24u
+    public const val MAP_SPRITE_LOADED_VALUE: UInt = 23u
     @JvmField
     public val MAP_SPRITE_ERROR: RuntimeEventType = RuntimeEventType(MAP_SPRITE_ERROR_VALUE)
     /** The `rawValue` of [MAP_SPRITE_ERROR]. */
-    public const val MAP_SPRITE_ERROR_VALUE: UInt = 25u
+    public const val MAP_SPRITE_ERROR_VALUE: UInt = 24u
 
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
@@ -2716,7 +3108,6 @@ public class RuntimeEventType(@get:JvmName("getRawValue") public val rawValue: U
         MAP_SOURCE_CHANGED_VALUE -> MAP_SOURCE_CHANGED
         OFFLINE_REGION_STATUS_CHANGED_VALUE -> OFFLINE_REGION_STATUS_CHANGED
         OFFLINE_REGION_RESPONSE_ERROR_VALUE -> OFFLINE_REGION_RESPONSE_ERROR
-        OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED_VALUE -> OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED
         MAP_GLYPHS_REQUESTED_VALUE -> MAP_GLYPHS_REQUESTED
         MAP_GLYPHS_LOADED_VALUE -> MAP_GLYPHS_LOADED
         MAP_GLYPHS_ERROR_VALUE -> MAP_GLYPHS_ERROR
@@ -3422,7 +3813,7 @@ public class ViewportMode(@get:JvmName("getRawValue") public val rawValue: UInt)
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_vulkan_image_owner` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public class VulkanImageOwner(@get:JvmName("getRawValue") public val rawValue: UInt) {
   override fun toString(): String =
@@ -3439,7 +3830,7 @@ public class VulkanImageOwner(@get:JvmName("getRawValue") public val rawValue: U
   override fun hashCode(): Int = rawValue.hashCode()
 
   public companion object {
-    /** The image stays with the queue family of `graphics_queue_family_index`. */
+    /** The image stays with the queue family of the device's queue. */
     @JvmField public val GRAPHICS_QUEUE: VulkanImageOwner = VulkanImageOwner(GRAPHICS_QUEUE_VALUE)
     /** The `rawValue` of [GRAPHICS_QUEUE]. */
     public const val GRAPHICS_QUEUE_VALUE: UInt = 0u
@@ -3466,57 +3857,10 @@ public class VulkanImageOwner(@get:JvmName("getRawValue") public val rawValue: U
 }
 
 /**
- * How a render session gets its WebGL context.
- *
- * Later versions may add values; an unknown one keeps its `rawValue`.
- *
- * See `mln_web_gl_context_kind` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public class WebGlContextKind(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  override fun toString(): String =
-    when (rawValue) {
-      0u -> "EXISTING"
-      1u -> "TRANSFERRED_CANVAS"
-      else -> "WebGlContextKind($rawValue)"
-    }
-
-  override fun equals(other: Any?): Boolean =
-    other is WebGlContextKind && other.rawValue == rawValue
-
-  override fun hashCode(): Int = rawValue.hashCode()
-
-  public companion object {
-    /** The session uses a context that you created with `emscripten_webgl_create_context()`. */
-    @JvmField public val EXISTING: WebGlContextKind = WebGlContextKind(EXISTING_VALUE)
-    /** The `rawValue` of [EXISTING]. */
-    public const val EXISTING_VALUE: UInt = 0u
-    /**
-     * The library transfers the canvas that `canvas_selector` names to a worker and creates the
-     * context there.
-     */
-    @JvmField
-    public val TRANSFERRED_CANVAS: WebGlContextKind = WebGlContextKind(TRANSFERRED_CANVAS_VALUE)
-    /** The `rawValue` of [TRANSFERRED_CANVAS]. */
-    public const val TRANSFERRED_CANVAS_VALUE: UInt = 1u
-
-    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
-    @JvmStatic
-    @JvmName("of")
-    public fun of(rawValue: UInt): WebGlContextKind =
-      when (rawValue) {
-        EXISTING_VALUE -> EXISTING
-        TRANSFERRED_CANVAS_VALUE -> TRANSFERRED_CANVAS
-        else -> WebGlContextKind(rawValue)
-      }
-  }
-}
-
-/**
- * The Android hardware buffer of an acquired frame.
+ * The Android hardware buffer of an exported ring's acquired frame.
  *
  * See `mln_android_hardware_buffer_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class AndroidHardwareBufferFrame(
   @get:JvmName("getWidth") public val width: UInt,
@@ -3560,7 +3904,7 @@ public class AndroidHardwareBufferFrame(
  * Where one plane of a dmabuf keeps its data.
  *
  * See `mln_dma_buf_plane` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class DmaBufPlane(
   /**
@@ -3582,10 +3926,10 @@ public data class DmaBufPlane(
 }
 
 /**
- * The dmabuf of an acquired frame.
+ * The dmabuf of an exported ring's acquired frame.
  *
  * See `mln_dma_buf_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class DmaBufFrame(
   @get:JvmName("getWidth") public val width: UInt,
@@ -3636,10 +3980,10 @@ public class DmaBufFrame(
 }
 
 /**
- * The DXGI shared texture of an acquired frame.
+ * The DXGI shared texture of an exported ring's acquired frame.
  *
  * See `mln_dxgi_shared_texture_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class DxgiSharedTextureFrame(
   @get:JvmName("getWidth") public val width: UInt,
@@ -3684,10 +4028,10 @@ public class DxgiSharedTextureFrame(
 }
 
 /**
- * The IOSurface of an acquired frame.
+ * The IOSurface of an exported ring's acquired frame.
  *
  * See `mln_io_surface_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public class IoSurfaceFrame(
   @get:JvmName("getWidth") public val width: UInt,
@@ -3730,6 +4074,10 @@ public class IoSurfaceFrame(
 /**
  * The Metal texture of an acquired frame.
  *
+ * The depth members are set when the frame has a depth texture: one of a borrowed ring's
+ * `depth_textures`, or an exported ring's with `RenderSessionAttachOptions.keepDepth`. Otherwise
+ * they are zero.
+ *
  * See `mln_metal_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
@@ -3745,6 +4093,10 @@ public class MetalTextureFrame(
   device: NativePointer,
   /** The texture's MTLPixelFormat. */
   @get:JvmName("getPixelFormat") public val pixelFormat: ULong,
+  /** The MTLTexture that holds the frame's depth and stencil. */
+  depthTexture: NativePointer,
+  /** The depth texture's MTLPixelFormat. */
+  @get:JvmName("getDepthPixelFormat") public val depthPixelFormat: ULong,
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: NativePointer = texture
@@ -3761,6 +4113,13 @@ public class MetalTextureFrame(
       return storedDevice
     }
 
+  private val storedDepthTexture: NativePointer = depthTexture
+  public val depthTexture: NativePointer
+    get() {
+      bindingScope?.ensureActive()
+      return storedDepthTexture
+    }
+
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
     @JvmStatic
@@ -3773,6 +4132,8 @@ public class MetalTextureFrame(
       texture: NativePointer,
       device: NativePointer,
       pixelFormat: Long,
+      depthTexture: NativePointer,
+      depthPixelFormat: Long,
     ): MetalTextureFrame =
       MetalTextureFrame(
         width = width.toUInt(),
@@ -3782,12 +4143,115 @@ public class MetalTextureFrame(
         texture = texture,
         device = device,
         pixelFormat = pixelFormat.toULong(),
+        depthTexture = depthTexture,
+        depthPixelFormat = depthPixelFormat.toULong(),
+      )
+  }
+}
+
+/**
+ * The memory of an exported ring's acquired frame, as an opaque file descriptor.
+ *
+ * The memory holds a 2D Vulkan image of `format`, with one mip level, one layer, optimal tiling,
+ * and the usage VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_IMAGE_USAGE_SAMPLED_BIT, and
+ * VK_IMAGE_USAGE_TRANSFER_SRC_BIT, which a Vulkan image that imports it has too. In OpenGL, import
+ * it with glImportMemoryFdEXT() and GL_HANDLE_TYPE_OPAQUE_FD_EXT, and make the texture with
+ * GL_TEXTURE_TILING_EXT set to GL_OPTIMAL_TILING_EXT and glTexStorageMem2DEXT() at offset 0. Each
+ * frame leaves the image in VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
+ *
+ * With `RenderSessionAttachOptions.keepDepth`, on a device whose
+ * `GpuDeviceCapabilities.depthExportKinds` has `GpuExportKind.OPAQUE_FD`, the depth members share
+ * the memory of the frame's depth image in the same way. Otherwise `depth_fd` is -1 and the others
+ * are zero. The depth image is 2D, of `depth_format`, with one mip level, one layer, optimal
+ * tiling, and the usage VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_USAGE_SAMPLED_BIT,
+ * and VK_IMAGE_USAGE_TRANSFER_SRC_BIT. Each frame leaves it in VK_IMAGE_LAYOUT_GENERAL, released to
+ * VK_QUEUE_FAMILY_EXTERNAL. In OpenGL, make its texture with the internal format that
+ * `DepthStencilFormatFlag` names for `depth_format`.
+ *
+ * See `mln_opaque_fd_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public class OpaqueFdFrame(
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
+  public val scaleFactor: Double,
+  /** The texture's index in the ring. */
+  @get:JvmName("getSlot") public val slot: UInt,
+  /** The file descriptor of the image's memory. */
+  fd: Int,
+  /** The size of the memory in bytes. */
+  @get:JvmName("getAllocationSize") public val allocationSize: ULong,
+  /**
+   * Whether the memory is the image's own, which an import says, such as with
+   * GL_DEDICATED_MEMORY_OBJECT_EXT.
+   */
+  public val dedicated: Boolean,
+  /** The image's `VkFormat`: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8. */
+  @get:JvmName("getFormat") public val format: UInt,
+  /** The file descriptor of the depth image's memory. */
+  depthFd: Int,
+  /** The size of the depth image's memory in bytes. */
+  @get:JvmName("getDepthAllocationSize") public val depthAllocationSize: ULong,
+  /** Whether the memory is the depth image's own. */
+  public val depthDedicated: Boolean,
+  /** The depth image's `VkFormat`. */
+  @get:JvmName("getDepthFormat") public val depthFormat: UInt,
+) {
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
+  private val storedFd: Int = fd
+  public val fd: Int
+    get() {
+      bindingScope?.ensureActive()
+      return storedFd
+    }
+
+  private val storedDepthFd: Int = depthFd
+  public val depthFd: Int
+    get() {
+      bindingScope?.ensureActive()
+      return storedDepthFd
+    }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      scaleFactor: Double,
+      slot: Int,
+      fd: Int,
+      allocationSize: Long,
+      dedicated: Boolean,
+      format: Int,
+      depthFd: Int,
+      depthAllocationSize: Long,
+      depthDedicated: Boolean,
+      depthFormat: Int,
+    ): OpaqueFdFrame =
+      OpaqueFdFrame(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        scaleFactor = scaleFactor,
+        slot = slot.toUInt(),
+        fd = fd,
+        allocationSize = allocationSize.toULong(),
+        dedicated = dedicated,
+        format = format.toUInt(),
+        depthFd = depthFd,
+        depthAllocationSize = depthAllocationSize.toULong(),
+        depthDedicated = depthDedicated,
+        depthFormat = depthFormat.toUInt(),
       )
   }
 }
 
 /**
  * The OpenGL texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for `MetalTextureFrame`.
+ * Otherwise they are zero.
  *
  * See `mln_open_gl_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -3800,6 +4264,13 @@ public class OpenGlTextureFrame(
   @get:JvmName("getSlot") public val slot: UInt,
   texture: UInt,
   @get:JvmName("getTarget") public val target: UInt,
+  /** The `GL_TEXTURE_2D` texture that holds the frame's depth and stencil. */
+  depthTexture: UInt,
+  /**
+   * The depth texture's internal format, such as GL_DEPTH24_STENCIL8, or zero for a borrowed
+   * ring's.
+   */
+  @get:JvmName("getDepthInternalFormat") public val depthInternalFormat: UInt,
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedTexture: UInt = texture
@@ -3808,6 +4279,14 @@ public class OpenGlTextureFrame(
     get() {
       bindingScope?.ensureActive()
       return storedTexture
+    }
+
+  private val storedDepthTexture: UInt = depthTexture
+  @get:JvmName("getDepthTexture")
+  public val depthTexture: UInt
+    get() {
+      bindingScope?.ensureActive()
+      return storedDepthTexture
     }
 
   public companion object {
@@ -3821,6 +4300,8 @@ public class OpenGlTextureFrame(
       slot: Int,
       texture: Int,
       target: Int,
+      depthTexture: Int,
+      depthInternalFormat: Int,
     ): OpenGlTextureFrame =
       OpenGlTextureFrame(
         width = width.toUInt(),
@@ -3829,6 +4310,8 @@ public class OpenGlTextureFrame(
         slot = slot.toUInt(),
         texture = texture.toUInt(),
         target = target.toUInt(),
+        depthTexture = depthTexture.toUInt(),
+        depthInternalFormat = depthInternalFormat.toUInt(),
       )
   }
 }
@@ -4257,6 +4740,85 @@ public data class MapView(
 }
 
 /**
+ * A vector in four dimensions, such as a point in homogeneous coordinates.
+ *
+ * See `mln_vec4` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class Vec4(
+  public val x: Double,
+  public val y: Double,
+  public val z: Double,
+  public val w: Double,
+)
+
+/**
+ * A 4×4 matrix, by its columns: it takes a vector to `x` times the vector's x, plus `y` times its
+ * y, `z` times its z, and `w` times its w. In memory it is 16 doubles in column-major order, as
+ * OpenGL, Metal, Vulkan, and WebGPU shaders take a matrix.
+ *
+ * See `mln_mat4` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class Mat4(
+  public val x: Vec4,
+  public val y: Vec4,
+  public val z: Vec4,
+  public val w: Vec4,
+)
+
+/**
+ * Where a frame drew the map, and the depth that it wrote there.
+ *
+ * World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at 180° east, and on past
+ * both into the copies of the world beside the first. y runs from 0 at the north edge of the
+ * Mercator world, about 85.05° north, to 1 at its south edge. z is the altitude in meters above sea
+ * level, at the scale of the heights of the map's 3D layers, and the map draws its ground at 0.
+ *
+ * `matrix` takes a world point to the clip coordinates where the frame drew it, with the camera's
+ * padding, roll, field of view, and center altitude, and the map's viewport and projection mode.
+ * Clip y points up, as the map draws with OpenGL, Metal, and WebGPU. The map negates clip y with
+ * Vulkan, so negate it there too. At high zooms, single precision can't tell nearby world points
+ * apart: subtract an origin near your geometry from its coordinates in double precision, and fold
+ * the origin into the matrix, before you convert to float.
+ *
+ * Clip z follows `clip_depth_range`, the convention of the device's graphics API. With the API's
+ * default depth range of 0 to 1, a fragment that you draw through `matrix` gets the depth that the
+ * map's 3D layers, such as fill extrusions, wrote at the same place: 0 at `near_distance` from the
+ * camera, up to `far_depth` at `far_distance`. Depth-tested against the frame's depth, your
+ * fragments hide behind the map's 3D layers where those stand in front of them.
+ *
+ * The frame's depth starts at 1. The map's 3D layers write the depth of each of their fragments. A
+ * 2D layer below every 3D layer of the style that draws opaque fragments, such as an opaque fill,
+ * writes one depth over all of them, wherever they are: the higher the layer, the lower its depth,
+ * and every one between `far_depth` and 1. Backgrounds, translucent fragments, and the 2D layers
+ * above a 3D layer, such as labels, write no depth. So what you draw through `matrix`, even on the
+ * ground, lies in front of every 2D layer.
+ *
+ * While `globe` is true, the frame drew the map onto a globe, and its 2D layers wrote no depth.
+ * `matrix` then is the map's Mercator one, which doesn't place points on the globe.
+ *
+ * See `mln_frame_projection` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class FrameProjection(
+  public val matrix: Mat4,
+  public val clipDepthRange: ClipDepthRange,
+  /**
+   * The distance from the camera to the plane where the depth that you get through `matrix` is 0,
+   * along the camera's view. Like `far_distance`, it is in pixels of the map at the camera's zoom,
+   * where the world is 512 × 2^zoom pixels wide.
+   */
+  public val nearDistance: Double,
+  /** The distance to the plane where the depth is `far_depth`. */
+  public val farDistance: Double,
+  /** The depth at `far_distance`, below 1. */
+  public val farDepth: Double,
+  /** Whether the frame drew the map as a globe, alone or blending into Mercator. */
+  public val globe: Boolean,
+)
+
+/**
  * How one frame demand finished.
  *
  * See `mln_render_frame_result` in the
@@ -4275,6 +4837,11 @@ public data class RenderFrameResult(
   public val needsRepaint: Boolean,
   /** The camera and extent that a rendered frame shows. */
   public val view: MapView,
+  /**
+   * Where a rendered frame drew the map, for drawing into its frame with depth. All zero for a
+   * demand that rendered nothing.
+   */
+  public val frameProjection: FrameProjection,
   public val mode: RenderMode,
 ) {
   public companion object {
@@ -4289,6 +4856,7 @@ public data class RenderFrameResult(
       frameGeneration: Long,
       needsRepaint: Boolean,
       view: MapView,
+      frameProjection: FrameProjection,
       mode: RenderMode,
     ): RenderFrameResult =
       RenderFrameResult(
@@ -4299,6 +4867,7 @@ public data class RenderFrameResult(
         frameGeneration = frameGeneration.toULong(),
         needsRepaint = needsRepaint,
         view = view,
+        frameProjection = frameProjection,
         mode = mode,
       )
   }
@@ -4306,6 +4875,9 @@ public data class RenderFrameResult(
 
 /**
  * The Vulkan image of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth image, as for `MetalTextureFrame`. Otherwise
+ * they are zero.
  *
  * See `mln_vulkan_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4326,6 +4898,14 @@ public class VulkanTextureFrame(
   @get:JvmName("getFormat") public val format: UInt,
   /** The VkImageLayout that the frame left the image in. */
   @get:JvmName("getLayout") public val layout: UInt,
+  /** The VkImage that holds the frame's depth and stencil. */
+  depthImage: ULong,
+  /** A VkImageView of the depth image's depth and stencil aspects. */
+  depthImageView: ULong,
+  /** The depth image's VkFormat. */
+  @get:JvmName("getDepthFormat") public val depthFormat: UInt,
+  /** The VkImageLayout that the frame left the depth image in. */
+  @get:JvmName("getDepthLayout") public val depthLayout: UInt,
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
   private val storedImage: ULong = image
@@ -4351,6 +4931,22 @@ public class VulkanTextureFrame(
       return storedDevice
     }
 
+  private val storedDepthImage: ULong = depthImage
+  @get:JvmName("getDepthImage")
+  public val depthImage: ULong
+    get() {
+      bindingScope?.ensureActive()
+      return storedDepthImage
+    }
+
+  private val storedDepthImageView: ULong = depthImageView
+  @get:JvmName("getDepthImageView")
+  public val depthImageView: ULong
+    get() {
+      bindingScope?.ensureActive()
+      return storedDepthImageView
+    }
+
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
     @JvmStatic
@@ -4365,6 +4961,10 @@ public class VulkanTextureFrame(
       device: NativePointer,
       format: Int,
       layout: Int,
+      depthImage: Long,
+      depthImageView: Long,
+      depthFormat: Int,
+      depthLayout: Int,
     ): VulkanTextureFrame =
       VulkanTextureFrame(
         width = width.toUInt(),
@@ -4376,12 +4976,19 @@ public class VulkanTextureFrame(
         device = device,
         format = format.toUInt(),
         layout = layout.toUInt(),
+        depthImage = depthImage.toULong(),
+        depthImageView = depthImageView.toULong(),
+        depthFormat = depthFormat.toUInt(),
+        depthLayout = depthLayout.toUInt(),
       )
   }
 }
 
 /**
  * The WebGPU texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for `MetalTextureFrame`.
+ * Otherwise they are zero.
  *
  * See `mln_web_gpu_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4392,35 +4999,54 @@ public class WebGpuTextureFrame(
   public val scaleFactor: Double,
   /** The texture's index in the descriptor's `textures`. */
   @get:JvmName("getSlot") public val slot: UInt,
-  /** The WGPUTexture. */
-  texture: NativePointer,
-  /** The WGPUTextureView. */
-  textureView: NativePointer,
-  /** The texture's WGPUDevice. */
-  device: NativePointer,
-  /** The texture's WGPUTextureFormat. */
-  @get:JvmName("getFormat") public val format: UInt,
+  /** The `GPUTexture`. */
+  texture: UInt,
+  /** The texture's `GPUDevice`. */
+  device: UInt,
+  /** The texture's `GPUTextureFormat`. */
+  format: String,
+  /** The `GPUTexture` that holds the frame's depth and stencil. */
+  depthTexture: UInt,
+  /** The depth texture's `GPUTextureFormat`. */
+  depthFormat: String,
 ) {
   @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
-  private val storedTexture: NativePointer = texture
-  public val texture: NativePointer
+  private val storedTexture: UInt = texture
+  @get:JvmName("getTexture")
+  public val texture: UInt
     get() {
       bindingScope?.ensureActive()
       return storedTexture
     }
 
-  private val storedTextureView: NativePointer = textureView
-  public val textureView: NativePointer
-    get() {
-      bindingScope?.ensureActive()
-      return storedTextureView
-    }
-
-  private val storedDevice: NativePointer = device
-  public val device: NativePointer
+  private val storedDevice: UInt = device
+  @get:JvmName("getDevice")
+  public val device: UInt
     get() {
       bindingScope?.ensureActive()
       return storedDevice
+    }
+
+  private val storedFormat: String = format
+  public val format: String
+    get() {
+      bindingScope?.ensureActive()
+      return storedFormat
+    }
+
+  private val storedDepthTexture: UInt = depthTexture
+  @get:JvmName("getDepthTexture")
+  public val depthTexture: UInt
+    get() {
+      bindingScope?.ensureActive()
+      return storedDepthTexture
+    }
+
+  private val storedDepthFormat: String = depthFormat
+  public val depthFormat: String
+    get() {
+      bindingScope?.ensureActive()
+      return storedDepthFormat
     }
 
   public companion object {
@@ -4432,51 +5058,23 @@ public class WebGpuTextureFrame(
       height: Int,
       scaleFactor: Double,
       slot: Int,
-      texture: NativePointer,
-      textureView: NativePointer,
-      device: NativePointer,
-      format: Int,
+      texture: Int,
+      device: Int,
+      format: String,
+      depthTexture: Int,
+      depthFormat: String,
     ): WebGpuTextureFrame =
       WebGpuTextureFrame(
         width = width.toUInt(),
         height = height.toUInt(),
         scaleFactor = scaleFactor,
         slot = slot.toUInt(),
-        texture = texture,
-        textureView = textureView,
-        device = device,
-        format = format.toUInt(),
+        texture = texture.toUInt(),
+        device = device.toUInt(),
+        format = format,
+        depthTexture = depthTexture.toUInt(),
+        depthFormat = depthFormat,
       )
-  }
-}
-
-/**
- * Options for creating a frame pacer.
- *
- * See `mln_frame_pacer_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
- */
-public data class FramePacerOptions(
-  /**
-   * The most frames per second that the pacer demands, greater than zero. The pacer skips display
-   * refreshes to stay within it. By default, it can demand frames at every refresh.
-   */
-  @get:JvmSynthetic public val maximumFramesPerSecond: UInt? = null,
-) {
-  @PublishedApi
-  @JvmName("getMaximumFramesPerSecond")
-  internal fun maximumFramesPerSecondForJava(): Int? = maximumFramesPerSecond?.toInt()
-
-  @PublishedApi
-  internal fun withMaximumFramesPerSecond(maximumFramesPerSecond: Int): FramePacerOptions =
-    copy(maximumFramesPerSecond = maximumFramesPerSecond.toUInt())
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): FramePacerOptions = FramePacerOptions()
   }
 }
 
@@ -4542,6 +5140,376 @@ public data class LogicalSize(
 }
 
 /**
+ * Options for creating a frame pacer, or for `FramePacerHandle.setOptions()`.
+ *
+ * See `mln_frame_pacer_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+public data class FramePacerOptions(
+  /**
+   * The most frames per second that the pacer demands, greater than zero. The pacer skips display
+   * refreshes to stay within it. By default, it can demand frames at every refresh.
+   */
+  @get:JvmSynthetic public val maximumFramesPerSecond: UInt? = null,
+  /**
+   * Removes the frame rate limit, so the pacer can demand frames at every display refresh, as it
+   * does by default.
+   */
+  public val unlimitedFramesPerSecond: Boolean = false,
+) {
+  @PublishedApi
+  @JvmName("getMaximumFramesPerSecond")
+  internal fun maximumFramesPerSecondForJava(): Int? = maximumFramesPerSecond?.toInt()
+
+  @PublishedApi
+  internal fun withMaximumFramesPerSecond(maximumFramesPerSecond: Int): FramePacerOptions =
+    copy(maximumFramesPerSecond = maximumFramesPerSecond.toUInt())
+
+  @PublishedApi
+  internal fun withUnlimitedFramesPerSecond(unlimitedFramesPerSecond: Boolean): FramePacerOptions =
+    copy(unlimitedFramesPerSecond = unlimitedFramesPerSecond)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): FramePacerOptions = FramePacerOptions()
+  }
+}
+
+/**
+ * Options for `GpuDeviceHandle.create()`.
+ *
+ * Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and `adapter_luid`. Without one,
+ * the device prefers a discrete GPU. An OpenGL device takes none of them: it renders on the GPU
+ * that the platform picks.
+ *
+ * See `mln_gpu_device_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class GpuDeviceOptions(
+  /**
+   * The backend that the device renders with. By default, the platform's own: Metal on Apple
+   * platforms, Vulkan elsewhere, or OpenGL where the system has no Vulkan driver, and in a browser
+   * the build's one backend: WebGPU or OpenGL (WebGL2).
+   */
+  public val backend: RenderBackend? = null,
+  /**
+   * The GPU to use, as an index into the backend's list of GPUs. OpenGL's list holds one GPU: the
+   * one that its display renders on.
+   */
+  @get:JvmSynthetic public val adapterIndex: UInt? = null,
+  /**
+   * The 16-byte UUID of the GPU to use: Vulkan's `VkPhysicalDeviceIDProperties.deviceUUID`. Only a
+   * Vulkan device takes one.
+   */
+  public val adapterUuid: ByteArray? = null,
+  /**
+   * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which Vulkan reports as
+   * `VkPhysicalDeviceIDProperties.deviceLUID`. Only a Vulkan device takes one.
+   */
+  public val adapterLuid: ByteArray? = null,
+  /**
+   * The OpenGL API that an OpenGL device renders with. An EGL device defaults to
+   * `OpenGlClientApi.GLES`, and takes `OpenGlClientApi.GL` too on Linux and FreeBSD. A WGL device
+   * takes only `OpenGlClientApi.GL`, its default, and a WebGL device only `OpenGlClientApi.GLES`,
+   * its default.
+   */
+  public val openGlClientApi: OpenGlClientApi? = null,
+  /**
+   * Whether the sessions of an EGL device take turns in one OpenGL context instead of having one
+   * each.
+   */
+  public val openGlSingleContext: Boolean? = null,
+  /**
+   * Your lock on a Vulkan device's queue, when you submit to the queue that
+   * `GpuDeviceHandle.getVulkanContext()` reports. Only a Vulkan device takes one.
+   */
+  public val queueLock: QueueLock = QueueLock(),
+) {
+  private fun contentFields(): Array<Any?> =
+    arrayOf(
+      backend,
+      adapterIndex,
+      adapterUuid,
+      adapterLuid,
+      openGlClientApi,
+      openGlSingleContext,
+      queueLock,
+    )
+
+  override fun equals(other: Any?): Boolean =
+    this === other ||
+      other is GpuDeviceOptions && contentFields().contentDeepEquals(other.contentFields())
+
+  override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+  @PublishedApi
+  @JvmName("getAdapterIndex")
+  internal fun adapterIndexForJava(): Int? = adapterIndex?.toInt()
+
+  @PublishedApi
+  internal fun withBackend(backend: RenderBackend): GpuDeviceOptions = copy(backend = backend)
+
+  @PublishedApi
+  internal fun withAdapterIndex(adapterIndex: Int): GpuDeviceOptions =
+    copy(adapterIndex = adapterIndex.toUInt())
+
+  @PublishedApi
+  internal fun withAdapterUuid(adapterUuid: ByteArray): GpuDeviceOptions =
+    copy(adapterUuid = adapterUuid)
+
+  @PublishedApi
+  internal fun withAdapterLuid(adapterLuid: ByteArray): GpuDeviceOptions =
+    copy(adapterLuid = adapterLuid)
+
+  @PublishedApi
+  internal fun withOpenGlClientApi(openGlClientApi: OpenGlClientApi): GpuDeviceOptions =
+    copy(openGlClientApi = openGlClientApi)
+
+  @PublishedApi
+  internal fun withOpenGlSingleContext(openGlSingleContext: Boolean): GpuDeviceOptions =
+    copy(openGlSingleContext = openGlSingleContext)
+
+  @PublishedApi
+  internal fun withQueueLock(queueLock: QueueLock): GpuDeviceOptions = copy(queueLock = queueLock)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GpuDeviceOptions = GpuDeviceOptions()
+  }
+}
+
+/**
+ * Your Metal device and command queue, for `GpuDeviceHandle.wrapMetal()`.
+ *
+ * See `mln_metal_device_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class MetalDeviceDescriptor(
+  /** Your `MTLDevice`. */
+  public val device: NativePointer,
+  /**
+   * Your `MTLCommandQueue` on `device`, or null for a queue of the library's. With your queue,
+   * borrowed rings can use `GpuSyncKind.QUEUE_ORDER`.
+   */
+  public val commandQueue: NativePointer,
+)
+
+/**
+ * Your WGL context, which each session's context shares objects with.
+ *
+ * See `mln_wgl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WglContextDescriptor(
+  /** An `HDC` with the pixel format of `share_context`. */
+  public val deviceContext: NativePointer,
+  /** Your `HGLRC`. */
+  public val shareContext: NativePointer,
+  /** Your `wglGetProcAddress`, or null to use the system's. */
+  public val getProcAddress: NativePointer,
+)
+
+/**
+ * Your EGL context, which each session's context shares objects with.
+ *
+ * Each session makes its context on `display` with `config` and the client API and version of
+ * `share_context`.
+ *
+ * See `mln_egl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class EglContextDescriptor(
+  /** An `EGLDisplay`, which you initialized. */
+  public val display: NativePointer,
+  /** The `EGLConfig` of `share_context`. */
+  public val config: NativePointer,
+  /** Your `EGLContext`. */
+  public val shareContext: NativePointer,
+  /** Your `eglGetProcAddress`, or null to use the system's. */
+  public val getProcAddress: NativePointer,
+)
+
+/**
+ * The WebGL2 context that an OpenGL device wraps.
+ *
+ * See `mln_web_gl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WebGlContextDescriptor(
+  /** Your `WebGL2RenderingContext`. */
+  @get:JvmName("getContext") public val context: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(context: Int): WebGlContextDescriptor =
+      WebGlContextDescriptor(context = context.toUInt())
+  }
+}
+
+/**
+ * Your OpenGL context, for `GpuDeviceHandle.wrapOpenGl()`: the root of the share group that the
+ * device's sessions join.
+ *
+ * See `mln_open_gl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public sealed interface OpenGlContextDescriptor {
+  public data class Wgl(public val value: WglContextDescriptor) : OpenGlContextDescriptor
+
+  public data class Egl(public val value: EglContextDescriptor) : OpenGlContextDescriptor
+
+  public data class WebGl(public val value: WebGlContextDescriptor) : OpenGlContextDescriptor
+}
+
+/**
+ * The Vulkan device and queue that a render session uses.
+ *
+ * Keep these objects alive until a detach or release of the session completes, or an abandon of it
+ * returns.
+ *
+ * See `mln_vulkan_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class VulkanContextDescriptor(
+  /** A `VkInstance`. */
+  public val instance: NativePointer,
+  /** A `VkPhysicalDevice`. */
+  public val physicalDevice: NativePointer,
+  /** A `VkDevice`. */
+  public val device: NativePointer,
+  /**
+   * A `VkQueue` from `graphics_queue_family_index` that supports graphics. If you submit to it too,
+   * give the device your `QueueLock`.
+   */
+  public val graphicsQueue: NativePointer,
+  @get:JvmName("getGraphicsQueueFamilyIndex") public val graphicsQueueFamilyIndex: UInt = 0u,
+  /** Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's. */
+  public val getInstanceProcAddr: NativePointer,
+  /** Your `vkGetDeviceProcAddr`, or null to look it up from the instance. */
+  public val getDeviceProcAddr: NativePointer,
+) {
+  @PublishedApi
+  internal fun withGraphicsQueueFamilyIndex(
+    graphicsQueueFamilyIndex: Int,
+  ): VulkanContextDescriptor = copy(graphicsQueueFamilyIndex = graphicsQueueFamilyIndex.toUInt())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      instance: NativePointer,
+      physicalDevice: NativePointer,
+      device: NativePointer,
+      graphicsQueue: NativePointer,
+      getInstanceProcAddr: NativePointer,
+      getDeviceProcAddr: NativePointer,
+    ): VulkanContextDescriptor =
+      VulkanContextDescriptor(
+        instance = instance,
+        physicalDevice = physicalDevice,
+        device = device,
+        graphicsQueue = graphicsQueue,
+        getInstanceProcAddr = getInstanceProcAddr,
+        getDeviceProcAddr = getDeviceProcAddr,
+      )
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      instance: NativePointer,
+      physicalDevice: NativePointer,
+      device: NativePointer,
+      graphicsQueue: NativePointer,
+      graphicsQueueFamilyIndex: Int,
+      getInstanceProcAddr: NativePointer,
+      getDeviceProcAddr: NativePointer,
+    ): VulkanContextDescriptor =
+      VulkanContextDescriptor(
+        instance = instance,
+        physicalDevice = physicalDevice,
+        device = device,
+        graphicsQueue = graphicsQueue,
+        graphicsQueueFamilyIndex = graphicsQueueFamilyIndex.toUInt(),
+        getInstanceProcAddr = getInstanceProcAddr,
+        getDeviceProcAddr = getDeviceProcAddr,
+      )
+  }
+}
+
+/**
+ * Your Vulkan device and queue, for `GpuDeviceHandle.wrapVulkan()`.
+ *
+ * See `mln_vulkan_device_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class VulkanDeviceDescriptor(
+  public val context: VulkanContextDescriptor,
+  /**
+   * Your lock on `context.graphics_queue`, when you submit to it yourself. Give every device that
+   * wraps the queue the same lock.
+   */
+  public val queueLock: QueueLock = QueueLock(),
+  /**
+   * The names of the device extensions that you enabled on `context.device`, such as
+   * "VK_KHR_external_semaphore_fd". Vulkan offers no way to ask a device which extensions it has,
+   * so the device offers the export kinds and `GpuSyncKind.SYNC_FD` only when the extensions that
+   * they need are listed here, and none of them when the list is empty.
+   */
+  public val enabledExtensions: List<String> = emptyList(),
+) {
+  @PublishedApi
+  internal fun withQueueLock(queueLock: QueueLock): VulkanDeviceDescriptor =
+    copy(queueLock = queueLock)
+
+  @PublishedApi
+  internal fun withEnabledExtensions(enabledExtensions: List<String>): VulkanDeviceDescriptor =
+    copy(enabledExtensions = enabledExtensions)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(context: VulkanContextDescriptor): VulkanDeviceDescriptor =
+      VulkanDeviceDescriptor(context = context)
+  }
+}
+
+/**
+ * The WebGPU device that a render session uses.
+ *
+ * See `mln_web_gpu_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WebGpuContextDescriptor(
+  /** Your `GPUDevice`. Sessions submit to its `queue`. */
+  @get:JvmName("getDevice") public val device: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(device: Int): WebGpuContextDescriptor =
+      WebGpuContextDescriptor(device = device.toUInt())
+  }
+}
+
+/**
  * A point in the Web Mercator projection, in meters.
  *
  * See `mln_projected_meters` in the
@@ -4562,53 +5530,6 @@ public data class ProjectedMeters(
      * `withX` methods.
      */
     @JvmStatic @PublishedApi internal fun of(): ProjectedMeters = ProjectedMeters()
-  }
-}
-
-/**
- * Options for `OffscreenDeviceHandle.create()`.
- *
- * See `mln_offscreen_device_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
- */
-public data class OffscreenDeviceOptions(
-  /** The GPU to use, as an index into the platform's list of GPUs. */
-  @get:JvmSynthetic public val adapterIndex: UInt? = null,
-  /**
-   * Whether the device's sessions take turns in one OpenGL context instead of having one each. Only
-   * an EGL device reads it.
-   */
-  public val singleContext: Boolean? = null,
-  /**
-   * The OpenGL API that the device's sessions render with. An EGL device defaults to
-   * `OpenGlClientApi.GLES`, and takes `OpenGlClientApi.GL` too on Linux and FreeBSD. A WGL device
-   * takes only `OpenGlClientApi.GL`, its default, and a WebGL device only `OpenGlClientApi.GLES`,
-   * its default. Other devices take neither.
-   */
-  public val clientApi: OpenGlClientApi? = null,
-) {
-  @PublishedApi
-  @JvmName("getAdapterIndex")
-  internal fun adapterIndexForJava(): Int? = adapterIndex?.toInt()
-
-  @PublishedApi
-  internal fun withAdapterIndex(adapterIndex: Int): OffscreenDeviceOptions =
-    copy(adapterIndex = adapterIndex.toUInt())
-
-  @PublishedApi
-  internal fun withSingleContext(singleContext: Boolean): OffscreenDeviceOptions =
-    copy(singleContext = singleContext)
-
-  @PublishedApi
-  internal fun withClientApi(clientApi: OpenGlClientApi): OffscreenDeviceOptions =
-    copy(clientApi = clientApi)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): OffscreenDeviceOptions = OffscreenDeviceOptions()
   }
 }
 
@@ -4715,53 +5636,438 @@ public data class StyleExpressionOptions(
 }
 
 /**
- * Options for `VulkanDeviceHandle.create()`.
+ * What a GPU device can do.
  *
- * See `mln_vulkan_device_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
+ * See `mln_gpu_device_capabilities` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
  */
-public data class VulkanDeviceOptions(
+public data class GpuDeviceCapabilities(
+  public val backend: RenderBackend,
+  /** The kinds of `RenderTarget` that sessions on the device render to. */
+  public val targetKinds: RenderTargetKindFlag,
   /**
-   * Whether the device can present to a window. The instance then enables VK_KHR_surface and the
-   * platform's surface extensions, and the device enables VK_KHR_swapchain. Defaults to false.
+   * The ways that the device can share the textures of an exported ring. A kind is here only once
+   * the device has exported a texture of it, so a driver that offers an extension but can't
+   * allocate the memory reports no kind of it.
    */
-  public val presentation: Boolean? = null,
-  /** The 16-byte `deviceUUID` of the GPU to use, as `VkPhysicalDeviceIDProperties` reports it. */
-  public val deviceUuid: ByteArray? = null,
+  public val exportKinds: GpuExportKindFlag,
+  /** The kinds of `GpuSync` that the device can signal and wait on. */
+  public val syncKinds: GpuSyncKindFlag,
+  /** The formats of the depth textures that a borrowed ring takes. */
+  public val depthStencilFormats: DepthStencilFormatFlag,
   /**
-   * The 8-byte `deviceLUID` of the GPU to use, as `VkPhysicalDeviceIDProperties` reports it. On
-   * Windows, this is the GPU's DXGI adapter LUID.
+   * The kinds of `export_kinds` whose rings also share each frame's depth texture, with
+   * `RenderSessionAttachOptions.keepDepth`. An IOSurface or a dmabuf holds no depth format, so only
+   * `GpuExportKind.OPAQUE_FD` can be here.
    */
-  public val deviceLuid: ByteArray? = null,
+  public val depthExportKinds: GpuExportKindFlag,
+)
+
+/**
+ * The Vulkan objects of a device, as `GpuDeviceHandle.getVulkanContext()` reports them.
+ *
+ * See `mln_gpu_device_vulkan_context_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class GpuDeviceVulkanContextResult(
+  public val context: VulkanContextDescriptor,
+)
+
+/**
+ * The frame's Metal command buffer, outside the map's render pass.
+ *
+ * End each encoder that you make on `command_buffer` before the callback returns, and don't commit
+ * the buffer.
+ *
+ * See `mln_metal_custom_layer_encoder` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class MetalCustomLayerEncoder(
+  /** The frame's `MTLCommandBuffer`, with no encoder open. */
+  public val commandBuffer: NativePointer,
+)
+
+/**
+ * The frame's Vulkan command buffer, outside the map's render pass.
+ *
+ * Record work such as copies, compute dispatches, and render passes of your own, with the barriers
+ * that it needs. The map's render pass loads its attachments after a barrier of its own, but it
+ * doesn't wait for writes to your images: give those the barriers that your later reads need. Don't
+ * end or submit `command_buffer`.
+ *
+ * See `mln_vulkan_custom_layer_encoder` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class VulkanCustomLayerEncoder(
+  /**
+   * The device that the session renders on. Make the objects that your commands use on
+   * `context.device`. Don't submit to `context.graphics_queue` from a callback.
+   */
+  public val context: VulkanContextDescriptor,
+  /** The frame's `VkCommandBuffer`, recording outside a render pass. */
+  public val commandBuffer: NativePointer,
+)
+
+/**
+ * The frame's WebGPU command encoder, outside the map's render pass.
+ *
+ * End each pass that you begin on `encoder` before the callback returns, and don't finish the
+ * encoder.
+ *
+ * See `mln_web_gpu_custom_layer_encoder` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class WebGpuCustomLayerEncoder(
+  /** The `GPUDevice` that the session renders on. */
+  @get:JvmName("getDevice") public val device: UInt,
+  /** The frame's `GPUCommandEncoder`, with no pass open. */
+  @get:JvmName("getEncoder") public val encoder: UInt,
 ) {
-  private fun contentFields(): Array<Any?> = arrayOf(presentation, deviceUuid, deviceLuid)
-
-  override fun equals(other: Any?): Boolean =
-    this === other ||
-      other is VulkanDeviceOptions && contentFields().contentDeepEquals(other.contentFields())
-
-  override fun hashCode(): Int = contentFields().contentDeepHashCode()
-
-  @PublishedApi
-  internal fun withPresentation(presentation: Boolean): VulkanDeviceOptions =
-    copy(presentation = presentation)
-
-  @PublishedApi
-  internal fun withDeviceUuid(deviceUuid: ByteArray): VulkanDeviceOptions =
-    copy(deviceUuid = deviceUuid)
-
-  @PublishedApi
-  internal fun withDeviceLuid(deviceLuid: ByteArray): VulkanDeviceOptions =
-    copy(deviceLuid = deviceLuid)
-
   public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): VulkanDeviceOptions = VulkanDeviceOptions()
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(device: Int, encoder: Int): WebGpuCustomLayerEncoder =
+      WebGpuCustomLayerEncoder(device = device.toUInt(), encoder = encoder.toUInt())
   }
 }
+
+/**
+ * The frame that a custom layer draws into, as its callbacks get it.
+ *
+ * The view and the frame projection are the ones that the frame draws the map with, so they are
+ * never newer than the frame, unlike the map's camera.
+ *
+ * See `mln_custom_layer_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class CustomLayerFrame(
+  /** The camera, extent, and scale factor that the frame shows. */
+  public val view: MapView,
+  /** Where the frame draws the map, and the depth that it writes there. */
+  public val frameProjection: FrameProjection,
+  /** The width of the frame's attachments, in physical pixels. */
+  @get:JvmName("getWidth") public val width: UInt,
+  /** The height of the frame's attachments, in physical pixels. */
+  @get:JvmName("getHeight") public val height: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      view: MapView,
+      frameProjection: FrameProjection,
+      width: Int,
+      height: Int,
+    ): CustomLayerFrame =
+      CustomLayerFrame(
+        view = view,
+        frameProjection = frameProjection,
+        width = width.toUInt(),
+        height = height.toUInt(),
+      )
+  }
+}
+
+/**
+ * The GPU commands of a frame outside the map's render pass, by the backend that the session
+ * renders with.
+ *
+ * An OpenGL session has no variant: its context is current, and it draws through no object that the
+ * callback needs.
+ *
+ * See `mln_custom_layer_encoder_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public sealed interface CustomLayerPrerenderParametersEncoder {
+  public data class Metal(public val value: MetalCustomLayerEncoder) :
+    CustomLayerPrerenderParametersEncoder
+
+  public data class Vulkan(public val value: VulkanCustomLayerEncoder) :
+    CustomLayerPrerenderParametersEncoder
+
+  public data class WebGpu(public val value: WebGpuCustomLayerEncoder) :
+    CustomLayerPrerenderParametersEncoder
+
+  public data object None : CustomLayerPrerenderParametersEncoder
+
+  public data class Unknown(
+    @get:JvmName("getTag") public val tag: UInt,
+    public val bytes: ByteArray,
+  ) : CustomLayerPrerenderParametersEncoder {
+    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+
+    override fun equals(other: Any?): Boolean =
+      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+
+    override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+    public companion object {
+      /** Creates a value, for Java, which can't call the constructor. */
+      @JvmStatic
+      @PublishedApi
+      internal fun of(tag: Int, bytes: ByteArray): Unknown =
+        Unknown(tag = tag.toUInt(), bytes = bytes)
+    }
+  }
+}
+
+/**
+ * What a custom layer's prerender callback gets.
+ *
+ * See `mln_custom_layer_prerender_parameters` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class CustomLayerPrerenderParameters(
+  public val encoder: CustomLayerPrerenderParametersEncoder,
+  public val frame: CustomLayerFrame,
+)
+
+/**
+ * The map's Metal render pass, at a custom layer's place in the style.
+ *
+ * Set your own pipeline state, depth-stencil state, buffers, textures, and samplers on `encoder`,
+ * and any other state that your draws need. After the callback returns, the map sets the state that
+ * its own draws need again. Don't end `encoder`.
+ *
+ * See `mln_metal_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class MetalCustomLayerPass(
+  /** The pass's `MTLRenderCommandEncoder`. */
+  public val encoder: NativePointer,
+  /** The `MTLCommandBuffer` that `encoder` encodes into. Don't commit it. */
+  public val commandBuffer: NativePointer,
+  /** The `MTLPixelFormat` of the pass's color attachment. */
+  @get:JvmName("getColorFormat") public val colorFormat: ULong,
+  /**
+   * The `MTLPixelFormat` of the pass's depth attachment, or `MTLPixelFormatInvalid` when it has
+   * none.
+   */
+  @get:JvmName("getDepthFormat") public val depthFormat: ULong,
+  /**
+   * The `MTLPixelFormat` of the pass's stencil attachment, or `MTLPixelFormatInvalid` when it has
+   * none.
+   */
+  @get:JvmName("getStencilFormat") public val stencilFormat: ULong,
+  /** The sample count of the pass's attachments. */
+  @get:JvmName("getSampleCount") public val sampleCount: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      encoder: NativePointer,
+      commandBuffer: NativePointer,
+      colorFormat: Long,
+      depthFormat: Long,
+      stencilFormat: Long,
+      sampleCount: Int,
+    ): MetalCustomLayerPass =
+      MetalCustomLayerPass(
+        encoder = encoder,
+        commandBuffer = commandBuffer,
+        colorFormat = colorFormat.toULong(),
+        depthFormat = depthFormat.toULong(),
+        stencilFormat = stencilFormat.toULong(),
+        sampleCount = sampleCount.toUInt(),
+      )
+  }
+}
+
+/**
+ * The map's Vulkan render pass, at a custom layer's place in the style.
+ *
+ * Record draws into `command_buffer`, with pipelines that you make for `render_pass`, `subpass`,
+ * and `sample_count`. Bind your own pipeline, descriptor sets, vertex and index buffers, and push
+ * constants, and set the dynamic state that your pipelines have, such as the viewport and scissor.
+ * After the callback returns, the map binds and sets again what its own draws need. Your pipeline
+ * layouts can differ from the map's. Record nothing that a render pass can't hold, and don't end
+ * the render pass.
+ *
+ * See `mln_vulkan_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class VulkanCustomLayerPass(
+  /**
+   * The device that the session renders on. Make the objects that your commands use on
+   * `context.device`. Don't submit to `context.graphics_queue` from a callback.
+   */
+  public val context: VulkanContextDescriptor,
+  /** The frame's `VkCommandBuffer`, recording inside `render_pass`. */
+  public val commandBuffer: NativePointer,
+  /** The `VkRenderPass` that `command_buffer` records in. */
+  @get:JvmName("getRenderPass") public val renderPass: ULong,
+  /** The index of the subpass that `command_buffer` records in. */
+  @get:JvmName("getSubpass") public val subpass: UInt,
+  /** The `VkSampleCountFlagBits` of the render pass's attachments. */
+  @get:JvmName("getSampleCount") public val sampleCount: UInt,
+  /** The `VkFormat` of the render pass's color attachment. */
+  @get:JvmName("getColorFormat") public val colorFormat: UInt,
+  /**
+   * The `VkFormat` of the render pass's depth-stencil attachment, or `VK_FORMAT_UNDEFINED` when it
+   * has none.
+   */
+  @get:JvmName("getDepthStencilFormat") public val depthStencilFormat: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      context: VulkanContextDescriptor,
+      commandBuffer: NativePointer,
+      renderPass: Long,
+      subpass: Int,
+      sampleCount: Int,
+      colorFormat: Int,
+      depthStencilFormat: Int,
+    ): VulkanCustomLayerPass =
+      VulkanCustomLayerPass(
+        context = context,
+        commandBuffer = commandBuffer,
+        renderPass = renderPass.toULong(),
+        subpass = subpass.toUInt(),
+        sampleCount = sampleCount.toUInt(),
+        colorFormat = colorFormat.toUInt(),
+        depthStencilFormat = depthStencilFormat.toUInt(),
+      )
+  }
+}
+
+/**
+ * The map's OpenGL framebuffer, at a custom layer's place in the style.
+ *
+ * The session's context is current, with `framebuffer` bound and the viewport covering it. You can
+ * change the program, the vertex array, the buffers bound to each target, the framebuffer, the
+ * viewport, the active texture unit and the textures bound to each unit, the uniform buffer
+ * bindings, and the scissor, depth, stencil, blend, color mask, cull face, and line width state.
+ * After the callback returns, the map sets again what its own draws need of these. The vertex array
+ * bound when the callback starts is 0, so bind your own before you set vertex attributes. Leave any
+ * other state as you found it, such as the sampler objects bound to texture units, the pixel pack
+ * and unpack buffers and parameters, polygon offset, and rasterizer discard. Don't clear or
+ * invalidate the framebuffer's attachments.
+ *
+ * See `mln_open_gl_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class OpenGlCustomLayerPass(
+  /** The framebuffer that the map draws into, or 0 for the default one. */
+  @get:JvmName("getFramebuffer") public val framebuffer: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(framebuffer: Int): OpenGlCustomLayerPass =
+      OpenGlCustomLayerPass(framebuffer = framebuffer.toUInt())
+  }
+}
+
+/**
+ * The map's WebGPU render pass, at a custom layer's place in the style.
+ *
+ * Set your own pipeline, bind groups, vertex and index buffers, viewport, scissor rectangle, and
+ * stencil reference on `encoder`. After the callback returns, the map sets again what its own draws
+ * need. Don't end `encoder`.
+ *
+ * See `mln_web_gpu_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class WebGpuCustomLayerPass(
+  /** The `GPUDevice` that the session renders on. */
+  @get:JvmName("getDevice") public val device: UInt,
+  /** The pass's `GPURenderPassEncoder`. */
+  @get:JvmName("getEncoder") public val encoder: UInt,
+  /** The `GPUTextureFormat` of the pass's color attachment. */
+  public val colorFormat: String,
+  /** The `GPUTextureFormat` of the pass's depth-stencil attachment, or empty when it has none. */
+  public val depthStencilFormat: String,
+  /** The sample count of the pass's attachments. */
+  @get:JvmName("getSampleCount") public val sampleCount: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      device: Int,
+      encoder: Int,
+      colorFormat: String,
+      depthStencilFormat: String,
+      sampleCount: Int,
+    ): WebGpuCustomLayerPass =
+      WebGpuCustomLayerPass(
+        device = device.toUInt(),
+        encoder = encoder.toUInt(),
+        colorFormat = colorFormat,
+        depthStencilFormat = depthStencilFormat,
+        sampleCount = sampleCount.toUInt(),
+      )
+  }
+}
+
+/**
+ * The map's render pass at a custom layer's place in the style, by the backend that the session
+ * renders with.
+ *
+ * See `mln_custom_layer_pass_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public sealed interface CustomLayerRenderParametersPass {
+  public data class Metal(public val value: MetalCustomLayerPass) : CustomLayerRenderParametersPass
+
+  public data class Vulkan(public val value: VulkanCustomLayerPass) :
+    CustomLayerRenderParametersPass
+
+  public data class OpenGl(public val value: OpenGlCustomLayerPass) :
+    CustomLayerRenderParametersPass
+
+  public data class WebGpu(public val value: WebGpuCustomLayerPass) :
+    CustomLayerRenderParametersPass
+
+  public data class Unknown(
+    @get:JvmName("getTag") public val tag: UInt,
+    public val bytes: ByteArray,
+  ) : CustomLayerRenderParametersPass {
+    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+
+    override fun equals(other: Any?): Boolean =
+      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+
+    override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+    public companion object {
+      /** Creates a value, for Java, which can't call the constructor. */
+      @JvmStatic
+      @PublishedApi
+      internal fun of(tag: Int, bytes: ByteArray): Unknown =
+        Unknown(tag = tag.toUInt(), bytes = bytes)
+    }
+  }
+}
+
+/**
+ * What a custom layer's render callback gets.
+ *
+ * See `mln_custom_layer_render_parameters` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class CustomLayerRenderParameters(
+  public val pass: CustomLayerRenderParametersPass,
+  public val frame: CustomLayerFrame,
+  /**
+   * The depth that a 2D layer at the layer's place in the style writes, as `FrameProjection`
+   * describes, between `frame.frame_projection.far_depth` and 1.
+   *
+   * The map draws the opaque fragments of its 2D layers before the render callback runs, those
+   * above the custom layer too. A fragment that you draw at this depth, tested with less-or-equal,
+   * stays under those above that wrote depth.
+   */
+  public val layerDepth: Double,
+)
 
 /**
  * Options for a GeoJSON
@@ -5312,30 +6618,208 @@ public data class CameraDelta(
 }
 
 /**
- * A ring of Android hardware buffers that the library allocates, for
- * `MapHandle.attachAndroidHardwareBufferRing()`.
+ * An image that the session allocates, renders at the map's scale factor, and reads back with
+ * `RenderSessionHandle.readTexture()`.
  *
- * Each buffer has the map's size in pixels, `logical_size` times the map's scale factor, and the
- * format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM. Its usage is
- * AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT, AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
- * `usage`.
- *
- * See `mln_android_hardware_buffer_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ * See `mln_offscreen_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class AndroidHardwareBufferRingDescriptor(
+public data class OffscreenTarget(
   public val logicalSize: LogicalSize,
-  /** How many buffers the ring has, from 1 to 8. */
-  @get:JvmName("getBufferCount") public val bufferCount: UInt,
+)
+
+/**
+ * A `CAMetalLayer` to present to.
+ *
+ * The session sets the layer's device, pixel format, and drawable size.
+ *
+ * See `mln_metal_layer_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class MetalLayerTarget(
+  public val logicalSize: LogicalSize,
+  /** Your `CAMetalLayer*`. */
+  public val layer: NativePointer,
+)
+
+/**
+ * A Win32 window to present to.
+ *
+ * On an OpenGL device, the session sets the window's pixel format, so don't set one yourself. While
+ * the window is minimized, frame demands finish with `RenderResult.TARGET_NOT_READY`.
+ *
+ * See `mln_win32_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class Win32WindowTarget(
+  public val logicalSize: LogicalSize,
+  /** Your `HWND`. */
+  public val window: NativePointer,
+)
+
+/**
+ * An X11 window to present to, through Xlib.
+ *
+ * Keep the display connected until the session's detach completes.
+ *
+ * See `mln_xlib_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class XlibWindowTarget(
+  public val logicalSize: LogicalSize,
+  /** Your `Display*`. */
+  public val display: NativePointer,
+  /** Your `Window`, on `display`. */
+  @get:JvmName("getWindow") public val window: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      display: NativePointer,
+      window: Long,
+    ): XlibWindowTarget =
+      XlibWindowTarget(logicalSize = logicalSize, display = display, window = window.toULong())
+  }
+}
+
+/**
+ * A Wayland surface to present to.
+ *
+ * Keep the display connected until the session's detach completes. On an OpenGL device, if you also
+ * use EGL on the display, initialize it before you attach.
+ *
+ * See `mln_wayland_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WaylandSurfaceTarget(
+  public val logicalSize: LogicalSize,
+  /** Your `wl_display*`. */
+  public val display: NativePointer,
+  /** Your `wl_surface*`, on `display`. */
+  public val surface: NativePointer,
+)
+
+/**
+ * An Android window to present to.
+ *
+ * The session takes its own reference to the window, so you can release yours once the call
+ * returns. When the platform destroys the window, such as in
+ * `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+ * `RenderSessionHandle.releaseTarget()`, or give the session another window with
+ * `RenderSessionHandle.setTarget()`, without waiting for that to complete. A frame to the destroyed
+ * window finishes with `RenderResult.TARGET_NOT_READY`, or with `RenderResult.RENDERED` if the
+ * window went away while the frame was presenting.
+ *
+ * See `mln_android_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class AndroidWindowTarget(
+  public val logicalSize: LogicalSize,
+  /** Your `ANativeWindow*`. */
+  public val window: NativePointer,
+)
+
+/**
+ * An OpenHarmony window to present to.
+ *
+ * The session takes its own reference to the window, so you can release yours once the call
+ * returns. When the platform destroys the window, such as in an `XComponent`'s `onSurfaceDestroyed`
+ * callback, release the target or give the session another window without waiting, as for an
+ * Android window.
+ *
+ * See `mln_ohos_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class OhosWindowTarget(
+  public val logicalSize: LogicalSize,
+  /** Your `OHNativeWindow*`. */
+  public val window: NativePointer,
+)
+
+/**
+ * Your Vulkan surface to present to.
+ *
+ * Make it with the instance of the Vulkan device that you attach on. The device's queue family must
+ * support presenting to the surface. The session creates the swapchain, and destroys it but not the
+ * surface.
+ *
+ * See `mln_vulkan_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class VulkanSurfaceTarget(
+  public val logicalSize: LogicalSize,
+  /** Your `VkSurfaceKHR`. */
+  @get:JvmName("getSurface") public val surface: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(logicalSize: LogicalSize, surface: Long): VulkanSurfaceTarget =
+      VulkanSurfaceTarget(logicalSize = logicalSize, surface = surface.toULong())
+  }
+}
+
+/**
+ * Your OpenGL surface to present to, with the context that `GpuDeviceHandle.wrapOpenGl()` wrapped.
+ *
+ * The session makes its context current on the surface for each frame, and swaps the surface's
+ * buffers to present.
+ *
+ * See `mln_open_gl_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class OpenGlSurfaceTarget(
+  public val logicalSize: LogicalSize,
   /**
-   * More `AHARDWAREBUFFER_USAGE_*` bits that your reads need, such as
-   * AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+   * Your `EGLSurface` on the context's display, with its config, or your `HDC` with the context's
+   * pixel format.
    */
-  @get:JvmName("getUsage") public val usage: ULong = 0uL,
+  public val surface: NativePointer,
+)
+
+/**
+ * A Metal texture of a borrowed ring.
+ *
+ * See `mln_metal_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class MetalBorrowedTexture(
+  /** Your `MTLTexture`. */
+  public val texture: NativePointer,
+)
+
+/**
+ * A ring of your Metal textures to render into, on the Metal device that you attach on.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels, which is usually
+ * `logical_size` times the map's scale factor. The textures must all have that size, the device's
+ * `MTLDevice`, one pixel format, one sample, and `MTLTextureUsageRenderTarget`. The ring holds up
+ * to `TEXTURE_RING_MAX_DEPTH` distinct textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against the map, as
+ * `FrameProjection` says: one for each of `textures`, at the same index, or none. Each frame clears
+ * the one at its slot, renders the map's depth and stencil into it, and stores them. They must have
+ * the size of `textures`, one pixel format of `GpuDeviceCapabilities.depthStencilFormats`, one
+ * sample, `MTLTextureUsageRenderTarget`, and a storage mode other than `MTLStorageModeMemoryless`.
+ *
+ * See `mln_metal_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class MetalBorrowedTexturesTarget(
+  public val logicalSize: LogicalSize,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
+  public val textures: List<MetalBorrowedTexture>,
+  public val depthTextures: List<MetalBorrowedTexture> = emptyList(),
 ) {
   @PublishedApi
-  internal fun withUsage(usage: Long): AndroidHardwareBufferRingDescriptor =
-    copy(usage = usage.toULong())
+  internal fun withDepthTextures(
+    depthTextures: List<MetalBorrowedTexture>,
+  ): MetalBorrowedTexturesTarget = copy(depthTextures = depthTextures)
 
   public companion object {
     /**
@@ -5346,11 +6830,15 @@ public data class AndroidHardwareBufferRingDescriptor(
     @PublishedApi
     internal fun of(
       logicalSize: LogicalSize,
-      bufferCount: Int,
-    ): AndroidHardwareBufferRingDescriptor =
-      AndroidHardwareBufferRingDescriptor(
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<MetalBorrowedTexture>,
+    ): MetalBorrowedTexturesTarget =
+      MetalBorrowedTexturesTarget(
         logicalSize = logicalSize,
-        bufferCount = bufferCount.toUInt(),
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
       )
 
     /** Creates a value, for Java, which can't call the constructor. */
@@ -5358,81 +6846,92 @@ public data class AndroidHardwareBufferRingDescriptor(
     @PublishedApi
     internal fun of(
       logicalSize: LogicalSize,
-      bufferCount: Int,
-      usage: Long,
-    ): AndroidHardwareBufferRingDescriptor =
-      AndroidHardwareBufferRingDescriptor(
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<MetalBorrowedTexture>,
+      depthTextures: List<MetalBorrowedTexture>,
+    ): MetalBorrowedTexturesTarget =
+      MetalBorrowedTexturesTarget(
         logicalSize = logicalSize,
-        bufferCount = bufferCount.toUInt(),
-        usage = usage.toULong(),
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+        depthTextures = depthTextures,
       )
   }
 }
 
 /**
- * Options for attaching a render session to a map.
+ * A Vulkan image of a borrowed ring.
  *
- * See `mln_render_session_attach_options` in the
+ * See `mln_vulkan_borrowed_texture` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class RenderSessionAttachOptions(
-  /**
-   * The thread that runs the session's graphics work, which depends on the target:
-   *
-   * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a shared or dedicated EGL or WGL context, an
-   *   existing WebGL context, or a browser's WebGPU device.
-   * - `RenderDriverKind.CORE_WORKER` for a transferred WebGL canvas, an Android, OpenHarmony, or
-   *   Win32 window, a Wayland surface, a ring of Android hardware buffers, dmabufs, DXGI shared
-   *   textures, or IOSurfaces, or an offscreen session.
-   * - Either one for another Metal or Vulkan target.
-   *
-   * An attach with another driver fails with `Status.UNSUPPORTED`.
-   */
-  public val driver: RenderDriverKind,
-  /**
-   * The kinds of `GpuSync` that you can wait on before you read an acquired frame. The session uses
-   * one of them that its target supports. Zero lets the session pick a kind that names no object to
-   * wait on.
-   */
-  public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
-  /**
-   * Called when frame results are waiting for `RenderSessionHandle.drainFrameResults()`. It isn't
-   * called again until a drain takes them.
-   */
-  public val frameWake: Wake = Wake(),
-  /**
-   * Called when the session has something new to draw. Demand a frame at your next display refresh.
-   * It isn't called again until you demand a frame, or while the session has no target.
-   */
-  public val redrawWake: Wake = Wake(),
-  /**
-   * Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD` has work for
-   * `RenderSessionHandle.serviceDriverWork()`. It isn't called again until a service runs.
-   */
-  public val driverWorkWake: Wake = Wake(),
-  /** Your lock on the Vulkan queue, when you submit to it yourself. */
-  public val queueLock: QueueLock = QueueLock(),
+public data class VulkanBorrowedTexture(
+  /** Your `VkImage`. */
+  @get:JvmName("getImage") public val image: ULong,
+  /** A 2D `VkImageView` of `image` with one mip level and one layer. */
+  @get:JvmName("getImageView") public val imageView: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(image: Long, imageView: Long): VulkanBorrowedTexture =
+      VulkanBorrowedTexture(image = image.toULong(), imageView = imageView.toULong())
+  }
+}
+
+/**
+ * A ring of your Vulkan images to render into, on the Vulkan device that you attach on.
+ *
+ * `physical_width` and `physical_height` give the images' size in pixels, which is usually
+ * `logical_size` times the map's scale factor. Each image must have that size, `format`, and
+ * `VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT`, and belong to the device's `VkDevice`. The ring holds up
+ * to `TEXTURE_RING_MAX_DEPTH` distinct images.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against the map, as
+ * `FrameProjection` says: one for each of `textures`, at the same index, or none. Each frame clears
+ * the one at its slot, renders the map's depth and stencil into it, stores them, and leaves it in
+ * `depth_final_layout`, with `owner` as for the color image. They must have the size of `textures`,
+ * `depth_format`, one sample, and `VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT`, and their views
+ * both the depth and the stencil aspect.
+ *
+ * See `mln_vulkan_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class VulkanBorrowedTexturesTarget(
+  public val logicalSize: LogicalSize,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
+  public val textures: List<VulkanBorrowedTexture>,
+  /** The images' `VkFormat`. */
+  @get:JvmName("getFormat") public val format: UInt,
+  /** The `VkImageLayout` that each frame leaves its image in. */
+  @get:JvmName("getFinalLayout") public val finalLayout: UInt,
+  public val owner: VulkanImageOwner = VulkanImageOwner.GRAPHICS_QUEUE,
+  public val depthTextures: List<VulkanBorrowedTexture> = emptyList(),
+  /** The depth images' `VkFormat`, of `GpuDeviceCapabilities.depthStencilFormats`. */
+  @get:JvmName("getDepthFormat") public val depthFormat: UInt = 0u,
+  /** The `VkImageLayout` that each frame leaves its depth image in. */
+  @get:JvmName("getDepthFinalLayout") public val depthFinalLayout: UInt = 0u,
 ) {
   @PublishedApi
-  internal fun withProducerSyncKinds(
-    producerSyncKinds: GpuSyncKindFlag,
-  ): RenderSessionAttachOptions = copy(producerSyncKinds = producerSyncKinds)
+  internal fun withOwner(owner: VulkanImageOwner): VulkanBorrowedTexturesTarget =
+    copy(owner = owner)
 
   @PublishedApi
-  internal fun withFrameWake(frameWake: Wake): RenderSessionAttachOptions =
-    copy(frameWake = frameWake)
+  internal fun withDepthTextures(
+    depthTextures: List<VulkanBorrowedTexture>,
+  ): VulkanBorrowedTexturesTarget = copy(depthTextures = depthTextures)
 
   @PublishedApi
-  internal fun withRedrawWake(redrawWake: Wake): RenderSessionAttachOptions =
-    copy(redrawWake = redrawWake)
+  internal fun withDepthFormat(depthFormat: Int): VulkanBorrowedTexturesTarget =
+    copy(depthFormat = depthFormat.toUInt())
 
   @PublishedApi
-  internal fun withDriverWorkWake(driverWorkWake: Wake): RenderSessionAttachOptions =
-    copy(driverWorkWake = driverWorkWake)
-
-  @PublishedApi
-  internal fun withQueueLock(queueLock: QueueLock): RenderSessionAttachOptions =
-    copy(queueLock = queueLock)
+  internal fun withDepthFinalLayout(depthFinalLayout: Int): VulkanBorrowedTexturesTarget =
+    copy(depthFinalLayout = depthFinalLayout.toUInt())
 
   public companion object {
     /**
@@ -5441,35 +6940,257 @@ public data class RenderSessionAttachOptions(
      */
     @JvmStatic
     @PublishedApi
-    internal fun of(driver: RenderDriverKind): RenderSessionAttachOptions =
-      RenderSessionAttachOptions(driver = driver)
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<VulkanBorrowedTexture>,
+      format: Int,
+      finalLayout: Int,
+    ): VulkanBorrowedTexturesTarget =
+      VulkanBorrowedTexturesTarget(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+        format = format.toUInt(),
+        finalLayout = finalLayout.toUInt(),
+      )
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<VulkanBorrowedTexture>,
+      format: Int,
+      finalLayout: Int,
+      owner: VulkanImageOwner,
+      depthTextures: List<VulkanBorrowedTexture>,
+      depthFormat: Int,
+      depthFinalLayout: Int,
+    ): VulkanBorrowedTexturesTarget =
+      VulkanBorrowedTexturesTarget(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+        format = format.toUInt(),
+        finalLayout = finalLayout.toUInt(),
+        owner = owner,
+        depthTextures = depthTextures,
+        depthFormat = depthFormat.toUInt(),
+        depthFinalLayout = depthFinalLayout.toUInt(),
+      )
   }
 }
 
 /**
- * An Android window to present to, for `MapHandle.attachAndroidSurface()`.
+ * An OpenGL texture of a borrowed ring.
  *
- * Name the window by `window`, or by `jni_env` and `surface`. The session takes its own reference
- * to the window, so you can release yours once the call returns.
- *
- * See `mln_android_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+ * See `mln_open_gl_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class AndroidSurfaceDescriptor(
+public data class OpenGlBorrowedTexture(
+  /** Your texture name. */
+  @get:JvmName("getTexture") public val texture: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(texture: Int): OpenGlBorrowedTexture =
+      OpenGlBorrowedTexture(texture = texture.toUInt())
+  }
+}
+
+/**
+ * A ring of your OpenGL textures to render into, on an OpenGL device that
+ * `GpuDeviceHandle.wrapOpenGl()` made from your context.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels, which is usually
+ * `logical_size` times the map's scale factor. Each texture must be in your context's share group,
+ * with RGBA8 storage of that size. The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against the map, as
+ * `FrameProjection` says: one for each of `textures`, at the same index, or none. Each frame clears
+ * the one at its slot, and renders the map's depth and stencil into it. They must be
+ * `GL_TEXTURE_2D` textures in the share group, with storage of the size of `textures` in a format
+ * of `GpuDeviceCapabilities.depthStencilFormats`.
+ *
+ * See `mln_open_gl_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class OpenGlBorrowedTexturesTarget(
   public val logicalSize: LogicalSize,
-  /** Your `ANativeWindow*`, or null to name the window by `surface`. */
-  public val window: NativePointer,
-  /** The calling thread's `JNIEnv*`, with `surface`. */
-  public val jniEnv: NativePointer,
-  /** An `android.view.Surface`, with `jni_env`. */
-  public val surface: NativePointer,
-)
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
+  public val textures: List<OpenGlBorrowedTexture>,
+  /** The textures' target. It must be `GL_TEXTURE_2D`. */
+  @get:JvmName("getTarget") public val target: UInt,
+  public val depthTextures: List<OpenGlBorrowedTexture> = emptyList(),
+) {
+  @PublishedApi
+  internal fun withDepthTextures(
+    depthTextures: List<OpenGlBorrowedTexture>,
+  ): OpenGlBorrowedTexturesTarget = copy(depthTextures = depthTextures)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<OpenGlBorrowedTexture>,
+      target: Int,
+    ): OpenGlBorrowedTexturesTarget =
+      OpenGlBorrowedTexturesTarget(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+        target = target.toUInt(),
+      )
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<OpenGlBorrowedTexture>,
+      target: Int,
+      depthTextures: List<OpenGlBorrowedTexture>,
+    ): OpenGlBorrowedTexturesTarget =
+      OpenGlBorrowedTexturesTarget(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+        target = target.toUInt(),
+        depthTextures = depthTextures,
+      )
+  }
+}
+
+/**
+ * A WebGPU texture of a borrowed ring.
+ *
+ * See `mln_web_gpu_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WebGpuBorrowedTexture(
+  /** Your `GPUTexture`. */
+  @get:JvmName("getTexture") public val texture: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(texture: Int): WebGpuBorrowedTexture =
+      WebGpuBorrowedTexture(texture = texture.toUInt())
+  }
+}
+
+/**
+ * A ring of your WebGPU textures to render into, on a WebGPU device that wraps yours.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels, which is usually
+ * `logical_size` times the map's scale factor. Each texture must be 2D with that size, `format`,
+ * one layer, one mip level, one sample, and `GPUTextureUsage.RENDER_ATTACHMENT`. The ring holds up
+ * to `TEXTURE_RING_MAX_DEPTH` distinct textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against the map, as
+ * `FrameProjection` says: one for each of `textures`, at the same index, or none. Each frame clears
+ * the one at its slot, renders the map's depth and stencil into it, and stores them. They must be
+ * 2D with the size of `textures`, `depth_format`, one layer, one mip level, one sample, and
+ * `GPUTextureUsage.RENDER_ATTACHMENT`.
+ *
+ * The ring renders on a device from `GpuDeviceHandle.wrapWebGpu()`, which no build has yet: an
+ * attach with it fails with `Status.UNSUPPORTED`.
+ *
+ * See `mln_web_gpu_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class WebGpuBorrowedTexturesTarget(
+  public val logicalSize: LogicalSize,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
+  public val textures: List<WebGpuBorrowedTexture>,
+  /** The textures' `GPUTextureFormat`, such as `rgba8unorm`. */
+  public val format: String,
+  public val depthTextures: List<WebGpuBorrowedTexture> = emptyList(),
+  /** The depth textures' `GPUTextureFormat`, of `GpuDeviceCapabilities.depthStencilFormats`. */
+  public val depthFormat: String = "",
+) {
+  @PublishedApi
+  internal fun withDepthTextures(
+    depthTextures: List<WebGpuBorrowedTexture>,
+  ): WebGpuBorrowedTexturesTarget = copy(depthTextures = depthTextures)
+
+  @PublishedApi
+  internal fun withDepthFormat(depthFormat: String): WebGpuBorrowedTexturesTarget =
+    copy(depthFormat = depthFormat)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<WebGpuBorrowedTexture>,
+      format: String,
+    ): WebGpuBorrowedTexturesTarget =
+      WebGpuBorrowedTexturesTarget(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+        format = format,
+      )
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<WebGpuBorrowedTexture>,
+      format: String,
+      depthTextures: List<WebGpuBorrowedTexture>,
+      depthFormat: String,
+    ): WebGpuBorrowedTexturesTarget =
+      WebGpuBorrowedTexturesTarget(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+        format = format,
+        depthTextures = depthTextures,
+        depthFormat = depthFormat,
+      )
+  }
+}
 
 /**
  * A DRM format and modifier that you can import.
  *
  * See `mln_dma_buf_format` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class DmaBufFormat(
   /** A DRM fourcc code, such as DRM_FORMAT_ABGR8888. */
@@ -5498,447 +7219,144 @@ public data class DmaBufFormat(
 }
 
 /**
- * A ring of dmabufs that the library allocates, for `MapHandle.attachDmaBufRing()`.
+ * A ring of textures that the session allocates on its device and shares with you, in one of the
+ * ways that you can import.
  *
- * Each buffer has the map's size in pixels and a format and modifier from `formats`. The library
- * renders only DRM_FORMAT_ABGR8888 and DRM_FORMAT_ARGB8888. A modifier can give a buffer more
- * planes than its format has, such as a plane of compression metadata, and the library takes any
- * such modifier that its GPU can render into and share.
+ * Each texture has the size in pixels of `logical_size` at the map's scale factor.
+ * `RenderSessionHandle.resize()` gives the ring textures of the new size, and a frame that you hold
+ * keeps its texture of the old size until you release or discard it.
  *
- * See `mln_dma_buf_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * The ring shares its textures in the first kind of `export_kinds` that the device exports, in this
+ * order, and `RenderSessionCapabilities.exportKind` reports it:
+ *
+ * - `GpuExportKind.IO_SURFACE`: IOSurfaces of the pixel format kCVPixelFormatType_32BGRA, which
+ *   Metal names MTLPixelFormatBGRA8Unorm. Get each frame's surface with
+ *   `AcquiredFrameHandle.withIoSurface()`.
+ * - `GpuExportKind.ANDROID_HARDWARE_BUFFER`: hardware buffers of the format
+ *   AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, with the usage AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+ *   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `android_hardware_buffer_usage`. Get
+ *   each frame's buffer with `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
+ * - `GpuExportKind.DXGI_SHARED_HANDLE`: D3D11 textures of the format DXGI_FORMAT_B8G8R8A8_UNORM on
+ *   the device's GPU, which bind as shader resources and render targets. Open them on a D3D11 or
+ *   D3D12 device of the same adapter, which you pick with `GpuDeviceOptions.adapterLuid`. Get each
+ *   frame's texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+ * - `GpuExportKind.DMA_BUF`: dmabufs of a format and modifier from `dma_buf_formats`. Get each
+ *   frame's buffer with `AcquiredFrameHandle.withDmaBuf()`.
+ * - `GpuExportKind.OPAQUE_FD`: the memory of Vulkan images, which only a Vulkan device or an OpenGL
+ *   context with GL_EXT_memory_object_fd on the same GPU and driver imports. To pick the GPU,
+ *   create the device with `GpuDeviceOptions.adapterUuid` set to your context's GL_DEVICE_UUID_EXT.
+ *   Get each frame's memory with `AcquiredFrameHandle.withOpaqueFd()`.
+ *
+ * `GpuDeviceCapabilities.exportKinds` reports the kinds that a device exports. Attach with
+ * `RenderDriverKind.CORE_WORKER`. Without a device, the session renders on the first of the
+ * platform's backends whose device exports one of `export_kinds`.
+ *
+ * Each frame hands over with `GpuSyncKind.CPU_COMPLETE` or with the sync kind that crosses APIs on
+ * its platform: `GpuSyncKind.METAL_SHARED_EVENT` for an IOSurface, and `GpuSyncKind.SYNC_FD` for
+ * the others, where the device has them. For a reader that waits on neither, such as a Wayland
+ * compositor without explicit synchronization or Flutter's `copyPixelBuffer`, leave them out of
+ * `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes before you acquire
+ * it, and release each frame only once the reader is done with its texture. Give the ring 3
+ * textures, so the session can render while you hold two frames.
+ *
+ * See `mln_exported_ring_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class DmaBufRingDescriptor(
+public data class ExportedRingTarget(
   public val logicalSize: LogicalSize,
-  /** How many buffers the ring has, from 1 to 8. */
-  @get:JvmName("getBufferCount") public val bufferCount: UInt,
+  /** How many textures the ring has, from 1 to `TEXTURE_RING_MAX_DEPTH`. */
+  @get:JvmName("getTextureCount") public val textureCount: UInt,
+  /** The ways of sharing a texture that you can import. */
+  public val exportKinds: GpuExportKindFlag,
   /**
-   * The formats and modifiers that your reader imports, most preferred first, such as those that
-   * eglQueryDmaBufModifiersEXT() reports.
+   * The dmabuf formats and modifiers that you import, most preferred first, such as those that
+   * eglQueryDmaBufModifiersEXT() reports. A ring exports dmabufs only of one of them. The library
+   * renders only DRM_FORMAT_ABGR8888 and DRM_FORMAT_ARGB8888. A modifier can give a buffer more
+   * planes than its format has, such as a plane of compression metadata, and the library takes any
+   * such modifier that its GPU can render into and share. The library takes no implicit modifier:
+   * it skips DRM_FORMAT_MOD_INVALID, so a list of only that one gets no dmabuf.
    */
-  public val formats: List<DmaBufFormat>,
+  public val dmaBufFormats: List<DmaBufFormat> = emptyList(),
+  /**
+   * More `AHARDWAREBUFFER_USAGE_*` bits that your reads of a hardware buffer need, such as
+   * AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+   */
+  @get:JvmName("getAndroidHardwareBufferUsage") public val androidHardwareBufferUsage: ULong = 0uL,
 ) {
+  @PublishedApi
+  internal fun withDmaBufFormats(dmaBufFormats: List<DmaBufFormat>): ExportedRingTarget =
+    copy(dmaBufFormats = dmaBufFormats)
+
+  @PublishedApi
+  internal fun withAndroidHardwareBufferUsage(
+    androidHardwareBufferUsage: Long,
+  ): ExportedRingTarget = copy(androidHardwareBufferUsage = androidHardwareBufferUsage.toULong())
+
   public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
     @JvmStatic
     @PublishedApi
     internal fun of(
       logicalSize: LogicalSize,
-      bufferCount: Int,
-      formats: List<DmaBufFormat>,
-    ): DmaBufRingDescriptor =
-      DmaBufRingDescriptor(
-        logicalSize = logicalSize,
-        bufferCount = bufferCount.toUInt(),
-        formats = formats,
-      )
-  }
-}
-
-/**
- * A ring of DXGI shared textures that the library allocates, for
- * `MapHandle.attachDxgiSharedTextureRing()`.
- *
- * Each texture is a D3D11 2D texture with the map's size in pixels and the format
- * DXGI_FORMAT_B8G8R8A8_UNORM. It binds as a shader resource and a render target, and is shared
- * through an NT handle.
- *
- * See `mln_dxgi_shared_texture_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
- */
-public data class DxgiSharedTextureRingDescriptor(
-  public val logicalSize: LogicalSize,
-  /** How many textures the ring has, from 1 to 8. */
-  @get:JvmName("getTextureCount") public val textureCount: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(logicalSize: LogicalSize, textureCount: Int): DxgiSharedTextureRingDescriptor =
-      DxgiSharedTextureRingDescriptor(
+      textureCount: Int,
+      exportKinds: GpuExportKindFlag,
+    ): ExportedRingTarget =
+      ExportedRingTarget(
         logicalSize = logicalSize,
         textureCount = textureCount.toUInt(),
+        exportKinds = exportKinds,
       )
-  }
-}
 
-/**
- * The Metal device that a render session uses.
- *
- * See `mln_metal_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class MetalContextDescriptor(
-  /** An `MTLDevice`. */
-  public val device: NativePointer,
-)
-
-/**
- * A ring of IOSurfaces that the library allocates, for `MapHandle.attachIoSurfaceRing()`.
- *
- * Each surface has the map's size in pixels, `logical_size` times the map's scale factor, and the
- * pixel format kCVPixelFormatType_32BGRA, which Metal names MTLPixelFormatBGRA8Unorm.
- *
- * See `mln_io_surface_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
- */
-public data class IoSurfaceRingDescriptor(
-  public val logicalSize: LogicalSize,
-  /** How many surfaces the ring has, from 1 to 8. */
-  @get:JvmName("getBufferCount") public val bufferCount: UInt,
-  /** The MTLDevice to render with. A null device picks the system's default. */
-  public val context: MetalContextDescriptor,
-) {
-  public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
     @JvmStatic
     @PublishedApi
     internal fun of(
       logicalSize: LogicalSize,
-      bufferCount: Int,
-      context: MetalContextDescriptor,
-    ): IoSurfaceRingDescriptor =
-      IoSurfaceRingDescriptor(
+      textureCount: Int,
+      exportKinds: GpuExportKindFlag,
+      dmaBufFormats: List<DmaBufFormat>,
+      androidHardwareBufferUsage: Long,
+    ): ExportedRingTarget =
+      ExportedRingTarget(
         logicalSize = logicalSize,
-        bufferCount = bufferCount.toUInt(),
-        context = context,
+        textureCount = textureCount.toUInt(),
+        exportKinds = exportKinds,
+        dmaBufFormats = dmaBufFormats,
+        androidHardwareBufferUsage = androidHardwareBufferUsage.toULong(),
       )
   }
 }
 
 /**
- * A Metal texture of a borrowed ring.
+ * A canvas to present to.
  *
- * See `mln_metal_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * The session makes the canvas's "webgpu" or "webgl2" context with the device's backend, and sets
+ * the canvas's size to `logical_size` at the map's scale factor. Attached without a device, it
+ * renders with the build's backend: a WebGPU build asks the browser for a device, and attaches once
+ * it has one. For an OpenGL device that wraps your WebGL2 context, the canvas must be the context's
+ * own.
+ *
+ * See `mln_web_canvas_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class MetalBorrowedTexture(
-  /** Your MTLTexture. */
-  public val texture: NativePointer,
-)
-
-/**
- * A ring of your Metal textures, for `MapHandle.attachMetalBorrowedTexture()`.
- *
- * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
- * size in pixels, which is usually `logical_size` times the map's scale factor. The textures must
- * all have that size, one device, one pixel format, one sample, and MTLTextureUsageRenderTarget.
- * The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
- *
- * The session uses the textures until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_metal_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class MetalBorrowedTextureDescriptor(
+public data class WebCanvasTarget(
   public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val textures: List<MetalBorrowedTexture>,
   /**
-   * Your MTLCommandQueue on the textures' device, or null for a queue of the session's own. With
-   * your queue, frames can use `GpuSyncKind.QUEUE_ORDER`.
+   * An `OffscreenCanvas`, such as one from `HTMLCanvasElement.transferControlToOffscreen()` that
+   * you posted to the library's Web Worker, or an `HTMLCanvasElement` when the library runs on the
+   * page's thread.
    */
-  public val commandQueue: NativePointer,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      textures: List<MetalBorrowedTexture>,
-      commandQueue: NativePointer,
-    ): MetalBorrowedTextureDescriptor =
-      MetalBorrowedTextureDescriptor(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        textures = textures,
-        commandQueue = commandQueue,
-      )
-  }
-}
-
-/**
- * A Metal layer to render to, for `MapHandle.attachMetalSurface()`.
- *
- * The session sets the layer's device, pixel format, and drawable size. It uses the layer until a
- * replacement or release of the target completes, a detach or release of the session completes, or
- * an abandon of it returns.
- *
- * See `mln_metal_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class MetalSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  /** The MTLDevice to render with. A null device picks the system's default. */
-  public val context: MetalContextDescriptor,
-  /** Your CAMetalLayer. */
-  public val layer: NativePointer,
-)
-
-/**
- * The image that `MapHandle.attachOffscreen()` renders. The session renders it at the map's scale
- * factor.
- *
- * See `mln_offscreen_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
- */
-public data class OffscreenDescriptor(
-  public val logicalSize: LogicalSize,
-)
-
-/**
- * The WGL objects that a render session makes its OpenGL context from.
- *
- * See `mln_wgl_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class WglContextDescriptor(
-  /** An `HDC`. */
-  public val deviceContext: NativePointer,
-  /** Your `HGLRC`, for a shared context. */
-  public val shareContext: NativePointer,
-  /** Your `wglGetProcAddress`, or null to use the system's. */
-  public val getProcAddress: NativePointer,
-)
-
-/**
- * The EGL objects that a render session makes its OpenGL context from.
- *
- * See `mln_egl_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class EglContextDescriptor(
-  /** An `EGLDisplay`. */
-  public val display: NativePointer,
-  /** An `EGLConfig`. */
-  public val config: NativePointer,
-  /** Your `EGLContext`, for a shared context. */
-  public val shareContext: NativePointer,
-  /** The API of a dedicated context. A shared context uses the API of yours. */
-  public val clientApi: OpenGlClientApi = OpenGlClientApi.UNSPECIFIED,
-  /** Your `eglGetProcAddress`, or null to use the system's. */
-  public val getProcAddress: NativePointer,
-) {
-  @PublishedApi
-  internal fun withClientApi(clientApi: OpenGlClientApi): EglContextDescriptor =
-    copy(clientApi = clientApi)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      display: NativePointer,
-      config: NativePointer,
-      shareContext: NativePointer,
-      getProcAddress: NativePointer,
-    ): EglContextDescriptor =
-      EglContextDescriptor(
-        display = display,
-        config = config,
-        shareContext = shareContext,
-        getProcAddress = getProcAddress,
-      )
-  }
-}
-
-/**
- * The WebGL context or canvas that a render session uses.
- *
- * See `mln_web_gl_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class WebGlContextDescriptor(
-  public val kind: WebGlContextKind = WebGlContextKind.EXISTING,
-  /** Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context. */
-  public val context: Int = 0,
-  /** The canvas's CSS selector, for a transferred canvas. */
-  public val canvasSelector: String = "",
-) {
-  @PublishedApi
-  internal fun withKind(kind: WebGlContextKind): WebGlContextDescriptor = copy(kind = kind)
-
-  @PublishedApi
-  internal fun withContext(context: Int): WebGlContextDescriptor = copy(context = context)
-
-  @PublishedApi
-  internal fun withCanvasSelector(canvasSelector: String): WebGlContextDescriptor =
-    copy(canvasSelector = canvasSelector)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): WebGlContextDescriptor = WebGlContextDescriptor()
-  }
-}
-
-/**
- * The WGL, EGL, or WebGL part of an OpenGL context descriptor.
- *
- * See `mln_open_gl_context_descriptor_data` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public sealed interface OpenGlContextDescriptorData {
-  public data class Wgl(public val value: WglContextDescriptor) : OpenGlContextDescriptorData
-
-  public data class Egl(public val value: EglContextDescriptor) : OpenGlContextDescriptorData
-
-  public data class WebGl(public val value: WebGlContextDescriptor) : OpenGlContextDescriptorData
-}
-
-/**
- * How a render session gets the OpenGL context that it renders with.
- *
- * Keep the objects that it names alive until a detach or release of the session completes, or an
- * abandon of it returns.
- *
- * See `mln_open_gl_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class OpenGlContextDescriptor(
-  public val ownership: OpenGlContextOwnership = OpenGlContextOwnership.SHARED,
-  public val data: OpenGlContextDescriptorData,
-) {
-  @PublishedApi
-  internal fun withOwnership(ownership: OpenGlContextOwnership): OpenGlContextDescriptor =
-    copy(ownership = ownership)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(data: OpenGlContextDescriptorData): OpenGlContextDescriptor =
-      OpenGlContextDescriptor(data = data)
-  }
-}
-
-/**
- * An OpenGL texture of a borrowed ring.
- *
- * See `mln_open_gl_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class OpenGlBorrowedTexture(
-  /** Your texture name. */
-  @get:JvmName("getTexture") public val texture: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(texture: Int): OpenGlBorrowedTexture =
-      OpenGlBorrowedTexture(texture = texture.toUInt())
-  }
-}
-
-/**
- * A ring of your OpenGL textures, for `MapHandle.attachOpenGlBorrowedTexture()`.
- *
- * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
- * size in pixels, which is usually `logical_size` times the map's scale factor. The context must
- * use `OpenGlContextOwnership.SHARED`. Each texture must be in your context's share group, with
- * storage of that size. The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct textures.
- *
- * The session uses the textures until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_open_gl_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class OpenGlBorrowedTextureDescriptor(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val context: OpenGlContextDescriptor,
-  public val textures: List<OpenGlBorrowedTexture>,
-  /** The textures' target. It must be GL_TEXTURE_2D. */
-  @get:JvmName("getTarget") public val target: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      context: OpenGlContextDescriptor,
-      textures: List<OpenGlBorrowedTexture>,
-      target: Int,
-    ): OpenGlBorrowedTextureDescriptor =
-      OpenGlBorrowedTextureDescriptor(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        context = context,
-        textures = textures,
-        target = target.toUInt(),
-      )
-  }
-}
-
-/**
- * An OpenGL surface to present to, for `MapHandle.attachOpenGlSurface()`.
- *
- * The session uses the surface until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_open_gl_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class OpenGlSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  public val context: OpenGlContextDescriptor,
-  /** Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it. */
-  public val surface: NativePointer,
-)
-
-/**
- * The Vulkan device and queue that a render session uses.
- *
- * Keep these objects alive until a detach or release of the session completes, or an abandon of it
- * returns.
- *
- * See `mln_vulkan_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class VulkanContextDescriptor(
-  /** A `VkInstance`. */
-  public val instance: NativePointer,
-  /** A `VkPhysicalDevice`. */
-  public val physicalDevice: NativePointer,
-  /** A `VkDevice`. */
-  public val device: NativePointer,
+  @get:JvmName("getCanvas") public val canvas: UInt,
   /**
-   * A `VkQueue` from `graphics_queue_family_index` that supports graphics. If you submit to it too,
-   * set `RenderSessionAttachOptions.queueLock`.
+   * For a WebGPU device, the `GPUTextureFormat` to configure the canvas with, such as `bgra8unorm`.
+   * Empty for a format that the device's adapter prefers.
    */
-  public val graphicsQueue: NativePointer,
-  @get:JvmName("getGraphicsQueueFamilyIndex") public val graphicsQueueFamilyIndex: UInt = 0u,
-  /** Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's. */
-  public val getInstanceProcAddr: NativePointer,
-  /** Your `vkGetDeviceProcAddr`, or null to look it up from the instance. */
-  public val getDeviceProcAddr: NativePointer,
+  public val format: String = "",
 ) {
-  @PublishedApi
-  internal fun withGraphicsQueueFamilyIndex(
-    graphicsQueueFamilyIndex: Int,
-  ): VulkanContextDescriptor = copy(graphicsQueueFamilyIndex = graphicsQueueFamilyIndex.toUInt())
+  @PublishedApi internal fun withFormat(format: String): WebCanvasTarget = copy(format = format)
 
   public companion object {
     /**
@@ -5947,320 +7365,158 @@ public data class VulkanContextDescriptor(
      */
     @JvmStatic
     @PublishedApi
-    internal fun of(
-      instance: NativePointer,
-      physicalDevice: NativePointer,
-      device: NativePointer,
-      graphicsQueue: NativePointer,
-      getInstanceProcAddr: NativePointer,
-      getDeviceProcAddr: NativePointer,
-    ): VulkanContextDescriptor =
-      VulkanContextDescriptor(
-        instance = instance,
-        physicalDevice = physicalDevice,
-        device = device,
-        graphicsQueue = graphicsQueue,
-        getInstanceProcAddr = getInstanceProcAddr,
-        getDeviceProcAddr = getDeviceProcAddr,
-      )
+    internal fun of(logicalSize: LogicalSize, canvas: Int): WebCanvasTarget =
+      WebCanvasTarget(logicalSize = logicalSize, canvas = canvas.toUInt())
 
     /** Creates a value, for Java, which can't call the constructor. */
     @JvmStatic
     @PublishedApi
-    internal fun of(
-      instance: NativePointer,
-      physicalDevice: NativePointer,
-      device: NativePointer,
-      graphicsQueue: NativePointer,
-      graphicsQueueFamilyIndex: Int,
-      getInstanceProcAddr: NativePointer,
-      getDeviceProcAddr: NativePointer,
-    ): VulkanContextDescriptor =
-      VulkanContextDescriptor(
-        instance = instance,
-        physicalDevice = physicalDevice,
-        device = device,
-        graphicsQueue = graphicsQueue,
-        graphicsQueueFamilyIndex = graphicsQueueFamilyIndex.toUInt(),
-        getInstanceProcAddr = getInstanceProcAddr,
-        getDeviceProcAddr = getDeviceProcAddr,
-      )
+    internal fun of(logicalSize: LogicalSize, canvas: Int, format: String): WebCanvasTarget =
+      WebCanvasTarget(logicalSize = logicalSize, canvas = canvas.toUInt(), format = format)
   }
 }
 
 /**
- * A Vulkan image of a borrowed ring.
+ * What a render session renders into: one kind of target, and its descriptor.
  *
- * See `mln_vulkan_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class VulkanBorrowedTexture(
-  /** Your VkImage. */
-  @get:JvmName("getImage") public val image: ULong,
-  /** A 2D VkImageView of `image` with one mip level and one layer. */
-  @get:JvmName("getImageView") public val imageView: ULong,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(image: Long, imageView: Long): VulkanBorrowedTexture =
-      VulkanBorrowedTexture(image = image.toULong(), imageView = imageView.toULong())
-  }
-}
-
-/**
- * A ring of your Vulkan images, for `MapHandle.attachVulkanBorrowedTexture()`.
+ * Every target has a size in logical pixels, which sets the map's size. The session renders it at
+ * the map's scale factor. A borrowed or exported ring hands each frame to you: acquire it with
+ * `RenderSessionHandle.acquireFrame()`, and release it with your GPU's synchronization once you
+ * have read it.
  *
- * `logical_size` sets the map's size. `physical_width` and `physical_height` give the images' size
- * in pixels, which is usually `logical_size` times the map's scale factor. Each image must have
- * that size, `format`, and VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device.
- * The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct images.
+ * The session uses the objects that the descriptor names until a replacement or release of the
+ * target completes, a detach or release of the session completes, or an abandon of it returns,
+ * except as a kind's descriptor says. A window target presents without waiting for the display, so
+ * demand at most one frame per display refresh.
  *
- * The session uses the images until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_vulkan_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class VulkanBorrowedTextureDescriptor(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val context: VulkanContextDescriptor,
-  public val textures: List<VulkanBorrowedTexture>,
-  /** The images' VkFormat. */
-  @get:JvmName("getFormat") public val format: UInt,
-  /** The VkImageLayout that each frame leaves its image in. */
-  @get:JvmName("getFinalLayout") public val finalLayout: UInt,
-  public val owner: VulkanImageOwner = VulkanImageOwner.GRAPHICS_QUEUE,
-) {
-  @PublishedApi
-  internal fun withOwner(owner: VulkanImageOwner): VulkanBorrowedTextureDescriptor =
-    copy(owner = owner)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      context: VulkanContextDescriptor,
-      textures: List<VulkanBorrowedTexture>,
-      format: Int,
-      finalLayout: Int,
-    ): VulkanBorrowedTextureDescriptor =
-      VulkanBorrowedTextureDescriptor(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        context = context,
-        textures = textures,
-        format = format.toUInt(),
-        finalLayout = finalLayout.toUInt(),
-      )
-
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      context: VulkanContextDescriptor,
-      textures: List<VulkanBorrowedTexture>,
-      format: Int,
-      finalLayout: Int,
-      owner: VulkanImageOwner,
-    ): VulkanBorrowedTextureDescriptor =
-      VulkanBorrowedTextureDescriptor(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        context = context,
-        textures = textures,
-        format = format.toUInt(),
-        finalLayout = finalLayout.toUInt(),
-        owner = owner,
-      )
-  }
-}
-
-/**
- * A Vulkan surface to present to, for `MapHandle.attachVulkanSurface()`.
- *
- * The device must have VK_KHR_swapchain enabled, and the queue family of
- * `graphics_queue_family_index` must support presenting to the surface. The session creates the
- * swapchain. It uses the surface until a replacement or release of the target completes, a detach
- * or release of the session completes, or an abandon of it returns.
- *
- * See `mln_vulkan_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class VulkanSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  public val context: VulkanContextDescriptor,
-  /** Your VkSurfaceKHR. */
-  @get:JvmName("getSurface") public val surface: ULong,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      context: VulkanContextDescriptor,
-      surface: Long,
-    ): VulkanSurfaceDescriptor =
-      VulkanSurfaceDescriptor(
-        logicalSize = logicalSize,
-        context = context,
-        surface = surface.toULong(),
-      )
-  }
-}
-
-/**
- * A Wayland surface to present to, for `MapHandle.attachWaylandSurface()`.
- *
- * See `mln_wayland_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
- */
-public data class WaylandSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  /** Your `wl_display*`. */
-  public val display: NativePointer,
-  /** Your `wl_surface*`, on `display`. */
-  public val surface: NativePointer,
-)
-
-/**
- * The WebGPU device that a render session uses.
- *
- * See `mln_web_gpu_context_descriptor` in the
+ * See `mln_render_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class WebGpuContextDescriptor(
-  /** A `WGPUInstance`, or null. */
-  public val instance: NativePointer,
-  /** A `WGPUDevice`. */
-  public val device: NativePointer,
-  /** A `WGPUQueue`, or null to use the device's queue. */
-  public val queue: NativePointer,
-)
+public sealed interface RenderTarget {
+  public data class Offscreen(public val value: OffscreenTarget) : RenderTarget
 
-/**
- * A WebGPU texture of a borrowed ring.
- *
- * See `mln_web_gpu_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class WebGpuBorrowedTexture(
-  /** Your WGPUTexture. */
-  public val texture: NativePointer,
-  /** A WGPUTextureView of `texture`. */
-  public val textureView: NativePointer,
-)
+  public data class MetalLayer(public val value: MetalLayerTarget) : RenderTarget
 
-/**
- * A ring of your WebGPU textures, for `MapHandle.attachWebGpuBorrowedTexture()`.
- *
- * `logical_size` sets the map's size. `physical_width` and `physical_height` give the textures'
- * size in pixels, which is usually `logical_size` times the map's scale factor. Each texture must
- * be 2D with that size, `format`, one layer, one mip level, one sample, and
- * WGPUTextureUsage_RenderAttachment. The ring holds up to `TEXTURE_RING_MAX_DEPTH` distinct
- * textures.
- *
- * The session uses the textures until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_web_gpu_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class WebGpuBorrowedTextureDescriptor(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val context: WebGpuContextDescriptor,
-  public val textures: List<WebGpuBorrowedTexture>,
-  /** The textures' WGPUTextureFormat. */
-  @get:JvmName("getFormat") public val format: UInt,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      context: WebGpuContextDescriptor,
-      textures: List<WebGpuBorrowedTexture>,
-      format: Int,
-    ): WebGpuBorrowedTextureDescriptor =
-      WebGpuBorrowedTextureDescriptor(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        context = context,
-        textures = textures,
-        format = format.toUInt(),
-      )
-  }
+  public data class Win32Window(public val value: Win32WindowTarget) : RenderTarget
+
+  public data class XlibWindow(public val value: XlibWindowTarget) : RenderTarget
+
+  public data class WaylandSurface(public val value: WaylandSurfaceTarget) : RenderTarget
+
+  public data class AndroidWindow(public val value: AndroidWindowTarget) : RenderTarget
+
+  public data class OhosWindow(public val value: OhosWindowTarget) : RenderTarget
+
+  public data class VulkanSurface(public val value: VulkanSurfaceTarget) : RenderTarget
+
+  public data class OpenGlSurface(public val value: OpenGlSurfaceTarget) : RenderTarget
+
+  public data class MetalBorrowedTextures(public val value: MetalBorrowedTexturesTarget) :
+    RenderTarget
+
+  public data class VulkanBorrowedTextures(public val value: VulkanBorrowedTexturesTarget) :
+    RenderTarget
+
+  public data class OpenGlBorrowedTextures(public val value: OpenGlBorrowedTexturesTarget) :
+    RenderTarget
+
+  public data class WebGpuBorrowedTextures(public val value: WebGpuBorrowedTexturesTarget) :
+    RenderTarget
+
+  public data class ExportedRing(public val value: ExportedRingTarget) : RenderTarget
+
+  public data class WebCanvas(public val value: WebCanvasTarget) : RenderTarget
 }
 
 /**
- * A WebGPU surface to present to, for `MapHandle.attachWebGpuSurface()`.
+ * Options for attaching a render session to a map.
  *
- * The session configures the surface. It uses the surface until a replacement or release of the
- * target completes, a detach or release of the session completes, or an abandon of it returns.
- *
- * See `mln_web_gpu_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ * See `mln_render_session_attach_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class WebGpuSurfaceDescriptor(
-  public val logicalSize: LogicalSize,
-  public val context: WebGpuContextDescriptor,
-  /** Your WGPUSurface. */
-  public val surface: NativePointer,
-  /** The WGPUTextureFormat to configure the surface with. */
-  @get:JvmName("getFormat") public val format: UInt,
+public data class RenderSessionAttachOptions(
+  /**
+   * The thread that runs the session's graphics work, which depends on the target:
+   *
+   * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a borrowed ring of WebGPU textures.
+   * - `RenderDriverKind.CORE_WORKER` for an offscreen target, a window, or an exported ring.
+   * - Either one for a web canvas. In a browser both run on the thread that loaded the library:
+   *   `RenderDriverKind.CORE_WORKER` in the library's own tasks, and
+   *   `RenderDriverKind.CALLER_GRAPHICS_THREAD` when you service the session.
+   * - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a borrowed ring of
+   *   Metal, Vulkan, or OpenGL textures. A build may drive these on `RenderDriverKind.CORE_WORKER`
+   *   only, and fails an attach with `RenderDriverKind.CALLER_GRAPHICS_THREAD` then.
+   *
+   * An attach with another driver fails with `Status.UNSUPPORTED`.
+   */
+  public val driver: RenderDriverKind,
+  /**
+   * The kinds of `GpuSync` that you can wait on before you read an acquired frame. The session uses
+   * one of them that its target supports. Zero lets the session pick a kind that names no object to
+   * wait on.
+   */
+  public val producerSyncKinds: GpuSyncKindFlag = GpuSyncKindFlag.NONE,
+  /**
+   * Called when frame results are waiting for `RenderSessionHandle.drainFrameResults()`. It isn't
+   * called again until a drain takes them.
+   */
+  public val frameWake: Wake = Wake(),
+  /**
+   * Called when the session has something new to draw. Demand a frame at your next display refresh.
+   * It isn't called again until you demand a frame, or while the session has no target.
+   */
+  public val redrawWake: Wake = Wake(),
+  /**
+   * Called when a session driven by `RenderDriverKind.CALLER_GRAPHICS_THREAD` has work for
+   * `RenderSessionHandle.serviceDriverWork()`. It isn't called again until a service runs. It's
+   * never called on your graphics thread during a service: the service runs the work that comes
+   * while it runs, so you can call `RenderSessionHandle.serviceDriverWork()` from the wake.
+   */
+  public val driverWorkWake: Wake = Wake(),
+  /**
+   * Whether an exported ring keeps the depth and stencil of each frame for you, so that you can
+   * draw into the frame depth-tested against the map, as `FrameProjection` says. The getter of the
+   * device's API, such as `AcquiredFrameHandle.withVulkanTexture()`, gets a frame's depth texture
+   * on the device, and `AcquiredFrameHandle.withOpaqueFd()` shares it across APIs when
+   * `GpuDeviceCapabilities.depthExportKinds` has the ring's kind. Keeping depth costs memory
+   * bandwidth, most on tile-based GPUs. A borrowed ring keeps depth in the textures that you give
+   * it instead, and the other targets keep none, so an attach to them with `keep_depth` fails with
+   * `Status.UNSUPPORTED`.
+   */
+  public val keepDepth: Boolean = false,
 ) {
+  @PublishedApi
+  internal fun withProducerSyncKinds(
+    producerSyncKinds: GpuSyncKindFlag,
+  ): RenderSessionAttachOptions = copy(producerSyncKinds = producerSyncKinds)
+
+  @PublishedApi
+  internal fun withFrameWake(frameWake: Wake): RenderSessionAttachOptions =
+    copy(frameWake = frameWake)
+
+  @PublishedApi
+  internal fun withRedrawWake(redrawWake: Wake): RenderSessionAttachOptions =
+    copy(redrawWake = redrawWake)
+
+  @PublishedApi
+  internal fun withDriverWorkWake(driverWorkWake: Wake): RenderSessionAttachOptions =
+    copy(driverWorkWake = driverWorkWake)
+
+  @PublishedApi
+  internal fun withKeepDepth(keepDepth: Boolean): RenderSessionAttachOptions =
+    copy(keepDepth = keepDepth)
+
   public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
     @JvmStatic
     @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      context: WebGpuContextDescriptor,
-      surface: NativePointer,
-      format: Int,
-    ): WebGpuSurfaceDescriptor =
-      WebGpuSurfaceDescriptor(
-        logicalSize = logicalSize,
-        context = context,
-        surface = surface,
-        format = format.toUInt(),
-      )
+    internal fun of(driver: RenderDriverKind): RenderSessionAttachOptions =
+      RenderSessionAttachOptions(driver = driver)
   }
 }
-
-/**
- * A Win32 window to present to, for `MapHandle.attachWin32Window()`.
- *
- * See `mln_win32_window_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
- */
-public data class Win32WindowDescriptor(
-  public val logicalSize: LogicalSize,
-  /** Your `HWND`. */
-  public val window: NativePointer,
-)
 
 /**
  * Options for finding the camera that fits an area.
@@ -7274,6 +8530,11 @@ public data class RenderSessionCapabilities(
    * and on what the device supports.
    */
   public val consumerSyncKinds: GpuSyncKindFlag,
+  /**
+   * How an exported ring shares its textures, which says which getter gets an acquired frame's
+   * texture, or `GpuExportKind.NONE` for another target.
+   */
+  public val exportKind: GpuExportKind,
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
@@ -7285,6 +8546,7 @@ public data class RenderSessionCapabilities(
       flags: RenderSessionCapabilityFlag,
       producerSyncKind: GpuSyncKind,
       consumerSyncKinds: GpuSyncKindFlag,
+      exportKind: GpuExportKind,
     ): RenderSessionCapabilities =
       RenderSessionCapabilities(
         driver = driver,
@@ -7292,6 +8554,7 @@ public data class RenderSessionCapabilities(
         flags = flags,
         producerSyncKind = producerSyncKind,
         consumerSyncKinds = consumerSyncKinds,
+        exportKind = exportKind,
       )
   }
 }
@@ -7551,266 +8814,6 @@ public data class TextureReadbackResult(
 }
 
 /**
- * A new Android window for `RenderSessionHandle.setAndroidSurfaceTarget()`.
- *
- * Name the window by `window`, or by `jni_env` and `surface`. The session takes its own reference
- * to the window, so you can release yours once the call returns.
- *
- * See `mln_android_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
- */
-public data class AndroidSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your `ANativeWindow*`, or null to name the window by `surface`. */
-  public val window: NativePointer,
-  /** The calling thread's `JNIEnv*`, with `surface`. */
-  public val jniEnv: NativePointer,
-  /** An `android.view.Surface`, with `jni_env`. */
-  public val surface: NativePointer,
-)
-
-/**
- * New Metal textures for a borrowed ring, for
- * `RenderSessionHandle.setMetalBorrowedTextureTarget()`.
- *
- * The members and the textures follow the rules of `MetalBorrowedTextureDescriptor`. The ring keeps
- * its depth, device, and command queue, so give it as many textures as it attached with, on the
- * same device.
- *
- * See `mln_metal_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class MetalBorrowedTextureReplacement(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val textures: List<MetalBorrowedTexture>,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      textures: List<MetalBorrowedTexture>,
-    ): MetalBorrowedTextureReplacement =
-      MetalBorrowedTextureReplacement(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        textures = textures,
-      )
-  }
-}
-
-/**
- * A new Metal layer for `RenderSessionHandle.setMetalSurfaceTarget()`.
- *
- * The session renders to it with the device that it attached with. It uses the layer until a
- * replacement or release of the target completes, a detach or release of the session completes, or
- * an abandon of it returns.
- *
- * See `mln_metal_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class MetalSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your CAMetalLayer. */
-  public val layer: NativePointer,
-)
-
-/**
- * New OpenGL textures for a borrowed ring, for
- * `RenderSessionHandle.setOpenGlBorrowedTextureTarget()`.
- *
- * The members and the textures follow the rules of `OpenGlBorrowedTextureDescriptor`. The ring
- * keeps its depth, context, and texture target, so give it as many textures as it attached with, in
- * the same share group.
- *
- * See `mln_open_gl_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class OpenGlBorrowedTextureReplacement(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val textures: List<OpenGlBorrowedTexture>,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      textures: List<OpenGlBorrowedTexture>,
-    ): OpenGlBorrowedTextureReplacement =
-      OpenGlBorrowedTextureReplacement(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        textures = textures,
-      )
-  }
-}
-
-/**
- * A new OpenGL surface for `RenderSessionHandle.setOpenGlSurfaceTarget()`.
- *
- * The session presents to it with the context that it attached with. It uses the surface until a
- * replacement or release of the target completes, a detach or release of the session completes, or
- * an abandon of it returns.
- *
- * See `mln_open_gl_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class OpenGlSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so leave it null. */
-  public val surface: NativePointer,
-)
-
-/**
- * New Vulkan images for a borrowed ring, for
- * `RenderSessionHandle.setVulkanBorrowedTextureTarget()`.
- *
- * The members and the images follow the rules of `VulkanBorrowedTextureDescriptor`. The ring keeps
- * its depth, context, `format`, `final_layout`, and `owner`, so give it as many images as it
- * attached with, in that format, on the same device.
- *
- * See `mln_vulkan_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class VulkanBorrowedTextureReplacement(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val textures: List<VulkanBorrowedTexture>,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      textures: List<VulkanBorrowedTexture>,
-    ): VulkanBorrowedTextureReplacement =
-      VulkanBorrowedTextureReplacement(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        textures = textures,
-      )
-  }
-}
-
-/**
- * A new Vulkan surface for `RenderSessionHandle.setVulkanSurfaceTarget()`.
- *
- * The session presents to it with the context that it attached with, so the queue family of that
- * context's `graphics_queue_family_index` must support presenting to the surface. It uses the
- * surface until a replacement or release of the target completes, a detach or release of the
- * session completes, or an abandon of it returns.
- *
- * See `mln_vulkan_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class VulkanSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your VkSurfaceKHR. */
-  @get:JvmName("getSurface") public val surface: ULong,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(logicalSize: LogicalSize, surface: Long): VulkanSurfaceReplacement =
-      VulkanSurfaceReplacement(logicalSize = logicalSize, surface = surface.toULong())
-  }
-}
-
-/**
- * A new Wayland surface for `RenderSessionHandle.setWaylandSurfaceTarget()`.
- *
- * See `mln_wayland_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
- */
-public data class WaylandSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your `wl_surface*`, on the display that the session attached with. */
-  public val surface: NativePointer,
-)
-
-/**
- * New WebGPU textures for a borrowed ring, for
- * `RenderSessionHandle.setWebGpuBorrowedTextureTarget()`.
- *
- * The members and the textures follow the rules of `WebGpuBorrowedTextureDescriptor`. The ring
- * keeps its depth, context, and `format`, so give it as many textures as it attached with, in that
- * format, on the same device.
- *
- * See `mln_web_gpu_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class WebGpuBorrowedTextureReplacement(
-  public val logicalSize: LogicalSize,
-  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
-  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
-  public val textures: List<WebGpuBorrowedTexture>,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(
-      logicalSize: LogicalSize,
-      physicalWidth: Int,
-      physicalHeight: Int,
-      textures: List<WebGpuBorrowedTexture>,
-    ): WebGpuBorrowedTextureReplacement =
-      WebGpuBorrowedTextureReplacement(
-        logicalSize = logicalSize,
-        physicalWidth = physicalWidth.toUInt(),
-        physicalHeight = physicalHeight.toUInt(),
-        textures = textures,
-      )
-  }
-}
-
-/**
- * A new WebGPU surface for `RenderSessionHandle.setWebGpuSurfaceTarget()`.
- *
- * The session configures it with the context and format that it attached with. It uses the surface
- * until a replacement or release of the target completes, a detach or release of the session
- * completes, or an abandon of it returns.
- *
- * See `mln_web_gpu_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-public data class WebGpuSurfaceReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your WGPUSurface. */
-  public val surface: NativePointer,
-)
-
-/**
- * A new Win32 window for `RenderSessionHandle.setWin32WindowTarget()`.
- *
- * See `mln_win32_window_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
- */
-public data class Win32WindowReplacement(
-  public val logicalSize: LogicalSize,
-  /** Your `HWND`. */
-  public val window: NativePointer,
-)
-
-/**
  * The answer to a resource request.
  *
  * See `mln_resource_response` in the
@@ -7932,8 +8935,9 @@ public data class ResourceTransformError(
  */
 public data class MapOptions(
   /**
-   * The map's first size, and its scale factor. The scale factor stays fixed for the map's life,
-   * and every render session of the map renders at it.
+   * The map's first size, and its scale factor. Render sessions of the map render at its scale
+   * factor. `MapHandle.resize()` changes both, or `RenderSessionHandle.resize()` while a render
+   * session is attached.
    */
   public val initialExtent: LogicalExtent,
   public val mapMode: MapMode = MapMode.CONTINUOUS,
@@ -7953,9 +8957,18 @@ public data class MapOptions(
    * Fonts for the text that a style's own fonts don't draw, such as scripts that need complex
    * shaping, like Myanmar or Devanagari. A JSON array of font files, each an object with a `url`
    * and an optional `unicode-range`, as in a font face of a style's `font-faces`, which every font
-   * stack uses after the style's own font faces. Empty for none.
+   * stack uses after the style's own font faces. Empty for the system's fonts, unless
+   * `system_fonts_enabled` is false.
    */
   public val fallbackFontFaces: String = "",
+  /**
+   * Whether the map falls back to the system's fonts for CJK and the scripts that need complex
+   * shaping when `fallback_font_faces` is empty: fonts that the platform's font matcher picks for
+   * the user's preferred languages. Without it, the map does. The first map that uses them waits
+   * for them to be found. In the browser, the browser draws CJK glyphs in its sans-serif font
+   * instead, where `fallback_font_faces` doesn't cover them.
+   */
+  public val systemFontsEnabled: Boolean? = null,
 ) {
   @PublishedApi internal fun withMapMode(mapMode: MapMode): MapOptions = copy(mapMode = mapMode)
 
@@ -7973,6 +8986,10 @@ public data class MapOptions(
   @PublishedApi
   internal fun withFallbackFontFaces(fallbackFontFaces: String): MapOptions =
     copy(fallbackFontFaces = fallbackFontFaces)
+
+  @PublishedApi
+  internal fun withSystemFontsEnabled(systemFontsEnabled: Boolean): MapOptions =
+    copy(systemFontsEnabled = systemFontsEnabled)
 
   public companion object {
     /**
@@ -8348,26 +9365,6 @@ public data class RuntimeEventOfflineRegionResponseError(
 )
 
 /**
- * The details of `RuntimeEventType.OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
- *
- * See `mln_runtime_event_offline_region_tile_count_limit` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEventOfflineRegionTileCountLimit(
-  public val regionId: Long,
-  /** The number of demo server tiles that the cache file's offline regions may hold together. */
-  @get:JvmName("getLimit") public val limit: ULong,
-) {
-  public companion object {
-    /** Creates a value, for Java, which can't call the constructor. */
-    @JvmStatic
-    @PublishedApi
-    internal fun of(regionId: Long, limit: Long): RuntimeEventOfflineRegionTileCountLimit =
-      RuntimeEventOfflineRegionTileCountLimit(regionId = regionId, limit = limit.toULong())
-  }
-}
-
-/**
  * The details of a glyph event.
  *
  * The event covers the glyphs from `first` to `last`, both included.
@@ -8438,10 +9435,6 @@ public sealed interface RuntimeEventPayload {
 
   public data class OfflineRegionResponseError(
     public val value: RuntimeEventOfflineRegionResponseError,
-  ) : RuntimeEventPayload
-
-  public data class OfflineRegionTileCountLimit(
-    public val value: RuntimeEventOfflineRegionTileCountLimit,
   ) : RuntimeEventPayload
 
   public data class Glyphs(public val value: RuntimeEventGlyphs) : RuntimeEventPayload
@@ -8801,16 +9794,6 @@ public data class StyleExpressionInfo(
   public val isZoomConstant: Boolean,
 )
 
-/**
- * A Vulkan device's context, as `VulkanDeviceHandle.getContext()` reports it.
- *
- * See `mln_vulkan_device_context_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
- */
-public data class VulkanDeviceContextResult(
-  public val context: VulkanContextDescriptor,
-)
-
 public data class LogicalExtentPhysicalSizeResult(
   @get:JvmName("getWidth") public val width: UInt,
   @get:JvmName("getHeight") public val height: UInt,
@@ -8822,6 +9805,68 @@ public data class LogicalExtentPhysicalSizeResult(
     internal fun of(width: Int, height: Int): LogicalExtentPhysicalSizeResult =
       LogicalExtentPhysicalSizeResult(width = width.toUInt(), height = height.toUInt())
   }
+}
+
+/**
+ * Your lock on a Vulkan queue that you and the render sessions of a GPU device all submit to.
+ *
+ * A session holds the lock only while it submits or presents to the queue, or submits the empty
+ * batch that drains its work from the queue. It never holds the lock while it waits. Set both
+ * `lock` and `unlock`, or neither when you don't submit to the queue yourself.
+ *
+ * Don't hold the lock while you call the library.
+ *
+ * It can run on a library thread, and it can't call the library.
+ *
+ * The JVM, Android, and Kotlin/Native also create one from the host's native functions with
+ * `QueueLock.native`.
+ *
+ * See `mln_queue_lock` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+@ConsistentCopyVisibility
+public data class QueueLock
+private constructor(
+  public val lock: QueueLockCallback?,
+  public val unlock: QueueLockCallback?,
+  private val nativeRegistration: NativeRegistration?,
+) {
+  /** A registration of Kotlin callbacks. */
+  public constructor(
+    lock: QueueLockCallback? = null,
+    unlock: QueueLockCallback? = null,
+  ) : this(lock, unlock, null)
+
+  /**
+   * A registration that does nothing, for Java, which can't leave out the constructor's arguments.
+   */
+  @PublishedApi internal constructor() : this(null, null, null)
+
+  @get:JvmSynthetic
+  internal val bindingNative: NativeRegistration?
+    get() = nativeRegistration
+
+  public companion object {
+    /** A registration of native functions, which only `native` creates. */
+    @JvmSynthetic
+    internal fun wrap(native: NativeRegistration): QueueLock = QueueLock(null, null, native)
+  }
+}
+
+/**
+ * Locks or unlocks the Vulkan queue that you share with the render sessions of a GPU device.
+ *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads and relies
+ * on its work being done when it returns. Kotlin/Wasm cannot run Kotlin on a native thread, so it
+ * refuses a registration that sets one.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
+ * See `mln_queue_lock_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public fun interface QueueLockCallback {
+  public operator fun invoke()
 }
 
 /**
@@ -8981,6 +10026,129 @@ public fun interface CustomSourceCancelTileCallback {
 }
 
 /**
+ * The callbacks of a custom layer, which draws with your own GPU commands in the map's frame.
+ *
+ * A session runs the callbacks only when it can hand you its commands as one of
+ * `CustomLayerRenderParametersPass`'s variants, so a session on another backend, such as WebGPU
+ * outside a browser, doesn't draw the layer. Nor does a browser WebGPU session yet: the library's
+ * WebGPU (wgpu) exposes no command encoder or render pass to hand you. Leave unset the callbacks
+ * that you don't need.
+ *
+ * Runs on the thread that runs the session's graphics work: a library thread, or yours with
+ * `RenderDriverKind.CALLER_GRAPHICS_THREAD`. It can't call the library.
+ *
+ * Runs on the thread that runs the session's graphics work, as `CustomLayerPrerenderCallback` says.
+ * It can't call the library.
+ *
+ * The JVM, Android, and Kotlin/Native also create one from the host's native functions with
+ * `CustomLayerHost.native`.
+ *
+ * See `mln_custom_layer_host` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+@ConsistentCopyVisibility
+public data class CustomLayerHost
+private constructor(
+  public val prerender: CustomLayerPrerenderCallback?,
+  public val render: CustomLayerRenderCallback?,
+  public val deinitialize: CustomLayerSessionEndCallback?,
+  public val contextLost: CustomLayerSessionEndCallback?,
+  private val nativeRegistration: NativeRegistration?,
+) {
+  /** A registration of Kotlin callbacks. */
+  public constructor(
+    prerender: CustomLayerPrerenderCallback? = null,
+    render: CustomLayerRenderCallback? = null,
+    deinitialize: CustomLayerSessionEndCallback? = null,
+    contextLost: CustomLayerSessionEndCallback? = null,
+  ) : this(prerender, render, deinitialize, contextLost, null)
+
+  /**
+   * A registration that does nothing, for Java, which can't leave out the constructor's arguments.
+   */
+  @PublishedApi internal constructor() : this(null, null, null, null, null)
+
+  @get:JvmSynthetic
+  internal val bindingNative: NativeRegistration?
+    get() = nativeRegistration
+
+  public companion object {
+    /** A registration of native functions, which only `native` creates. */
+    @JvmSynthetic
+    internal fun wrap(native: NativeRegistration): CustomLayerHost =
+      CustomLayerHost(null, null, null, null, native)
+  }
+}
+
+/**
+ * Records a custom layer's GPU work that can't run in the map's render pass, such as drawing into
+ * textures of your own.
+ *
+ * Each frame that shows the layer runs the prerender callbacks of its custom layers, from the
+ * bottom of the style to the top, before the map begins its render pass, and so before any render
+ * callback.
+ *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads and relies
+ * on its work being done when it returns. Kotlin/Wasm cannot run Kotlin on a native thread, so it
+ * refuses a registration that sets one.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
+ * See `mln_custom_layer_prerender_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public fun interface CustomLayerPrerenderCallback {
+  public operator fun invoke(parameters: CustomLayerPrerenderParameters)
+}
+
+/**
+ * Draws a custom layer into the map's render pass, at its place in the style.
+ *
+ * The map draws its layers below the custom layer before the callback, and those above it after,
+ * except for the opaque fragments of 2D layers, which it draws before either, as
+ * `CustomLayerRenderParameters.layerDepth` describes. Draw through `frame.frame_projection.matrix`
+ * to depth-test against the map's 3D layers.
+ *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads and relies
+ * on its work being done when it returns. Kotlin/Wasm cannot run Kotlin on a native thread, so it
+ * refuses a registration that sets one.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
+ * See `mln_custom_layer_render_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public fun interface CustomLayerRenderCallback {
+  public operator fun invoke(parameters: CustomLayerRenderParameters)
+}
+
+/**
+ * Tells a custom layer that a session stopped drawing it.
+ *
+ * `deinitialize` runs once a session that ran the layer's prerender or render callback stops
+ * drawing the layer: when the layer leaves the style, or the session detaches, is released, or
+ * replaces its device's backend. Destroy the GPU objects that you made for that session then. The
+ * session's GPU no longer uses them, and an OpenGL session's context is current. `context_lost`
+ * runs instead when the session is abandoned. Its graphics objects may be gone already, so forget
+ * yours without destroying them.
+ *
+ * A later prerender or render callback is for a new session, which can render on another device or
+ * backend.
+ *
+ * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads and relies
+ * on its work being done when it returns. Kotlin/Wasm cannot run Kotlin on a native thread, so it
+ * refuses a registration that sets one.
+ *
+ * If it throws, the binding reports it as a `CallbackException`.
+ *
+ * See `mln_custom_layer_session_end_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public fun interface CustomLayerSessionEndCallback {
+  public operator fun invoke()
+}
+
+/**
  * The callbacks and options of a custom vector source.
  *
  * Zoom levels are whole numbers from 0 to 32.
@@ -9108,65 +10276,6 @@ private constructor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
  */
 public fun interface WakeCallback {
-  public operator fun invoke()
-}
-
-/**
- * Your lock on a Vulkan queue that you and a render session both submit to.
- *
- * The session holds the lock only while it submits or presents to the queue. Set both `lock` and
- * `unlock`, or neither when you don't submit to the queue yourself.
- *
- * It can run on a library thread, and it can't call the library.
- *
- * The JVM, Android, and Kotlin/Native also create one from the host's native functions with
- * `QueueLock.native`.
- *
- * See `mln_queue_lock` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-@ConsistentCopyVisibility
-public data class QueueLock
-private constructor(
-  public val lock: QueueLockCallback?,
-  public val unlock: QueueLockCallback?,
-  private val nativeRegistration: NativeRegistration?,
-) {
-  /** A registration of Kotlin callbacks. */
-  public constructor(
-    lock: QueueLockCallback? = null,
-    unlock: QueueLockCallback? = null,
-  ) : this(lock, unlock, null)
-
-  /**
-   * A registration that does nothing, for Java, which can't leave out the constructor's arguments.
-   */
-  @PublishedApi internal constructor() : this(null, null, null)
-
-  @get:JvmSynthetic
-  internal val bindingNative: NativeRegistration?
-    get() = nativeRegistration
-
-  public companion object {
-    /** A registration of native functions, which only `native` creates. */
-    @JvmSynthetic
-    internal fun wrap(native: NativeRegistration): QueueLock = QueueLock(null, null, native)
-  }
-}
-
-/**
- * Locks or unlocks the Vulkan queue that you share with a render session.
- *
- * On the JVM, Android, and Kotlin/Native, native code calls it on one of its own threads and relies
- * on its work being done when it returns. Kotlin/Wasm cannot run Kotlin on a native thread, so it
- * refuses a registration that sets one.
- *
- * If it throws, the binding reports it as a `CallbackException`.
- *
- * See `mln_queue_lock_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public fun interface QueueLockCallback {
   public operator fun invoke()
 }
 
@@ -9332,8 +10441,8 @@ public fun interface ResourceTransformCallback {
 public const val DIAGNOSTIC_MESSAGE_CAPACITY: UInt = 4096u
 
 /**
- * The token of the frame results that a session adds when it renders an image for
- * `MapHandle.requestStillImage()`. Your own demands can't use it.
+ * The token of the frame results of the demand that a session holds for an image of
+ * `MapHandle.requestStillImage()`, which says how that demand runs. Your own demands can't use it.
  *
  * See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

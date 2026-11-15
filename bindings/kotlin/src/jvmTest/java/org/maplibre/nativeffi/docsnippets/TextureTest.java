@@ -6,6 +6,7 @@ package org.maplibre.nativeffi.docsnippets;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
 import org.maplibre.nativeffi.AcquiredFrameHandle;
+import org.maplibre.nativeffi.GpuDeviceHandle;
 import org.maplibre.nativeffi.GpuSync;
 import org.maplibre.nativeffi.GpuSyncKind;
 import org.maplibre.nativeffi.LogicalSize;
@@ -15,10 +16,11 @@ import org.maplibre.nativeffi.QueueLock;
 import org.maplibre.nativeffi.RenderDriverKind;
 import org.maplibre.nativeffi.RenderSessionAttachOptions;
 import org.maplibre.nativeffi.RenderSessionHandle;
+import org.maplibre.nativeffi.RenderTarget;
 import org.maplibre.nativeffi.VulkanBorrowedTexture;
-import org.maplibre.nativeffi.VulkanBorrowedTextureDescriptor;
-import org.maplibre.nativeffi.VulkanBorrowedTextureReplacement;
+import org.maplibre.nativeffi.VulkanBorrowedTexturesTarget;
 import org.maplibre.nativeffi.VulkanContextDescriptor;
+import org.maplibre.nativeffi.VulkanDeviceDescriptor;
 import org.maplibre.nativeffi.Wake;
 
 public class TextureTest {
@@ -62,22 +64,34 @@ public class TextureTest {
     // #region attach-options
     RenderSessionAttachOptions options =
         RenderSessionAttachOptions.of(RenderDriverKind.CORE_WORKER)
-            .withFrameWake(new Wake(this::onFrameWake))
-            // Only if your renderer also submits to the graphics
-            // queue.
-            .withQueueLock(
-                new QueueLock(queueMutex::lock, queueMutex::unlock));
+            .withFrameWake(new Wake(this::onFrameWake));
     // #endregion attach-options
 
     // #region attach-borrowed
-    VulkanBorrowedTextureDescriptor ring =
-        VulkanBorrowedTextureDescriptor.of(
+    // Your VkDevice and graphics queue.
+    GpuDeviceHandle device =
+        MaplibreNative.wrapVulkan(
+            GpuDeviceHandle.Companion,
+            VulkanDeviceDescriptor.of(vulkan)
+                // Only if your renderer also submits to the graphics
+                // queue.
+                .withQueueLock(
+                    new QueueLock(
+                        queueMutex::lock, queueMutex::unlock))
+                // The device extensions that you enabled on your
+                // VkDevice.
+                .withEnabledExtensions(
+                    List.of(
+                        "VK_KHR_swapchain",
+                        "VK_KHR_external_semaphore_fd")));
+
+    VulkanBorrowedTexturesTarget ring =
+        VulkanBorrowedTexturesTarget.of(
             // The map's size in logical pixels.
             LogicalSize.of(800, 600),
             // The size of your textures in device pixels.
             1600,
             1200,
-            vulkan,
             // Your VkImage and VkImageView for each texture of the
             // ring.
             List.of(
@@ -88,16 +102,20 @@ public class TextureTest {
             5); // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 
     session =
-        MaplibreNative.attachVulkanBorrowedTexture(
-            map, ring, options);
+        map.attach(
+            new RenderTarget.VulkanBorrowedTextures(ring),
+            device,
+            options);
+    // The session keeps the device until it detaches.
+    device.release();
     session.getReady().join();
     // #endregion attach-borrowed
 
     drawFrame();
 
     // #region resize-borrowed
-    VulkanBorrowedTextureReplacement resized =
-        VulkanBorrowedTextureReplacement.of(
+    VulkanBorrowedTexturesTarget resized =
+        VulkanBorrowedTexturesTarget.of(
             LogicalSize.of(1024, 768),
             2048,
             1536,
@@ -106,9 +124,12 @@ public class TextureTest {
                 VulkanBorrowedTexture.of(
                     newImages.get(0), newViews.get(0)),
                 VulkanBorrowedTexture.of(
-                    newImages.get(1), newViews.get(1))));
+                    newImages.get(1), newViews.get(1))),
+            37,
+            5);
 
-    MaplibreNative.setVulkanBorrowedTextureTarget(session, resized)
+    session
+        .setTarget(new RenderTarget.VulkanBorrowedTextures(resized))
         .join();
     // vkDestroyImageView and vkDestroyImage
     destroyTextures(images, views);

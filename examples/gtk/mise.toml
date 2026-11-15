@@ -7,7 +7,7 @@
 description = "Build the C library and the GObject library for a Linux preset, then build the GTK example against their install."
 usage = '''
 arg "[preset]" default="{{vars.host_native_preset}}" {
-  choices "linux-gnu-x64-vulkan" "linux-gnu-x64-egl" "linux-gnu-arm64-vulkan" "linux-gnu-arm64-egl"
+  choices "linux-gnu-x64" "linux-gnu-arm64"
 }
 '''
 depends = [{ task = "//bindings/gobject:build", args = ["{{usage.preset}}"] }]
@@ -28,7 +28,7 @@ export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
 description = "Build the GTK example for a Linux preset and run it."
 usage = '''
 arg "[preset]" default="{{vars.host_native_preset}}" {
-  choices "linux-gnu-x64-vulkan" "linux-gnu-x64-egl" "linux-gnu-arm64-vulkan" "linux-gnu-arm64-egl"
+  choices "linux-gnu-x64" "linux-gnu-arm64"
 }
 '''
 depends = [{ task = "build", args = ["{{usage.preset}}"] }]

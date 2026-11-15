@@ -10,7 +10,6 @@ from textwrap import dedent
 
 from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.emitters.rust import RUST_KEYWORDS, native_call
 from tools.bindgen.model import Api, CType, Function, Lowered, Record, Unsupported
 from tools.bindgen.protocol import COMPLETION_RESULT
 from tools.bindgen.semantic import (
@@ -22,11 +21,14 @@ from tools.bindgen.semantic import (
     output_member,
 )
 
+from . import python_sys
+from .python_sys import RUST_KEYWORDS, native_call
 from .python_values import (
     Values,
     enum_member,
     enum_type,
     field_name,
+    native_name,
     ok,
     public_name,
     rust_field,
@@ -970,6 +972,9 @@ def lower(api: Api | BoundApi) -> Lowered:
     rust, facade, stubs = defaultdict(list), defaultdict(list), defaultdict(list)
     generated, errors, records = [], {}, set()
     discards = defaultdict(list)
+    # The raw declarations mirror the whole C API, including the functions that
+    # no wheel's platform serves.
+    sys_declarations = python_sys.declarations(api)
     bound = compile_api(api, TARGETS)
     api = bound.source
     OWNERS.clear()
@@ -1127,6 +1132,12 @@ def lower(api: Api | BoundApi) -> Lowered:
         if value.union_member
         for variant in value.union_member.value.fields
     )
+    # A parameter that takes a registration also takes its native form.
+    imported.update(
+        native_name(value)
+        for value in values.records.values()
+        if value.registration and async_hosts.accepts_native(values.api, value)
+    )
     imports = "\n".join(
         f"from ._generated_values import {name}" for name in sorted(imported)
     )
@@ -1278,6 +1289,11 @@ def lower(api: Api | BoundApi) -> Lowered:
         + repr(sorted(set(exports)))
         + "\n"
     )
+    files[python_sys.PATH] = sys_declarations.render()
+    for name, reason in sys_declarations.unsupported.items():
+        if name in generated:
+            generated.remove(name)
+        errors.setdefault(name, reason)
     support = tuple(
         plan.name
         for plan in bound.operations
@@ -1301,7 +1317,7 @@ mod py_errors {
 }
 fn map_error(error: Error) -> PyErr {
     match error {
-        Error::Status { status, diagnostic, generation } => py_errors::MaplibreError::new_err((status.as_raw(), diagnostic, generation)),
+        Error::Status { status, diagnostic } => py_errors::MaplibreError::new_err((status, diagnostic)),
         Error::AbiVersionMismatch { expected, actual } => py_errors::AbiVersionMismatchError::new_err((expected, actual)),
     }
 }

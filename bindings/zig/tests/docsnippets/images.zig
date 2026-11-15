@@ -37,12 +37,13 @@ fn images(allocator: std.mem.Allocator, runtime: maplibre.Runtime) !void {
     // #endregion style
 
     // #region attach
-    const attached = try map.attachOffscreen(
-        .{ .logical_size = .{ .width = 800, .height = 600 } },
-        // The library renders on its own thread.
-        .{ .driver = .core_worker },
+    const attached = try map.attach(
+        allocator,
+        .{ .offscreen = .{ .logical_size = .{ .width = 800, .height = 600 } } },
         // With no device, the session creates its own.
         null,
+        // The library renders on its own thread.
+        .{ .driver = .core_worker },
         null,
     );
     var session = attached.session;

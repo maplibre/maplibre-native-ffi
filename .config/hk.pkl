@@ -72,8 +72,8 @@ steps {
     )
     check = "uv run --no-sync ty check --error-on-warning {{files}}"
   }
-  // The generator ignores no diagnostic. The Python emitters wait for their
-  // rewrite onto the safe Rust crate.
+  // The generator ignores no diagnostic. The Python emitters are left out until
+  // they pass.
   ["ty-bindgen"] {
     glob = List("tools/bindgen/**/*.py")
     exclude = List("tools/bindgen/emitters/python*.py")

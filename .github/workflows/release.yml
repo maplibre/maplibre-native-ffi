@@ -171,20 +171,6 @@ jobs:
       tag: ${{ github.ref_name }}
       version: ${{ needs.source.outputs.version }}
 
-  rust:
-    name: Rust
-    needs:
-      - source
-      - native
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/_rust-crates.yml
-    with:
-      sha: ${{ needs.source.outputs.sha }}
-      tag: ${{ github.ref_name }}
-      version: ${{ needs.source.outputs.version }}
-
   typescript-npm:
     name: package / npm
     needs:
@@ -237,18 +223,19 @@ jobs:
         with:
           name: npm-packages-${{ env.PUBLISH_VERSION }}
           path: build/npm
-      # Addons, then backends, then the facade, then the React Native package,
-      # so every package's pins resolve once it publishes. A version that npm
+      # Addons and browser runtimes, then the desktop runtimes that pin the
+      # addons, then the facade, then the React Native package, so every
+      # package's pins resolve once it publishes. A version that npm
       # already has is skipped, so a rerun after a partial publish resumes where
       # it stopped. npm attests the provenance of each package.
       - name: Publish
         run: |
           set -euo pipefail
 
-          for kind in addon backend facade react-native; do
+          for kind in addon runtime facade react-native; do
             for tarball in build/npm/*.tgz; do
               manifest="$(tar -xOzf "$tarball" package/package.json)"
-              if [[ "$(jq -r 'if .optionalDependencies then "backend" elif .exports then "facade" elif .codegenConfig then "react-native" else "addon" end' <<<"$manifest")" != "$kind" ]]; then
+              if [[ "$(jq -r 'if .optionalDependencies then "runtime" elif .exports then "facade" elif .codegenConfig then "react-native" else "addon" end' <<<"$manifest")" != "$kind" ]]; then
                 continue
               fi
               name="$(jq -r .name <<<"$manifest")"
@@ -525,16 +512,10 @@ jobs:
         include:
           - distribution: maplibre-native-ffi
             environment: pypi
-          - distribution: maplibre-native-ffi-runtime-opengl
-            environment: pypi-runtime-opengl
-          - distribution: maplibre-native-ffi-runtime-metal
-            environment: pypi-runtime-metal
-          - distribution: maplibre-native-ffi-runtime-vulkan
-            environment: pypi-runtime-vulkan
-          - distribution: maplibre-native-ffi-runtime-opengl-mingw
-            environment: pypi-runtime-opengl-mingw
-          - distribution: maplibre-native-ffi-runtime-vulkan-mingw
-            environment: pypi-runtime-vulkan-mingw
+          - distribution: maplibre-native-ffi-runtime
+            environment: pypi-runtime
+          - distribution: maplibre-native-ffi-runtime-mingw
+            environment: pypi-runtime-mingw
     environment:
       name: ${{ matrix.environment }}
       url:
@@ -575,7 +556,6 @@ jobs:
       - go
       - kotlin
       - python
-      - rust
       - typescript
     if: >-
       !cancelled() && needs.source.result == 'success' && needs.native.result ==

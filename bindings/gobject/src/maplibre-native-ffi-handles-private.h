@@ -19,6 +19,10 @@ maplibre_native_ffi_frame_pacer_wrap(
   mln_frame_pacer handle, gpointer parent, gboolean borrowed,
   MaplibreNativeFfiReady* ready
 );
+G_GNUC_INTERNAL MaplibreNativeFfiGpuDevice* maplibre_native_ffi_gpu_device_wrap(
+  mln_gpu_device handle, gpointer parent, gboolean borrowed,
+  MaplibreNativeFfiReady* ready
+);
 G_GNUC_INTERNAL MaplibreNativeFfiMap* maplibre_native_ffi_map_wrap(
   mln_map handle, gpointer parent, gboolean borrowed,
   MaplibreNativeFfiReady* ready
@@ -26,11 +30,6 @@ G_GNUC_INTERNAL MaplibreNativeFfiMap* maplibre_native_ffi_map_wrap(
 G_GNUC_INTERNAL MaplibreNativeFfiMapProjection*
 maplibre_native_ffi_map_projection_wrap(
   mln_map_projection handle, gpointer parent, gboolean borrowed,
-  MaplibreNativeFfiReady* ready
-);
-G_GNUC_INTERNAL MaplibreNativeFfiOffscreenDevice*
-maplibre_native_ffi_offscreen_device_wrap(
-  mln_offscreen_device handle, gpointer parent, gboolean borrowed,
   MaplibreNativeFfiReady* ready
 );
 G_GNUC_INTERNAL MaplibreNativeFfiRenderSession*
@@ -55,11 +54,6 @@ G_GNUC_INTERNAL MaplibreNativeFfiRuntime* maplibre_native_ffi_runtime_wrap(
 G_GNUC_INTERNAL MaplibreNativeFfiStyleExpression*
 maplibre_native_ffi_style_expression_wrap(
   mln_style_expression handle, gpointer parent, gboolean borrowed,
-  MaplibreNativeFfiReady* ready
-);
-G_GNUC_INTERNAL MaplibreNativeFfiVulkanDevice*
-maplibre_native_ffi_vulkan_device_wrap(
-  mln_vulkan_device handle, gpointer parent, gboolean borrowed,
   MaplibreNativeFfiReady* ready
 );
 

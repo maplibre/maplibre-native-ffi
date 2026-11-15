@@ -21,9 +21,9 @@ G_BEGIN_DECLS
 /**
  * MAPLIBRE_NATIVE_FFI_FRAME_DEMAND_TOKEN_STILL_IMAGE:
  *
- * The token of the frame results that a session adds when it renders an image
- * for `maplibre_native_ffi_map_request_still_image_async()`. Your own demands
- * can't use it.
+ * The token of the frame results of the demand that a session holds for an
+ * image of `maplibre_native_ffi_map_request_still_image_async()`, which says
+ * how that demand runs. Your own demands can't use it.
  *
  * See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -53,10 +53,9 @@ G_BEGIN_DECLS
 
 typedef struct _MaplibreNativeFfiAcquiredFrame MaplibreNativeFfiAcquiredFrame;
 typedef struct _MaplibreNativeFfiFramePacer MaplibreNativeFfiFramePacer;
+typedef struct _MaplibreNativeFfiGpuDevice MaplibreNativeFfiGpuDevice;
 typedef struct _MaplibreNativeFfiMap MaplibreNativeFfiMap;
 typedef struct _MaplibreNativeFfiMapProjection MaplibreNativeFfiMapProjection;
-typedef struct _MaplibreNativeFfiOffscreenDevice
-  MaplibreNativeFfiOffscreenDevice;
 typedef struct _MaplibreNativeFfiRenderSession MaplibreNativeFfiRenderSession;
 typedef struct _MaplibreNativeFfiResourceRequest
   MaplibreNativeFfiResourceRequest;
@@ -65,7 +64,6 @@ typedef struct _MaplibreNativeFfiResourceTransformRequest
 typedef struct _MaplibreNativeFfiRuntime MaplibreNativeFfiRuntime;
 typedef struct _MaplibreNativeFfiStyleExpression
   MaplibreNativeFfiStyleExpression;
-typedef struct _MaplibreNativeFfiVulkanDevice MaplibreNativeFfiVulkanDevice;
 #define MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY \
   (maplibre_native_ffi_momentum_decay_get_type())
 G_DECLARE_FINAL_TYPE(
@@ -83,6 +81,13 @@ G_DECLARE_FINAL_TYPE(
 G_DECLARE_FINAL_TYPE(
   MaplibreNativeFfiAnchoredMomentum, maplibre_native_ffi_anchored_momentum,
   MAPLIBRE_NATIVE_FFI, ANCHORED_MOMENTUM, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_ANDROID_WINDOW_TARGET \
+  (maplibre_native_ffi_android_window_target_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiAndroidWindowTarget,
+  maplibre_native_ffi_android_window_target, MAPLIBRE_NATIVE_FFI,
+  ANDROID_WINDOW_TARGET, GObject
 )
 typedef struct _MaplibreNativeFfiCameraTransitionHandler
   MaplibreNativeFfiCameraTransitionHandler;
@@ -147,6 +152,33 @@ G_DECLARE_FINAL_TYPE(
   maplibre_native_ffi_custom_geometry_source_options, MAPLIBRE_NATIVE_FFI,
   CUSTOM_GEOMETRY_SOURCE_OPTIONS, GObject
 )
+typedef struct _MaplibreNativeFfiMetalCustomLayerEncoder
+  MaplibreNativeFfiMetalCustomLayerEncoder;
+#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_CONTEXT_DESCRIPTOR \
+  (maplibre_native_ffi_vulkan_context_descriptor_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiVulkanContextDescriptor,
+  maplibre_native_ffi_vulkan_context_descriptor, MAPLIBRE_NATIVE_FFI,
+  VULKAN_CONTEXT_DESCRIPTOR, GObject
+)
+typedef struct _MaplibreNativeFfiVulkanCustomLayerEncoder
+  MaplibreNativeFfiVulkanCustomLayerEncoder;
+typedef struct _MaplibreNativeFfiCustomLayerEncoderData
+  MaplibreNativeFfiCustomLayerEncoderData;
+typedef struct _MaplibreNativeFfiCustomLayerHost
+  MaplibreNativeFfiCustomLayerHost;
+typedef struct _MaplibreNativeFfiMetalCustomLayerPass
+  MaplibreNativeFfiMetalCustomLayerPass;
+typedef struct _MaplibreNativeFfiVulkanCustomLayerPass
+  MaplibreNativeFfiVulkanCustomLayerPass;
+typedef struct _MaplibreNativeFfiWebGpuCustomLayerPass
+  MaplibreNativeFfiWebGpuCustomLayerPass;
+typedef struct _MaplibreNativeFfiCustomLayerPassData
+  MaplibreNativeFfiCustomLayerPassData;
+typedef struct _MaplibreNativeFfiCustomLayerPrerenderParameters
+  MaplibreNativeFfiCustomLayerPrerenderParameters;
+typedef struct _MaplibreNativeFfiCustomLayerRenderParameters
+  MaplibreNativeFfiCustomLayerRenderParameters;
 #define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_VECTOR_SOURCE_OPTIONS \
   (maplibre_native_ffi_custom_vector_source_options_get_type())
 G_DECLARE_FINAL_TYPE(
@@ -155,19 +187,18 @@ G_DECLARE_FINAL_TYPE(
   CUSTOM_VECTOR_SOURCE_OPTIONS, GObject
 )
 typedef struct _MaplibreNativeFfiDmaBufFrame MaplibreNativeFfiDmaBufFrame;
-#define MAPLIBRE_NATIVE_FFI_TYPE_DMA_BUF_RING_DESCRIPTOR \
-  (maplibre_native_ffi_dma_buf_ring_descriptor_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiDmaBufRingDescriptor,
-  maplibre_native_ffi_dma_buf_ring_descriptor, MAPLIBRE_NATIVE_FFI,
-  DMA_BUF_RING_DESCRIPTOR, GObject
-)
 #define MAPLIBRE_NATIVE_FFI_TYPE_EGL_CONTEXT_DESCRIPTOR \
   (maplibre_native_ffi_egl_context_descriptor_get_type())
 G_DECLARE_FINAL_TYPE(
   MaplibreNativeFfiEglContextDescriptor,
   maplibre_native_ffi_egl_context_descriptor, MAPLIBRE_NATIVE_FFI,
   EGL_CONTEXT_DESCRIPTOR, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_EXPORTED_RING_TARGET \
+  (maplibre_native_ffi_exported_ring_target_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiExportedRingTarget, maplibre_native_ffi_exported_ring_target,
+  MAPLIBRE_NATIVE_FFI, EXPORTED_RING_TARGET, GObject
 )
 typedef struct _MaplibreNativeFfiFeatureId MaplibreNativeFfiFeatureId;
 #define MAPLIBRE_NATIVE_FFI_TYPE_FEATURE_STATE_SELECTOR \
@@ -196,6 +227,15 @@ G_DECLARE_FINAL_TYPE(
   maplibre_native_ffi_geo_json_source_options, MAPLIBRE_NATIVE_FFI,
   GEO_JSON_SOURCE_OPTIONS, GObject
 )
+typedef struct _MaplibreNativeFfiQueueLock MaplibreNativeFfiQueueLock;
+#define MAPLIBRE_NATIVE_FFI_TYPE_GPU_DEVICE_OPTIONS \
+  (maplibre_native_ffi_gpu_device_options_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiGpuDeviceOptions, maplibre_native_ffi_gpu_device_options,
+  MAPLIBRE_NATIVE_FFI, GPU_DEVICE_OPTIONS, GObject
+)
+typedef struct _MaplibreNativeFfiGpuDeviceVulkanContextResult
+  MaplibreNativeFfiGpuDeviceVulkanContextResult;
 #define MAPLIBRE_NATIVE_FFI_TYPE_HTTP_HEADER \
   (maplibre_native_ffi_http_header_get_type())
 G_DECLARE_FINAL_TYPE(
@@ -211,20 +251,6 @@ G_DECLARE_FINAL_TYPE(
 typedef struct _MaplibreNativeFfiHttpHeaderTransform
   MaplibreNativeFfiHttpHeaderTransform;
 typedef struct _MaplibreNativeFfiIoSurfaceFrame MaplibreNativeFfiIoSurfaceFrame;
-#define MAPLIBRE_NATIVE_FFI_TYPE_METAL_CONTEXT_DESCRIPTOR \
-  (maplibre_native_ffi_metal_context_descriptor_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiMetalContextDescriptor,
-  maplibre_native_ffi_metal_context_descriptor, MAPLIBRE_NATIVE_FFI,
-  METAL_CONTEXT_DESCRIPTOR, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_IO_SURFACE_RING_DESCRIPTOR \
-  (maplibre_native_ffi_io_surface_ring_descriptor_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiIoSurfaceRingDescriptor,
-  maplibre_native_ffi_io_surface_ring_descriptor, MAPLIBRE_NATIVE_FFI,
-  IO_SURFACE_RING_DESCRIPTOR, GObject
-)
 #define MAPLIBRE_NATIVE_FFI_TYPE_LOG_HANDLER \
   (maplibre_native_ffi_log_handler_get_type())
 G_DECLARE_FINAL_TYPE(
@@ -256,33 +282,25 @@ G_DECLARE_FINAL_TYPE(
   maplibre_native_ffi_metal_borrowed_texture, MAPLIBRE_NATIVE_FFI,
   METAL_BORROWED_TEXTURE, GObject
 )
-#define MAPLIBRE_NATIVE_FFI_TYPE_METAL_BORROWED_TEXTURE_DESCRIPTOR \
-  (maplibre_native_ffi_metal_borrowed_texture_descriptor_get_type())
+#define MAPLIBRE_NATIVE_FFI_TYPE_METAL_BORROWED_TEXTURES_TARGET \
+  (maplibre_native_ffi_metal_borrowed_textures_target_get_type())
 G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor,
-  maplibre_native_ffi_metal_borrowed_texture_descriptor, MAPLIBRE_NATIVE_FFI,
-  METAL_BORROWED_TEXTURE_DESCRIPTOR, GObject
+  MaplibreNativeFfiMetalBorrowedTexturesTarget,
+  maplibre_native_ffi_metal_borrowed_textures_target, MAPLIBRE_NATIVE_FFI,
+  METAL_BORROWED_TEXTURES_TARGET, GObject
 )
-#define MAPLIBRE_NATIVE_FFI_TYPE_METAL_BORROWED_TEXTURE_REPLACEMENT \
-  (maplibre_native_ffi_metal_borrowed_texture_replacement_get_type())
+#define MAPLIBRE_NATIVE_FFI_TYPE_METAL_DEVICE_DESCRIPTOR \
+  (maplibre_native_ffi_metal_device_descriptor_get_type())
 G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiMetalBorrowedTextureReplacement,
-  maplibre_native_ffi_metal_borrowed_texture_replacement, MAPLIBRE_NATIVE_FFI,
-  METAL_BORROWED_TEXTURE_REPLACEMENT, GObject
+  MaplibreNativeFfiMetalDeviceDescriptor,
+  maplibre_native_ffi_metal_device_descriptor, MAPLIBRE_NATIVE_FFI,
+  METAL_DEVICE_DESCRIPTOR, GObject
 )
-#define MAPLIBRE_NATIVE_FFI_TYPE_METAL_SURFACE_DESCRIPTOR \
-  (maplibre_native_ffi_metal_surface_descriptor_get_type())
+#define MAPLIBRE_NATIVE_FFI_TYPE_METAL_LAYER_TARGET \
+  (maplibre_native_ffi_metal_layer_target_get_type())
 G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiMetalSurfaceDescriptor,
-  maplibre_native_ffi_metal_surface_descriptor, MAPLIBRE_NATIVE_FFI,
-  METAL_SURFACE_DESCRIPTOR, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_METAL_SURFACE_REPLACEMENT \
-  (maplibre_native_ffi_metal_surface_replacement_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiMetalSurfaceReplacement,
-  maplibre_native_ffi_metal_surface_replacement, MAPLIBRE_NATIVE_FFI,
-  METAL_SURFACE_REPLACEMENT, GObject
+  MaplibreNativeFfiMetalLayerTarget, maplibre_native_ffi_metal_layer_target,
+  MAPLIBRE_NATIVE_FFI, METAL_LAYER_TARGET, GObject
 )
 typedef struct _MaplibreNativeFfiMetalTextureFrame
   MaplibreNativeFfiMetalTextureFrame;
@@ -304,12 +322,18 @@ typedef struct _MaplibreNativeFfiOfflineRegionDefinition
   MaplibreNativeFfiOfflineRegionDefinition;
 typedef struct _MaplibreNativeFfiOfflineRegionInfo
   MaplibreNativeFfiOfflineRegionInfo;
-#define MAPLIBRE_NATIVE_FFI_TYPE_OFFSCREEN_DEVICE_OPTIONS \
-  (maplibre_native_ffi_offscreen_device_options_get_type())
+#define MAPLIBRE_NATIVE_FFI_TYPE_OHOS_WINDOW_TARGET \
+  (maplibre_native_ffi_ohos_window_target_get_type())
 G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiOffscreenDeviceOptions,
-  maplibre_native_ffi_offscreen_device_options, MAPLIBRE_NATIVE_FFI,
-  OFFSCREEN_DEVICE_OPTIONS, GObject
+  MaplibreNativeFfiOhosWindowTarget, maplibre_native_ffi_ohos_window_target,
+  MAPLIBRE_NATIVE_FFI, OHOS_WINDOW_TARGET, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_BORROWED_TEXTURES_TARGET \
+  (maplibre_native_ffi_open_gl_borrowed_textures_target_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget,
+  maplibre_native_ffi_open_gl_borrowed_textures_target, MAPLIBRE_NATIVE_FFI,
+  OPEN_GL_BORROWED_TEXTURES_TARGET, GObject
 )
 #define MAPLIBRE_NATIVE_FFI_TYPE_WGL_CONTEXT_DESCRIPTOR \
   (maplibre_native_ffi_wgl_context_descriptor_get_type())
@@ -318,49 +342,14 @@ G_DECLARE_FINAL_TYPE(
   maplibre_native_ffi_wgl_context_descriptor, MAPLIBRE_NATIVE_FFI,
   WGL_CONTEXT_DESCRIPTOR, GObject
 )
-#define MAPLIBRE_NATIVE_FFI_TYPE_WEB_GL_CONTEXT_DESCRIPTOR \
-  (maplibre_native_ffi_web_gl_context_descriptor_get_type())
+typedef struct _MaplibreNativeFfiOpenGlContextDescriptor
+  MaplibreNativeFfiOpenGlContextDescriptor;
+#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_SURFACE_TARGET \
+  (maplibre_native_ffi_open_gl_surface_target_get_type())
 G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiWebGlContextDescriptor,
-  maplibre_native_ffi_web_gl_context_descriptor, MAPLIBRE_NATIVE_FFI,
-  WEB_GL_CONTEXT_DESCRIPTOR, GObject
-)
-typedef struct _MaplibreNativeFfiOpenGlContextDescriptorData
-  MaplibreNativeFfiOpenGlContextDescriptorData;
-#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_CONTEXT_DESCRIPTOR \
-  (maplibre_native_ffi_open_gl_context_descriptor_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiOpenGlContextDescriptor,
-  maplibre_native_ffi_open_gl_context_descriptor, MAPLIBRE_NATIVE_FFI,
-  OPEN_GL_CONTEXT_DESCRIPTOR, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_BORROWED_TEXTURE_DESCRIPTOR \
-  (maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor,
-  maplibre_native_ffi_open_gl_borrowed_texture_descriptor, MAPLIBRE_NATIVE_FFI,
-  OPEN_GL_BORROWED_TEXTURE_DESCRIPTOR, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_BORROWED_TEXTURE_REPLACEMENT \
-  (maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement,
-  maplibre_native_ffi_open_gl_borrowed_texture_replacement, MAPLIBRE_NATIVE_FFI,
-  OPEN_GL_BORROWED_TEXTURE_REPLACEMENT, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_SURFACE_DESCRIPTOR \
-  (maplibre_native_ffi_open_gl_surface_descriptor_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiOpenGlSurfaceDescriptor,
-  maplibre_native_ffi_open_gl_surface_descriptor, MAPLIBRE_NATIVE_FFI,
-  OPEN_GL_SURFACE_DESCRIPTOR, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_SURFACE_REPLACEMENT \
-  (maplibre_native_ffi_open_gl_surface_replacement_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiOpenGlSurfaceReplacement,
-  maplibre_native_ffi_open_gl_surface_replacement, MAPLIBRE_NATIVE_FFI,
-  OPEN_GL_SURFACE_REPLACEMENT, GObject
+  MaplibreNativeFfiOpenGlSurfaceTarget,
+  maplibre_native_ffi_open_gl_surface_target, MAPLIBRE_NATIVE_FFI,
+  OPEN_GL_SURFACE_TARGET, GObject
 )
 #define MAPLIBRE_NATIVE_FFI_TYPE_PREMULTIPLIED_RGBA8_IMAGE \
   (maplibre_native_ffi_premultiplied_rgba8_image_get_type())
@@ -376,7 +365,6 @@ G_DECLARE_FINAL_TYPE(
   maplibre_native_ffi_projection_mode_options, MAPLIBRE_NATIVE_FFI,
   PROJECTION_MODE_OPTIONS, GObject
 )
-typedef struct _MaplibreNativeFfiQueueLock MaplibreNativeFfiQueueLock;
 typedef struct _MaplibreNativeFfiWake MaplibreNativeFfiWake;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RENDER_SESSION_ATTACH_OPTIONS \
   (maplibre_native_ffi_render_session_attach_options_get_type())
@@ -385,6 +373,46 @@ G_DECLARE_FINAL_TYPE(
   maplibre_native_ffi_render_session_attach_options, MAPLIBRE_NATIVE_FFI,
   RENDER_SESSION_ATTACH_OPTIONS, GObject
 )
+#define MAPLIBRE_NATIVE_FFI_TYPE_WIN32_WINDOW_TARGET \
+  (maplibre_native_ffi_win32_window_target_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiWin32WindowTarget, maplibre_native_ffi_win32_window_target,
+  MAPLIBRE_NATIVE_FFI, WIN32_WINDOW_TARGET, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_XLIB_WINDOW_TARGET \
+  (maplibre_native_ffi_xlib_window_target_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiXlibWindowTarget, maplibre_native_ffi_xlib_window_target,
+  MAPLIBRE_NATIVE_FFI, XLIB_WINDOW_TARGET, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_WAYLAND_SURFACE_TARGET \
+  (maplibre_native_ffi_wayland_surface_target_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiWaylandSurfaceTarget,
+  maplibre_native_ffi_wayland_surface_target, MAPLIBRE_NATIVE_FFI,
+  WAYLAND_SURFACE_TARGET, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_BORROWED_TEXTURES_TARGET \
+  (maplibre_native_ffi_vulkan_borrowed_textures_target_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget,
+  maplibre_native_ffi_vulkan_borrowed_textures_target, MAPLIBRE_NATIVE_FFI,
+  VULKAN_BORROWED_TEXTURES_TARGET, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_WEB_GPU_BORROWED_TEXTURES_TARGET \
+  (maplibre_native_ffi_web_gpu_borrowed_textures_target_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget,
+  maplibre_native_ffi_web_gpu_borrowed_textures_target, MAPLIBRE_NATIVE_FFI,
+  WEB_GPU_BORROWED_TEXTURES_TARGET, GObject
+)
+#define MAPLIBRE_NATIVE_FFI_TYPE_WEB_CANVAS_TARGET \
+  (maplibre_native_ffi_web_canvas_target_get_type())
+G_DECLARE_FINAL_TYPE(
+  MaplibreNativeFfiWebCanvasTarget, maplibre_native_ffi_web_canvas_target,
+  MAPLIBRE_NATIVE_FFI, WEB_CANVAS_TARGET, GObject
+)
+typedef struct _MaplibreNativeFfiRenderTarget MaplibreNativeFfiRenderTarget;
 typedef struct _MaplibreNativeFfiRenderedFeature
   MaplibreNativeFfiRenderedFeature;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RENDERED_FEATURE_QUERY_OPTIONS \
@@ -506,59 +534,15 @@ G_DECLARE_FINAL_TYPE(
 )
 typedef struct _MaplibreNativeFfiTextureReadbackResult
   MaplibreNativeFfiTextureReadbackResult;
-#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_CONTEXT_DESCRIPTOR \
-  (maplibre_native_ffi_vulkan_context_descriptor_get_type())
+#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_DEVICE_DESCRIPTOR \
+  (maplibre_native_ffi_vulkan_device_descriptor_get_type())
 G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiVulkanContextDescriptor,
-  maplibre_native_ffi_vulkan_context_descriptor, MAPLIBRE_NATIVE_FFI,
-  VULKAN_CONTEXT_DESCRIPTOR, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_BORROWED_TEXTURE_DESCRIPTOR \
-  (maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor,
-  maplibre_native_ffi_vulkan_borrowed_texture_descriptor, MAPLIBRE_NATIVE_FFI,
-  VULKAN_BORROWED_TEXTURE_DESCRIPTOR, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_BORROWED_TEXTURE_REPLACEMENT \
-  (maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement,
-  maplibre_native_ffi_vulkan_borrowed_texture_replacement, MAPLIBRE_NATIVE_FFI,
-  VULKAN_BORROWED_TEXTURE_REPLACEMENT, GObject
-)
-typedef struct _MaplibreNativeFfiVulkanDeviceContextResult
-  MaplibreNativeFfiVulkanDeviceContextResult;
-#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_DEVICE_OPTIONS \
-  (maplibre_native_ffi_vulkan_device_options_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiVulkanDeviceOptions,
-  maplibre_native_ffi_vulkan_device_options, MAPLIBRE_NATIVE_FFI,
-  VULKAN_DEVICE_OPTIONS, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_SURFACE_DESCRIPTOR \
-  (maplibre_native_ffi_vulkan_surface_descriptor_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiVulkanSurfaceDescriptor,
-  maplibre_native_ffi_vulkan_surface_descriptor, MAPLIBRE_NATIVE_FFI,
-  VULKAN_SURFACE_DESCRIPTOR, GObject
+  MaplibreNativeFfiVulkanDeviceDescriptor,
+  maplibre_native_ffi_vulkan_device_descriptor, MAPLIBRE_NATIVE_FFI,
+  VULKAN_DEVICE_DESCRIPTOR, GObject
 )
 typedef struct _MaplibreNativeFfiVulkanTextureFrame
   MaplibreNativeFfiVulkanTextureFrame;
-#define MAPLIBRE_NATIVE_FFI_TYPE_WAYLAND_SURFACE_DESCRIPTOR \
-  (maplibre_native_ffi_wayland_surface_descriptor_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiWaylandSurfaceDescriptor,
-  maplibre_native_ffi_wayland_surface_descriptor, MAPLIBRE_NATIVE_FFI,
-  WAYLAND_SURFACE_DESCRIPTOR, GObject
-)
-#define MAPLIBRE_NATIVE_FFI_TYPE_WAYLAND_SURFACE_REPLACEMENT \
-  (maplibre_native_ffi_wayland_surface_replacement_get_type())
-G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiWaylandSurfaceReplacement,
-  maplibre_native_ffi_wayland_surface_replacement, MAPLIBRE_NATIVE_FFI,
-  WAYLAND_SURFACE_REPLACEMENT, GObject
-)
 
 /**
  * MaplibreNativeFfiScreenPoint:
@@ -596,6 +580,21 @@ typedef struct {
   gdouble x2;
   gdouble y2;
 } MaplibreNativeFfiUnitBezier;
+
+/**
+ * MaplibreNativeFfiLogicalSize:
+ * @width: width
+ * @height: height
+ *
+ * A size in logical pixels, which the map's scale factor turns into pixels.
+ *
+ * See `mln_logical_size` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef struct {
+  guint32 width;
+  guint32 height;
+} MaplibreNativeFfiLogicalSize;
 
 /**
  * MaplibreNativeFfiLatLng:
@@ -772,171 +771,22 @@ typedef struct {
 } MaplibreNativeFfiCanonicalTileId;
 
 /**
- * MaplibreNativeFfiDmaBufFormat:
- * @fourcc: A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
- * @modifier: A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR.
+ * MaplibreNativeFfiWebGpuCustomLayerEncoder:
+ * @device: The `GPUDevice` that the session renders on.
+ * @encoder: The frame's `GPUCommandEncoder`, with no pass open.
  *
- * A DRM format and modifier that you can import.
+ * The frame's WebGPU command encoder, outside the map's render pass.
  *
- * See `mln_dma_buf_format` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
- */
-typedef struct {
-  guint32 fourcc;
-  guint64 modifier;
-} MaplibreNativeFfiDmaBufFormat;
-
-/**
- * MaplibreNativeFfiDmaBufPlane:
- * @fd: The file descriptor of the dmabuf that holds the plane. The planes of a
- *   buffer often share one.
- * @offset: The bytes from the start of the dmabuf to the plane's first byte.
- * @stride: The bytes from the start of one row to the start of the next.
+ * End each pass that you begin on `encoder` before the callback returns, and
+ * don't finish the encoder.
  *
- * Where one plane of a dmabuf keeps its data.
- *
- * See `mln_dma_buf_plane` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
- */
-typedef struct {
-  gint32 fd;
-  guint32 offset;
-  guint32 stride;
-} MaplibreNativeFfiDmaBufPlane;
-
-/**
- * MaplibreNativeFfiLogicalSize:
- * @width: width
- * @height: height
- *
- * A size in logical pixels, which the map's scale factor turns into pixels.
- *
- * See `mln_logical_size` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-typedef struct {
-  guint32 width;
-  guint32 height;
-} MaplibreNativeFfiLogicalSize;
-
-/**
- * MaplibreNativeFfiFrameDemand:
- * @flags: flags
- * @token: A value of your choice that the demand's frame result carries.
- *
- * A demand for one frame.
- *
- * See `mln_frame_demand` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
- */
-typedef struct {
-  MaplibreNativeFfiFrameDemandFlag flags;
-  guint64 token;
-} MaplibreNativeFfiFrameDemand;
-
-/**
- * MaplibreNativeFfiVec3:
- * @x: x
- * @y: y
- * @z: z
- *
- * A vector in three dimensions.
- *
- * See `mln_vec3` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-typedef struct {
-  gdouble x;
-  gdouble y;
-  gdouble z;
-} MaplibreNativeFfiVec3;
-
-/**
- * MaplibreNativeFfiQuaternion:
- * @x: x
- * @y: y
- * @z: z
- * @w: w
- *
- * A rotation, as a quaternion.
- *
- * See `mln_quaternion` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-typedef struct {
-  gdouble x;
-  gdouble y;
-  gdouble z;
-  gdouble w;
-} MaplibreNativeFfiQuaternion;
-
-/**
- * MaplibreNativeFfiFreeCamera:
- * @position: position
- * @orientation: orientation
- *
- * A map camera's whole position and orientation in three dimensions.
- *
- * Its members mean the same as those of `MaplibreNativeFfiFreeCameraOptions`.
- *
- * See `mln_free_camera` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-typedef struct {
-  MaplibreNativeFfiVec3 position;
-  MaplibreNativeFfiQuaternion orientation;
-} MaplibreNativeFfiFreeCamera;
-
-/**
- * MaplibreNativeFfiGpuSync:
- * @kind: kind
- * @handle: The object to wait on, for the kinds that name one.
- * @value: value
- *
- * A point in GPU work that the other side waits for before using a texture.
- *
- * See `mln_gpu_sync` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-typedef struct {
-  MaplibreNativeFfiGpuSyncKind kind;
-  guint64 handle;
-  guint64 value;
-} MaplibreNativeFfiGpuSync;
-
-/**
- * MaplibreNativeFfiImageContent:
- * @left: left
- * @top: top
- * @right: right
- * @bottom: bottom
- *
- * The area of an image, in image pixels, that text fits inside.
- *
- * See `mln_image_content` in the
+ * See `mln_web_gpu_custom_layer_encoder` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 typedef struct {
-  gfloat left;
-  gfloat top;
-  gfloat right;
-  gfloat bottom;
-} MaplibreNativeFfiImageContent;
-
-/**
- * MaplibreNativeFfiImageStretch:
- * @from: from
- * @to: to
- *
- * A range of image pixels, from `from` to `to`, that stretches to fit text.
- *
- * See `mln_image_stretch` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-typedef struct {
-  gfloat from;
-  gfloat to;
-} MaplibreNativeFfiImageStretch;
+  guint32 device;
+  guint32 encoder;
+} MaplibreNativeFfiWebGpuCustomLayerEncoder;
 
 /**
  * MaplibreNativeFfiLogicalExtent:
@@ -954,46 +804,6 @@ typedef struct {
   guint32 height;
   gdouble scale_factor;
 } MaplibreNativeFfiLogicalExtent;
-
-/**
- * MaplibreNativeFfiMapProjectionCameraResult:
- * @camera: camera
- *
- * A projection's camera, as `maplibre_native_ffi_map_projection_get_camera()`
- * reports it.
- *
- * See `mln_map_projection_camera_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
- */
-typedef struct {
-  MaplibreNativeFfiCamera camera;
-} MaplibreNativeFfiMapProjectionCameraResult;
-
-/**
- * MaplibreNativeFfiMapTileSettings:
- * @prefetch_zoom_delta: prefetch_zoom_delta
- * @lod_min_radius: lod_min_radius
- * @lod_scale: lod_scale
- * @lod_pitch_threshold: The pitch, in degrees, above which the map lowers the
- *   detail.
- * @lod_zoom_shift: lod_zoom_shift
- * @lod_mode: lod_mode
- *
- * All the settings for how a map picks the tiles to load.
- *
- * Its members mean the same as those of `MaplibreNativeFfiMapTileOptions`.
- *
- * See `mln_map_tile_settings` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-typedef struct {
-  guint32 prefetch_zoom_delta;
-  gdouble lod_min_radius;
-  gdouble lod_scale;
-  gdouble lod_pitch_threshold;
-  gdouble lod_zoom_shift;
-  MaplibreNativeFfiTileLodMode lod_mode;
-} MaplibreNativeFfiMapTileSettings;
 
 /**
  * MaplibreNativeFfiProjectionMode:
@@ -1078,6 +888,382 @@ typedef struct {
 } MaplibreNativeFfiMapView;
 
 /**
+ * MaplibreNativeFfiVec4:
+ * @x: x
+ * @y: y
+ * @z: z
+ * @w: w
+ *
+ * A vector in four dimensions, such as a point in homogeneous coordinates.
+ *
+ * See `mln_vec4` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef struct {
+  gdouble x;
+  gdouble y;
+  gdouble z;
+  gdouble w;
+} MaplibreNativeFfiVec4;
+
+/**
+ * MaplibreNativeFfiMat4:
+ * @x: x
+ * @y: y
+ * @z: z
+ * @w: w
+ *
+ * A 4×4 matrix, by its columns: it takes a vector to `x` times the vector's x,
+ * plus `y` times its y, `z` times its z, and `w` times its w. In memory it is
+ * 16 doubles in column-major order, as OpenGL, Metal, Vulkan, and WebGPU
+ * shaders take a matrix.
+ *
+ * See `mln_mat4` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiVec4 x;
+  MaplibreNativeFfiVec4 y;
+  MaplibreNativeFfiVec4 z;
+  MaplibreNativeFfiVec4 w;
+} MaplibreNativeFfiMat4;
+
+/**
+ * MaplibreNativeFfiFrameProjection:
+ * @matrix: matrix
+ * @clip_depth_range: clip_depth_range
+ * @near_distance: The distance from the camera to the plane where the depth
+ *   that you get through `matrix` is 0, along the camera's view. Like
+ *   `far_distance`, it is in pixels of the map at the camera's zoom, where the
+ *   world is 512 × 2^zoom pixels wide.
+ * @far_distance: The distance to the plane where the depth is `far_depth`.
+ * @far_depth: The depth at `far_distance`, below 1.
+ * @globe: Whether the frame drew the map as a globe, alone or blending into
+ *   Mercator.
+ *
+ * Where a frame drew the map, and the depth that it wrote there.
+ *
+ * World coordinates are Web Mercator's. x runs from 0 at 180° west to 1 at 180°
+ * east, and on past both into the copies of the world beside the first. y runs
+ * from 0 at the north edge of the Mercator world, about 85.05° north, to 1 at
+ * its south edge. z is the altitude in meters above sea level, at the scale of
+ * the heights of the map's 3D layers, and the map draws its ground at 0.
+ *
+ * `matrix` takes a world point to the clip coordinates where the frame drew it,
+ * with the camera's padding, roll, field of view, and center altitude, and the
+ * map's viewport and projection mode. Clip y points up, as the map draws with
+ * OpenGL, Metal, and WebGPU. The map negates clip y with Vulkan, so negate it
+ * there too. At high zooms, single precision can't tell nearby world points
+ * apart: subtract an origin near your geometry from its coordinates in double
+ * precision, and fold the origin into the matrix, before you convert to float.
+ *
+ * Clip z follows `clip_depth_range`, the convention of the device's graphics
+ * API. With the API's default depth range of 0 to 1, a fragment that you draw
+ * through `matrix` gets the depth that the map's 3D layers, such as fill
+ * extrusions, wrote at the same place: 0 at `near_distance` from the camera, up
+ * to `far_depth` at `far_distance`. Depth-tested against the frame's depth,
+ * your fragments hide behind the map's 3D layers where those stand in front of
+ * them.
+ *
+ * The frame's depth starts at 1. The map's 3D layers write the depth of each of
+ * their fragments. A 2D layer below every 3D layer of the style that draws
+ * opaque fragments, such as an opaque fill, writes one depth over all of them,
+ * wherever they are: the higher the layer, the lower its depth, and every one
+ * between `far_depth` and 1. Backgrounds, translucent fragments, and the 2D
+ * layers above a 3D layer, such as labels, write no depth. So what you draw
+ * through `matrix`, even on the ground, lies in front of every 2D layer.
+ *
+ * While `globe` is true, the frame drew the map onto a globe, and its 2D layers
+ * wrote no depth. `matrix` then is the map's Mercator one, which doesn't place
+ * points on the globe.
+ *
+ * See `mln_frame_projection` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiMat4 matrix;
+  MaplibreNativeFfiClipDepthRange clip_depth_range;
+  gdouble near_distance;
+  gdouble far_distance;
+  gdouble far_depth;
+  gboolean globe;
+} MaplibreNativeFfiFrameProjection;
+
+/**
+ * MaplibreNativeFfiCustomLayerFrame:
+ * @view: The camera, extent, and scale factor that the frame shows.
+ * @frame_projection: Where the frame draws the map, and the depth that it
+ *   writes there.
+ * @width: The width of the frame's attachments, in physical pixels.
+ * @height: The height of the frame's attachments, in physical pixels.
+ *
+ * The frame that a custom layer draws into, as its callbacks get it.
+ *
+ * The view and the frame projection are the ones that the frame draws the map
+ * with, so they are never newer than the frame, unlike the map's camera.
+ *
+ * See `mln_custom_layer_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiMapView view;
+  MaplibreNativeFfiFrameProjection frame_projection;
+  guint32 width;
+  guint32 height;
+} MaplibreNativeFfiCustomLayerFrame;
+
+/**
+ * MaplibreNativeFfiOpenGlCustomLayerPass:
+ * @framebuffer: The framebuffer that the map draws into, or 0 for the default
+ *   one.
+ *
+ * The map's OpenGL framebuffer, at a custom layer's place in the style.
+ *
+ * The session's context is current, with `framebuffer` bound and the viewport
+ * covering it. You can change the program, the vertex array, the buffers bound
+ * to each target, the framebuffer, the viewport, the active texture unit and
+ * the textures bound to each unit, the uniform buffer bindings, and the
+ * scissor, depth, stencil, blend, color mask, cull face, and line width state.
+ * After the callback returns, the map sets again what its own draws need of
+ * these. The vertex array bound when the callback starts is 0, so bind your own
+ * before you set vertex attributes. Leave any other state as you found it, such
+ * as the sampler objects bound to texture units, the pixel pack and unpack
+ * buffers and parameters, polygon offset, and rasterizer discard. Don't clear
+ * or invalidate the framebuffer's attachments.
+ *
+ * See `mln_open_gl_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+typedef struct {
+  guint32 framebuffer;
+} MaplibreNativeFfiOpenGlCustomLayerPass;
+
+/**
+ * MaplibreNativeFfiDmaBufFormat:
+ * @fourcc: A DRM fourcc code, such as DRM_FORMAT_ABGR8888.
+ * @modifier: A DRM format modifier, such as DRM_FORMAT_MOD_LINEAR.
+ *
+ * A DRM format and modifier that you can import.
+ *
+ * See `mln_dma_buf_format` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef struct {
+  guint32 fourcc;
+  guint64 modifier;
+} MaplibreNativeFfiDmaBufFormat;
+
+/**
+ * MaplibreNativeFfiDmaBufPlane:
+ * @fd: The file descriptor of the dmabuf that holds the plane. The planes of a
+ *   buffer often share one.
+ * @offset: The bytes from the start of the dmabuf to the plane's first byte.
+ * @stride: The bytes from the start of one row to the start of the next.
+ *
+ * Where one plane of a dmabuf keeps its data.
+ *
+ * See `mln_dma_buf_plane` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+typedef struct {
+  gint32 fd;
+  guint32 offset;
+  guint32 stride;
+} MaplibreNativeFfiDmaBufPlane;
+
+/**
+ * MaplibreNativeFfiFrameDemand:
+ * @flags: flags
+ * @token: A value of your choice that the demand's frame result carries.
+ *
+ * A demand for one frame.
+ *
+ * See `mln_frame_demand` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiFrameDemandFlag flags;
+  guint64 token;
+} MaplibreNativeFfiFrameDemand;
+
+/**
+ * MaplibreNativeFfiVec3:
+ * @x: x
+ * @y: y
+ * @z: z
+ *
+ * A vector in three dimensions.
+ *
+ * See `mln_vec3` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef struct {
+  gdouble x;
+  gdouble y;
+  gdouble z;
+} MaplibreNativeFfiVec3;
+
+/**
+ * MaplibreNativeFfiQuaternion:
+ * @x: x
+ * @y: y
+ * @z: z
+ * @w: w
+ *
+ * A rotation, as a quaternion.
+ *
+ * See `mln_quaternion` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef struct {
+  gdouble x;
+  gdouble y;
+  gdouble z;
+  gdouble w;
+} MaplibreNativeFfiQuaternion;
+
+/**
+ * MaplibreNativeFfiFreeCamera:
+ * @position: position
+ * @orientation: orientation
+ *
+ * A map camera's whole position and orientation in three dimensions.
+ *
+ * Its members mean the same as those of `MaplibreNativeFfiFreeCameraOptions`.
+ *
+ * See `mln_free_camera` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiVec3 position;
+  MaplibreNativeFfiQuaternion orientation;
+} MaplibreNativeFfiFreeCamera;
+
+/**
+ * MaplibreNativeFfiGpuDeviceCapabilities:
+ * @backend: backend
+ * @target_kinds: The kinds of `MaplibreNativeFfiRenderTarget` that sessions on
+ *   the device render to.
+ * @export_kinds: The ways that the device can share the textures of an exported
+ *   ring. A kind is here only once the device has exported a texture of it, so
+ *   a driver that offers an extension but can't allocate the memory reports no
+ *   kind of it.
+ * @sync_kinds: The kinds of `MaplibreNativeFfiGpuSync` that the device can
+ *   signal and wait on.
+ * @depth_stencil_formats: The formats of the depth textures that a borrowed
+ *   ring takes.
+ * @depth_export_kinds: The kinds of `export_kinds` whose rings also share each
+ *   frame's depth texture, with
+ *   `MaplibreNativeFfiRenderSessionAttachOptions:keep-depth`. An IOSurface or a
+ *   dmabuf holds no depth format, so only
+ *   `MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_OPAQUE_FD` can be here.
+ *
+ * What a GPU device can do.
+ *
+ * See `mln_gpu_device_capabilities` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiRenderBackend backend;
+  MaplibreNativeFfiRenderTargetKindFlag target_kinds;
+  MaplibreNativeFfiGpuExportKindFlag export_kinds;
+  MaplibreNativeFfiGpuSyncKindFlag sync_kinds;
+  MaplibreNativeFfiDepthStencilFormatFlag depth_stencil_formats;
+  MaplibreNativeFfiGpuExportKindFlag depth_export_kinds;
+} MaplibreNativeFfiGpuDeviceCapabilities;
+
+/**
+ * MaplibreNativeFfiGpuSync:
+ * @kind: kind
+ * @handle: The object to wait on, for the kinds that name one.
+ * @value: value
+ *
+ * A point in GPU work that the other side waits for before using a texture.
+ *
+ * See `mln_gpu_sync` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiGpuSyncKind kind;
+  guint64 handle;
+  guint64 value;
+} MaplibreNativeFfiGpuSync;
+
+/**
+ * MaplibreNativeFfiImageContent:
+ * @left: left
+ * @top: top
+ * @right: right
+ * @bottom: bottom
+ *
+ * The area of an image, in image pixels, that text fits inside.
+ *
+ * See `mln_image_content` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+typedef struct {
+  gfloat left;
+  gfloat top;
+  gfloat right;
+  gfloat bottom;
+} MaplibreNativeFfiImageContent;
+
+/**
+ * MaplibreNativeFfiImageStretch:
+ * @from: from
+ * @to: to
+ *
+ * A range of image pixels, from `from` to `to`, that stretches to fit text.
+ *
+ * See `mln_image_stretch` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+typedef struct {
+  gfloat from;
+  gfloat to;
+} MaplibreNativeFfiImageStretch;
+
+/**
+ * MaplibreNativeFfiMapProjectionCameraResult:
+ * @camera: camera
+ *
+ * A projection's camera, as `maplibre_native_ffi_map_projection_get_camera()`
+ * reports it.
+ *
+ * See `mln_map_projection_camera_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiCamera camera;
+} MaplibreNativeFfiMapProjectionCameraResult;
+
+/**
+ * MaplibreNativeFfiMapTileSettings:
+ * @prefetch_zoom_delta: prefetch_zoom_delta
+ * @lod_min_radius: lod_min_radius
+ * @lod_scale: lod_scale
+ * @lod_pitch_threshold: The pitch, in degrees, above which the map lowers the
+ *   detail.
+ * @lod_zoom_shift: lod_zoom_shift
+ * @lod_mode: lod_mode
+ *
+ * All the settings for how a map picks the tiles to load.
+ *
+ * Its members mean the same as those of `MaplibreNativeFfiMapTileOptions`.
+ *
+ * See `mln_map_tile_settings` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef struct {
+  guint32 prefetch_zoom_delta;
+  gdouble lod_min_radius;
+  gdouble lod_scale;
+  gdouble lod_pitch_threshold;
+  gdouble lod_zoom_shift;
+  MaplibreNativeFfiTileLodMode lod_mode;
+} MaplibreNativeFfiMapTileSettings;
+
+/**
  * MaplibreNativeFfiMapSnapshot:
  * @debug_flags: debug_flags
  * @generation: Grows with each change to the map's state.
@@ -1153,18 +1339,76 @@ typedef struct {
 } MaplibreNativeFfiOfflineRegionStatus;
 
 /**
- * MaplibreNativeFfiOffscreenDescriptor:
+ * MaplibreNativeFfiOffscreenTarget:
  * @logical_size: logical_size
  *
- * The image that `maplibre_native_ffi_map_attach_offscreen()` renders. The
- * session renders it at the map's scale factor.
+ * An image that the session allocates, renders at the map's scale factor, and
+ * reads back with `maplibre_native_ffi_render_session_read_texture_async()`.
  *
- * See `mln_offscreen_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+ * See `mln_offscreen_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef struct {
   MaplibreNativeFfiLogicalSize logical_size;
-} MaplibreNativeFfiOffscreenDescriptor;
+} MaplibreNativeFfiOffscreenTarget;
+
+/**
+ * MaplibreNativeFfiOpaqueFdFrame:
+ * @width: width
+ * @height: height
+ * @scale_factor: scale_factor
+ * @slot: The texture's index in the ring.
+ * @fd: The file descriptor of the image's memory.
+ * @allocation_size: The size of the memory in bytes.
+ * @dedicated: Whether the memory is the image's own, which an import says, such
+ *   as with GL_DEDICATED_MEMORY_OBJECT_EXT.
+ * @format: The image's `VkFormat`: VK_FORMAT_R8G8B8A8_UNORM, OpenGL's GL_RGBA8.
+ * @depth_fd: The file descriptor of the depth image's memory.
+ * @depth_allocation_size: The size of the depth image's memory in bytes.
+ * @depth_dedicated: Whether the memory is the depth image's own.
+ * @depth_format: The depth image's `VkFormat`.
+ *
+ * The memory of an exported ring's acquired frame, as an opaque file
+ * descriptor.
+ *
+ * The memory holds a 2D Vulkan image of `format`, with one mip level, one
+ * layer, optimal tiling, and the usage VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+ * VK_IMAGE_USAGE_SAMPLED_BIT, and VK_IMAGE_USAGE_TRANSFER_SRC_BIT, which a
+ * Vulkan image that imports it has too. In OpenGL, import it with
+ * glImportMemoryFdEXT() and GL_HANDLE_TYPE_OPAQUE_FD_EXT, and make the texture
+ * with GL_TEXTURE_TILING_EXT set to GL_OPTIMAL_TILING_EXT and
+ * glTexStorageMem2DEXT() at offset 0. Each frame leaves the image in
+ * VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL.
+ *
+ * With `MaplibreNativeFfiRenderSessionAttachOptions:keep-depth`, on a device
+ * whose `MaplibreNativeFfiGpuDeviceCapabilities.depth_export_kinds` has
+ * `MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_OPAQUE_FD`, the depth members share the
+ * memory of the frame's depth image in the same way. Otherwise `depth_fd` is -1
+ * and the others are zero. The depth image is 2D, of `depth_format`, with one
+ * mip level, one layer, optimal tiling, and the usage
+ * VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_IMAGE_USAGE_SAMPLED_BIT, and
+ * VK_IMAGE_USAGE_TRANSFER_SRC_BIT. Each frame leaves it in
+ * VK_IMAGE_LAYOUT_GENERAL, released to VK_QUEUE_FAMILY_EXTERNAL. In OpenGL,
+ * make its texture with the internal format that
+ * `MaplibreNativeFfiDepthStencilFormatFlag` names for `depth_format`.
+ *
+ * See `mln_opaque_fd_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+typedef struct {
+  guint32 width;
+  guint32 height;
+  gdouble scale_factor;
+  guint32 slot;
+  gint32 fd;
+  guint64 allocation_size;
+  gboolean dedicated;
+  guint32 format;
+  gint32 depth_fd;
+  guint64 depth_allocation_size;
+  gboolean depth_dedicated;
+  guint32 depth_format;
+} MaplibreNativeFfiOpaqueFdFrame;
 
 /**
  * MaplibreNativeFfiOpenGlBorrowedTexture:
@@ -1173,11 +1417,24 @@ typedef struct {
  * An OpenGL texture of a borrowed ring.
  *
  * See `mln_open_gl_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 typedef struct {
   guint32 texture;
 } MaplibreNativeFfiOpenGlBorrowedTexture;
+
+/**
+ * MaplibreNativeFfiWebGlContextDescriptor:
+ * @context: Your `WebGL2RenderingContext`.
+ *
+ * The WebGL2 context that an OpenGL device wraps.
+ *
+ * See `mln_web_gl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef struct {
+  guint32 context;
+} MaplibreNativeFfiWebGlContextDescriptor;
 
 /**
  * MaplibreNativeFfiOpenGlTextureFrame:
@@ -1187,8 +1444,15 @@ typedef struct {
  * @slot: The texture's index in the descriptor's `textures`.
  * @texture: texture
  * @target: target
+ * @depth_texture: The `GL_TEXTURE_2D` texture that holds the frame's depth and
+ *   stencil.
+ * @depth_internal_format: The depth texture's internal format, such as
+ *   GL_DEPTH24_STENCIL8, or zero for a borrowed ring's.
  *
  * The OpenGL texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for
+ * `MaplibreNativeFfiMetalTextureFrame`. Otherwise they are zero.
  *
  * See `mln_open_gl_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -1200,6 +1464,8 @@ typedef struct {
   guint32 slot;
   guint32 texture;
   guint32 target;
+  guint32 depth_texture;
+  guint32 depth_internal_format;
 } MaplibreNativeFfiOpenGlTextureFrame;
 
 /**
@@ -1243,6 +1509,8 @@ typedef struct {
  * @frame_generation: frame_generation
  * @needs_repaint: needs_repaint
  * @view: The camera and extent that a rendered frame shows.
+ * @frame_projection: Where a rendered frame drew the map, for drawing into its
+ *   frame with depth. All zero for a demand that rendered nothing.
  * @mode: mode
  *
  * How one frame demand finished.
@@ -1258,6 +1526,7 @@ typedef struct {
   guint64 frame_generation;
   gboolean needs_repaint;
   MaplibreNativeFfiMapView view;
+  MaplibreNativeFfiFrameProjection frame_projection;
   MaplibreNativeFfiRenderMode mode;
 } MaplibreNativeFfiRenderFrameResult;
 
@@ -1271,6 +1540,9 @@ typedef struct {
  * @consumer_sync_kinds: The kinds of `MaplibreNativeFfiGpuSync` that
  *   `maplibre_native_ffi_acquired_frame_release()` accepts. They depend on the
  *   target and on what the device supports.
+ * @export_kind: How an exported ring shares its textures, which says which
+ *   getter gets an acquired frame's texture, or
+ *   `MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_NONE` for another target.
  *
  * What an attached render session supports.
  *
@@ -1283,6 +1555,7 @@ typedef struct {
   MaplibreNativeFfiRenderSessionCapabilityFlag flags;
   MaplibreNativeFfiGpuSyncKind producer_sync_kind;
   MaplibreNativeFfiGpuSyncKindFlag consumer_sync_kinds;
+  MaplibreNativeFfiGpuExportKind export_kind;
 } MaplibreNativeFfiRenderSessionCapabilities;
 
 /**
@@ -1315,6 +1588,53 @@ typedef struct {
   MaplibreNativeFfiError failure_status;
   gboolean has_target;
 } MaplibreNativeFfiRenderSessionSnapshot;
+
+/**
+ * MaplibreNativeFfiVulkanSurfaceTarget:
+ * @logical_size: logical_size
+ * @surface: Your `VkSurfaceKHR`.
+ *
+ * Your Vulkan surface to present to.
+ *
+ * Make it with the instance of the Vulkan device that you attach on. The
+ * device's queue family must support presenting to the surface. The session
+ * creates the swapchain, and destroys it but not the surface.
+ *
+ * See `mln_vulkan_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef struct {
+  MaplibreNativeFfiLogicalSize logical_size;
+  guint64 surface;
+} MaplibreNativeFfiVulkanSurfaceTarget;
+
+/**
+ * MaplibreNativeFfiVulkanBorrowedTexture:
+ * @image: Your `VkImage`.
+ * @image_view: A 2D `VkImageView` of `image` with one mip level and one layer.
+ *
+ * A Vulkan image of a borrowed ring.
+ *
+ * See `mln_vulkan_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef struct {
+  guint64 image;
+  guint64 image_view;
+} MaplibreNativeFfiVulkanBorrowedTexture;
+
+/**
+ * MaplibreNativeFfiWebGpuBorrowedTexture:
+ * @texture: Your `GPUTexture`.
+ *
+ * A WebGPU texture of a borrowed ring.
+ *
+ * See `mln_web_gpu_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef struct {
+  guint32 texture;
+} MaplibreNativeFfiWebGpuBorrowedTexture;
 
 /**
  * MaplibreNativeFfiScreenBox:
@@ -1475,23 +1795,6 @@ typedef struct {
 } MaplibreNativeFfiRuntimeEventOfflineRegionResponseError;
 
 /**
- * MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit:
- * @region_id: region_id
- * @limit: The number of demo server tiles that the cache file's offline regions
- *   may hold together.
- *
- * The details of
- * `MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
- *
- * See `mln_runtime_event_offline_region_tile_count_limit` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-typedef struct {
-  gint64 region_id;
-  guint64 limit;
-} MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit;
-
-/**
  * MaplibreNativeFfiStyleExpressionInfo:
  * @is_feature_constant: True when the result doesn't depend on the feature or
  *   its state.
@@ -1547,43 +1850,6 @@ typedef struct {
 } MaplibreNativeFfiTextureImageInfo;
 
 /**
- * MaplibreNativeFfiVulkanBorrowedTexture:
- * @image: Your VkImage.
- * @image_view: A 2D VkImageView of `image` with one mip level and one layer.
- *
- * A Vulkan image of a borrowed ring.
- *
- * See `mln_vulkan_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-typedef struct {
-  guint64 image;
-  guint64 image_view;
-} MaplibreNativeFfiVulkanBorrowedTexture;
-
-/**
- * MaplibreNativeFfiVulkanSurfaceReplacement:
- * @logical_size: logical_size
- * @surface: Your VkSurfaceKHR.
- *
- * A new Vulkan surface for
- * `maplibre_native_ffi_render_session_set_vulkan_surface_target_async()`.
- *
- * The session presents to it with the context that it attached with, so the
- * queue family of that context's `graphics_queue_family_index` must support
- * presenting to the surface. It uses the surface until a replacement or release
- * of the target completes, a detach or release of the session completes, or an
- * abandon of it returns.
- *
- * See `mln_vulkan_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-typedef struct {
-  MaplibreNativeFfiLogicalSize logical_size;
-  guint64 surface;
-} MaplibreNativeFfiVulkanSurfaceReplacement;
-
-/**
  * MaplibreNativeFfiCameraTransitionEndCallback:
  * @end: (transfer none): the value
  * @user_data: (closure): the data that the callback's setter received
@@ -1595,6 +1861,83 @@ typedef struct {
  */
 typedef void (*MaplibreNativeFfiCameraTransitionEndCallback)(
   MaplibreNativeFfiCameraTransitionEnd* end, gpointer user_data
+);
+
+/**
+ * MaplibreNativeFfiCustomLayerPrerenderCallback:
+ * @parameters: (transfer none): the value
+ * @user_data: (closure): the data that the callback's setter received
+ *
+ * Records a custom layer's GPU work that can't run in the map's render pass,
+ * such as drawing into textures of your own.
+ *
+ * Each frame that shows the layer runs the prerender callbacks of its custom
+ * layers, from the bottom of the style to the top, before the map begins its
+ * render pass, and so before any render callback.
+ *
+ * Runs on the thread that runs the session's graphics work: a library thread,
+ * or yours with `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`. It
+ * can't call the library.
+ *
+ * See `mln_custom_layer_prerender_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+typedef void (*MaplibreNativeFfiCustomLayerPrerenderCallback)(
+  MaplibreNativeFfiCustomLayerPrerenderParameters* parameters,
+  gpointer user_data
+);
+
+/**
+ * MaplibreNativeFfiCustomLayerRenderCallback:
+ * @parameters: (transfer none): the value
+ * @user_data: (closure): the data that the callback's setter received
+ *
+ * Draws a custom layer into the map's render pass, at its place in the style.
+ *
+ * The map draws its layers below the custom layer before the callback, and
+ * those above it after, except for the opaque fragments of 2D layers, which it
+ * draws before either, as
+ * `maplibre_native_ffi_custom_layer_render_parameters_get_layer_depth`
+ * describes. Draw through `frame.frame_projection.matrix` to depth-test against
+ * the map's 3D layers.
+ *
+ * Runs on the thread that runs the session's graphics work, as
+ * `MaplibreNativeFfiCustomLayerPrerenderCallback` says. It can't call the
+ * library.
+ *
+ * See `mln_custom_layer_render_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+typedef void (*MaplibreNativeFfiCustomLayerRenderCallback)(
+  MaplibreNativeFfiCustomLayerRenderParameters* parameters, gpointer user_data
+);
+
+/**
+ * MaplibreNativeFfiCustomLayerSessionEndCallback:
+ * @user_data: (closure): the data that the callback's setter received
+ *
+ * Tells a custom layer that a session stopped drawing it.
+ *
+ * `deinitialize` runs once a session that ran the layer's prerender or render
+ * callback stops drawing the layer: when the layer leaves the style, or the
+ * session detaches, is released, or replaces its device's backend. Destroy the
+ * GPU objects that you made for that session then. The session's GPU no longer
+ * uses them, and an OpenGL session's context is current. `context_lost` runs
+ * instead when the session is abandoned. Its graphics objects may be gone
+ * already, so forget yours without destroying them.
+ *
+ * A later prerender or render callback is for a new session, which can render
+ * on another device or backend.
+ *
+ * Runs on the thread that runs the session's graphics work, as
+ * `MaplibreNativeFfiCustomLayerPrerenderCallback` says. It can't call the
+ * library.
+ *
+ * See `mln_custom_layer_session_end_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+typedef void (*MaplibreNativeFfiCustomLayerSessionEndCallback)(
+  gpointer user_data
 );
 
 /**
@@ -1665,7 +2008,8 @@ typedef void (*MaplibreNativeFfiLogCallback)(
  * MaplibreNativeFfiQueueLockCallback:
  * @user_data: (closure): the data that the callback's setter received
  *
- * Locks or unlocks the Vulkan queue that you share with a render session.
+ * Locks or unlocks the Vulkan queue that you share with the render sessions of
+ * a GPU device.
  *
  * It can run on a library thread, and it can't call the library.
  *
@@ -2513,6 +2857,115 @@ gboolean maplibre_native_ffi_anchored_momentum_has_snap(
  */
 void maplibre_native_ffi_anchored_momentum_set_snap(
   MaplibreNativeFfiAnchoredMomentum* self, MaplibreNativeFfiMomentumSnap* value
+);
+
+GType maplibre_native_ffi_logical_size_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_LOGICAL_SIZE \
+  (maplibre_native_ffi_logical_size_get_type())
+
+/**
+ * maplibre_native_ffi_logical_size_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiLogicalSize* maplibre_native_ffi_logical_size_copy(
+  const MaplibreNativeFfiLogicalSize* self
+);
+
+/**
+ * maplibre_native_ffi_logical_size_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_logical_size_free(MaplibreNativeFfiLogicalSize* self);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiLogicalSize, maplibre_native_ffi_logical_size_free
+)
+
+/**
+ * MaplibreNativeFfiAndroidWindowTarget:
+ *
+ * An Android window to present to.
+ *
+ * The session takes its own reference to the window, so you can release yours
+ * once the call returns. When the platform destroys the window, such as in
+ * `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
+ * `maplibre_native_ffi_render_session_release_target_async()`, or give the
+ * session another window with
+ * `maplibre_native_ffi_render_session_set_target_async()`, without waiting for
+ * that to complete. A frame to the destroyed window finishes with
+ * `MAPLIBRE_NATIVE_FFI_RENDER_RESULT_TARGET_NOT_READY`, or with
+ * `MAPLIBRE_NATIVE_FFI_RENDER_RESULT_RENDERED` if the window went away while
+ * the frame was presenting.
+ *
+ * See `mln_android_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+/**
+ * maplibre_native_ffi_android_window_target_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiAndroidWindowTarget` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiAndroidWindowTarget*
+maplibre_native_ffi_android_window_target_new(void);
+
+/**
+ * MaplibreNativeFfiAndroidWindowTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
+ *
+ * The `logical_size` member.
+ */
+/**
+ * maplibre_native_ffi_android_window_target_get_logical_size: (get-property logical-size)
+ *
+ * Gets `MaplibreNativeFfiAndroidWindowTarget:logical-size`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_android_window_target_get_logical_size(
+  MaplibreNativeFfiAndroidWindowTarget* self
+);
+
+/**
+ * maplibre_native_ffi_android_window_target_set_logical_size: (set-property logical-size)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiAndroidWindowTarget:logical-size`.
+ */
+void maplibre_native_ffi_android_window_target_set_logical_size(
+  MaplibreNativeFfiAndroidWindowTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+);
+
+/**
+ * MaplibreNativeFfiAndroidWindowTarget:window: (setter set_window) (getter get_window)
+ *
+ * Your `ANativeWindow*`.
+ */
+/**
+ * maplibre_native_ffi_android_window_target_get_window: (get-property window)
+ *
+ * Gets `MaplibreNativeFfiAndroidWindowTarget:window`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_android_window_target_get_window(
+  MaplibreNativeFfiAndroidWindowTarget* self
+);
+
+/**
+ * maplibre_native_ffi_android_window_target_set_window: (set-property window)
+ *
+ * Sets `MaplibreNativeFfiAndroidWindowTarget:window`.
+ */
+void maplibre_native_ffi_android_window_target_set_window(
+  MaplibreNativeFfiAndroidWindowTarget* self, gpointer value
 );
 
 /**
@@ -4887,6 +5340,1644 @@ void maplibre_native_ffi_custom_geometry_source_options_set_cancel_tile(
 );
 
 /**
+ * MaplibreNativeFfiMetalCustomLayerEncoder:
+ *
+ * The frame's Metal command buffer, outside the map's render pass.
+ *
+ * End each encoder that you make on `command_buffer` before the callback
+ * returns, and don't commit the buffer.
+ *
+ * See `mln_metal_custom_layer_encoder` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+GType maplibre_native_ffi_metal_custom_layer_encoder_get_type(
+  void
+) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_METAL_CUSTOM_LAYER_ENCODER \
+  (maplibre_native_ffi_metal_custom_layer_encoder_get_type())
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_encoder_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiMetalCustomLayerEncoder` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiMetalCustomLayerEncoder*
+maplibre_native_ffi_metal_custom_layer_encoder_new(void);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_encoder_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiMetalCustomLayerEncoder*
+maplibre_native_ffi_metal_custom_layer_encoder_copy(
+  const MaplibreNativeFfiMetalCustomLayerEncoder* self
+);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_encoder_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_metal_custom_layer_encoder_free(
+  MaplibreNativeFfiMetalCustomLayerEncoder* self
+);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_encoder_get_command_buffer:
+ *
+ * The frame's `MTLCommandBuffer`, with no encoder open.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_metal_custom_layer_encoder_get_command_buffer(
+  const MaplibreNativeFfiMetalCustomLayerEncoder* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiMetalCustomLayerEncoder,
+  maplibre_native_ffi_metal_custom_layer_encoder_free
+)
+
+/**
+ * MaplibreNativeFfiVulkanContextDescriptor:
+ *
+ * The Vulkan device and queue that a render session uses.
+ *
+ * Keep these objects alive until a detach or release of the session completes,
+ * or an abandon of it returns.
+ *
+ * See `mln_vulkan_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiVulkanContextDescriptor` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiVulkanContextDescriptor*
+maplibre_native_ffi_vulkan_context_descriptor_new(void);
+
+/**
+ * MaplibreNativeFfiVulkanContextDescriptor:instance: (setter set_instance) (getter get_instance)
+ *
+ * A `VkInstance`.
+ */
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_get_instance: (get-property instance)
+ *
+ * Gets `MaplibreNativeFfiVulkanContextDescriptor:instance`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_vulkan_context_descriptor_get_instance(
+  MaplibreNativeFfiVulkanContextDescriptor* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_set_instance: (set-property instance)
+ *
+ * Sets `MaplibreNativeFfiVulkanContextDescriptor:instance`.
+ */
+void maplibre_native_ffi_vulkan_context_descriptor_set_instance(
+  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiVulkanContextDescriptor:physical-device: (setter set_physical_device) (getter get_physical_device)
+ *
+ * A `VkPhysicalDevice`.
+ */
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_get_physical_device: (get-property physical-device)
+ *
+ * Gets `MaplibreNativeFfiVulkanContextDescriptor:physical-device`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_vulkan_context_descriptor_get_physical_device(
+  MaplibreNativeFfiVulkanContextDescriptor* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_set_physical_device: (set-property physical-device)
+ *
+ * Sets `MaplibreNativeFfiVulkanContextDescriptor:physical-device`.
+ */
+void maplibre_native_ffi_vulkan_context_descriptor_set_physical_device(
+  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiVulkanContextDescriptor:device: (setter set_device) (getter get_device)
+ *
+ * A `VkDevice`.
+ */
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_get_device: (get-property device)
+ *
+ * Gets `MaplibreNativeFfiVulkanContextDescriptor:device`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_vulkan_context_descriptor_get_device(
+  MaplibreNativeFfiVulkanContextDescriptor* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_set_device: (set-property device)
+ *
+ * Sets `MaplibreNativeFfiVulkanContextDescriptor:device`.
+ */
+void maplibre_native_ffi_vulkan_context_descriptor_set_device(
+  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiVulkanContextDescriptor:graphics-queue: (setter set_graphics_queue) (getter get_graphics_queue)
+ *
+ * A `VkQueue` from `graphics_queue_family_index` that supports graphics. If you
+ * submit to it too, give the device your `MaplibreNativeFfiQueueLock`.
+ */
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_get_graphics_queue: (get-property graphics-queue)
+ *
+ * Gets `MaplibreNativeFfiVulkanContextDescriptor:graphics-queue`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_vulkan_context_descriptor_get_graphics_queue(
+  MaplibreNativeFfiVulkanContextDescriptor* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue: (set-property graphics-queue)
+ *
+ * Sets `MaplibreNativeFfiVulkanContextDescriptor:graphics-queue`.
+ */
+void maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue(
+  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiVulkanContextDescriptor:graphics-queue-family-index: (setter set_graphics_queue_family_index) (getter get_graphics_queue_family_index)
+ *
+ * The `graphics_queue_family_index` member.
+ */
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_get_graphics_queue_family_index: (get-property graphics-queue-family-index)
+ *
+ * Gets `MaplibreNativeFfiVulkanContextDescriptor:graphics-queue-family-index`.
+ *
+ * Returns: the value
+ */
+guint32
+maplibre_native_ffi_vulkan_context_descriptor_get_graphics_queue_family_index(
+  MaplibreNativeFfiVulkanContextDescriptor* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue_family_index: (set-property graphics-queue-family-index)
+ *
+ * Sets `MaplibreNativeFfiVulkanContextDescriptor:graphics-queue-family-index`.
+ */
+void maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue_family_index(
+  MaplibreNativeFfiVulkanContextDescriptor* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiVulkanContextDescriptor:get-instance-proc-addr: (setter set_get_instance_proc_addr) (getter get_get_instance_proc_addr)
+ *
+ * Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's.
+ */
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_get_get_instance_proc_addr: (get-property get-instance-proc-addr)
+ *
+ * Gets `MaplibreNativeFfiVulkanContextDescriptor:get-instance-proc-addr`.
+ *
+ * Returns: the value
+ */
+gpointer
+maplibre_native_ffi_vulkan_context_descriptor_get_get_instance_proc_addr(
+  MaplibreNativeFfiVulkanContextDescriptor* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_set_get_instance_proc_addr: (set-property get-instance-proc-addr)
+ *
+ * Sets `MaplibreNativeFfiVulkanContextDescriptor:get-instance-proc-addr`.
+ */
+void maplibre_native_ffi_vulkan_context_descriptor_set_get_instance_proc_addr(
+  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiVulkanContextDescriptor:get-device-proc-addr: (setter set_get_device_proc_addr) (getter get_get_device_proc_addr)
+ *
+ * Your `vkGetDeviceProcAddr`, or null to look it up from the instance.
+ */
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_get_get_device_proc_addr: (get-property get-device-proc-addr)
+ *
+ * Gets `MaplibreNativeFfiVulkanContextDescriptor:get-device-proc-addr`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_vulkan_context_descriptor_get_get_device_proc_addr(
+  MaplibreNativeFfiVulkanContextDescriptor* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_context_descriptor_set_get_device_proc_addr: (set-property get-device-proc-addr)
+ *
+ * Sets `MaplibreNativeFfiVulkanContextDescriptor:get-device-proc-addr`.
+ */
+void maplibre_native_ffi_vulkan_context_descriptor_set_get_device_proc_addr(
+  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiVulkanCustomLayerEncoder:
+ *
+ * The frame's Vulkan command buffer, outside the map's render pass.
+ *
+ * Record work such as copies, compute dispatches, and render passes of your
+ * own, with the barriers that it needs. The map's render pass loads its
+ * attachments after a barrier of its own, but it doesn't wait for writes to
+ * your images: give those the barriers that your later reads need. Don't end or
+ * submit `command_buffer`.
+ *
+ * See `mln_vulkan_custom_layer_encoder` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+GType maplibre_native_ffi_vulkan_custom_layer_encoder_get_type(
+  void
+) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_CUSTOM_LAYER_ENCODER \
+  (maplibre_native_ffi_vulkan_custom_layer_encoder_get_type())
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_encoder_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiVulkanCustomLayerEncoder` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiVulkanCustomLayerEncoder*
+maplibre_native_ffi_vulkan_custom_layer_encoder_new(void);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_encoder_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiVulkanCustomLayerEncoder*
+maplibre_native_ffi_vulkan_custom_layer_encoder_copy(
+  const MaplibreNativeFfiVulkanCustomLayerEncoder* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_encoder_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_vulkan_custom_layer_encoder_free(
+  MaplibreNativeFfiVulkanCustomLayerEncoder* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_encoder_get_context:
+ *
+ * The device that the session renders on. Make the objects that your commands
+ * use on `context.device`. Don't submit to `context.graphics_queue` from a
+ * callback.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiVulkanContextDescriptor*
+maplibre_native_ffi_vulkan_custom_layer_encoder_get_context(
+  const MaplibreNativeFfiVulkanCustomLayerEncoder* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_encoder_get_command_buffer:
+ *
+ * The frame's `VkCommandBuffer`, recording outside a render pass.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_vulkan_custom_layer_encoder_get_command_buffer(
+  const MaplibreNativeFfiVulkanCustomLayerEncoder* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiVulkanCustomLayerEncoder,
+  maplibre_native_ffi_vulkan_custom_layer_encoder_free
+)
+
+GType maplibre_native_ffi_web_gpu_custom_layer_encoder_get_type(
+  void
+) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_WEB_GPU_CUSTOM_LAYER_ENCODER \
+  (maplibre_native_ffi_web_gpu_custom_layer_encoder_get_type())
+
+/**
+ * maplibre_native_ffi_web_gpu_custom_layer_encoder_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiWebGpuCustomLayerEncoder*
+maplibre_native_ffi_web_gpu_custom_layer_encoder_copy(
+  const MaplibreNativeFfiWebGpuCustomLayerEncoder* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_custom_layer_encoder_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_web_gpu_custom_layer_encoder_free(
+  MaplibreNativeFfiWebGpuCustomLayerEncoder* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiWebGpuCustomLayerEncoder,
+  maplibre_native_ffi_web_gpu_custom_layer_encoder_free
+)
+
+/**
+ * MaplibreNativeFfiCustomLayerEncoderData:
+ *
+ * The GPU commands of a frame outside the map's render pass, by the backend
+ * that the session renders with.
+ *
+ * An OpenGL session has no variant: its context is current, and it draws
+ * through no object that the callback needs.
+ *
+ * See `mln_custom_layer_encoder_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+GType maplibre_native_ffi_custom_layer_encoder_data_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_LAYER_ENCODER_DATA \
+  (maplibre_native_ffi_custom_layer_encoder_data_get_type())
+
+/**
+ * maplibre_native_ffi_custom_layer_encoder_data_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiCustomLayerEncoderData*
+maplibre_native_ffi_custom_layer_encoder_data_copy(
+  const MaplibreNativeFfiCustomLayerEncoderData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_encoder_data_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_custom_layer_encoder_data_free(
+  MaplibreNativeFfiCustomLayerEncoderData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_encoder_data_is_metal:
+ *
+ * Whether the value holds `maplibre_native_ffi_custom_layer_encoder_data_get_metal`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_custom_layer_encoder_data_is_metal(
+  const MaplibreNativeFfiCustomLayerEncoderData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_encoder_data_get_metal:
+ *
+ * The `metal` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiMetalCustomLayerEncoder*
+maplibre_native_ffi_custom_layer_encoder_data_get_metal(
+  const MaplibreNativeFfiCustomLayerEncoderData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_encoder_data_is_vulkan:
+ *
+ * Whether the value holds `maplibre_native_ffi_custom_layer_encoder_data_get_vulkan`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_custom_layer_encoder_data_is_vulkan(
+  const MaplibreNativeFfiCustomLayerEncoderData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_encoder_data_get_vulkan:
+ *
+ * The `vulkan` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiVulkanCustomLayerEncoder*
+maplibre_native_ffi_custom_layer_encoder_data_get_vulkan(
+  const MaplibreNativeFfiCustomLayerEncoderData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_encoder_data_is_web_gpu:
+ *
+ * Whether the value holds `maplibre_native_ffi_custom_layer_encoder_data_get_web_gpu`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_custom_layer_encoder_data_is_web_gpu(
+  const MaplibreNativeFfiCustomLayerEncoderData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_encoder_data_get_web_gpu:
+ *
+ * The `web_gpu` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiWebGpuCustomLayerEncoder*
+maplibre_native_ffi_custom_layer_encoder_data_get_web_gpu(
+  const MaplibreNativeFfiCustomLayerEncoderData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_encoder_data_is_open_gl:
+ *
+ * Whether the value is the `open_gl` variant.
+ *
+ * Returns: whether the value is the variant
+ */
+gboolean maplibre_native_ffi_custom_layer_encoder_data_is_open_gl(
+  const MaplibreNativeFfiCustomLayerEncoderData* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiCustomLayerEncoderData,
+  maplibre_native_ffi_custom_layer_encoder_data_free
+)
+
+GType maplibre_native_ffi_logical_extent_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_LOGICAL_EXTENT \
+  (maplibre_native_ffi_logical_extent_get_type())
+
+/**
+ * maplibre_native_ffi_logical_extent_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiLogicalExtent* maplibre_native_ffi_logical_extent_copy(
+  const MaplibreNativeFfiLogicalExtent* self
+);
+
+/**
+ * maplibre_native_ffi_logical_extent_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_logical_extent_free(
+  MaplibreNativeFfiLogicalExtent* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiLogicalExtent, maplibre_native_ffi_logical_extent_free
+)
+
+GType maplibre_native_ffi_projection_mode_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_PROJECTION_MODE \
+  (maplibre_native_ffi_projection_mode_get_type())
+
+/**
+ * maplibre_native_ffi_projection_mode_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiProjectionMode* maplibre_native_ffi_projection_mode_copy(
+  const MaplibreNativeFfiProjectionMode* self
+);
+
+/**
+ * maplibre_native_ffi_projection_mode_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_projection_mode_free(
+  MaplibreNativeFfiProjectionMode* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiProjectionMode, maplibre_native_ffi_projection_mode_free
+)
+
+GType maplibre_native_ffi_map_viewport_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_VIEWPORT \
+  (maplibre_native_ffi_map_viewport_get_type())
+
+/**
+ * maplibre_native_ffi_map_viewport_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiMapViewport* maplibre_native_ffi_map_viewport_copy(
+  const MaplibreNativeFfiMapViewport* self
+);
+
+/**
+ * maplibre_native_ffi_map_viewport_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_map_viewport_free(MaplibreNativeFfiMapViewport* self);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiMapViewport, maplibre_native_ffi_map_viewport_free
+)
+
+GType maplibre_native_ffi_projection_definition_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_PROJECTION_DEFINITION \
+  (maplibre_native_ffi_projection_definition_get_type())
+
+/**
+ * maplibre_native_ffi_projection_definition_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiProjectionDefinition*
+maplibre_native_ffi_projection_definition_copy(
+  const MaplibreNativeFfiProjectionDefinition* self
+);
+
+/**
+ * maplibre_native_ffi_projection_definition_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_projection_definition_free(
+  MaplibreNativeFfiProjectionDefinition* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiProjectionDefinition,
+  maplibre_native_ffi_projection_definition_free
+)
+
+GType maplibre_native_ffi_map_view_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_VIEW \
+  (maplibre_native_ffi_map_view_get_type())
+
+/**
+ * maplibre_native_ffi_map_view_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiMapView* maplibre_native_ffi_map_view_copy(
+  const MaplibreNativeFfiMapView* self
+);
+
+/**
+ * maplibre_native_ffi_map_view_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_map_view_free(MaplibreNativeFfiMapView* self);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiMapView, maplibre_native_ffi_map_view_free
+)
+
+GType maplibre_native_ffi_vec4_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_VEC4 (maplibre_native_ffi_vec4_get_type())
+
+/**
+ * maplibre_native_ffi_vec4_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiVec4* maplibre_native_ffi_vec4_copy(
+  const MaplibreNativeFfiVec4* self
+);
+
+/**
+ * maplibre_native_ffi_vec4_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_vec4_free(MaplibreNativeFfiVec4* self);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiVec4, maplibre_native_ffi_vec4_free
+)
+
+GType maplibre_native_ffi_mat4_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_MAT4 (maplibre_native_ffi_mat4_get_type())
+
+/**
+ * maplibre_native_ffi_mat4_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiMat4* maplibre_native_ffi_mat4_copy(
+  const MaplibreNativeFfiMat4* self
+);
+
+/**
+ * maplibre_native_ffi_mat4_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_mat4_free(MaplibreNativeFfiMat4* self);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiMat4, maplibre_native_ffi_mat4_free
+)
+
+GType maplibre_native_ffi_frame_projection_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_FRAME_PROJECTION \
+  (maplibre_native_ffi_frame_projection_get_type())
+
+/**
+ * maplibre_native_ffi_frame_projection_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiFrameProjection* maplibre_native_ffi_frame_projection_copy(
+  const MaplibreNativeFfiFrameProjection* self
+);
+
+/**
+ * maplibre_native_ffi_frame_projection_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_frame_projection_free(
+  MaplibreNativeFfiFrameProjection* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiFrameProjection, maplibre_native_ffi_frame_projection_free
+)
+
+GType maplibre_native_ffi_custom_layer_frame_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_LAYER_FRAME \
+  (maplibre_native_ffi_custom_layer_frame_get_type())
+
+/**
+ * maplibre_native_ffi_custom_layer_frame_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiCustomLayerFrame* maplibre_native_ffi_custom_layer_frame_copy(
+  const MaplibreNativeFfiCustomLayerFrame* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_frame_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_custom_layer_frame_free(
+  MaplibreNativeFfiCustomLayerFrame* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiCustomLayerFrame, maplibre_native_ffi_custom_layer_frame_free
+)
+
+/**
+ * MaplibreNativeFfiCustomLayerHost:
+ *
+ * The callbacks of a custom layer, which draws with your own GPU commands in
+ * the map's frame.
+ *
+ * A session runs the callbacks only when it can hand you its commands as one of
+ * `MaplibreNativeFfiCustomLayerPassData`'s variants, so a session on another
+ * backend, such as WebGPU outside a browser, doesn't draw the layer. Nor does a
+ * browser WebGPU session yet: the library's WebGPU (wgpu) exposes no command
+ * encoder or render pass to hand you. Leave unset the callbacks that you don't
+ * need.
+ *
+ * Runs on the thread that runs the session's graphics work: a library thread,
+ * or yours with `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`. It
+ * can't call the library.
+ *
+ * Runs on the thread that runs the session's graphics work, as
+ * `MaplibreNativeFfiCustomLayerPrerenderCallback` says. It can't call the
+ * library.
+ *
+ * See `mln_custom_layer_host` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+GType maplibre_native_ffi_custom_layer_host_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_LAYER_HOST \
+  (maplibre_native_ffi_custom_layer_host_get_type())
+
+/**
+ * maplibre_native_ffi_custom_layer_host_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiCustomLayerHost` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiCustomLayerHost* maplibre_native_ffi_custom_layer_host_new(
+  void
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_host_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiCustomLayerHost* maplibre_native_ffi_custom_layer_host_copy(
+  const MaplibreNativeFfiCustomLayerHost* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_host_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_custom_layer_host_free(
+  MaplibreNativeFfiCustomLayerHost* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_host_set_prerender: (skip)
+ * @callback: (scope notified) (closure user_data) (destroy notify) (nullable): the callback
+ * @user_data: the data to pass to `callback`
+ * @notify: the function that frees `user_data` after the last call
+ *
+ * Records a custom layer's GPU work that can't run in the map's render pass,
+ * such as drawing into textures of your own.
+ *
+ * Each frame that shows the layer runs the prerender callbacks of its custom
+ * layers, from the bottom of the style to the top, before the map begins its
+ * render pass, and so before any render callback.
+ *
+ * Runs on the thread that runs the session's graphics work: a library thread,
+ * or yours with `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`. It
+ * can't call the library.
+ *
+ * See `mln_custom_layer_prerender_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+void maplibre_native_ffi_custom_layer_host_set_prerender(
+  MaplibreNativeFfiCustomLayerHost* self,
+  MaplibreNativeFfiCustomLayerPrerenderCallback callback, gpointer user_data,
+  GDestroyNotify notify
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_host_set_render: (skip)
+ * @callback: (scope notified) (closure user_data) (destroy notify) (nullable): the callback
+ * @user_data: the data to pass to `callback`
+ * @notify: the function that frees `user_data` after the last call
+ *
+ * Draws a custom layer into the map's render pass, at its place in the style.
+ *
+ * The map draws its layers below the custom layer before the callback, and
+ * those above it after, except for the opaque fragments of 2D layers, which it
+ * draws before either, as
+ * `maplibre_native_ffi_custom_layer_render_parameters_get_layer_depth`
+ * describes. Draw through `frame.frame_projection.matrix` to depth-test against
+ * the map's 3D layers.
+ *
+ * Runs on the thread that runs the session's graphics work, as
+ * `MaplibreNativeFfiCustomLayerPrerenderCallback` says. It can't call the
+ * library.
+ *
+ * See `mln_custom_layer_render_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+void maplibre_native_ffi_custom_layer_host_set_render(
+  MaplibreNativeFfiCustomLayerHost* self,
+  MaplibreNativeFfiCustomLayerRenderCallback callback, gpointer user_data,
+  GDestroyNotify notify
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_host_set_deinitialize: (skip)
+ * @callback: (scope notified) (closure user_data) (destroy notify) (nullable): the callback
+ * @user_data: the data to pass to `callback`
+ * @notify: the function that frees `user_data` after the last call
+ *
+ * Tells a custom layer that a session stopped drawing it.
+ *
+ * `deinitialize` runs once a session that ran the layer's prerender or render
+ * callback stops drawing the layer: when the layer leaves the style, or the
+ * session detaches, is released, or replaces its device's backend. Destroy the
+ * GPU objects that you made for that session then. The session's GPU no longer
+ * uses them, and an OpenGL session's context is current. `context_lost` runs
+ * instead when the session is abandoned. Its graphics objects may be gone
+ * already, so forget yours without destroying them.
+ *
+ * A later prerender or render callback is for a new session, which can render
+ * on another device or backend.
+ *
+ * Runs on the thread that runs the session's graphics work, as
+ * `MaplibreNativeFfiCustomLayerPrerenderCallback` says. It can't call the
+ * library.
+ *
+ * See `mln_custom_layer_session_end_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+void maplibre_native_ffi_custom_layer_host_set_deinitialize(
+  MaplibreNativeFfiCustomLayerHost* self,
+  MaplibreNativeFfiCustomLayerSessionEndCallback callback, gpointer user_data,
+  GDestroyNotify notify
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_host_set_context_lost: (skip)
+ * @callback: (scope notified) (closure user_data) (destroy notify) (nullable): the callback
+ * @user_data: the data to pass to `callback`
+ * @notify: the function that frees `user_data` after the last call
+ *
+ * Tells a custom layer that a session stopped drawing it.
+ *
+ * `deinitialize` runs once a session that ran the layer's prerender or render
+ * callback stops drawing the layer: when the layer leaves the style, or the
+ * session detaches, is released, or replaces its device's backend. Destroy the
+ * GPU objects that you made for that session then. The session's GPU no longer
+ * uses them, and an OpenGL session's context is current. `context_lost` runs
+ * instead when the session is abandoned. Its graphics objects may be gone
+ * already, so forget yours without destroying them.
+ *
+ * A later prerender or render callback is for a new session, which can render
+ * on another device or backend.
+ *
+ * Runs on the thread that runs the session's graphics work, as
+ * `MaplibreNativeFfiCustomLayerPrerenderCallback` says. It can't call the
+ * library.
+ *
+ * See `mln_custom_layer_session_end_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+void maplibre_native_ffi_custom_layer_host_set_context_lost(
+  MaplibreNativeFfiCustomLayerHost* self,
+  MaplibreNativeFfiCustomLayerSessionEndCallback callback, gpointer user_data,
+  GDestroyNotify notify
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiCustomLayerHost, maplibre_native_ffi_custom_layer_host_free
+)
+
+/**
+ * MaplibreNativeFfiMetalCustomLayerPass:
+ *
+ * The map's Metal render pass, at a custom layer's place in the style.
+ *
+ * Set your own pipeline state, depth-stencil state, buffers, textures, and
+ * samplers on `encoder`, and any other state that your draws need. After the
+ * callback returns, the map sets the state that its own draws need again. Don't
+ * end `encoder`.
+ *
+ * See `mln_metal_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+GType maplibre_native_ffi_metal_custom_layer_pass_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_METAL_CUSTOM_LAYER_PASS \
+  (maplibre_native_ffi_metal_custom_layer_pass_get_type())
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_pass_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiMetalCustomLayerPass` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiMetalCustomLayerPass*
+maplibre_native_ffi_metal_custom_layer_pass_new(void);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_pass_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiMetalCustomLayerPass*
+maplibre_native_ffi_metal_custom_layer_pass_copy(
+  const MaplibreNativeFfiMetalCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_pass_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_metal_custom_layer_pass_free(
+  MaplibreNativeFfiMetalCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_pass_get_encoder:
+ *
+ * The pass's `MTLRenderCommandEncoder`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_metal_custom_layer_pass_get_encoder(
+  const MaplibreNativeFfiMetalCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_pass_get_command_buffer:
+ *
+ * The `MTLCommandBuffer` that `encoder` encodes into. Don't commit it.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_metal_custom_layer_pass_get_command_buffer(
+  const MaplibreNativeFfiMetalCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_pass_get_color_format:
+ *
+ * The `MTLPixelFormat` of the pass's color attachment.
+ *
+ * Returns: the value
+ */
+guint64 maplibre_native_ffi_metal_custom_layer_pass_get_color_format(
+  const MaplibreNativeFfiMetalCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_pass_get_depth_format:
+ *
+ * The `MTLPixelFormat` of the pass's depth attachment, or
+ * `MTLPixelFormatInvalid` when it has none.
+ *
+ * Returns: the value
+ */
+guint64 maplibre_native_ffi_metal_custom_layer_pass_get_depth_format(
+  const MaplibreNativeFfiMetalCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_pass_get_stencil_format:
+ *
+ * The `MTLPixelFormat` of the pass's stencil attachment, or
+ * `MTLPixelFormatInvalid` when it has none.
+ *
+ * Returns: the value
+ */
+guint64 maplibre_native_ffi_metal_custom_layer_pass_get_stencil_format(
+  const MaplibreNativeFfiMetalCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_metal_custom_layer_pass_get_sample_count:
+ *
+ * The sample count of the pass's attachments.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_metal_custom_layer_pass_get_sample_count(
+  const MaplibreNativeFfiMetalCustomLayerPass* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiMetalCustomLayerPass,
+  maplibre_native_ffi_metal_custom_layer_pass_free
+)
+
+/**
+ * MaplibreNativeFfiVulkanCustomLayerPass:
+ *
+ * The map's Vulkan render pass, at a custom layer's place in the style.
+ *
+ * Record draws into `command_buffer`, with pipelines that you make for
+ * `render_pass`, `subpass`, and `sample_count`. Bind your own pipeline,
+ * descriptor sets, vertex and index buffers, and push constants, and set the
+ * dynamic state that your pipelines have, such as the viewport and scissor.
+ * After the callback returns, the map binds and sets again what its own draws
+ * need. Your pipeline layouts can differ from the map's. Record nothing that a
+ * render pass can't hold, and don't end the render pass.
+ *
+ * See `mln_vulkan_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+GType maplibre_native_ffi_vulkan_custom_layer_pass_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_CUSTOM_LAYER_PASS \
+  (maplibre_native_ffi_vulkan_custom_layer_pass_get_type())
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_pass_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiVulkanCustomLayerPass` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiVulkanCustomLayerPass*
+maplibre_native_ffi_vulkan_custom_layer_pass_new(void);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_pass_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiVulkanCustomLayerPass*
+maplibre_native_ffi_vulkan_custom_layer_pass_copy(
+  const MaplibreNativeFfiVulkanCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_pass_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_vulkan_custom_layer_pass_free(
+  MaplibreNativeFfiVulkanCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_pass_get_context:
+ *
+ * The device that the session renders on. Make the objects that your commands
+ * use on `context.device`. Don't submit to `context.graphics_queue` from a
+ * callback.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiVulkanContextDescriptor*
+maplibre_native_ffi_vulkan_custom_layer_pass_get_context(
+  const MaplibreNativeFfiVulkanCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_pass_get_command_buffer:
+ *
+ * The frame's `VkCommandBuffer`, recording inside `render_pass`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_vulkan_custom_layer_pass_get_command_buffer(
+  const MaplibreNativeFfiVulkanCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_pass_get_render_pass:
+ *
+ * The `VkRenderPass` that `command_buffer` records in.
+ *
+ * Returns: the value
+ */
+guint64 maplibre_native_ffi_vulkan_custom_layer_pass_get_render_pass(
+  const MaplibreNativeFfiVulkanCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_pass_get_subpass:
+ *
+ * The index of the subpass that `command_buffer` records in.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_custom_layer_pass_get_subpass(
+  const MaplibreNativeFfiVulkanCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_pass_get_sample_count:
+ *
+ * The `VkSampleCountFlagBits` of the render pass's attachments.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_custom_layer_pass_get_sample_count(
+  const MaplibreNativeFfiVulkanCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_pass_get_color_format:
+ *
+ * The `VkFormat` of the render pass's color attachment.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_custom_layer_pass_get_color_format(
+  const MaplibreNativeFfiVulkanCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_custom_layer_pass_get_depth_stencil_format:
+ *
+ * The `VkFormat` of the render pass's depth-stencil attachment, or
+ * `VK_FORMAT_UNDEFINED` when it has none.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_custom_layer_pass_get_depth_stencil_format(
+  const MaplibreNativeFfiVulkanCustomLayerPass* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiVulkanCustomLayerPass,
+  maplibre_native_ffi_vulkan_custom_layer_pass_free
+)
+
+GType maplibre_native_ffi_open_gl_custom_layer_pass_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_CUSTOM_LAYER_PASS \
+  (maplibre_native_ffi_open_gl_custom_layer_pass_get_type())
+
+/**
+ * maplibre_native_ffi_open_gl_custom_layer_pass_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiOpenGlCustomLayerPass*
+maplibre_native_ffi_open_gl_custom_layer_pass_copy(
+  const MaplibreNativeFfiOpenGlCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_open_gl_custom_layer_pass_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_open_gl_custom_layer_pass_free(
+  MaplibreNativeFfiOpenGlCustomLayerPass* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiOpenGlCustomLayerPass,
+  maplibre_native_ffi_open_gl_custom_layer_pass_free
+)
+
+/**
+ * MaplibreNativeFfiWebGpuCustomLayerPass:
+ *
+ * The map's WebGPU render pass, at a custom layer's place in the style.
+ *
+ * Set your own pipeline, bind groups, vertex and index buffers, viewport,
+ * scissor rectangle, and stencil reference on `encoder`. After the callback
+ * returns, the map sets again what its own draws need. Don't end `encoder`.
+ *
+ * See `mln_web_gpu_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+GType maplibre_native_ffi_web_gpu_custom_layer_pass_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_WEB_GPU_CUSTOM_LAYER_PASS \
+  (maplibre_native_ffi_web_gpu_custom_layer_pass_get_type())
+
+/**
+ * maplibre_native_ffi_web_gpu_custom_layer_pass_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiWebGpuCustomLayerPass` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiWebGpuCustomLayerPass*
+maplibre_native_ffi_web_gpu_custom_layer_pass_new(void);
+
+/**
+ * maplibre_native_ffi_web_gpu_custom_layer_pass_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiWebGpuCustomLayerPass*
+maplibre_native_ffi_web_gpu_custom_layer_pass_copy(
+  const MaplibreNativeFfiWebGpuCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_custom_layer_pass_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_web_gpu_custom_layer_pass_free(
+  MaplibreNativeFfiWebGpuCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_custom_layer_pass_get_device:
+ *
+ * The `GPUDevice` that the session renders on.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_web_gpu_custom_layer_pass_get_device(
+  const MaplibreNativeFfiWebGpuCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_custom_layer_pass_get_encoder:
+ *
+ * The pass's `GPURenderPassEncoder`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_web_gpu_custom_layer_pass_get_encoder(
+  const MaplibreNativeFfiWebGpuCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_custom_layer_pass_get_color_format:
+ *
+ * The `GPUTextureFormat` of the pass's color attachment.
+ *
+ * Returns: (transfer none): the text
+ */
+const char* maplibre_native_ffi_web_gpu_custom_layer_pass_get_color_format(
+  const MaplibreNativeFfiWebGpuCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_custom_layer_pass_get_depth_stencil_format:
+ *
+ * The `GPUTextureFormat` of the pass's depth-stencil attachment, or empty when
+ * it has none.
+ *
+ * Returns: (transfer none): the text
+ */
+const char*
+maplibre_native_ffi_web_gpu_custom_layer_pass_get_depth_stencil_format(
+  const MaplibreNativeFfiWebGpuCustomLayerPass* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_custom_layer_pass_get_sample_count:
+ *
+ * The sample count of the pass's attachments.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_web_gpu_custom_layer_pass_get_sample_count(
+  const MaplibreNativeFfiWebGpuCustomLayerPass* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiWebGpuCustomLayerPass,
+  maplibre_native_ffi_web_gpu_custom_layer_pass_free
+)
+
+/**
+ * MaplibreNativeFfiCustomLayerPassData:
+ *
+ * The map's render pass at a custom layer's place in the style, by the backend
+ * that the session renders with.
+ *
+ * See `mln_custom_layer_pass_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+GType maplibre_native_ffi_custom_layer_pass_data_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_LAYER_PASS_DATA \
+  (maplibre_native_ffi_custom_layer_pass_data_get_type())
+
+/**
+ * maplibre_native_ffi_custom_layer_pass_data_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiCustomLayerPassData*
+maplibre_native_ffi_custom_layer_pass_data_copy(
+  const MaplibreNativeFfiCustomLayerPassData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_pass_data_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_custom_layer_pass_data_free(
+  MaplibreNativeFfiCustomLayerPassData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_pass_data_is_metal:
+ *
+ * Whether the value holds `maplibre_native_ffi_custom_layer_pass_data_get_metal`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_custom_layer_pass_data_is_metal(
+  const MaplibreNativeFfiCustomLayerPassData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_pass_data_get_metal:
+ *
+ * The `metal` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiMetalCustomLayerPass*
+maplibre_native_ffi_custom_layer_pass_data_get_metal(
+  const MaplibreNativeFfiCustomLayerPassData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_pass_data_is_vulkan:
+ *
+ * Whether the value holds `maplibre_native_ffi_custom_layer_pass_data_get_vulkan`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_custom_layer_pass_data_is_vulkan(
+  const MaplibreNativeFfiCustomLayerPassData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_pass_data_get_vulkan:
+ *
+ * The `vulkan` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiVulkanCustomLayerPass*
+maplibre_native_ffi_custom_layer_pass_data_get_vulkan(
+  const MaplibreNativeFfiCustomLayerPassData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_pass_data_is_open_gl:
+ *
+ * Whether the value holds `maplibre_native_ffi_custom_layer_pass_data_get_open_gl`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_custom_layer_pass_data_is_open_gl(
+  const MaplibreNativeFfiCustomLayerPassData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_pass_data_get_open_gl:
+ *
+ * The `open_gl` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiOpenGlCustomLayerPass*
+maplibre_native_ffi_custom_layer_pass_data_get_open_gl(
+  const MaplibreNativeFfiCustomLayerPassData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_pass_data_is_web_gpu:
+ *
+ * Whether the value holds `maplibre_native_ffi_custom_layer_pass_data_get_web_gpu`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_custom_layer_pass_data_is_web_gpu(
+  const MaplibreNativeFfiCustomLayerPassData* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_pass_data_get_web_gpu:
+ *
+ * The `web_gpu` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiWebGpuCustomLayerPass*
+maplibre_native_ffi_custom_layer_pass_data_get_web_gpu(
+  const MaplibreNativeFfiCustomLayerPassData* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiCustomLayerPassData,
+  maplibre_native_ffi_custom_layer_pass_data_free
+)
+
+/**
+ * MaplibreNativeFfiCustomLayerPrerenderParameters:
+ *
+ * What a custom layer's prerender callback gets.
+ *
+ * See `mln_custom_layer_prerender_parameters` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+GType maplibre_native_ffi_custom_layer_prerender_parameters_get_type(
+  void
+) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_LAYER_PRERENDER_PARAMETERS \
+  (maplibre_native_ffi_custom_layer_prerender_parameters_get_type())
+
+/**
+ * maplibre_native_ffi_custom_layer_prerender_parameters_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiCustomLayerPrerenderParameters` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiCustomLayerPrerenderParameters*
+maplibre_native_ffi_custom_layer_prerender_parameters_new(void);
+
+/**
+ * maplibre_native_ffi_custom_layer_prerender_parameters_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiCustomLayerPrerenderParameters*
+maplibre_native_ffi_custom_layer_prerender_parameters_copy(
+  const MaplibreNativeFfiCustomLayerPrerenderParameters* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_prerender_parameters_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_custom_layer_prerender_parameters_free(
+  MaplibreNativeFfiCustomLayerPrerenderParameters* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_prerender_parameters_get_encoder:
+ *
+ * The `encoder` member.
+ *
+ * Returns: (transfer none) (nullable): the value
+ */
+MaplibreNativeFfiCustomLayerEncoderData*
+maplibre_native_ffi_custom_layer_prerender_parameters_get_encoder(
+  const MaplibreNativeFfiCustomLayerPrerenderParameters* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_prerender_parameters_get_frame:
+ *
+ * The `frame` member.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiCustomLayerFrame*
+maplibre_native_ffi_custom_layer_prerender_parameters_get_frame(
+  const MaplibreNativeFfiCustomLayerPrerenderParameters* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiCustomLayerPrerenderParameters,
+  maplibre_native_ffi_custom_layer_prerender_parameters_free
+)
+
+/**
+ * MaplibreNativeFfiCustomLayerRenderParameters:
+ *
+ * What a custom layer's render callback gets.
+ *
+ * See `mln_custom_layer_render_parameters` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+GType maplibre_native_ffi_custom_layer_render_parameters_get_type(
+  void
+) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_CUSTOM_LAYER_RENDER_PARAMETERS \
+  (maplibre_native_ffi_custom_layer_render_parameters_get_type())
+
+/**
+ * maplibre_native_ffi_custom_layer_render_parameters_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiCustomLayerRenderParameters` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiCustomLayerRenderParameters*
+maplibre_native_ffi_custom_layer_render_parameters_new(void);
+
+/**
+ * maplibre_native_ffi_custom_layer_render_parameters_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiCustomLayerRenderParameters*
+maplibre_native_ffi_custom_layer_render_parameters_copy(
+  const MaplibreNativeFfiCustomLayerRenderParameters* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_render_parameters_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_custom_layer_render_parameters_free(
+  MaplibreNativeFfiCustomLayerRenderParameters* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_render_parameters_get_pass:
+ *
+ * The `pass` member.
+ *
+ * Returns: (transfer none) (nullable): the value
+ */
+MaplibreNativeFfiCustomLayerPassData*
+maplibre_native_ffi_custom_layer_render_parameters_get_pass(
+  const MaplibreNativeFfiCustomLayerRenderParameters* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_render_parameters_get_frame:
+ *
+ * The `frame` member.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiCustomLayerFrame*
+maplibre_native_ffi_custom_layer_render_parameters_get_frame(
+  const MaplibreNativeFfiCustomLayerRenderParameters* self
+);
+
+/**
+ * maplibre_native_ffi_custom_layer_render_parameters_get_layer_depth:
+ *
+ * The depth that a 2D layer at the layer's place in the style writes, as
+ * `MaplibreNativeFfiFrameProjection` describes, between
+ * `frame.frame_projection.far_depth` and 1.
+ *
+ * The map draws the opaque fragments of its 2D layers before the render
+ * callback runs, those above the custom layer too. A fragment that you draw at
+ * this depth, tested with less-or-equal, stays under those above that wrote
+ * depth.
+ *
+ * Returns: the value
+ */
+gdouble maplibre_native_ffi_custom_layer_render_parameters_get_layer_depth(
+  const MaplibreNativeFfiCustomLayerRenderParameters* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiCustomLayerRenderParameters,
+  maplibre_native_ffi_custom_layer_render_parameters_free
+)
+
+/**
  * MaplibreNativeFfiCustomVectorSourceOptions:
  *
  * The callbacks and options of a custom vector source.
@@ -5084,10 +7175,10 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 /**
  * MaplibreNativeFfiDmaBufFrame:
  *
- * The dmabuf of an acquired frame.
+ * The dmabuf of an exported ring's acquired frame.
  *
  * See `mln_dma_buf_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 GType maplibre_native_ffi_dma_buf_frame_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_DMA_BUF_FRAME \
@@ -5204,138 +7295,13 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   MaplibreNativeFfiDmaBufFrame, maplibre_native_ffi_dma_buf_frame_free
 )
 
-GType maplibre_native_ffi_logical_size_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_LOGICAL_SIZE \
-  (maplibre_native_ffi_logical_size_get_type())
-
-/**
- * maplibre_native_ffi_logical_size_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiLogicalSize* maplibre_native_ffi_logical_size_copy(
-  const MaplibreNativeFfiLogicalSize* self
-);
-
-/**
- * maplibre_native_ffi_logical_size_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_logical_size_free(MaplibreNativeFfiLogicalSize* self);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiLogicalSize, maplibre_native_ffi_logical_size_free
-)
-
-/**
- * MaplibreNativeFfiDmaBufRingDescriptor:
- *
- * A ring of dmabufs that the library allocates, for
- * `maplibre_native_ffi_map_attach_dma_buf_ring()`.
- *
- * Each buffer has the map's size in pixels and a format and modifier from
- * `formats`. The library renders only DRM_FORMAT_ABGR8888 and
- * DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its format
- * has, such as a plane of compression metadata, and the library takes any such
- * modifier that its GPU can render into and share.
- *
- * See `mln_dma_buf_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
- */
-/**
- * maplibre_native_ffi_dma_buf_ring_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiDmaBufRingDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiDmaBufRingDescriptor*
-maplibre_native_ffi_dma_buf_ring_descriptor_new(void);
-
-/**
- * MaplibreNativeFfiDmaBufRingDescriptor:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_dma_buf_ring_descriptor_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiDmaBufRingDescriptor:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_dma_buf_ring_descriptor_get_logical_size(
-  MaplibreNativeFfiDmaBufRingDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_dma_buf_ring_descriptor_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiDmaBufRingDescriptor:logical-size`.
- */
-void maplibre_native_ffi_dma_buf_ring_descriptor_set_logical_size(
-  MaplibreNativeFfiDmaBufRingDescriptor* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiDmaBufRingDescriptor:buffer-count: (setter set_buffer_count) (getter get_buffer_count)
- *
- * How many buffers the ring has, from 1 to 8.
- */
-/**
- * maplibre_native_ffi_dma_buf_ring_descriptor_get_buffer_count: (get-property buffer-count)
- *
- * Gets `MaplibreNativeFfiDmaBufRingDescriptor:buffer-count`.
- *
- * Returns: the value
- */
-guint32 maplibre_native_ffi_dma_buf_ring_descriptor_get_buffer_count(
-  MaplibreNativeFfiDmaBufRingDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_dma_buf_ring_descriptor_set_buffer_count: (set-property buffer-count)
- *
- * Sets `MaplibreNativeFfiDmaBufRingDescriptor:buffer-count`.
- */
-void maplibre_native_ffi_dma_buf_ring_descriptor_set_buffer_count(
-  MaplibreNativeFfiDmaBufRingDescriptor* self, guint32 value
-);
-
-/**
- * maplibre_native_ffi_dma_buf_ring_descriptor_get_formats:
- *
- * Gets the value that `maplibre_native_ffi_dma_buf_ring_descriptor_set_formats` sets.
- *
- * Returns: (transfer none) (element-type MaplibreNativeFfiDmaBufFormat): the items
- */
-GPtrArray* maplibre_native_ffi_dma_buf_ring_descriptor_get_formats(
-  MaplibreNativeFfiDmaBufRingDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_dma_buf_ring_descriptor_set_formats:
- * @value: (array length=value_count): the items
- *
- * The formats and modifiers that your reader imports, most preferred first,
- * such as those that eglQueryDmaBufModifiersEXT() reports.
- */
-void maplibre_native_ffi_dma_buf_ring_descriptor_set_formats(
-  MaplibreNativeFfiDmaBufRingDescriptor* self,
-  const MaplibreNativeFfiDmaBufFormat* value, gsize value_count
-);
-
 /**
  * MaplibreNativeFfiEglContextDescriptor:
  *
- * The EGL objects that a render session makes its OpenGL context from.
+ * Your EGL context, which each session's context shares objects with.
+ *
+ * Each session makes its context on `display` with `config` and the client API
+ * and version of `share_context`.
  *
  * See `mln_egl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -5353,7 +7319,7 @@ maplibre_native_ffi_egl_context_descriptor_new(void);
 /**
  * MaplibreNativeFfiEglContextDescriptor:display: (setter set_display) (getter get_display)
  *
- * An `EGLDisplay`.
+ * An `EGLDisplay`, which you initialized.
  */
 /**
  * maplibre_native_ffi_egl_context_descriptor_get_display: (get-property display)
@@ -5378,7 +7344,7 @@ void maplibre_native_ffi_egl_context_descriptor_set_display(
 /**
  * MaplibreNativeFfiEglContextDescriptor:config: (setter set_config) (getter get_config)
  *
- * An `EGLConfig`.
+ * The `EGLConfig` of `share_context`.
  */
 /**
  * maplibre_native_ffi_egl_context_descriptor_get_config: (get-property config)
@@ -5403,7 +7369,7 @@ void maplibre_native_ffi_egl_context_descriptor_set_config(
 /**
  * MaplibreNativeFfiEglContextDescriptor:share-context: (setter set_share_context) (getter get_share_context)
  *
- * Your `EGLContext`, for a shared context.
+ * Your `EGLContext`.
  */
 /**
  * maplibre_native_ffi_egl_context_descriptor_get_share_context: (get-property share-context)
@@ -5423,33 +7389,6 @@ gpointer maplibre_native_ffi_egl_context_descriptor_get_share_context(
  */
 void maplibre_native_ffi_egl_context_descriptor_set_share_context(
   MaplibreNativeFfiEglContextDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiEglContextDescriptor:client-api: (setter set_client_api) (getter get_client_api)
- *
- * The API of a dedicated context. A shared context uses the API of yours.
- */
-/**
- * maplibre_native_ffi_egl_context_descriptor_get_client_api: (get-property client-api)
- *
- * Gets `MaplibreNativeFfiEglContextDescriptor:client-api`.
- *
- * Returns: the value
- */
-MaplibreNativeFfiOpenGlClientApi
-maplibre_native_ffi_egl_context_descriptor_get_client_api(
-  MaplibreNativeFfiEglContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_egl_context_descriptor_set_client_api: (set-property client-api)
- *
- * Sets `MaplibreNativeFfiEglContextDescriptor:client-api`.
- */
-void maplibre_native_ffi_egl_context_descriptor_set_client_api(
-  MaplibreNativeFfiEglContextDescriptor* self,
-  MaplibreNativeFfiOpenGlClientApi value
 );
 
 /**
@@ -5475,6 +7414,213 @@ gpointer maplibre_native_ffi_egl_context_descriptor_get_get_proc_address(
  */
 void maplibre_native_ffi_egl_context_descriptor_set_get_proc_address(
   MaplibreNativeFfiEglContextDescriptor* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiExportedRingTarget:
+ *
+ * A ring of textures that the session allocates on its device and shares with
+ * you, in one of the ways that you can import.
+ *
+ * Each texture has the size in pixels of `logical_size` at the map's scale
+ * factor. `maplibre_native_ffi_render_session_resize_async()` gives the ring
+ * textures of the new size, and a frame that you hold keeps its texture of the
+ * old size until you release or discard it.
+ *
+ * The ring shares its textures in the first kind of `export_kinds` that the
+ * device exports, in this order, and
+ * `MaplibreNativeFfiRenderSessionCapabilities.export_kind` reports it:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_IO_SURFACE`: IOSurfaces of the pixel
+ *   format kCVPixelFormatType_32BGRA, which Metal names
+ *   MTLPixelFormatBGRA8Unorm. Get each frame's surface with
+ *   `maplibre_native_ffi_acquired_frame_get_io_surface()`.
+ * - `MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_ANDROID_HARDWARE_BUFFER`: hardware
+ *   buffers of the format AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, with the usage
+ *   AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
+ *   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
+ *   `android_hardware_buffer_usage`.
+ * - `MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE`: D3D11 textures of
+ *   the format DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as
+ *   shader resources and render targets. Open them on a D3D11 or D3D12 device
+ *   of the same adapter, which you pick with
+ *   `MaplibreNativeFfiGpuDeviceOptions:adapter-luid`.
+ * - `MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_DMA_BUF`: dmabufs of a format and
+ *   modifier from `dma_buf_formats`. Get each frame's buffer with
+ *   `maplibre_native_ffi_acquired_frame_get_dma_buf()`.
+ * - `MAPLIBRE_NATIVE_FFI_GPU_EXPORT_KIND_OPAQUE_FD`: the memory of Vulkan
+ *   images, which only a Vulkan device or an OpenGL context with
+ *   GL_EXT_memory_object_fd on the same GPU and driver imports. To pick the
+ *   GPU, create the device with
+ *   `MaplibreNativeFfiGpuDeviceOptions:adapter-uuid` set to your context's
+ *   GL_DEVICE_UUID_EXT. Get each frame's memory with
+ *   `maplibre_native_ffi_acquired_frame_get_opaque_fd()`.
+ *
+ * `MaplibreNativeFfiGpuDeviceCapabilities.export_kinds` reports the kinds that
+ * a device exports. Attach with
+ * `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER`. Without a device, the
+ * session renders on the first of the platform's backends whose device exports
+ * one of `export_kinds`.
+ *
+ * Each frame hands over with `MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE` or
+ * with the sync kind that crosses APIs on its platform:
+ * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_METAL_SHARED_EVENT` for an IOSurface, and
+ * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_SYNC_FD` for the others, where the device has
+ * them. For a reader that waits on neither, such as a Wayland compositor
+ * without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
+ * out of `MaplibreNativeFfiRenderSessionAttachOptions:producer-sync-kinds`, so
+ * that each frame finishes before you acquire it, and release each frame only
+ * once the reader is done with its texture. Give the ring 3 textures, so the
+ * session can render while you hold two frames.
+ *
+ * See `mln_exported_ring_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+/**
+ * maplibre_native_ffi_exported_ring_target_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiExportedRingTarget` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiExportedRingTarget*
+maplibre_native_ffi_exported_ring_target_new(void);
+
+/**
+ * MaplibreNativeFfiExportedRingTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
+ *
+ * The `logical_size` member.
+ */
+/**
+ * maplibre_native_ffi_exported_ring_target_get_logical_size: (get-property logical-size)
+ *
+ * Gets `MaplibreNativeFfiExportedRingTarget:logical-size`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_exported_ring_target_get_logical_size(
+  MaplibreNativeFfiExportedRingTarget* self
+);
+
+/**
+ * maplibre_native_ffi_exported_ring_target_set_logical_size: (set-property logical-size)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiExportedRingTarget:logical-size`.
+ */
+void maplibre_native_ffi_exported_ring_target_set_logical_size(
+  MaplibreNativeFfiExportedRingTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+);
+
+/**
+ * MaplibreNativeFfiExportedRingTarget:texture-count: (setter set_texture_count) (getter get_texture_count)
+ *
+ * How many textures the ring has, from 1 to
+ * `MAPLIBRE_NATIVE_FFI_TEXTURE_RING_MAX_DEPTH`.
+ */
+/**
+ * maplibre_native_ffi_exported_ring_target_get_texture_count: (get-property texture-count)
+ *
+ * Gets `MaplibreNativeFfiExportedRingTarget:texture-count`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_exported_ring_target_get_texture_count(
+  MaplibreNativeFfiExportedRingTarget* self
+);
+
+/**
+ * maplibre_native_ffi_exported_ring_target_set_texture_count: (set-property texture-count)
+ *
+ * Sets `MaplibreNativeFfiExportedRingTarget:texture-count`.
+ */
+void maplibre_native_ffi_exported_ring_target_set_texture_count(
+  MaplibreNativeFfiExportedRingTarget* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiExportedRingTarget:export-kinds: (setter set_export_kinds) (getter get_export_kinds)
+ *
+ * The ways of sharing a texture that you can import.
+ */
+/**
+ * maplibre_native_ffi_exported_ring_target_get_export_kinds: (get-property export-kinds)
+ *
+ * Gets `MaplibreNativeFfiExportedRingTarget:export-kinds`.
+ *
+ * Returns: the value
+ */
+MaplibreNativeFfiGpuExportKindFlag
+maplibre_native_ffi_exported_ring_target_get_export_kinds(
+  MaplibreNativeFfiExportedRingTarget* self
+);
+
+/**
+ * maplibre_native_ffi_exported_ring_target_set_export_kinds: (set-property export-kinds)
+ *
+ * Sets `MaplibreNativeFfiExportedRingTarget:export-kinds`.
+ */
+void maplibre_native_ffi_exported_ring_target_set_export_kinds(
+  MaplibreNativeFfiExportedRingTarget* self,
+  MaplibreNativeFfiGpuExportKindFlag value
+);
+
+/**
+ * maplibre_native_ffi_exported_ring_target_get_dma_buf_formats:
+ *
+ * Gets the value that `maplibre_native_ffi_exported_ring_target_set_dma_buf_formats` sets.
+ *
+ * Returns: (transfer none) (element-type MaplibreNativeFfiDmaBufFormat): the items
+ */
+GPtrArray* maplibre_native_ffi_exported_ring_target_get_dma_buf_formats(
+  MaplibreNativeFfiExportedRingTarget* self
+);
+
+/**
+ * maplibre_native_ffi_exported_ring_target_set_dma_buf_formats:
+ * @value: (array length=value_count): the items
+ *
+ * The dmabuf formats and modifiers that you import, most preferred first, such
+ * as those that eglQueryDmaBufModifiersEXT() reports. A ring exports dmabufs
+ * only of one of them. The library renders only DRM_FORMAT_ABGR8888 and
+ * DRM_FORMAT_ARGB8888. A modifier can give a buffer more planes than its format
+ * has, such as a plane of compression metadata, and the library takes any such
+ * modifier that its GPU can render into and share. The library takes no
+ * implicit modifier: it skips DRM_FORMAT_MOD_INVALID, so a list of only that
+ * one gets no dmabuf.
+ */
+void maplibre_native_ffi_exported_ring_target_set_dma_buf_formats(
+  MaplibreNativeFfiExportedRingTarget* self,
+  const MaplibreNativeFfiDmaBufFormat* value, gsize value_count
+);
+
+/**
+ * MaplibreNativeFfiExportedRingTarget:android-hardware-buffer-usage: (setter set_android_hardware_buffer_usage) (getter get_android_hardware_buffer_usage)
+ *
+ * More `AHARDWAREBUFFER_USAGE_*` bits that your reads of a hardware buffer
+ * need, such as AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, or zero.
+ */
+/**
+ * maplibre_native_ffi_exported_ring_target_get_android_hardware_buffer_usage: (get-property android-hardware-buffer-usage)
+ *
+ * Gets `MaplibreNativeFfiExportedRingTarget:android-hardware-buffer-usage`.
+ *
+ * Returns: the value
+ */
+guint64
+maplibre_native_ffi_exported_ring_target_get_android_hardware_buffer_usage(
+  MaplibreNativeFfiExportedRingTarget* self
+);
+
+/**
+ * maplibre_native_ffi_exported_ring_target_set_android_hardware_buffer_usage: (set-property android-hardware-buffer-usage)
+ *
+ * Sets `MaplibreNativeFfiExportedRingTarget:android-hardware-buffer-usage`.
+ */
+void maplibre_native_ffi_exported_ring_target_set_android_hardware_buffer_usage(
+  MaplibreNativeFfiExportedRingTarget* self, guint64 value
 );
 
 /**
@@ -5819,7 +7965,8 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 /**
  * MaplibreNativeFfiFramePacerOptions:
  *
- * Options for creating a frame pacer.
+ * Options for creating a frame pacer, or for
+ * `maplibre_native_ffi_frame_pacer_set_options()`.
  *
  * A member that a `has_` method reports on is unset until its property or
  * setter sets it.
@@ -6431,6 +8578,486 @@ void maplibre_native_ffi_geo_json_source_options_set_cluster(
   MaplibreNativeFfiGeoJsonSourceOptions* self, gboolean value
 );
 
+GType maplibre_native_ffi_gpu_device_capabilities_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_GPU_DEVICE_CAPABILITIES \
+  (maplibre_native_ffi_gpu_device_capabilities_get_type())
+
+/**
+ * maplibre_native_ffi_gpu_device_capabilities_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiGpuDeviceCapabilities*
+maplibre_native_ffi_gpu_device_capabilities_copy(
+  const MaplibreNativeFfiGpuDeviceCapabilities* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_capabilities_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_gpu_device_capabilities_free(
+  MaplibreNativeFfiGpuDeviceCapabilities* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiGpuDeviceCapabilities,
+  maplibre_native_ffi_gpu_device_capabilities_free
+)
+
+/**
+ * MaplibreNativeFfiQueueLock:
+ *
+ * Your lock on a Vulkan queue that you and the render sessions of a GPU device
+ * all submit to.
+ *
+ * A session holds the lock only while it submits or presents to the queue, or
+ * submits the empty batch that drains its work from the queue. It never holds
+ * the lock while it waits. Set both `lock` and `unlock`, or neither when you
+ * don't submit to the queue yourself.
+ *
+ * Don't hold the lock while you call the library.
+ *
+ * It can run on a library thread, and it can't call the library.
+ *
+ * See `mln_queue_lock` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+GType maplibre_native_ffi_queue_lock_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_QUEUE_LOCK \
+  (maplibre_native_ffi_queue_lock_get_type())
+
+/**
+ * maplibre_native_ffi_queue_lock_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiQueueLock` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiQueueLock* maplibre_native_ffi_queue_lock_new(void);
+
+/**
+ * maplibre_native_ffi_queue_lock_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiQueueLock* maplibre_native_ffi_queue_lock_copy(
+  const MaplibreNativeFfiQueueLock* self
+);
+
+/**
+ * maplibre_native_ffi_queue_lock_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_queue_lock_free(MaplibreNativeFfiQueueLock* self);
+
+/**
+ * maplibre_native_ffi_queue_lock_set_lock: (skip)
+ * @callback: (scope notified) (closure user_data) (destroy notify) (nullable): the callback
+ * @user_data: the data to pass to `callback`
+ * @notify: the function that frees `user_data` after the last call
+ *
+ * Locks or unlocks the Vulkan queue that you share with the render sessions of
+ * a GPU device.
+ *
+ * It can run on a library thread, and it can't call the library.
+ *
+ * See `mln_queue_lock_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+void maplibre_native_ffi_queue_lock_set_lock(
+  MaplibreNativeFfiQueueLock* self, MaplibreNativeFfiQueueLockCallback callback,
+  gpointer user_data, GDestroyNotify notify
+);
+
+/**
+ * maplibre_native_ffi_queue_lock_set_unlock: (skip)
+ * @callback: (scope notified) (closure user_data) (destroy notify) (nullable): the callback
+ * @user_data: the data to pass to `callback`
+ * @notify: the function that frees `user_data` after the last call
+ *
+ * Locks or unlocks the Vulkan queue that you share with the render sessions of
+ * a GPU device.
+ *
+ * It can run on a library thread, and it can't call the library.
+ *
+ * See `mln_queue_lock_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+void maplibre_native_ffi_queue_lock_set_unlock(
+  MaplibreNativeFfiQueueLock* self, MaplibreNativeFfiQueueLockCallback callback,
+  gpointer user_data, GDestroyNotify notify
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiQueueLock, maplibre_native_ffi_queue_lock_free
+)
+
+/**
+ * MaplibreNativeFfiGpuDeviceOptions:
+ *
+ * Options for `maplibre_native_ffi_gpu_device_create()`.
+ *
+ * Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
+ * `adapter_luid`. Without one, the device prefers a discrete GPU. An OpenGL
+ * device takes none of them: it renders on the GPU that the platform picks.
+ *
+ * A member that a `has_` method reports on is unset until its property or
+ * setter sets it.
+ *
+ * See `mln_gpu_device_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+/**
+ * maplibre_native_ffi_gpu_device_options_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiGpuDeviceOptions` whose members are zero, empty, or unset.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiGpuDeviceOptions* maplibre_native_ffi_gpu_device_options_new(
+  void
+);
+
+/**
+ * MaplibreNativeFfiGpuDeviceOptions:backend: (setter set_backend) (getter get_backend)
+ *
+ * The backend that the device renders with. By default, the platform's own:
+ * Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has no
+ * Vulkan driver, and in a browser the build's one backend: WebGPU or OpenGL
+ * (WebGL2).
+ *
+ * Until it is set, it holds 0, which names no value and which native code
+ * rejects, whatever the property's default says.
+ */
+/**
+ * maplibre_native_ffi_gpu_device_options_get_backend: (get-property backend)
+ *
+ * Gets `MaplibreNativeFfiGpuDeviceOptions:backend`.
+ *
+ * Returns: the value
+ */
+MaplibreNativeFfiRenderBackend
+maplibre_native_ffi_gpu_device_options_get_backend(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_has_backend:
+ *
+ * Whether `MaplibreNativeFfiGpuDeviceOptions:backend` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gpu_device_options_has_backend(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_set_backend: (set-property backend)
+ *
+ * Sets `MaplibreNativeFfiGpuDeviceOptions:backend`.
+ */
+void maplibre_native_ffi_gpu_device_options_set_backend(
+  MaplibreNativeFfiGpuDeviceOptions* self, MaplibreNativeFfiRenderBackend value
+);
+
+/**
+ * MaplibreNativeFfiGpuDeviceOptions:adapter-index: (setter set_adapter_index) (getter get_adapter_index)
+ *
+ * The GPU to use, as an index into the backend's list of GPUs. OpenGL's list
+ * holds one GPU: the one that its display renders on.
+ */
+/**
+ * maplibre_native_ffi_gpu_device_options_get_adapter_index: (get-property adapter-index)
+ *
+ * Gets `MaplibreNativeFfiGpuDeviceOptions:adapter-index`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_gpu_device_options_get_adapter_index(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_has_adapter_index:
+ *
+ * Whether `MaplibreNativeFfiGpuDeviceOptions:adapter-index` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gpu_device_options_has_adapter_index(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_set_adapter_index: (set-property adapter-index)
+ *
+ * Sets `MaplibreNativeFfiGpuDeviceOptions:adapter-index`.
+ */
+void maplibre_native_ffi_gpu_device_options_set_adapter_index(
+  MaplibreNativeFfiGpuDeviceOptions* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiGpuDeviceOptions:adapter-uuid: (setter set_adapter_uuid) (getter get_adapter_uuid)
+ *
+ * The 16-byte UUID of the GPU to use: Vulkan's
+ * `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes one.
+ */
+/**
+ * maplibre_native_ffi_gpu_device_options_get_adapter_uuid: (get-property adapter-uuid)
+ *
+ * Gets `MaplibreNativeFfiGpuDeviceOptions:adapter-uuid`.
+ *
+ * Returns: (transfer none) (nullable): the bytes
+ */
+GBytes* maplibre_native_ffi_gpu_device_options_get_adapter_uuid(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_has_adapter_uuid:
+ *
+ * Whether `MaplibreNativeFfiGpuDeviceOptions:adapter-uuid` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gpu_device_options_has_adapter_uuid(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_set_adapter_uuid: (set-property adapter-uuid)
+ * @value: (nullable): the bytes
+ *
+ * Sets `MaplibreNativeFfiGpuDeviceOptions:adapter-uuid`.
+ */
+void maplibre_native_ffi_gpu_device_options_set_adapter_uuid(
+  MaplibreNativeFfiGpuDeviceOptions* self, GBytes* value
+);
+
+/**
+ * MaplibreNativeFfiGpuDeviceOptions:adapter-luid: (setter set_adapter_luid) (getter get_adapter_luid)
+ *
+ * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which
+ * Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a Vulkan
+ * device takes one.
+ */
+/**
+ * maplibre_native_ffi_gpu_device_options_get_adapter_luid: (get-property adapter-luid)
+ *
+ * Gets `MaplibreNativeFfiGpuDeviceOptions:adapter-luid`.
+ *
+ * Returns: (transfer none) (nullable): the bytes
+ */
+GBytes* maplibre_native_ffi_gpu_device_options_get_adapter_luid(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_has_adapter_luid:
+ *
+ * Whether `MaplibreNativeFfiGpuDeviceOptions:adapter-luid` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gpu_device_options_has_adapter_luid(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_set_adapter_luid: (set-property adapter-luid)
+ * @value: (nullable): the bytes
+ *
+ * Sets `MaplibreNativeFfiGpuDeviceOptions:adapter-luid`.
+ */
+void maplibre_native_ffi_gpu_device_options_set_adapter_luid(
+  MaplibreNativeFfiGpuDeviceOptions* self, GBytes* value
+);
+
+/**
+ * MaplibreNativeFfiGpuDeviceOptions:open-gl-client-api: (setter set_open_gl_client_api) (getter get_open_gl_client_api)
+ *
+ * The OpenGL API that an OpenGL device renders with. An EGL device defaults to
+ * `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES`, and takes
+ * `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GL` too on Linux and FreeBSD. A WGL
+ * device takes only `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GL`, its default,
+ * and a WebGL device only `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES`, its
+ * default.
+ */
+/**
+ * maplibre_native_ffi_gpu_device_options_get_open_gl_client_api: (get-property open-gl-client-api)
+ *
+ * Gets `MaplibreNativeFfiGpuDeviceOptions:open-gl-client-api`.
+ *
+ * Returns: the value
+ */
+MaplibreNativeFfiOpenGlClientApi
+maplibre_native_ffi_gpu_device_options_get_open_gl_client_api(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_has_open_gl_client_api:
+ *
+ * Whether `MaplibreNativeFfiGpuDeviceOptions:open-gl-client-api` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gpu_device_options_has_open_gl_client_api(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_set_open_gl_client_api: (set-property open-gl-client-api)
+ *
+ * Sets `MaplibreNativeFfiGpuDeviceOptions:open-gl-client-api`.
+ */
+void maplibre_native_ffi_gpu_device_options_set_open_gl_client_api(
+  MaplibreNativeFfiGpuDeviceOptions* self,
+  MaplibreNativeFfiOpenGlClientApi value
+);
+
+/**
+ * MaplibreNativeFfiGpuDeviceOptions:open-gl-single-context: (setter set_open_gl_single_context) (getter get_open_gl_single_context)
+ *
+ * Whether the sessions of an EGL device take turns in one OpenGL context
+ * instead of having one each.
+ */
+/**
+ * maplibre_native_ffi_gpu_device_options_get_open_gl_single_context: (get-property open-gl-single-context)
+ *
+ * Gets `MaplibreNativeFfiGpuDeviceOptions:open-gl-single-context`.
+ *
+ * Returns: the value
+ */
+gboolean maplibre_native_ffi_gpu_device_options_get_open_gl_single_context(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_has_open_gl_single_context:
+ *
+ * Whether `MaplibreNativeFfiGpuDeviceOptions:open-gl-single-context` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_gpu_device_options_has_open_gl_single_context(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_set_open_gl_single_context: (set-property open-gl-single-context)
+ *
+ * Sets `MaplibreNativeFfiGpuDeviceOptions:open-gl-single-context`.
+ */
+void maplibre_native_ffi_gpu_device_options_set_open_gl_single_context(
+  MaplibreNativeFfiGpuDeviceOptions* self, gboolean value
+);
+
+/**
+ * MaplibreNativeFfiGpuDeviceOptions:queue-lock: (setter set_queue_lock) (getter get_queue_lock)
+ *
+ * Your lock on a Vulkan device's queue, when you submit to the queue that
+ * `maplibre_native_ffi_gpu_device_get_vulkan_context()` reports. Only a Vulkan
+ * device takes one.
+ */
+/**
+ * maplibre_native_ffi_gpu_device_options_get_queue_lock: (get-property queue-lock)
+ *
+ * Gets `MaplibreNativeFfiGpuDeviceOptions:queue-lock`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiQueueLock*
+maplibre_native_ffi_gpu_device_options_get_queue_lock(
+  MaplibreNativeFfiGpuDeviceOptions* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_options_set_queue_lock: (set-property queue-lock)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiGpuDeviceOptions:queue-lock`.
+ */
+void maplibre_native_ffi_gpu_device_options_set_queue_lock(
+  MaplibreNativeFfiGpuDeviceOptions* self,
+  const MaplibreNativeFfiQueueLock* value
+);
+
+/**
+ * MaplibreNativeFfiGpuDeviceVulkanContextResult:
+ *
+ * The Vulkan objects of a device, as
+ * `maplibre_native_ffi_gpu_device_get_vulkan_context()` reports them.
+ *
+ * See `mln_gpu_device_vulkan_context_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+GType maplibre_native_ffi_gpu_device_vulkan_context_result_get_type(
+  void
+) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_GPU_DEVICE_VULKAN_CONTEXT_RESULT \
+  (maplibre_native_ffi_gpu_device_vulkan_context_result_get_type())
+
+/**
+ * maplibre_native_ffi_gpu_device_vulkan_context_result_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiGpuDeviceVulkanContextResult` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiGpuDeviceVulkanContextResult*
+maplibre_native_ffi_gpu_device_vulkan_context_result_new(void);
+
+/**
+ * maplibre_native_ffi_gpu_device_vulkan_context_result_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiGpuDeviceVulkanContextResult*
+maplibre_native_ffi_gpu_device_vulkan_context_result_copy(
+  const MaplibreNativeFfiGpuDeviceVulkanContextResult* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_vulkan_context_result_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_gpu_device_vulkan_context_result_free(
+  MaplibreNativeFfiGpuDeviceVulkanContextResult* self
+);
+
+/**
+ * maplibre_native_ffi_gpu_device_vulkan_context_result_get_context:
+ *
+ * The `context` member.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiVulkanContextDescriptor*
+maplibre_native_ffi_gpu_device_vulkan_context_result_get_context(
+  const MaplibreNativeFfiGpuDeviceVulkanContextResult* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiGpuDeviceVulkanContextResult,
+  maplibre_native_ffi_gpu_device_vulkan_context_result_free
+)
+
 GType maplibre_native_ffi_gpu_sync_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_GPU_SYNC \
   (maplibre_native_ffi_gpu_sync_get_type())
@@ -6778,10 +9405,10 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 /**
  * MaplibreNativeFfiIoSurfaceFrame:
  *
- * The IOSurface of an acquired frame.
+ * The IOSurface of an exported ring's acquired frame.
  *
  * See `mln_io_surface_frame` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 GType maplibre_native_ffi_io_surface_frame_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_IO_SURFACE_FRAME \
@@ -6877,153 +9504,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 )
 
 /**
- * MaplibreNativeFfiMetalContextDescriptor:
- *
- * The Metal device that a render session uses.
- *
- * See `mln_metal_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-/**
- * maplibre_native_ffi_metal_context_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiMetalContextDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiMetalContextDescriptor*
-maplibre_native_ffi_metal_context_descriptor_new(void);
-
-/**
- * MaplibreNativeFfiMetalContextDescriptor:device: (setter set_device) (getter get_device)
- *
- * An `MTLDevice`.
- */
-/**
- * maplibre_native_ffi_metal_context_descriptor_get_device: (get-property device)
- *
- * Gets `MaplibreNativeFfiMetalContextDescriptor:device`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_metal_context_descriptor_get_device(
-  MaplibreNativeFfiMetalContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_metal_context_descriptor_set_device: (set-property device)
- *
- * Sets `MaplibreNativeFfiMetalContextDescriptor:device`.
- */
-void maplibre_native_ffi_metal_context_descriptor_set_device(
-  MaplibreNativeFfiMetalContextDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiIoSurfaceRingDescriptor:
- *
- * A ring of IOSurfaces that the library allocates, for
- * `maplibre_native_ffi_map_attach_io_surface_ring()`.
- *
- * Each surface has the map's size in pixels, `logical_size` times the map's
- * scale factor, and the pixel format kCVPixelFormatType_32BGRA, which Metal
- * names MTLPixelFormatBGRA8Unorm.
- *
- * See `mln_io_surface_ring_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
- */
-/**
- * maplibre_native_ffi_io_surface_ring_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiIoSurfaceRingDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiIoSurfaceRingDescriptor*
-maplibre_native_ffi_io_surface_ring_descriptor_new(void);
-
-/**
- * MaplibreNativeFfiIoSurfaceRingDescriptor:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_io_surface_ring_descriptor_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiIoSurfaceRingDescriptor:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_io_surface_ring_descriptor_get_logical_size(
-  MaplibreNativeFfiIoSurfaceRingDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_io_surface_ring_descriptor_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiIoSurfaceRingDescriptor:logical-size`.
- */
-void maplibre_native_ffi_io_surface_ring_descriptor_set_logical_size(
-  MaplibreNativeFfiIoSurfaceRingDescriptor* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiIoSurfaceRingDescriptor:buffer-count: (setter set_buffer_count) (getter get_buffer_count)
- *
- * How many surfaces the ring has, from 1 to 8.
- */
-/**
- * maplibre_native_ffi_io_surface_ring_descriptor_get_buffer_count: (get-property buffer-count)
- *
- * Gets `MaplibreNativeFfiIoSurfaceRingDescriptor:buffer-count`.
- *
- * Returns: the value
- */
-guint32 maplibre_native_ffi_io_surface_ring_descriptor_get_buffer_count(
-  MaplibreNativeFfiIoSurfaceRingDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_io_surface_ring_descriptor_set_buffer_count: (set-property buffer-count)
- *
- * Sets `MaplibreNativeFfiIoSurfaceRingDescriptor:buffer-count`.
- */
-void maplibre_native_ffi_io_surface_ring_descriptor_set_buffer_count(
-  MaplibreNativeFfiIoSurfaceRingDescriptor* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiIoSurfaceRingDescriptor:context: (setter set_context) (getter get_context)
- *
- * The MTLDevice to render with. A null device picks the system's default.
- */
-/**
- * maplibre_native_ffi_io_surface_ring_descriptor_get_context: (get-property context)
- *
- * Gets `MaplibreNativeFfiIoSurfaceRingDescriptor:context`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiMetalContextDescriptor*
-maplibre_native_ffi_io_surface_ring_descriptor_get_context(
-  MaplibreNativeFfiIoSurfaceRingDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_io_surface_ring_descriptor_set_context: (set-property context)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiIoSurfaceRingDescriptor:context`.
- */
-void maplibre_native_ffi_io_surface_ring_descriptor_set_context(
-  MaplibreNativeFfiIoSurfaceRingDescriptor* self,
-  MaplibreNativeFfiMetalContextDescriptor* value
-);
-
-/**
  * MaplibreNativeFfiLogHandler:
  *
  * A log callback, for `maplibre_native_ffi_set_log_callback()`.
@@ -7088,35 +9568,6 @@ void maplibre_native_ffi_log_handler_set_callback(
   gpointer user_data, GDestroyNotify notify
 );
 
-GType maplibre_native_ffi_logical_extent_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_LOGICAL_EXTENT \
-  (maplibre_native_ffi_logical_extent_get_type())
-
-/**
- * maplibre_native_ffi_logical_extent_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiLogicalExtent* maplibre_native_ffi_logical_extent_copy(
-  const MaplibreNativeFfiLogicalExtent* self
-);
-
-/**
- * maplibre_native_ffi_logical_extent_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_logical_extent_free(
-  MaplibreNativeFfiLogicalExtent* self
-);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiLogicalExtent, maplibre_native_ffi_logical_extent_free
-)
-
 /**
  * MaplibreNativeFfiMapOptions:
  *
@@ -7140,8 +9591,10 @@ MaplibreNativeFfiMapOptions* maplibre_native_ffi_map_options_new(void);
 /**
  * MaplibreNativeFfiMapOptions:initial-extent: (setter set_initial_extent) (getter get_initial_extent)
  *
- * The map's first size, and its scale factor. The scale factor stays fixed for
- * the map's life, and every render session of the map renders at it.
+ * The map's first size, and its scale factor. Render sessions of the map render
+ * at its scale factor. `maplibre_native_ffi_map_resize_async()` changes both,
+ * or `maplibre_native_ffi_render_session_resize_async()` while a render session
+ * is attached.
  */
 /**
  * maplibre_native_ffi_map_options_get_initial_extent: (get-property initial-extent)
@@ -7297,7 +9750,8 @@ void maplibre_native_ffi_map_options_set_tile_cache_enabled(
  * need complex shaping, like Myanmar or Devanagari. A JSON array of font files,
  * each an object with a `url` and an optional `unicode-range`, as in a font
  * face of a style's `font-faces`, which every font stack uses after the style's
- * own font faces. Empty for none.
+ * own font faces. Empty for the system's fonts, unless `system_fonts_enabled`
+ * is false.
  */
 /**
  * maplibre_native_ffi_map_options_get_fallback_font_faces: (get-property fallback-font-faces)
@@ -7318,6 +9772,47 @@ const char* maplibre_native_ffi_map_options_get_fallback_font_faces(
  */
 void maplibre_native_ffi_map_options_set_fallback_font_faces(
   MaplibreNativeFfiMapOptions* self, const char* value
+);
+
+/**
+ * MaplibreNativeFfiMapOptions:system-fonts-enabled: (setter set_system_fonts_enabled) (getter get_system_fonts_enabled)
+ *
+ * Whether the map falls back to the system's fonts for CJK and the scripts that
+ * need complex shaping when `fallback_font_faces` is empty: fonts that the
+ * platform's font matcher picks for the user's preferred languages. Without it,
+ * the map does. The first map that uses them waits for them to be found. In the
+ * browser, the browser draws CJK glyphs in its sans-serif font instead, where
+ * `fallback_font_faces` doesn't cover them.
+ */
+/**
+ * maplibre_native_ffi_map_options_get_system_fonts_enabled: (get-property system-fonts-enabled)
+ *
+ * Gets `MaplibreNativeFfiMapOptions:system-fonts-enabled`.
+ *
+ * Returns: the value
+ */
+gboolean maplibre_native_ffi_map_options_get_system_fonts_enabled(
+  MaplibreNativeFfiMapOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_options_has_system_fonts_enabled:
+ *
+ * Whether `MaplibreNativeFfiMapOptions:system-fonts-enabled` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_map_options_has_system_fonts_enabled(
+  MaplibreNativeFfiMapOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_options_set_system_fonts_enabled: (set-property system-fonts-enabled)
+ *
+ * Sets `MaplibreNativeFfiMapOptions:system-fonts-enabled`.
+ */
+void maplibre_native_ffi_map_options_set_system_fonts_enabled(
+  MaplibreNativeFfiMapOptions* self, gboolean value
 );
 
 GType maplibre_native_ffi_map_projection_camera_result_get_type(
@@ -7380,120 +9875,6 @@ void maplibre_native_ffi_map_tile_settings_free(
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   MaplibreNativeFfiMapTileSettings, maplibre_native_ffi_map_tile_settings_free
-)
-
-GType maplibre_native_ffi_projection_mode_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_PROJECTION_MODE \
-  (maplibre_native_ffi_projection_mode_get_type())
-
-/**
- * maplibre_native_ffi_projection_mode_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiProjectionMode* maplibre_native_ffi_projection_mode_copy(
-  const MaplibreNativeFfiProjectionMode* self
-);
-
-/**
- * maplibre_native_ffi_projection_mode_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_projection_mode_free(
-  MaplibreNativeFfiProjectionMode* self
-);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiProjectionMode, maplibre_native_ffi_projection_mode_free
-)
-
-GType maplibre_native_ffi_map_viewport_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_VIEWPORT \
-  (maplibre_native_ffi_map_viewport_get_type())
-
-/**
- * maplibre_native_ffi_map_viewport_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiMapViewport* maplibre_native_ffi_map_viewport_copy(
-  const MaplibreNativeFfiMapViewport* self
-);
-
-/**
- * maplibre_native_ffi_map_viewport_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_map_viewport_free(MaplibreNativeFfiMapViewport* self);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiMapViewport, maplibre_native_ffi_map_viewport_free
-)
-
-GType maplibre_native_ffi_projection_definition_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_PROJECTION_DEFINITION \
-  (maplibre_native_ffi_projection_definition_get_type())
-
-/**
- * maplibre_native_ffi_projection_definition_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiProjectionDefinition*
-maplibre_native_ffi_projection_definition_copy(
-  const MaplibreNativeFfiProjectionDefinition* self
-);
-
-/**
- * maplibre_native_ffi_projection_definition_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_projection_definition_free(
-  MaplibreNativeFfiProjectionDefinition* self
-);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiProjectionDefinition,
-  maplibre_native_ffi_projection_definition_free
-)
-
-GType maplibre_native_ffi_map_view_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_VIEW \
-  (maplibre_native_ffi_map_view_get_type())
-
-/**
- * maplibre_native_ffi_map_view_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiMapView* maplibre_native_ffi_map_view_copy(
-  const MaplibreNativeFfiMapView* self
-);
-
-/**
- * maplibre_native_ffi_map_view_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_map_view_free(MaplibreNativeFfiMapView* self);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiMapView, maplibre_native_ffi_map_view_free
 )
 
 GType maplibre_native_ffi_map_snapshot_get_type(void) G_GNUC_CONST;
@@ -7942,7 +10323,7 @@ void maplibre_native_ffi_map_viewport_options_set_frustum_offset(
  * A Metal texture of a borrowed ring.
  *
  * See `mln_metal_borrowed_texture` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 /**
  * maplibre_native_ffi_metal_borrowed_texture_new: (constructor)
@@ -7957,7 +10338,7 @@ maplibre_native_ffi_metal_borrowed_texture_new(void);
 /**
  * MaplibreNativeFfiMetalBorrowedTexture:texture: (setter set_texture) (getter get_texture)
  *
- * Your MTLTexture.
+ * Your `MTLTexture`.
  */
 /**
  * maplibre_native_ffi_metal_borrowed_texture_get_texture: (get-property texture)
@@ -7980,474 +10361,316 @@ void maplibre_native_ffi_metal_borrowed_texture_set_texture(
 );
 
 /**
- * MaplibreNativeFfiMetalBorrowedTextureDescriptor:
+ * MaplibreNativeFfiMetalBorrowedTexturesTarget:
  *
- * A ring of your Metal textures, for
- * `maplibre_native_ffi_map_attach_metal_borrowed_texture()`.
+ * A ring of your Metal textures to render into, on the Metal device that you
+ * attach on.
  *
- * `logical_size` sets the map's size. `physical_width` and `physical_height`
- * give the textures' size in pixels, which is usually `logical_size` times the
- * map's scale factor. The textures must all have that size, one device, one
- * pixel format, one sample, and MTLTextureUsageRenderTarget. The ring holds up
- * to `MAPLIBRE_NATIVE_FFI_TEXTURE_RING_MAX_DEPTH` distinct textures.
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. The textures
+ * must all have that size, the device's `MTLDevice`, one pixel format, one
+ * sample, and `MTLTextureUsageRenderTarget`. The ring holds up to
+ * `MAPLIBRE_NATIVE_FFI_TEXTURE_RING_MAX_DEPTH` distinct textures.
  *
- * The session uses the textures until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
- * returns.
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `MaplibreNativeFfiFrameProjection` says: one for each of
+ * `textures`, at the same index, or none. Each frame clears the one at its
+ * slot, renders the map's depth and stencil into it, and stores them. They must
+ * have the size of `textures`, one pixel format of
+ * `MaplibreNativeFfiGpuDeviceCapabilities.depth_stencil_formats`, one sample,
+ * `MTLTextureUsageRenderTarget`, and a storage mode other than
+ * `MTLStorageModeMemoryless`.
  *
- * See `mln_metal_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * See `mln_metal_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_new: (constructor)
+ * maplibre_native_ffi_metal_borrowed_textures_target_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiMetalBorrowedTextureDescriptor` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiMetalBorrowedTexturesTarget` whose members are zero or empty.
  *
  * Returns: (transfer full): the new value
  */
-MaplibreNativeFfiMetalBorrowedTextureDescriptor*
-maplibre_native_ffi_metal_borrowed_texture_descriptor_new(void);
+MaplibreNativeFfiMetalBorrowedTexturesTarget*
+maplibre_native_ffi_metal_borrowed_textures_target_new(void);
 
 /**
- * MaplibreNativeFfiMetalBorrowedTextureDescriptor:logical-size: (setter set_logical_size) (getter get_logical_size)
+ * MaplibreNativeFfiMetalBorrowedTexturesTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
  *
  * The `logical_size` member.
  */
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_get_logical_size: (get-property logical-size)
+ * maplibre_native_ffi_metal_borrowed_textures_target_get_logical_size: (get-property logical-size)
  *
- * Gets `MaplibreNativeFfiMetalBorrowedTextureDescriptor:logical-size`.
+ * Gets `MaplibreNativeFfiMetalBorrowedTexturesTarget:logical-size`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_metal_borrowed_texture_descriptor_get_logical_size(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self
+maplibre_native_ffi_metal_borrowed_textures_target_get_logical_size(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* self
 );
 
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_set_logical_size: (set-property logical-size)
+ * maplibre_native_ffi_metal_borrowed_textures_target_set_logical_size: (set-property logical-size)
  * @value: the value
  *
- * Sets `MaplibreNativeFfiMetalBorrowedTextureDescriptor:logical-size`.
+ * Sets `MaplibreNativeFfiMetalBorrowedTexturesTarget:logical-size`.
  */
-void maplibre_native_ffi_metal_borrowed_texture_descriptor_set_logical_size(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self,
+void maplibre_native_ffi_metal_borrowed_textures_target_set_logical_size(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* self,
   const MaplibreNativeFfiLogicalSize* value
 );
 
 /**
- * MaplibreNativeFfiMetalBorrowedTextureDescriptor:physical-width: (setter set_physical_width) (getter get_physical_width)
+ * MaplibreNativeFfiMetalBorrowedTexturesTarget:physical-width: (setter set_physical_width) (getter get_physical_width)
  *
  * The `physical_width` member.
  */
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_get_physical_width: (get-property physical-width)
+ * maplibre_native_ffi_metal_borrowed_textures_target_get_physical_width: (get-property physical-width)
  *
- * Gets `MaplibreNativeFfiMetalBorrowedTextureDescriptor:physical-width`.
+ * Gets `MaplibreNativeFfiMetalBorrowedTexturesTarget:physical-width`.
  *
  * Returns: the value
  */
-guint32
-maplibre_native_ffi_metal_borrowed_texture_descriptor_get_physical_width(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self
+guint32 maplibre_native_ffi_metal_borrowed_textures_target_get_physical_width(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* self
 );
 
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_set_physical_width: (set-property physical-width)
+ * maplibre_native_ffi_metal_borrowed_textures_target_set_physical_width: (set-property physical-width)
  *
- * Sets `MaplibreNativeFfiMetalBorrowedTextureDescriptor:physical-width`.
+ * Sets `MaplibreNativeFfiMetalBorrowedTexturesTarget:physical-width`.
  */
-void maplibre_native_ffi_metal_borrowed_texture_descriptor_set_physical_width(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self, guint32 value
+void maplibre_native_ffi_metal_borrowed_textures_target_set_physical_width(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* self, guint32 value
 );
 
 /**
- * MaplibreNativeFfiMetalBorrowedTextureDescriptor:physical-height: (setter set_physical_height) (getter get_physical_height)
+ * MaplibreNativeFfiMetalBorrowedTexturesTarget:physical-height: (setter set_physical_height) (getter get_physical_height)
  *
  * The `physical_height` member.
  */
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_get_physical_height: (get-property physical-height)
+ * maplibre_native_ffi_metal_borrowed_textures_target_get_physical_height: (get-property physical-height)
  *
- * Gets `MaplibreNativeFfiMetalBorrowedTextureDescriptor:physical-height`.
+ * Gets `MaplibreNativeFfiMetalBorrowedTexturesTarget:physical-height`.
  *
  * Returns: the value
  */
-guint32
-maplibre_native_ffi_metal_borrowed_texture_descriptor_get_physical_height(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self
+guint32 maplibre_native_ffi_metal_borrowed_textures_target_get_physical_height(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* self
 );
 
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_set_physical_height: (set-property physical-height)
+ * maplibre_native_ffi_metal_borrowed_textures_target_set_physical_height: (set-property physical-height)
  *
- * Sets `MaplibreNativeFfiMetalBorrowedTextureDescriptor:physical-height`.
+ * Sets `MaplibreNativeFfiMetalBorrowedTexturesTarget:physical-height`.
  */
-void maplibre_native_ffi_metal_borrowed_texture_descriptor_set_physical_height(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self, guint32 value
+void maplibre_native_ffi_metal_borrowed_textures_target_set_physical_height(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* self, guint32 value
 );
 
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_get_textures:
+ * maplibre_native_ffi_metal_borrowed_textures_target_get_textures:
  *
- * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_descriptor_set_textures` sets.
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_textures_target_set_textures` sets.
  *
  * Returns: (transfer none) (element-type MaplibreNativeFfiMetalBorrowedTexture): the items
  */
-GPtrArray* maplibre_native_ffi_metal_borrowed_texture_descriptor_get_textures(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self
+GPtrArray* maplibre_native_ffi_metal_borrowed_textures_target_get_textures(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* self
 );
 
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_set_textures:
+ * maplibre_native_ffi_metal_borrowed_textures_target_set_textures:
  * @value: (array length=value_count): the items
  *
  * The `textures` member.
  */
-void maplibre_native_ffi_metal_borrowed_texture_descriptor_set_textures(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self,
+void maplibre_native_ffi_metal_borrowed_textures_target_set_textures(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* self,
   MaplibreNativeFfiMetalBorrowedTexture* const* value, gsize value_count
 );
 
 /**
- * MaplibreNativeFfiMetalBorrowedTextureDescriptor:command-queue: (setter set_command_queue) (getter get_command_queue)
+ * maplibre_native_ffi_metal_borrowed_textures_target_get_depth_textures:
  *
- * Your MTLCommandQueue on the textures' device, or null for a queue of the
- * session's own. With your queue, frames can use
+ * Gets the value that `maplibre_native_ffi_metal_borrowed_textures_target_set_depth_textures` sets.
+ *
+ * Returns: (transfer none) (element-type MaplibreNativeFfiMetalBorrowedTexture): the items
+ */
+GPtrArray*
+maplibre_native_ffi_metal_borrowed_textures_target_get_depth_textures(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_metal_borrowed_textures_target_set_depth_textures:
+ * @value: (array length=value_count): the items
+ *
+ * The `depth_textures` member.
+ */
+void maplibre_native_ffi_metal_borrowed_textures_target_set_depth_textures(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* self,
+  MaplibreNativeFfiMetalBorrowedTexture* const* value, gsize value_count
+);
+
+/**
+ * MaplibreNativeFfiMetalDeviceDescriptor:
+ *
+ * Your Metal device and command queue, for
+ * `maplibre_native_ffi_gpu_device_wrap_metal()`.
+ *
+ * See `mln_metal_device_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+/**
+ * maplibre_native_ffi_metal_device_descriptor_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiMetalDeviceDescriptor` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiMetalDeviceDescriptor*
+maplibre_native_ffi_metal_device_descriptor_new(void);
+
+/**
+ * MaplibreNativeFfiMetalDeviceDescriptor:device: (setter set_device) (getter get_device)
+ *
+ * Your `MTLDevice`.
+ */
+/**
+ * maplibre_native_ffi_metal_device_descriptor_get_device: (get-property device)
+ *
+ * Gets `MaplibreNativeFfiMetalDeviceDescriptor:device`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_metal_device_descriptor_get_device(
+  MaplibreNativeFfiMetalDeviceDescriptor* self
+);
+
+/**
+ * maplibre_native_ffi_metal_device_descriptor_set_device: (set-property device)
+ *
+ * Sets `MaplibreNativeFfiMetalDeviceDescriptor:device`.
+ */
+void maplibre_native_ffi_metal_device_descriptor_set_device(
+  MaplibreNativeFfiMetalDeviceDescriptor* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiMetalDeviceDescriptor:command-queue: (setter set_command_queue) (getter get_command_queue)
+ *
+ * Your `MTLCommandQueue` on `device`, or null for a queue of the library's.
+ * With your queue, borrowed rings can use
  * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_QUEUE_ORDER`.
  */
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_get_command_queue: (get-property command-queue)
+ * maplibre_native_ffi_metal_device_descriptor_get_command_queue: (get-property command-queue)
  *
- * Gets `MaplibreNativeFfiMetalBorrowedTextureDescriptor:command-queue`.
+ * Gets `MaplibreNativeFfiMetalDeviceDescriptor:command-queue`.
  *
  * Returns: the value
  */
-gpointer
-maplibre_native_ffi_metal_borrowed_texture_descriptor_get_command_queue(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self
+gpointer maplibre_native_ffi_metal_device_descriptor_get_command_queue(
+  MaplibreNativeFfiMetalDeviceDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_metal_borrowed_texture_descriptor_set_command_queue: (set-property command-queue)
+ * maplibre_native_ffi_metal_device_descriptor_set_command_queue: (set-property command-queue)
  *
- * Sets `MaplibreNativeFfiMetalBorrowedTextureDescriptor:command-queue`.
+ * Sets `MaplibreNativeFfiMetalDeviceDescriptor:command-queue`.
  */
-void maplibre_native_ffi_metal_borrowed_texture_descriptor_set_command_queue(
-  MaplibreNativeFfiMetalBorrowedTextureDescriptor* self, gpointer value
+void maplibre_native_ffi_metal_device_descriptor_set_command_queue(
+  MaplibreNativeFfiMetalDeviceDescriptor* self, gpointer value
 );
 
 /**
- * MaplibreNativeFfiMetalBorrowedTextureReplacement:
+ * MaplibreNativeFfiMetalLayerTarget:
  *
- * New Metal textures for a borrowed ring, for
- * `maplibre_native_ffi_render_session_set_metal_borrowed_texture_target_async()`.
+ * A `CAMetalLayer` to present to.
  *
- * The members and the textures follow the rules of
- * `MaplibreNativeFfiMetalBorrowedTextureDescriptor`. The ring keeps its depth,
- * device, and command queue, so give it as many textures as it attached with,
- * on the same device.
+ * The session sets the layer's device, pixel format, and drawable size.
  *
- * See `mln_metal_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ * See `mln_metal_layer_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 /**
- * maplibre_native_ffi_metal_borrowed_texture_replacement_new: (constructor)
+ * maplibre_native_ffi_metal_layer_target_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiMetalBorrowedTextureReplacement` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiMetalLayerTarget` whose members are zero or empty.
  *
  * Returns: (transfer full): the new value
  */
-MaplibreNativeFfiMetalBorrowedTextureReplacement*
-maplibre_native_ffi_metal_borrowed_texture_replacement_new(void);
+MaplibreNativeFfiMetalLayerTarget* maplibre_native_ffi_metal_layer_target_new(
+  void
+);
 
 /**
- * MaplibreNativeFfiMetalBorrowedTextureReplacement:logical-size: (setter set_logical_size) (getter get_logical_size)
+ * MaplibreNativeFfiMetalLayerTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
  *
  * The `logical_size` member.
  */
 /**
- * maplibre_native_ffi_metal_borrowed_texture_replacement_get_logical_size: (get-property logical-size)
+ * maplibre_native_ffi_metal_layer_target_get_logical_size: (get-property logical-size)
  *
- * Gets `MaplibreNativeFfiMetalBorrowedTextureReplacement:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_metal_borrowed_texture_replacement_get_logical_size(
-  MaplibreNativeFfiMetalBorrowedTextureReplacement* self
-);
-
-/**
- * maplibre_native_ffi_metal_borrowed_texture_replacement_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiMetalBorrowedTextureReplacement:logical-size`.
- */
-void maplibre_native_ffi_metal_borrowed_texture_replacement_set_logical_size(
-  MaplibreNativeFfiMetalBorrowedTextureReplacement* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiMetalBorrowedTextureReplacement:physical-width: (setter set_physical_width) (getter get_physical_width)
- *
- * The `physical_width` member.
- */
-/**
- * maplibre_native_ffi_metal_borrowed_texture_replacement_get_physical_width: (get-property physical-width)
- *
- * Gets `MaplibreNativeFfiMetalBorrowedTextureReplacement:physical-width`.
- *
- * Returns: the value
- */
-guint32
-maplibre_native_ffi_metal_borrowed_texture_replacement_get_physical_width(
-  MaplibreNativeFfiMetalBorrowedTextureReplacement* self
-);
-
-/**
- * maplibre_native_ffi_metal_borrowed_texture_replacement_set_physical_width: (set-property physical-width)
- *
- * Sets `MaplibreNativeFfiMetalBorrowedTextureReplacement:physical-width`.
- */
-void maplibre_native_ffi_metal_borrowed_texture_replacement_set_physical_width(
-  MaplibreNativeFfiMetalBorrowedTextureReplacement* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiMetalBorrowedTextureReplacement:physical-height: (setter set_physical_height) (getter get_physical_height)
- *
- * The `physical_height` member.
- */
-/**
- * maplibre_native_ffi_metal_borrowed_texture_replacement_get_physical_height: (get-property physical-height)
- *
- * Gets `MaplibreNativeFfiMetalBorrowedTextureReplacement:physical-height`.
- *
- * Returns: the value
- */
-guint32
-maplibre_native_ffi_metal_borrowed_texture_replacement_get_physical_height(
-  MaplibreNativeFfiMetalBorrowedTextureReplacement* self
-);
-
-/**
- * maplibre_native_ffi_metal_borrowed_texture_replacement_set_physical_height: (set-property physical-height)
- *
- * Sets `MaplibreNativeFfiMetalBorrowedTextureReplacement:physical-height`.
- */
-void maplibre_native_ffi_metal_borrowed_texture_replacement_set_physical_height(
-  MaplibreNativeFfiMetalBorrowedTextureReplacement* self, guint32 value
-);
-
-/**
- * maplibre_native_ffi_metal_borrowed_texture_replacement_get_textures:
- *
- * Gets the value that `maplibre_native_ffi_metal_borrowed_texture_replacement_set_textures` sets.
- *
- * Returns: (transfer none) (element-type MaplibreNativeFfiMetalBorrowedTexture): the items
- */
-GPtrArray* maplibre_native_ffi_metal_borrowed_texture_replacement_get_textures(
-  MaplibreNativeFfiMetalBorrowedTextureReplacement* self
-);
-
-/**
- * maplibre_native_ffi_metal_borrowed_texture_replacement_set_textures:
- * @value: (array length=value_count): the items
- *
- * The `textures` member.
- */
-void maplibre_native_ffi_metal_borrowed_texture_replacement_set_textures(
-  MaplibreNativeFfiMetalBorrowedTextureReplacement* self,
-  MaplibreNativeFfiMetalBorrowedTexture* const* value, gsize value_count
-);
-
-/**
- * MaplibreNativeFfiMetalSurfaceDescriptor:
- *
- * A Metal layer to render to, for
- * `maplibre_native_ffi_map_attach_metal_surface()`.
- *
- * The session sets the layer's device, pixel format, and drawable size. It uses
- * the layer until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_metal_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-/**
- * maplibre_native_ffi_metal_surface_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiMetalSurfaceDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiMetalSurfaceDescriptor*
-maplibre_native_ffi_metal_surface_descriptor_new(void);
-
-/**
- * MaplibreNativeFfiMetalSurfaceDescriptor:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_metal_surface_descriptor_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiMetalSurfaceDescriptor:logical-size`.
+ * Gets `MaplibreNativeFfiMetalLayerTarget:logical-size`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_metal_surface_descriptor_get_logical_size(
-  MaplibreNativeFfiMetalSurfaceDescriptor* self
+maplibre_native_ffi_metal_layer_target_get_logical_size(
+  MaplibreNativeFfiMetalLayerTarget* self
 );
 
 /**
- * maplibre_native_ffi_metal_surface_descriptor_set_logical_size: (set-property logical-size)
+ * maplibre_native_ffi_metal_layer_target_set_logical_size: (set-property logical-size)
  * @value: the value
  *
- * Sets `MaplibreNativeFfiMetalSurfaceDescriptor:logical-size`.
+ * Sets `MaplibreNativeFfiMetalLayerTarget:logical-size`.
  */
-void maplibre_native_ffi_metal_surface_descriptor_set_logical_size(
-  MaplibreNativeFfiMetalSurfaceDescriptor* self,
+void maplibre_native_ffi_metal_layer_target_set_logical_size(
+  MaplibreNativeFfiMetalLayerTarget* self,
   const MaplibreNativeFfiLogicalSize* value
 );
 
 /**
- * MaplibreNativeFfiMetalSurfaceDescriptor:context: (setter set_context) (getter get_context)
+ * MaplibreNativeFfiMetalLayerTarget:layer: (setter set_layer) (getter get_layer)
  *
- * The MTLDevice to render with. A null device picks the system's default.
+ * Your `CAMetalLayer*`.
  */
 /**
- * maplibre_native_ffi_metal_surface_descriptor_get_context: (get-property context)
+ * maplibre_native_ffi_metal_layer_target_get_layer: (get-property layer)
  *
- * Gets `MaplibreNativeFfiMetalSurfaceDescriptor:context`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiMetalContextDescriptor*
-maplibre_native_ffi_metal_surface_descriptor_get_context(
-  MaplibreNativeFfiMetalSurfaceDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_metal_surface_descriptor_set_context: (set-property context)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiMetalSurfaceDescriptor:context`.
- */
-void maplibre_native_ffi_metal_surface_descriptor_set_context(
-  MaplibreNativeFfiMetalSurfaceDescriptor* self,
-  MaplibreNativeFfiMetalContextDescriptor* value
-);
-
-/**
- * MaplibreNativeFfiMetalSurfaceDescriptor:layer: (setter set_layer) (getter get_layer)
- *
- * Your CAMetalLayer.
- */
-/**
- * maplibre_native_ffi_metal_surface_descriptor_get_layer: (get-property layer)
- *
- * Gets `MaplibreNativeFfiMetalSurfaceDescriptor:layer`.
+ * Gets `MaplibreNativeFfiMetalLayerTarget:layer`.
  *
  * Returns: the value
  */
-gpointer maplibre_native_ffi_metal_surface_descriptor_get_layer(
-  MaplibreNativeFfiMetalSurfaceDescriptor* self
+gpointer maplibre_native_ffi_metal_layer_target_get_layer(
+  MaplibreNativeFfiMetalLayerTarget* self
 );
 
 /**
- * maplibre_native_ffi_metal_surface_descriptor_set_layer: (set-property layer)
+ * maplibre_native_ffi_metal_layer_target_set_layer: (set-property layer)
  *
- * Sets `MaplibreNativeFfiMetalSurfaceDescriptor:layer`.
+ * Sets `MaplibreNativeFfiMetalLayerTarget:layer`.
  */
-void maplibre_native_ffi_metal_surface_descriptor_set_layer(
-  MaplibreNativeFfiMetalSurfaceDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiMetalSurfaceReplacement:
- *
- * A new Metal layer for
- * `maplibre_native_ffi_render_session_set_metal_surface_target_async()`.
- *
- * The session renders to it with the device that it attached with. It uses the
- * layer until a replacement or release of the target completes, a detach or
- * release of the session completes, or an abandon of it returns.
- *
- * See `mln_metal_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-/**
- * maplibre_native_ffi_metal_surface_replacement_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiMetalSurfaceReplacement` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiMetalSurfaceReplacement*
-maplibre_native_ffi_metal_surface_replacement_new(void);
-
-/**
- * MaplibreNativeFfiMetalSurfaceReplacement:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_metal_surface_replacement_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiMetalSurfaceReplacement:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_metal_surface_replacement_get_logical_size(
-  MaplibreNativeFfiMetalSurfaceReplacement* self
-);
-
-/**
- * maplibre_native_ffi_metal_surface_replacement_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiMetalSurfaceReplacement:logical-size`.
- */
-void maplibre_native_ffi_metal_surface_replacement_set_logical_size(
-  MaplibreNativeFfiMetalSurfaceReplacement* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiMetalSurfaceReplacement:layer: (setter set_layer) (getter get_layer)
- *
- * Your CAMetalLayer.
- */
-/**
- * maplibre_native_ffi_metal_surface_replacement_get_layer: (get-property layer)
- *
- * Gets `MaplibreNativeFfiMetalSurfaceReplacement:layer`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_metal_surface_replacement_get_layer(
-  MaplibreNativeFfiMetalSurfaceReplacement* self
-);
-
-/**
- * maplibre_native_ffi_metal_surface_replacement_set_layer: (set-property layer)
- *
- * Sets `MaplibreNativeFfiMetalSurfaceReplacement:layer`.
- */
-void maplibre_native_ffi_metal_surface_replacement_set_layer(
-  MaplibreNativeFfiMetalSurfaceReplacement* self, gpointer value
+void maplibre_native_ffi_metal_layer_target_set_layer(
+  MaplibreNativeFfiMetalLayerTarget* self, gpointer value
 );
 
 /**
  * MaplibreNativeFfiMetalTextureFrame:
  *
  * The Metal texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture: one of a
+ * borrowed ring's `depth_textures`, or an exported ring's with
+ * `MaplibreNativeFfiRenderSessionAttachOptions:keep-depth`. Otherwise they are
+ * zero.
  *
  * See `mln_metal_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -8563,6 +10786,28 @@ gpointer maplibre_native_ffi_metal_texture_frame_get_device(
  * Returns: the value
  */
 guint64 maplibre_native_ffi_metal_texture_frame_get_pixel_format(
+  const MaplibreNativeFfiMetalTextureFrame* self
+);
+
+/**
+ * maplibre_native_ffi_metal_texture_frame_get_depth_texture:
+ *
+ * The MTLTexture that holds the frame's depth and stencil.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_metal_texture_frame_get_depth_texture(
+  const MaplibreNativeFfiMetalTextureFrame* self
+);
+
+/**
+ * maplibre_native_ffi_metal_texture_frame_get_depth_pixel_format:
+ *
+ * The depth texture's MTLPixelFormat.
+ *
+ * Returns: the value
+ */
+guint64 maplibre_native_ffi_metal_texture_frame_get_depth_pixel_format(
   const MaplibreNativeFfiMetalTextureFrame* self
 );
 
@@ -9148,173 +11393,140 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   maplibre_native_ffi_offline_region_status_free
 )
 
-GType maplibre_native_ffi_offscreen_descriptor_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_OFFSCREEN_DESCRIPTOR \
-  (maplibre_native_ffi_offscreen_descriptor_get_type())
+GType maplibre_native_ffi_offscreen_target_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_OFFSCREEN_TARGET \
+  (maplibre_native_ffi_offscreen_target_get_type())
 
 /**
- * maplibre_native_ffi_offscreen_descriptor_copy:
+ * maplibre_native_ffi_offscreen_target_copy:
  *
  * Copies the value.
  *
  * Returns: (transfer full): the copy
  */
-MaplibreNativeFfiOffscreenDescriptor*
-maplibre_native_ffi_offscreen_descriptor_copy(
-  const MaplibreNativeFfiOffscreenDescriptor* self
+MaplibreNativeFfiOffscreenTarget* maplibre_native_ffi_offscreen_target_copy(
+  const MaplibreNativeFfiOffscreenTarget* self
 );
 
 /**
- * maplibre_native_ffi_offscreen_descriptor_free:
+ * maplibre_native_ffi_offscreen_target_free:
  * @self: (transfer full) (nullable): the value
  *
  * Frees the value.
  */
-void maplibre_native_ffi_offscreen_descriptor_free(
-  MaplibreNativeFfiOffscreenDescriptor* self
+void maplibre_native_ffi_offscreen_target_free(
+  MaplibreNativeFfiOffscreenTarget* self
 );
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiOffscreenDescriptor,
-  maplibre_native_ffi_offscreen_descriptor_free
+  MaplibreNativeFfiOffscreenTarget, maplibre_native_ffi_offscreen_target_free
 )
 
 /**
- * MaplibreNativeFfiOffscreenDeviceOptions:
+ * MaplibreNativeFfiOhosWindowTarget:
  *
- * Options for `maplibre_native_ffi_offscreen_device_create()`.
+ * An OpenHarmony window to present to.
  *
- * A member that a `has_` method reports on is unset until its property or
- * setter sets it.
+ * The session takes its own reference to the window, so you can release yours
+ * once the call returns. When the platform destroys the window, such as in an
+ * `XComponent`'s `onSurfaceDestroyed` callback, release the target or give the
+ * session another window without waiting, as for an Android window.
  *
- * See `mln_offscreen_device_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+ * See `mln_ohos_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 /**
- * maplibre_native_ffi_offscreen_device_options_new: (constructor)
+ * maplibre_native_ffi_ohos_window_target_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiOffscreenDeviceOptions` whose members are zero, empty, or unset.
+ * Creates a `MaplibreNativeFfiOhosWindowTarget` whose members are zero or empty.
  *
  * Returns: (transfer full): the new value
  */
-MaplibreNativeFfiOffscreenDeviceOptions*
-maplibre_native_ffi_offscreen_device_options_new(void);
+MaplibreNativeFfiOhosWindowTarget* maplibre_native_ffi_ohos_window_target_new(
+  void
+);
 
 /**
- * MaplibreNativeFfiOffscreenDeviceOptions:adapter-index: (setter set_adapter_index) (getter get_adapter_index)
+ * MaplibreNativeFfiOhosWindowTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
  *
- * The GPU to use, as an index into the platform's list of GPUs.
+ * The `logical_size` member.
  */
 /**
- * maplibre_native_ffi_offscreen_device_options_get_adapter_index: (get-property adapter-index)
+ * maplibre_native_ffi_ohos_window_target_get_logical_size: (get-property logical-size)
  *
- * Gets `MaplibreNativeFfiOffscreenDeviceOptions:adapter-index`.
+ * Gets `MaplibreNativeFfiOhosWindowTarget:logical-size`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_ohos_window_target_get_logical_size(
+  MaplibreNativeFfiOhosWindowTarget* self
+);
+
+/**
+ * maplibre_native_ffi_ohos_window_target_set_logical_size: (set-property logical-size)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiOhosWindowTarget:logical-size`.
+ */
+void maplibre_native_ffi_ohos_window_target_set_logical_size(
+  MaplibreNativeFfiOhosWindowTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+);
+
+/**
+ * MaplibreNativeFfiOhosWindowTarget:window: (setter set_window) (getter get_window)
+ *
+ * Your `OHNativeWindow*`.
+ */
+/**
+ * maplibre_native_ffi_ohos_window_target_get_window: (get-property window)
+ *
+ * Gets `MaplibreNativeFfiOhosWindowTarget:window`.
  *
  * Returns: the value
  */
-guint32 maplibre_native_ffi_offscreen_device_options_get_adapter_index(
-  MaplibreNativeFfiOffscreenDeviceOptions* self
+gpointer maplibre_native_ffi_ohos_window_target_get_window(
+  MaplibreNativeFfiOhosWindowTarget* self
 );
 
 /**
- * maplibre_native_ffi_offscreen_device_options_has_adapter_index:
+ * maplibre_native_ffi_ohos_window_target_set_window: (set-property window)
  *
- * Whether `MaplibreNativeFfiOffscreenDeviceOptions:adapter-index` is set.
- *
- * Returns: whether the member is set
+ * Sets `MaplibreNativeFfiOhosWindowTarget:window`.
  */
-gboolean maplibre_native_ffi_offscreen_device_options_has_adapter_index(
-  MaplibreNativeFfiOffscreenDeviceOptions* self
+void maplibre_native_ffi_ohos_window_target_set_window(
+  MaplibreNativeFfiOhosWindowTarget* self, gpointer value
+);
+
+GType maplibre_native_ffi_opaque_fd_frame_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_OPAQUE_FD_FRAME \
+  (maplibre_native_ffi_opaque_fd_frame_get_type())
+
+/**
+ * maplibre_native_ffi_opaque_fd_frame_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiOpaqueFdFrame* maplibre_native_ffi_opaque_fd_frame_copy(
+  const MaplibreNativeFfiOpaqueFdFrame* self
 );
 
 /**
- * maplibre_native_ffi_offscreen_device_options_set_adapter_index: (set-property adapter-index)
+ * maplibre_native_ffi_opaque_fd_frame_free:
+ * @self: (transfer full) (nullable): the value
  *
- * Sets `MaplibreNativeFfiOffscreenDeviceOptions:adapter-index`.
+ * Frees the value.
  */
-void maplibre_native_ffi_offscreen_device_options_set_adapter_index(
-  MaplibreNativeFfiOffscreenDeviceOptions* self, guint32 value
+void maplibre_native_ffi_opaque_fd_frame_free(
+  MaplibreNativeFfiOpaqueFdFrame* self
 );
 
-/**
- * MaplibreNativeFfiOffscreenDeviceOptions:single-context: (setter set_single_context) (getter get_single_context)
- *
- * Whether the device's sessions take turns in one OpenGL context instead of
- * having one each. Only an EGL device reads it.
- */
-/**
- * maplibre_native_ffi_offscreen_device_options_get_single_context: (get-property single-context)
- *
- * Gets `MaplibreNativeFfiOffscreenDeviceOptions:single-context`.
- *
- * Returns: the value
- */
-gboolean maplibre_native_ffi_offscreen_device_options_get_single_context(
-  MaplibreNativeFfiOffscreenDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_offscreen_device_options_has_single_context:
- *
- * Whether `MaplibreNativeFfiOffscreenDeviceOptions:single-context` is set.
- *
- * Returns: whether the member is set
- */
-gboolean maplibre_native_ffi_offscreen_device_options_has_single_context(
-  MaplibreNativeFfiOffscreenDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_offscreen_device_options_set_single_context: (set-property single-context)
- *
- * Sets `MaplibreNativeFfiOffscreenDeviceOptions:single-context`.
- */
-void maplibre_native_ffi_offscreen_device_options_set_single_context(
-  MaplibreNativeFfiOffscreenDeviceOptions* self, gboolean value
-);
-
-/**
- * MaplibreNativeFfiOffscreenDeviceOptions:client-api: (setter set_client_api) (getter get_client_api)
- *
- * The OpenGL API that the device's sessions render with. An EGL device defaults
- * to `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES`, and takes
- * `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GL` too on Linux and FreeBSD. A WGL
- * device takes only `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GL`, its default,
- * and a WebGL device only `MAPLIBRE_NATIVE_FFI_OPEN_GL_CLIENT_API_GLES`, its
- * default. Other devices take neither.
- */
-/**
- * maplibre_native_ffi_offscreen_device_options_get_client_api: (get-property client-api)
- *
- * Gets `MaplibreNativeFfiOffscreenDeviceOptions:client-api`.
- *
- * Returns: the value
- */
-MaplibreNativeFfiOpenGlClientApi
-maplibre_native_ffi_offscreen_device_options_get_client_api(
-  MaplibreNativeFfiOffscreenDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_offscreen_device_options_has_client_api:
- *
- * Whether `MaplibreNativeFfiOffscreenDeviceOptions:client-api` is set.
- *
- * Returns: whether the member is set
- */
-gboolean maplibre_native_ffi_offscreen_device_options_has_client_api(
-  MaplibreNativeFfiOffscreenDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_offscreen_device_options_set_client_api: (set-property client-api)
- *
- * Sets `MaplibreNativeFfiOffscreenDeviceOptions:client-api`.
- */
-void maplibre_native_ffi_offscreen_device_options_set_client_api(
-  MaplibreNativeFfiOffscreenDeviceOptions* self,
-  MaplibreNativeFfiOpenGlClientApi value
-);
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiOpaqueFdFrame, maplibre_native_ffi_opaque_fd_frame_free
+)
 
 GType maplibre_native_ffi_open_gl_borrowed_texture_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_BORROWED_TEXTURE \
@@ -9348,9 +11560,191 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
 )
 
 /**
+ * MaplibreNativeFfiOpenGlBorrowedTexturesTarget:
+ *
+ * A ring of your OpenGL textures to render into, on an OpenGL device that
+ * `maplibre_native_ffi_gpu_device_wrap_open_gl()` made from your context.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. Each texture
+ * must be in your context's share group, with RGBA8 storage of that size. The
+ * ring holds up to `MAPLIBRE_NATIVE_FFI_TEXTURE_RING_MAX_DEPTH` distinct
+ * textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `MaplibreNativeFfiFrameProjection` says: one for each of
+ * `textures`, at the same index, or none. Each frame clears the one at its
+ * slot, and renders the map's depth and stencil into it. They must be
+ * `GL_TEXTURE_2D` textures in the share group, with storage of the size of
+ * `textures` in a format of
+ * `MaplibreNativeFfiGpuDeviceCapabilities.depth_stencil_formats`.
+ *
+ * See `mln_open_gl_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiOpenGlBorrowedTexturesTarget` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiOpenGlBorrowedTexturesTarget*
+maplibre_native_ffi_open_gl_borrowed_textures_target_new(void);
+
+/**
+ * MaplibreNativeFfiOpenGlBorrowedTexturesTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
+ *
+ * The `logical_size` member.
+ */
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_get_logical_size: (get-property logical-size)
+ *
+ * Gets `MaplibreNativeFfiOpenGlBorrowedTexturesTarget:logical-size`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_open_gl_borrowed_textures_target_get_logical_size(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_set_logical_size: (set-property logical-size)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiOpenGlBorrowedTexturesTarget:logical-size`.
+ */
+void maplibre_native_ffi_open_gl_borrowed_textures_target_set_logical_size(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+);
+
+/**
+ * MaplibreNativeFfiOpenGlBorrowedTexturesTarget:physical-width: (setter set_physical_width) (getter get_physical_width)
+ *
+ * The `physical_width` member.
+ */
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_get_physical_width: (get-property physical-width)
+ *
+ * Gets `MaplibreNativeFfiOpenGlBorrowedTexturesTarget:physical-width`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_open_gl_borrowed_textures_target_get_physical_width(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_set_physical_width: (set-property physical-width)
+ *
+ * Sets `MaplibreNativeFfiOpenGlBorrowedTexturesTarget:physical-width`.
+ */
+void maplibre_native_ffi_open_gl_borrowed_textures_target_set_physical_width(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiOpenGlBorrowedTexturesTarget:physical-height: (setter set_physical_height) (getter get_physical_height)
+ *
+ * The `physical_height` member.
+ */
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_get_physical_height: (get-property physical-height)
+ *
+ * Gets `MaplibreNativeFfiOpenGlBorrowedTexturesTarget:physical-height`.
+ *
+ * Returns: the value
+ */
+guint32
+maplibre_native_ffi_open_gl_borrowed_textures_target_get_physical_height(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_set_physical_height: (set-property physical-height)
+ *
+ * Sets `MaplibreNativeFfiOpenGlBorrowedTexturesTarget:physical-height`.
+ */
+void maplibre_native_ffi_open_gl_borrowed_textures_target_set_physical_height(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self, guint32 value
+);
+
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_get_textures:
+ *
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_textures_target_set_textures` sets.
+ *
+ * Returns: (transfer none) (element-type MaplibreNativeFfiOpenGlBorrowedTexture): the items
+ */
+GPtrArray* maplibre_native_ffi_open_gl_borrowed_textures_target_get_textures(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_set_textures:
+ * @value: (array length=value_count): the items
+ *
+ * The `textures` member.
+ */
+void maplibre_native_ffi_open_gl_borrowed_textures_target_set_textures(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self,
+  const MaplibreNativeFfiOpenGlBorrowedTexture* value, gsize value_count
+);
+
+/**
+ * MaplibreNativeFfiOpenGlBorrowedTexturesTarget:target: (setter set_target) (getter get_target)
+ *
+ * The textures' target. It must be `GL_TEXTURE_2D`.
+ */
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_get_target: (get-property target)
+ *
+ * Gets `MaplibreNativeFfiOpenGlBorrowedTexturesTarget:target`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_open_gl_borrowed_textures_target_get_target(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_set_target: (set-property target)
+ *
+ * Sets `MaplibreNativeFfiOpenGlBorrowedTexturesTarget:target`.
+ */
+void maplibre_native_ffi_open_gl_borrowed_textures_target_set_target(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self, guint32 value
+);
+
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_get_depth_textures:
+ *
+ * Gets the value that `maplibre_native_ffi_open_gl_borrowed_textures_target_set_depth_textures` sets.
+ *
+ * Returns: (transfer none) (element-type MaplibreNativeFfiOpenGlBorrowedTexture): the items
+ */
+GPtrArray*
+maplibre_native_ffi_open_gl_borrowed_textures_target_get_depth_textures(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_open_gl_borrowed_textures_target_set_depth_textures:
+ * @value: (array length=value_count): the items
+ *
+ * The `depth_textures` member.
+ */
+void maplibre_native_ffi_open_gl_borrowed_textures_target_set_depth_textures(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* self,
+  const MaplibreNativeFfiOpenGlBorrowedTexture* value, gsize value_count
+);
+
+/**
  * MaplibreNativeFfiWglContextDescriptor:
  *
- * The WGL objects that a render session makes its OpenGL context from.
+ * Your WGL context, which each session's context shares objects with.
  *
  * See `mln_wgl_context_descriptor` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -9368,7 +11762,7 @@ maplibre_native_ffi_wgl_context_descriptor_new(void);
 /**
  * MaplibreNativeFfiWglContextDescriptor:device-context: (setter set_device_context) (getter get_device_context)
  *
- * An `HDC`.
+ * An `HDC` with the pixel format of `share_context`.
  */
 /**
  * maplibre_native_ffi_wgl_context_descriptor_get_device_context: (get-property device-context)
@@ -9393,7 +11787,7 @@ void maplibre_native_ffi_wgl_context_descriptor_set_device_context(
 /**
  * MaplibreNativeFfiWglContextDescriptor:share-context: (setter set_share_context) (getter get_share_context)
  *
- * Your `HGLRC`, for a shared context.
+ * Your `HGLRC`.
  */
 /**
  * maplibre_native_ffi_wgl_context_descriptor_get_share_context: (get-property share-context)
@@ -9440,818 +11834,261 @@ void maplibre_native_ffi_wgl_context_descriptor_set_get_proc_address(
   MaplibreNativeFfiWglContextDescriptor* self, gpointer value
 );
 
-/**
- * MaplibreNativeFfiWebGlContextDescriptor:
- *
- * The WebGL context or canvas that a render session uses.
- *
- * See `mln_web_gl_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiWebGlContextDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiWebGlContextDescriptor*
-maplibre_native_ffi_web_gl_context_descriptor_new(void);
+GType maplibre_native_ffi_web_gl_context_descriptor_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_WEB_GL_CONTEXT_DESCRIPTOR \
+  (maplibre_native_ffi_web_gl_context_descriptor_get_type())
 
 /**
- * MaplibreNativeFfiWebGlContextDescriptor:kind: (setter set_kind) (getter get_kind)
- *
- * The `kind` member.
- */
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_get_kind: (get-property kind)
- *
- * Gets `MaplibreNativeFfiWebGlContextDescriptor:kind`.
- *
- * Returns: the value
- */
-MaplibreNativeFfiWebGlContextKind
-maplibre_native_ffi_web_gl_context_descriptor_get_kind(
-  MaplibreNativeFfiWebGlContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_set_kind: (set-property kind)
- *
- * Sets `MaplibreNativeFfiWebGlContextDescriptor:kind`.
- */
-void maplibre_native_ffi_web_gl_context_descriptor_set_kind(
-  MaplibreNativeFfiWebGlContextDescriptor* self,
-  MaplibreNativeFfiWebGlContextKind value
-);
-
-/**
- * MaplibreNativeFfiWebGlContextDescriptor:context: (setter set_context) (getter get_context)
- *
- * Your `EMSCRIPTEN_WEBGL_CONTEXT_HANDLE`, for an existing context.
- */
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_get_context: (get-property context)
- *
- * Gets `MaplibreNativeFfiWebGlContextDescriptor:context`.
- *
- * Returns: the value
- */
-gint32 maplibre_native_ffi_web_gl_context_descriptor_get_context(
-  MaplibreNativeFfiWebGlContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_set_context: (set-property context)
- *
- * Sets `MaplibreNativeFfiWebGlContextDescriptor:context`.
- */
-void maplibre_native_ffi_web_gl_context_descriptor_set_context(
-  MaplibreNativeFfiWebGlContextDescriptor* self, gint32 value
-);
-
-/**
- * MaplibreNativeFfiWebGlContextDescriptor:canvas-selector: (setter set_canvas_selector) (getter get_canvas_selector)
- *
- * The canvas's CSS selector, for a transferred canvas.
- */
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_get_canvas_selector: (get-property canvas-selector)
- *
- * Gets `MaplibreNativeFfiWebGlContextDescriptor:canvas-selector`.
- *
- * Returns: (transfer none): the text
- */
-const char* maplibre_native_ffi_web_gl_context_descriptor_get_canvas_selector(
-  MaplibreNativeFfiWebGlContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_web_gl_context_descriptor_set_canvas_selector: (set-property canvas-selector)
- * @value: the UTF-8 text
- *
- * Sets `MaplibreNativeFfiWebGlContextDescriptor:canvas-selector`.
- */
-void maplibre_native_ffi_web_gl_context_descriptor_set_canvas_selector(
-  MaplibreNativeFfiWebGlContextDescriptor* self, const char* value
-);
-
-/**
- * MaplibreNativeFfiOpenGlContextDescriptorData:
- *
- * The WGL, EGL, or WebGL part of an OpenGL context descriptor.
- *
- * See `mln_open_gl_context_descriptor_data` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-GType maplibre_native_ffi_open_gl_context_descriptor_data_get_type(
-  void
-) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_CONTEXT_DESCRIPTOR_DATA \
-  (maplibre_native_ffi_open_gl_context_descriptor_data_get_type())
-
-/**
- * maplibre_native_ffi_open_gl_context_descriptor_data_copy:
+ * maplibre_native_ffi_web_gl_context_descriptor_copy:
  *
  * Copies the value.
  *
  * Returns: (transfer full): the copy
  */
-MaplibreNativeFfiOpenGlContextDescriptorData*
-maplibre_native_ffi_open_gl_context_descriptor_data_copy(
-  const MaplibreNativeFfiOpenGlContextDescriptorData* self
+MaplibreNativeFfiWebGlContextDescriptor*
+maplibre_native_ffi_web_gl_context_descriptor_copy(
+  const MaplibreNativeFfiWebGlContextDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_data_free:
+ * maplibre_native_ffi_web_gl_context_descriptor_free:
  * @self: (transfer full) (nullable): the value
  *
  * Frees the value.
  */
-void maplibre_native_ffi_open_gl_context_descriptor_data_free(
-  MaplibreNativeFfiOpenGlContextDescriptorData* self
+void maplibre_native_ffi_web_gl_context_descriptor_free(
+  MaplibreNativeFfiWebGlContextDescriptor* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiWebGlContextDescriptor,
+  maplibre_native_ffi_web_gl_context_descriptor_free
+)
+
+/**
+ * MaplibreNativeFfiOpenGlContextDescriptor:
+ *
+ * Your OpenGL context, for `maplibre_native_ffi_gpu_device_wrap_open_gl()`: the
+ * root of the share group that the device's sessions join.
+ *
+ * See `mln_open_gl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+GType maplibre_native_ffi_open_gl_context_descriptor_get_type(
+  void
+) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_OPEN_GL_CONTEXT_DESCRIPTOR \
+  (maplibre_native_ffi_open_gl_context_descriptor_get_type())
+
+/**
+ * maplibre_native_ffi_open_gl_context_descriptor_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiOpenGlContextDescriptor*
+maplibre_native_ffi_open_gl_context_descriptor_copy(
+  const MaplibreNativeFfiOpenGlContextDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_data_new_wgl: (constructor)
+ * maplibre_native_ffi_open_gl_context_descriptor_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_open_gl_context_descriptor_free(
+  MaplibreNativeFfiOpenGlContextDescriptor* self
+);
+
+/**
+ * maplibre_native_ffi_open_gl_context_descriptor_new_wgl: (constructor)
  * @value: the value
  *
  * The `wgl` variant.
  *
  * Returns: (transfer full): the new value
  */
-MaplibreNativeFfiOpenGlContextDescriptorData*
-maplibre_native_ffi_open_gl_context_descriptor_data_new_wgl(
+MaplibreNativeFfiOpenGlContextDescriptor*
+maplibre_native_ffi_open_gl_context_descriptor_new_wgl(
   MaplibreNativeFfiWglContextDescriptor* value
 );
 
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_data_is_wgl:
+ * maplibre_native_ffi_open_gl_context_descriptor_is_wgl:
  *
- * Whether the value holds `maplibre_native_ffi_open_gl_context_descriptor_data_get_wgl`.
+ * Whether the value holds `maplibre_native_ffi_open_gl_context_descriptor_get_wgl`.
  *
  * Returns: whether the value holds the variant
  */
-gboolean maplibre_native_ffi_open_gl_context_descriptor_data_is_wgl(
-  const MaplibreNativeFfiOpenGlContextDescriptorData* self
+gboolean maplibre_native_ffi_open_gl_context_descriptor_is_wgl(
+  const MaplibreNativeFfiOpenGlContextDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_data_get_wgl:
+ * maplibre_native_ffi_open_gl_context_descriptor_get_wgl:
  *
  * The `wgl` variant.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiWglContextDescriptor*
-maplibre_native_ffi_open_gl_context_descriptor_data_get_wgl(
-  const MaplibreNativeFfiOpenGlContextDescriptorData* self
+maplibre_native_ffi_open_gl_context_descriptor_get_wgl(
+  const MaplibreNativeFfiOpenGlContextDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_data_new_egl: (constructor)
+ * maplibre_native_ffi_open_gl_context_descriptor_new_egl: (constructor)
  * @value: the value
  *
  * The `egl` variant.
  *
  * Returns: (transfer full): the new value
  */
-MaplibreNativeFfiOpenGlContextDescriptorData*
-maplibre_native_ffi_open_gl_context_descriptor_data_new_egl(
+MaplibreNativeFfiOpenGlContextDescriptor*
+maplibre_native_ffi_open_gl_context_descriptor_new_egl(
   MaplibreNativeFfiEglContextDescriptor* value
 );
 
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_data_is_egl:
+ * maplibre_native_ffi_open_gl_context_descriptor_is_egl:
  *
- * Whether the value holds `maplibre_native_ffi_open_gl_context_descriptor_data_get_egl`.
+ * Whether the value holds `maplibre_native_ffi_open_gl_context_descriptor_get_egl`.
  *
  * Returns: whether the value holds the variant
  */
-gboolean maplibre_native_ffi_open_gl_context_descriptor_data_is_egl(
-  const MaplibreNativeFfiOpenGlContextDescriptorData* self
+gboolean maplibre_native_ffi_open_gl_context_descriptor_is_egl(
+  const MaplibreNativeFfiOpenGlContextDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_data_get_egl:
+ * maplibre_native_ffi_open_gl_context_descriptor_get_egl:
  *
  * The `egl` variant.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiEglContextDescriptor*
-maplibre_native_ffi_open_gl_context_descriptor_data_get_egl(
-  const MaplibreNativeFfiOpenGlContextDescriptorData* self
+maplibre_native_ffi_open_gl_context_descriptor_get_egl(
+  const MaplibreNativeFfiOpenGlContextDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_data_new_web_gl: (constructor)
+ * maplibre_native_ffi_open_gl_context_descriptor_new_web_gl: (constructor)
  * @value: the value
  *
  * The `web_gl` variant.
  *
  * Returns: (transfer full): the new value
  */
-MaplibreNativeFfiOpenGlContextDescriptorData*
-maplibre_native_ffi_open_gl_context_descriptor_data_new_web_gl(
-  MaplibreNativeFfiWebGlContextDescriptor* value
+MaplibreNativeFfiOpenGlContextDescriptor*
+maplibre_native_ffi_open_gl_context_descriptor_new_web_gl(
+  const MaplibreNativeFfiWebGlContextDescriptor* value
 );
 
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_data_is_web_gl:
+ * maplibre_native_ffi_open_gl_context_descriptor_is_web_gl:
  *
- * Whether the value holds `maplibre_native_ffi_open_gl_context_descriptor_data_get_web_gl`.
+ * Whether the value holds `maplibre_native_ffi_open_gl_context_descriptor_get_web_gl`.
  *
  * Returns: whether the value holds the variant
  */
-gboolean maplibre_native_ffi_open_gl_context_descriptor_data_is_web_gl(
-  const MaplibreNativeFfiOpenGlContextDescriptorData* self
+gboolean maplibre_native_ffi_open_gl_context_descriptor_is_web_gl(
+  const MaplibreNativeFfiOpenGlContextDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_data_get_web_gl:
+ * maplibre_native_ffi_open_gl_context_descriptor_get_web_gl:
  *
  * The `web_gl` variant.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiWebGlContextDescriptor*
-maplibre_native_ffi_open_gl_context_descriptor_data_get_web_gl(
-  const MaplibreNativeFfiOpenGlContextDescriptorData* self
+maplibre_native_ffi_open_gl_context_descriptor_get_web_gl(
+  const MaplibreNativeFfiOpenGlContextDescriptor* self
 );
 
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiOpenGlContextDescriptorData,
-  maplibre_native_ffi_open_gl_context_descriptor_data_free
+  MaplibreNativeFfiOpenGlContextDescriptor,
+  maplibre_native_ffi_open_gl_context_descriptor_free
 )
 
 /**
- * MaplibreNativeFfiOpenGlContextDescriptor:
+ * MaplibreNativeFfiOpenGlSurfaceTarget:
  *
- * How a render session gets the OpenGL context that it renders with.
+ * Your OpenGL surface to present to, with the context that
+ * `maplibre_native_ffi_gpu_device_wrap_open_gl()` wrapped.
  *
- * Keep the objects that it names alive until a detach or release of the session
- * completes, or an abandon of it returns.
+ * The session makes its context current on the surface for each frame, and
+ * swaps the surface's buffers to present.
  *
- * See `mln_open_gl_context_descriptor` in the
+ * See `mln_open_gl_surface_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 /**
- * maplibre_native_ffi_open_gl_context_descriptor_new: (constructor)
+ * maplibre_native_ffi_open_gl_surface_target_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiOpenGlContextDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiOpenGlContextDescriptor*
-maplibre_native_ffi_open_gl_context_descriptor_new(void);
-
-/**
- * MaplibreNativeFfiOpenGlContextDescriptor:ownership: (setter set_ownership) (getter get_ownership)
- *
- * The `ownership` member.
- */
-/**
- * maplibre_native_ffi_open_gl_context_descriptor_get_ownership: (get-property ownership)
- *
- * Gets `MaplibreNativeFfiOpenGlContextDescriptor:ownership`.
- *
- * Returns: the value
- */
-MaplibreNativeFfiOpenGlContextOwnership
-maplibre_native_ffi_open_gl_context_descriptor_get_ownership(
-  MaplibreNativeFfiOpenGlContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_context_descriptor_set_ownership: (set-property ownership)
- *
- * Sets `MaplibreNativeFfiOpenGlContextDescriptor:ownership`.
- */
-void maplibre_native_ffi_open_gl_context_descriptor_set_ownership(
-  MaplibreNativeFfiOpenGlContextDescriptor* self,
-  MaplibreNativeFfiOpenGlContextOwnership value
-);
-
-/**
- * MaplibreNativeFfiOpenGlContextDescriptor:data: (setter set_data) (getter get_data)
- *
- * The `data` member.
- */
-/**
- * maplibre_native_ffi_open_gl_context_descriptor_get_data: (get-property data)
- *
- * Gets `MaplibreNativeFfiOpenGlContextDescriptor:data`.
- *
- * Returns: (transfer none) (nullable): the value
- */
-MaplibreNativeFfiOpenGlContextDescriptorData*
-maplibre_native_ffi_open_gl_context_descriptor_get_data(
-  MaplibreNativeFfiOpenGlContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_context_descriptor_set_data: (set-property data)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiOpenGlContextDescriptor:data`.
- */
-void maplibre_native_ffi_open_gl_context_descriptor_set_data(
-  MaplibreNativeFfiOpenGlContextDescriptor* self,
-  const MaplibreNativeFfiOpenGlContextDescriptorData* value
-);
-
-/**
- * MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:
- *
- * A ring of your OpenGL textures, for
- * `maplibre_native_ffi_map_attach_open_gl_borrowed_texture()`.
- *
- * `logical_size` sets the map's size. `physical_width` and `physical_height`
- * give the textures' size in pixels, which is usually `logical_size` times the
- * map's scale factor. The context must use
- * `MAPLIBRE_NATIVE_FFI_OPEN_GL_CONTEXT_OWNERSHIP_SHARED`. Each texture must be
- * in your context's share group, with storage of that size. The ring holds up
- * to `MAPLIBRE_NATIVE_FFI_TEXTURE_RING_MAX_DEPTH` distinct textures.
- *
- * The session uses the textures until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
- * returns.
- *
- * See `mln_open_gl_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiOpenGlSurfaceTarget` whose members are zero or empty.
  *
  * Returns: (transfer full): the new value
  */
-MaplibreNativeFfiOpenGlBorrowedTextureDescriptor*
-maplibre_native_ffi_open_gl_borrowed_texture_descriptor_new(void);
+MaplibreNativeFfiOpenGlSurfaceTarget*
+maplibre_native_ffi_open_gl_surface_target_new(void);
 
 /**
- * MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:logical-size: (setter set_logical_size) (getter get_logical_size)
+ * MaplibreNativeFfiOpenGlSurfaceTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
  *
  * The `logical_size` member.
  */
 /**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_logical_size: (get-property logical-size)
+ * maplibre_native_ffi_open_gl_surface_target_get_logical_size: (get-property logical-size)
  *
- * Gets `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_logical_size(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:logical-size`.
- */
-void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_logical_size(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:physical-width: (setter set_physical_width) (getter get_physical_width)
- *
- * The `physical_width` member.
- */
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_physical_width: (get-property physical-width)
- *
- * Gets `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:physical-width`.
- *
- * Returns: the value
- */
-guint32
-maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_physical_width(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_physical_width: (set-property physical-width)
- *
- * Sets `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:physical-width`.
- */
-void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_physical_width(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:physical-height: (setter set_physical_height) (getter get_physical_height)
- *
- * The `physical_height` member.
- */
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_physical_height: (get-property physical-height)
- *
- * Gets `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:physical-height`.
- *
- * Returns: the value
- */
-guint32
-maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_physical_height(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_physical_height: (set-property physical-height)
- *
- * Sets `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:physical-height`.
- */
-void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_physical_height(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:context: (setter set_context) (getter get_context)
- *
- * The `context` member.
- */
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_context: (get-property context)
- *
- * Gets `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:context`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiOpenGlContextDescriptor*
-maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_context(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_context: (set-property context)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:context`.
- */
-void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_context(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self,
-  MaplibreNativeFfiOpenGlContextDescriptor* value
-);
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_textures:
- *
- * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_textures` sets.
- *
- * Returns: (transfer none) (element-type MaplibreNativeFfiOpenGlBorrowedTexture): the items
- */
-GPtrArray* maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_textures(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_textures:
- * @value: (array length=value_count): the items
- *
- * The `textures` member.
- */
-void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_textures(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self,
-  const MaplibreNativeFfiOpenGlBorrowedTexture* value, gsize value_count
-);
-
-/**
- * MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:target: (setter set_target) (getter get_target)
- *
- * The textures' target. It must be GL_TEXTURE_2D.
- */
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_target: (get-property target)
- *
- * Gets `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:target`.
- *
- * Returns: the value
- */
-guint32 maplibre_native_ffi_open_gl_borrowed_texture_descriptor_get_target(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_target: (set-property target)
- *
- * Sets `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor:target`.
- */
-void maplibre_native_ffi_open_gl_borrowed_texture_descriptor_set_target(
-  MaplibreNativeFfiOpenGlBorrowedTextureDescriptor* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiOpenGlBorrowedTextureReplacement:
- *
- * New OpenGL textures for a borrowed ring, for
- * `maplibre_native_ffi_render_session_set_open_gl_borrowed_texture_target_async()`.
- *
- * The members and the textures follow the rules of
- * `MaplibreNativeFfiOpenGlBorrowedTextureDescriptor`. The ring keeps its depth,
- * context, and texture target, so give it as many textures as it attached with,
- * in the same share group.
- *
- * See `mln_open_gl_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_replacement_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiOpenGlBorrowedTextureReplacement` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiOpenGlBorrowedTextureReplacement*
-maplibre_native_ffi_open_gl_borrowed_texture_replacement_new(void);
-
-/**
- * MaplibreNativeFfiOpenGlBorrowedTextureReplacement:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiOpenGlBorrowedTextureReplacement:logical-size`.
+ * Gets `MaplibreNativeFfiOpenGlSurfaceTarget:logical-size`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_logical_size(
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self
+maplibre_native_ffi_open_gl_surface_target_get_logical_size(
+  MaplibreNativeFfiOpenGlSurfaceTarget* self
 );
 
 /**
- * maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_logical_size: (set-property logical-size)
+ * maplibre_native_ffi_open_gl_surface_target_set_logical_size: (set-property logical-size)
  * @value: the value
  *
- * Sets `MaplibreNativeFfiOpenGlBorrowedTextureReplacement:logical-size`.
+ * Sets `MaplibreNativeFfiOpenGlSurfaceTarget:logical-size`.
  */
-void maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_logical_size(
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self,
+void maplibre_native_ffi_open_gl_surface_target_set_logical_size(
+  MaplibreNativeFfiOpenGlSurfaceTarget* self,
   const MaplibreNativeFfiLogicalSize* value
 );
 
 /**
- * MaplibreNativeFfiOpenGlBorrowedTextureReplacement:physical-width: (setter set_physical_width) (getter get_physical_width)
+ * MaplibreNativeFfiOpenGlSurfaceTarget:surface: (setter set_surface) (getter get_surface)
  *
- * The `physical_width` member.
+ * Your `EGLSurface` on the context's display, with its config, or your `HDC`
+ * with the context's pixel format.
  */
 /**
- * maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_physical_width: (get-property physical-width)
+ * maplibre_native_ffi_open_gl_surface_target_get_surface: (get-property surface)
  *
- * Gets `MaplibreNativeFfiOpenGlBorrowedTextureReplacement:physical-width`.
+ * Gets `MaplibreNativeFfiOpenGlSurfaceTarget:surface`.
  *
  * Returns: the value
  */
-guint32
-maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_physical_width(
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self
+gpointer maplibre_native_ffi_open_gl_surface_target_get_surface(
+  MaplibreNativeFfiOpenGlSurfaceTarget* self
 );
 
 /**
- * maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_physical_width: (set-property physical-width)
+ * maplibre_native_ffi_open_gl_surface_target_set_surface: (set-property surface)
  *
- * Sets `MaplibreNativeFfiOpenGlBorrowedTextureReplacement:physical-width`.
+ * Sets `MaplibreNativeFfiOpenGlSurfaceTarget:surface`.
  */
-void maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_physical_width(
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiOpenGlBorrowedTextureReplacement:physical-height: (setter set_physical_height) (getter get_physical_height)
- *
- * The `physical_height` member.
- */
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_physical_height: (get-property physical-height)
- *
- * Gets `MaplibreNativeFfiOpenGlBorrowedTextureReplacement:physical-height`.
- *
- * Returns: the value
- */
-guint32
-maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_physical_height(
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_physical_height: (set-property physical-height)
- *
- * Sets `MaplibreNativeFfiOpenGlBorrowedTextureReplacement:physical-height`.
- */
-void maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_physical_height(
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self, guint32 value
-);
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_textures:
- *
- * Gets the value that `maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_textures` sets.
- *
- * Returns: (transfer none) (element-type MaplibreNativeFfiOpenGlBorrowedTexture): the items
- */
-GPtrArray*
-maplibre_native_ffi_open_gl_borrowed_texture_replacement_get_textures(
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_textures:
- * @value: (array length=value_count): the items
- *
- * The `textures` member.
- */
-void maplibre_native_ffi_open_gl_borrowed_texture_replacement_set_textures(
-  MaplibreNativeFfiOpenGlBorrowedTextureReplacement* self,
-  const MaplibreNativeFfiOpenGlBorrowedTexture* value, gsize value_count
-);
-
-/**
- * MaplibreNativeFfiOpenGlSurfaceDescriptor:
- *
- * An OpenGL surface to present to, for
- * `maplibre_native_ffi_map_attach_open_gl_surface()`.
- *
- * The session uses the surface until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
- * returns.
- *
- * See `mln_open_gl_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-/**
- * maplibre_native_ffi_open_gl_surface_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiOpenGlSurfaceDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiOpenGlSurfaceDescriptor*
-maplibre_native_ffi_open_gl_surface_descriptor_new(void);
-
-/**
- * MaplibreNativeFfiOpenGlSurfaceDescriptor:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_open_gl_surface_descriptor_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiOpenGlSurfaceDescriptor:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_open_gl_surface_descriptor_get_logical_size(
-  MaplibreNativeFfiOpenGlSurfaceDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_surface_descriptor_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiOpenGlSurfaceDescriptor:logical-size`.
- */
-void maplibre_native_ffi_open_gl_surface_descriptor_set_logical_size(
-  MaplibreNativeFfiOpenGlSurfaceDescriptor* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiOpenGlSurfaceDescriptor:context: (setter set_context) (getter get_context)
- *
- * The `context` member.
- */
-/**
- * maplibre_native_ffi_open_gl_surface_descriptor_get_context: (get-property context)
- *
- * Gets `MaplibreNativeFfiOpenGlSurfaceDescriptor:context`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiOpenGlContextDescriptor*
-maplibre_native_ffi_open_gl_surface_descriptor_get_context(
-  MaplibreNativeFfiOpenGlSurfaceDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_surface_descriptor_set_context: (set-property context)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiOpenGlSurfaceDescriptor:context`.
- */
-void maplibre_native_ffi_open_gl_surface_descriptor_set_context(
-  MaplibreNativeFfiOpenGlSurfaceDescriptor* self,
-  MaplibreNativeFfiOpenGlContextDescriptor* value
-);
-
-/**
- * MaplibreNativeFfiOpenGlSurfaceDescriptor:surface: (setter set_surface) (getter get_surface)
- *
- * Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it.
- */
-/**
- * maplibre_native_ffi_open_gl_surface_descriptor_get_surface: (get-property surface)
- *
- * Gets `MaplibreNativeFfiOpenGlSurfaceDescriptor:surface`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_open_gl_surface_descriptor_get_surface(
-  MaplibreNativeFfiOpenGlSurfaceDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_surface_descriptor_set_surface: (set-property surface)
- *
- * Sets `MaplibreNativeFfiOpenGlSurfaceDescriptor:surface`.
- */
-void maplibre_native_ffi_open_gl_surface_descriptor_set_surface(
-  MaplibreNativeFfiOpenGlSurfaceDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiOpenGlSurfaceReplacement:
- *
- * A new OpenGL surface for
- * `maplibre_native_ffi_render_session_set_open_gl_surface_target_async()`.
- *
- * The session presents to it with the context that it attached with. It uses
- * the surface until a replacement or release of the target completes, a detach
- * or release of the session completes, or an abandon of it returns.
- *
- * See `mln_open_gl_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-/**
- * maplibre_native_ffi_open_gl_surface_replacement_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiOpenGlSurfaceReplacement` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiOpenGlSurfaceReplacement*
-maplibre_native_ffi_open_gl_surface_replacement_new(void);
-
-/**
- * MaplibreNativeFfiOpenGlSurfaceReplacement:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_open_gl_surface_replacement_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiOpenGlSurfaceReplacement:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_open_gl_surface_replacement_get_logical_size(
-  MaplibreNativeFfiOpenGlSurfaceReplacement* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_surface_replacement_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiOpenGlSurfaceReplacement:logical-size`.
- */
-void maplibre_native_ffi_open_gl_surface_replacement_set_logical_size(
-  MaplibreNativeFfiOpenGlSurfaceReplacement* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiOpenGlSurfaceReplacement:surface: (setter set_surface) (getter get_surface)
- *
- * Your EGLSurface with EGL, or your HDC with WGL. WebGL doesn't use it, so
- * leave it null.
- */
-/**
- * maplibre_native_ffi_open_gl_surface_replacement_get_surface: (get-property surface)
- *
- * Gets `MaplibreNativeFfiOpenGlSurfaceReplacement:surface`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_open_gl_surface_replacement_get_surface(
-  MaplibreNativeFfiOpenGlSurfaceReplacement* self
-);
-
-/**
- * maplibre_native_ffi_open_gl_surface_replacement_set_surface: (set-property surface)
- *
- * Sets `MaplibreNativeFfiOpenGlSurfaceReplacement:surface`.
- */
-void maplibre_native_ffi_open_gl_surface_replacement_set_surface(
-  MaplibreNativeFfiOpenGlSurfaceReplacement* self, gpointer value
+void maplibre_native_ffi_open_gl_surface_target_set_surface(
+  MaplibreNativeFfiOpenGlSurfaceTarget* self, gpointer value
 );
 
 GType maplibre_native_ffi_open_gl_texture_frame_get_type(void) G_GNUC_CONST;
@@ -10563,92 +12400,6 @@ void maplibre_native_ffi_projection_mode_options_set_y_skew(
   MaplibreNativeFfiProjectionModeOptions* self, gdouble value
 );
 
-/**
- * MaplibreNativeFfiQueueLock:
- *
- * Your lock on a Vulkan queue that you and a render session both submit to.
- *
- * The session holds the lock only while it submits or presents to the queue.
- * Set both `lock` and `unlock`, or neither when you don't submit to the queue
- * yourself.
- *
- * It can run on a library thread, and it can't call the library.
- *
- * See `mln_queue_lock` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-GType maplibre_native_ffi_queue_lock_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_QUEUE_LOCK \
-  (maplibre_native_ffi_queue_lock_get_type())
-
-/**
- * maplibre_native_ffi_queue_lock_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiQueueLock` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiQueueLock* maplibre_native_ffi_queue_lock_new(void);
-
-/**
- * maplibre_native_ffi_queue_lock_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiQueueLock* maplibre_native_ffi_queue_lock_copy(
-  const MaplibreNativeFfiQueueLock* self
-);
-
-/**
- * maplibre_native_ffi_queue_lock_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_queue_lock_free(MaplibreNativeFfiQueueLock* self);
-
-/**
- * maplibre_native_ffi_queue_lock_set_lock: (skip)
- * @callback: (scope notified) (closure user_data) (destroy notify) (nullable): the callback
- * @user_data: the data to pass to `callback`
- * @notify: the function that frees `user_data` after the last call
- *
- * Locks or unlocks the Vulkan queue that you share with a render session.
- *
- * It can run on a library thread, and it can't call the library.
- *
- * See `mln_queue_lock_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-void maplibre_native_ffi_queue_lock_set_lock(
-  MaplibreNativeFfiQueueLock* self, MaplibreNativeFfiQueueLockCallback callback,
-  gpointer user_data, GDestroyNotify notify
-);
-
-/**
- * maplibre_native_ffi_queue_lock_set_unlock: (skip)
- * @callback: (scope notified) (closure user_data) (destroy notify) (nullable): the callback
- * @user_data: the data to pass to `callback`
- * @notify: the function that frees `user_data` after the last call
- *
- * Locks or unlocks the Vulkan queue that you share with a render session.
- *
- * It can run on a library thread, and it can't call the library.
- *
- * See `mln_queue_lock_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-void maplibre_native_ffi_queue_lock_set_unlock(
-  MaplibreNativeFfiQueueLock* self, MaplibreNativeFfiQueueLockCallback callback,
-  gpointer user_data, GDestroyNotify notify
-);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiQueueLock, maplibre_native_ffi_queue_lock_free
-)
-
 GType maplibre_native_ffi_render_abandon_result_get_type(void) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_RENDER_ABANDON_RESULT \
   (maplibre_native_ffi_render_abandon_result_get_type())
@@ -10793,14 +12544,20 @@ maplibre_native_ffi_render_session_attach_options_new(void);
  * The thread that runs the session's graphics work, which depends on the
  * target:
  *
- * - `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD` for a shared or
- *   dedicated EGL or WGL context, an existing WebGL context, or a browser's
- *   WebGPU device.
- * - `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER` for a transferred WebGL
- *   canvas, an Android, OpenHarmony, or Win32 window, a Wayland surface, a ring
- *   of Android hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces,
- *   or an offscreen session.
- * - Either one for another Metal or Vulkan target.
+ * - `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD` for a borrowed
+ *   ring of WebGPU textures.
+ * - `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER` for an offscreen target, a
+ *   window, or an exported ring.
+ * - Either one for a web canvas. In a browser both run on the thread that
+ *   loaded the library: `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER` in the
+ *   library's own tasks, and
+ *   `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD` when you service
+ *   the session.
+ * - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
+ *   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive these
+ *   on `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CORE_WORKER` only, and fails an
+ *   attach with `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`
+ *   then.
  *
  * An attach with another driver fails with
  * `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED`.
@@ -10925,7 +12682,10 @@ void maplibre_native_ffi_render_session_attach_options_set_redraw_wake(
  * Called when a session driven by
  * `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD` has work for
  * `maplibre_native_ffi_render_session_service_driver_work()`. It isn't called
- * again until a service runs.
+ * again until a service runs. It's never called on your graphics thread during
+ * a service: the service runs the work that comes while it runs, so you can
+ * call `maplibre_native_ffi_render_session_service_driver_work()` from the
+ * wake.
  */
 /**
  * maplibre_native_ffi_render_session_attach_options_get_driver_work_wake: (get-property driver-work-wake)
@@ -10951,31 +12711,38 @@ void maplibre_native_ffi_render_session_attach_options_set_driver_work_wake(
 );
 
 /**
- * MaplibreNativeFfiRenderSessionAttachOptions:queue-lock: (setter set_queue_lock) (getter get_queue_lock)
+ * MaplibreNativeFfiRenderSessionAttachOptions:keep-depth: (setter set_keep_depth) (getter get_keep_depth)
  *
- * Your lock on the Vulkan queue, when you submit to it yourself.
+ * Whether an exported ring keeps the depth and stencil of each frame for you,
+ * so that you can draw into the frame depth-tested against the map, as
+ * `MaplibreNativeFfiFrameProjection` says. The getter of the device's API, such
+ * as `maplibre_native_ffi_acquired_frame_get_vulkan_texture()`, gets a frame's
+ * depth texture on the device, and
+ * `maplibre_native_ffi_acquired_frame_get_opaque_fd()` shares it across APIs
+ * when `MaplibreNativeFfiGpuDeviceCapabilities.depth_export_kinds` has the
+ * ring's kind. Keeping depth costs memory bandwidth, most on tile-based GPUs. A
+ * borrowed ring keeps depth in the textures that you give it instead, and the
+ * other targets keep none, so an attach to them with `keep_depth` fails with
+ * `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED`.
  */
 /**
- * maplibre_native_ffi_render_session_attach_options_get_queue_lock: (get-property queue-lock)
+ * maplibre_native_ffi_render_session_attach_options_get_keep_depth: (get-property keep-depth)
  *
- * Gets `MaplibreNativeFfiRenderSessionAttachOptions:queue-lock`.
+ * Gets `MaplibreNativeFfiRenderSessionAttachOptions:keep-depth`.
  *
- * Returns: (transfer none): the value
+ * Returns: the value
  */
-MaplibreNativeFfiQueueLock*
-maplibre_native_ffi_render_session_attach_options_get_queue_lock(
+gboolean maplibre_native_ffi_render_session_attach_options_get_keep_depth(
   MaplibreNativeFfiRenderSessionAttachOptions* self
 );
 
 /**
- * maplibre_native_ffi_render_session_attach_options_set_queue_lock: (set-property queue-lock)
- * @value: the value
+ * maplibre_native_ffi_render_session_attach_options_set_keep_depth: (set-property keep-depth)
  *
- * Sets `MaplibreNativeFfiRenderSessionAttachOptions:queue-lock`.
+ * Sets `MaplibreNativeFfiRenderSessionAttachOptions:keep-depth`.
  */
-void maplibre_native_ffi_render_session_attach_options_set_queue_lock(
-  MaplibreNativeFfiRenderSessionAttachOptions* self,
-  const MaplibreNativeFfiQueueLock* value
+void maplibre_native_ffi_render_session_attach_options_set_keep_depth(
+  MaplibreNativeFfiRenderSessionAttachOptions* self, gboolean value
 );
 
 GType maplibre_native_ffi_render_session_capabilities_get_type(
@@ -11040,6 +12807,1565 @@ void maplibre_native_ffi_render_session_snapshot_free(
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   MaplibreNativeFfiRenderSessionSnapshot,
   maplibre_native_ffi_render_session_snapshot_free
+)
+
+/**
+ * MaplibreNativeFfiWin32WindowTarget:
+ *
+ * A Win32 window to present to.
+ *
+ * On an OpenGL device, the session sets the window's pixel format, so don't set
+ * one yourself. While the window is minimized, frame demands finish with
+ * `MAPLIBRE_NATIVE_FFI_RENDER_RESULT_TARGET_NOT_READY`.
+ *
+ * See `mln_win32_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+/**
+ * maplibre_native_ffi_win32_window_target_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiWin32WindowTarget` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiWin32WindowTarget* maplibre_native_ffi_win32_window_target_new(
+  void
+);
+
+/**
+ * MaplibreNativeFfiWin32WindowTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
+ *
+ * The `logical_size` member.
+ */
+/**
+ * maplibre_native_ffi_win32_window_target_get_logical_size: (get-property logical-size)
+ *
+ * Gets `MaplibreNativeFfiWin32WindowTarget:logical-size`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_win32_window_target_get_logical_size(
+  MaplibreNativeFfiWin32WindowTarget* self
+);
+
+/**
+ * maplibre_native_ffi_win32_window_target_set_logical_size: (set-property logical-size)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiWin32WindowTarget:logical-size`.
+ */
+void maplibre_native_ffi_win32_window_target_set_logical_size(
+  MaplibreNativeFfiWin32WindowTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+);
+
+/**
+ * MaplibreNativeFfiWin32WindowTarget:window: (setter set_window) (getter get_window)
+ *
+ * Your `HWND`.
+ */
+/**
+ * maplibre_native_ffi_win32_window_target_get_window: (get-property window)
+ *
+ * Gets `MaplibreNativeFfiWin32WindowTarget:window`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_win32_window_target_get_window(
+  MaplibreNativeFfiWin32WindowTarget* self
+);
+
+/**
+ * maplibre_native_ffi_win32_window_target_set_window: (set-property window)
+ *
+ * Sets `MaplibreNativeFfiWin32WindowTarget:window`.
+ */
+void maplibre_native_ffi_win32_window_target_set_window(
+  MaplibreNativeFfiWin32WindowTarget* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiXlibWindowTarget:
+ *
+ * An X11 window to present to, through Xlib.
+ *
+ * Keep the display connected until the session's detach completes.
+ *
+ * See `mln_xlib_window_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+/**
+ * maplibre_native_ffi_xlib_window_target_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiXlibWindowTarget` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiXlibWindowTarget* maplibre_native_ffi_xlib_window_target_new(
+  void
+);
+
+/**
+ * MaplibreNativeFfiXlibWindowTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
+ *
+ * The `logical_size` member.
+ */
+/**
+ * maplibre_native_ffi_xlib_window_target_get_logical_size: (get-property logical-size)
+ *
+ * Gets `MaplibreNativeFfiXlibWindowTarget:logical-size`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_xlib_window_target_get_logical_size(
+  MaplibreNativeFfiXlibWindowTarget* self
+);
+
+/**
+ * maplibre_native_ffi_xlib_window_target_set_logical_size: (set-property logical-size)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiXlibWindowTarget:logical-size`.
+ */
+void maplibre_native_ffi_xlib_window_target_set_logical_size(
+  MaplibreNativeFfiXlibWindowTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+);
+
+/**
+ * MaplibreNativeFfiXlibWindowTarget:display: (setter set_display) (getter get_display)
+ *
+ * Your `Display*`.
+ */
+/**
+ * maplibre_native_ffi_xlib_window_target_get_display: (get-property display)
+ *
+ * Gets `MaplibreNativeFfiXlibWindowTarget:display`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_xlib_window_target_get_display(
+  MaplibreNativeFfiXlibWindowTarget* self
+);
+
+/**
+ * maplibre_native_ffi_xlib_window_target_set_display: (set-property display)
+ *
+ * Sets `MaplibreNativeFfiXlibWindowTarget:display`.
+ */
+void maplibre_native_ffi_xlib_window_target_set_display(
+  MaplibreNativeFfiXlibWindowTarget* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiXlibWindowTarget:window: (setter set_window) (getter get_window)
+ *
+ * Your `Window`, on `display`.
+ */
+/**
+ * maplibre_native_ffi_xlib_window_target_get_window: (get-property window)
+ *
+ * Gets `MaplibreNativeFfiXlibWindowTarget:window`.
+ *
+ * Returns: the value
+ */
+guint64 maplibre_native_ffi_xlib_window_target_get_window(
+  MaplibreNativeFfiXlibWindowTarget* self
+);
+
+/**
+ * maplibre_native_ffi_xlib_window_target_set_window: (set-property window)
+ *
+ * Sets `MaplibreNativeFfiXlibWindowTarget:window`.
+ */
+void maplibre_native_ffi_xlib_window_target_set_window(
+  MaplibreNativeFfiXlibWindowTarget* self, guint64 value
+);
+
+/**
+ * MaplibreNativeFfiWaylandSurfaceTarget:
+ *
+ * A Wayland surface to present to.
+ *
+ * Keep the display connected until the session's detach completes. On an OpenGL
+ * device, if you also use EGL on the display, initialize it before you attach.
+ *
+ * See `mln_wayland_surface_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+/**
+ * maplibre_native_ffi_wayland_surface_target_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiWaylandSurfaceTarget` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiWaylandSurfaceTarget*
+maplibre_native_ffi_wayland_surface_target_new(void);
+
+/**
+ * MaplibreNativeFfiWaylandSurfaceTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
+ *
+ * The `logical_size` member.
+ */
+/**
+ * maplibre_native_ffi_wayland_surface_target_get_logical_size: (get-property logical-size)
+ *
+ * Gets `MaplibreNativeFfiWaylandSurfaceTarget:logical-size`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_wayland_surface_target_get_logical_size(
+  MaplibreNativeFfiWaylandSurfaceTarget* self
+);
+
+/**
+ * maplibre_native_ffi_wayland_surface_target_set_logical_size: (set-property logical-size)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiWaylandSurfaceTarget:logical-size`.
+ */
+void maplibre_native_ffi_wayland_surface_target_set_logical_size(
+  MaplibreNativeFfiWaylandSurfaceTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+);
+
+/**
+ * MaplibreNativeFfiWaylandSurfaceTarget:display: (setter set_display) (getter get_display)
+ *
+ * Your `wl_display*`.
+ */
+/**
+ * maplibre_native_ffi_wayland_surface_target_get_display: (get-property display)
+ *
+ * Gets `MaplibreNativeFfiWaylandSurfaceTarget:display`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_wayland_surface_target_get_display(
+  MaplibreNativeFfiWaylandSurfaceTarget* self
+);
+
+/**
+ * maplibre_native_ffi_wayland_surface_target_set_display: (set-property display)
+ *
+ * Sets `MaplibreNativeFfiWaylandSurfaceTarget:display`.
+ */
+void maplibre_native_ffi_wayland_surface_target_set_display(
+  MaplibreNativeFfiWaylandSurfaceTarget* self, gpointer value
+);
+
+/**
+ * MaplibreNativeFfiWaylandSurfaceTarget:surface: (setter set_surface) (getter get_surface)
+ *
+ * Your `wl_surface*`, on `display`.
+ */
+/**
+ * maplibre_native_ffi_wayland_surface_target_get_surface: (get-property surface)
+ *
+ * Gets `MaplibreNativeFfiWaylandSurfaceTarget:surface`.
+ *
+ * Returns: the value
+ */
+gpointer maplibre_native_ffi_wayland_surface_target_get_surface(
+  MaplibreNativeFfiWaylandSurfaceTarget* self
+);
+
+/**
+ * maplibre_native_ffi_wayland_surface_target_set_surface: (set-property surface)
+ *
+ * Sets `MaplibreNativeFfiWaylandSurfaceTarget:surface`.
+ */
+void maplibre_native_ffi_wayland_surface_target_set_surface(
+  MaplibreNativeFfiWaylandSurfaceTarget* self, gpointer value
+);
+
+GType maplibre_native_ffi_vulkan_surface_target_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_SURFACE_TARGET \
+  (maplibre_native_ffi_vulkan_surface_target_get_type())
+
+/**
+ * maplibre_native_ffi_vulkan_surface_target_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiVulkanSurfaceTarget*
+maplibre_native_ffi_vulkan_surface_target_copy(
+  const MaplibreNativeFfiVulkanSurfaceTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_surface_target_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_vulkan_surface_target_free(
+  MaplibreNativeFfiVulkanSurfaceTarget* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiVulkanSurfaceTarget,
+  maplibre_native_ffi_vulkan_surface_target_free
+)
+
+GType maplibre_native_ffi_vulkan_borrowed_texture_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_BORROWED_TEXTURE \
+  (maplibre_native_ffi_vulkan_borrowed_texture_get_type())
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_texture_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiVulkanBorrowedTexture*
+maplibre_native_ffi_vulkan_borrowed_texture_copy(
+  const MaplibreNativeFfiVulkanBorrowedTexture* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_texture_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_vulkan_borrowed_texture_free(
+  MaplibreNativeFfiVulkanBorrowedTexture* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiVulkanBorrowedTexture,
+  maplibre_native_ffi_vulkan_borrowed_texture_free
+)
+
+/**
+ * MaplibreNativeFfiVulkanBorrowedTexturesTarget:
+ *
+ * A ring of your Vulkan images to render into, on the Vulkan device that you
+ * attach on.
+ *
+ * `physical_width` and `physical_height` give the images' size in pixels, which
+ * is usually `logical_size` times the map's scale factor. Each image must have
+ * that size, `format`, and `VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT`, and belong to
+ * the device's `VkDevice`. The ring holds up to
+ * `MAPLIBRE_NATIVE_FFI_TEXTURE_RING_MAX_DEPTH` distinct images.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `MaplibreNativeFfiFrameProjection` says: one for each of
+ * `textures`, at the same index, or none. Each frame clears the one at its
+ * slot, renders the map's depth and stencil into it, stores them, and leaves it
+ * in `depth_final_layout`, with `owner` as for the color image. They must have
+ * the size of `textures`, `depth_format`, one sample, and
+ * `VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT`, and their views both the depth
+ * and the stencil aspect.
+ *
+ * See `mln_vulkan_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiVulkanBorrowedTexturesTarget` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiVulkanBorrowedTexturesTarget*
+maplibre_native_ffi_vulkan_borrowed_textures_target_new(void);
+
+/**
+ * MaplibreNativeFfiVulkanBorrowedTexturesTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
+ *
+ * The `logical_size` member.
+ */
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_get_logical_size: (get-property logical-size)
+ *
+ * Gets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:logical-size`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_vulkan_borrowed_textures_target_get_logical_size(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_set_logical_size: (set-property logical-size)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:logical-size`.
+ */
+void maplibre_native_ffi_vulkan_borrowed_textures_target_set_logical_size(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+);
+
+/**
+ * MaplibreNativeFfiVulkanBorrowedTexturesTarget:physical-width: (setter set_physical_width) (getter get_physical_width)
+ *
+ * The `physical_width` member.
+ */
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_get_physical_width: (get-property physical-width)
+ *
+ * Gets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:physical-width`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_borrowed_textures_target_get_physical_width(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_set_physical_width: (set-property physical-width)
+ *
+ * Sets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:physical-width`.
+ */
+void maplibre_native_ffi_vulkan_borrowed_textures_target_set_physical_width(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiVulkanBorrowedTexturesTarget:physical-height: (setter set_physical_height) (getter get_physical_height)
+ *
+ * The `physical_height` member.
+ */
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_get_physical_height: (get-property physical-height)
+ *
+ * Gets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:physical-height`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_borrowed_textures_target_get_physical_height(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_set_physical_height: (set-property physical-height)
+ *
+ * Sets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:physical-height`.
+ */
+void maplibre_native_ffi_vulkan_borrowed_textures_target_set_physical_height(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self, guint32 value
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_get_textures:
+ *
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_textures_target_set_textures` sets.
+ *
+ * Returns: (transfer none) (element-type MaplibreNativeFfiVulkanBorrowedTexture): the items
+ */
+GPtrArray* maplibre_native_ffi_vulkan_borrowed_textures_target_get_textures(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_set_textures:
+ * @value: (array length=value_count): the items
+ *
+ * The `textures` member.
+ */
+void maplibre_native_ffi_vulkan_borrowed_textures_target_set_textures(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self,
+  const MaplibreNativeFfiVulkanBorrowedTexture* value, gsize value_count
+);
+
+/**
+ * MaplibreNativeFfiVulkanBorrowedTexturesTarget:format: (setter set_format) (getter get_format)
+ *
+ * The images' `VkFormat`.
+ */
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_get_format: (get-property format)
+ *
+ * Gets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:format`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_borrowed_textures_target_get_format(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_set_format: (set-property format)
+ *
+ * Sets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:format`.
+ */
+void maplibre_native_ffi_vulkan_borrowed_textures_target_set_format(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiVulkanBorrowedTexturesTarget:final-layout: (setter set_final_layout) (getter get_final_layout)
+ *
+ * The `VkImageLayout` that each frame leaves its image in.
+ */
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_get_final_layout: (get-property final-layout)
+ *
+ * Gets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:final-layout`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_borrowed_textures_target_get_final_layout(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_set_final_layout: (set-property final-layout)
+ *
+ * Sets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:final-layout`.
+ */
+void maplibre_native_ffi_vulkan_borrowed_textures_target_set_final_layout(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiVulkanBorrowedTexturesTarget:owner: (setter set_owner) (getter get_owner)
+ *
+ * The `owner` member.
+ */
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_get_owner: (get-property owner)
+ *
+ * Gets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:owner`.
+ *
+ * Returns: the value
+ */
+MaplibreNativeFfiVulkanImageOwner
+maplibre_native_ffi_vulkan_borrowed_textures_target_get_owner(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_set_owner: (set-property owner)
+ *
+ * Sets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:owner`.
+ */
+void maplibre_native_ffi_vulkan_borrowed_textures_target_set_owner(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self,
+  MaplibreNativeFfiVulkanImageOwner value
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_get_depth_textures:
+ *
+ * Gets the value that `maplibre_native_ffi_vulkan_borrowed_textures_target_set_depth_textures` sets.
+ *
+ * Returns: (transfer none) (element-type MaplibreNativeFfiVulkanBorrowedTexture): the items
+ */
+GPtrArray*
+maplibre_native_ffi_vulkan_borrowed_textures_target_get_depth_textures(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_set_depth_textures:
+ * @value: (array length=value_count): the items
+ *
+ * The `depth_textures` member.
+ */
+void maplibre_native_ffi_vulkan_borrowed_textures_target_set_depth_textures(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self,
+  const MaplibreNativeFfiVulkanBorrowedTexture* value, gsize value_count
+);
+
+/**
+ * MaplibreNativeFfiVulkanBorrowedTexturesTarget:depth-format: (setter set_depth_format) (getter get_depth_format)
+ *
+ * The depth images' `VkFormat`, of
+ * `MaplibreNativeFfiGpuDeviceCapabilities.depth_stencil_formats`.
+ */
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_get_depth_format: (get-property depth-format)
+ *
+ * Gets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:depth-format`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_borrowed_textures_target_get_depth_format(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_set_depth_format: (set-property depth-format)
+ *
+ * Sets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:depth-format`.
+ */
+void maplibre_native_ffi_vulkan_borrowed_textures_target_set_depth_format(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiVulkanBorrowedTexturesTarget:depth-final-layout: (setter set_depth_final_layout) (getter get_depth_final_layout)
+ *
+ * The `VkImageLayout` that each frame leaves its depth image in.
+ */
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_get_depth_final_layout: (get-property depth-final-layout)
+ *
+ * Gets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:depth-final-layout`.
+ *
+ * Returns: the value
+ */
+guint32
+maplibre_native_ffi_vulkan_borrowed_textures_target_get_depth_final_layout(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_borrowed_textures_target_set_depth_final_layout: (set-property depth-final-layout)
+ *
+ * Sets `MaplibreNativeFfiVulkanBorrowedTexturesTarget:depth-final-layout`.
+ */
+void maplibre_native_ffi_vulkan_borrowed_textures_target_set_depth_final_layout(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* self, guint32 value
+);
+
+GType maplibre_native_ffi_web_gpu_borrowed_texture_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_WEB_GPU_BORROWED_TEXTURE \
+  (maplibre_native_ffi_web_gpu_borrowed_texture_get_type())
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_texture_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiWebGpuBorrowedTexture*
+maplibre_native_ffi_web_gpu_borrowed_texture_copy(
+  const MaplibreNativeFfiWebGpuBorrowedTexture* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_texture_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_web_gpu_borrowed_texture_free(
+  MaplibreNativeFfiWebGpuBorrowedTexture* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiWebGpuBorrowedTexture,
+  maplibre_native_ffi_web_gpu_borrowed_texture_free
+)
+
+/**
+ * MaplibreNativeFfiWebGpuBorrowedTexturesTarget:
+ *
+ * A ring of your WebGPU textures to render into, on a WebGPU device that wraps
+ * yours.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. Each texture
+ * must be 2D with that size, `format`, one layer, one mip level, one sample,
+ * and `GPUTextureUsage.RENDER_ATTACHMENT`. The ring holds up to
+ * `MAPLIBRE_NATIVE_FFI_TEXTURE_RING_MAX_DEPTH` distinct textures.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `MaplibreNativeFfiFrameProjection` says: one for each of
+ * `textures`, at the same index, or none. Each frame clears the one at its
+ * slot, renders the map's depth and stencil into it, and stores them. They must
+ * be 2D with the size of `textures`, `depth_format`, one layer, one mip level,
+ * one sample, and `GPUTextureUsage.RENDER_ATTACHMENT`.
+ *
+ * See `mln_web_gpu_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiWebGpuBorrowedTexturesTarget` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiWebGpuBorrowedTexturesTarget*
+maplibre_native_ffi_web_gpu_borrowed_textures_target_new(void);
+
+/**
+ * MaplibreNativeFfiWebGpuBorrowedTexturesTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
+ *
+ * The `logical_size` member.
+ */
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_get_logical_size: (get-property logical-size)
+ *
+ * Gets `MaplibreNativeFfiWebGpuBorrowedTexturesTarget:logical-size`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_web_gpu_borrowed_textures_target_get_logical_size(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_set_logical_size: (set-property logical-size)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiWebGpuBorrowedTexturesTarget:logical-size`.
+ */
+void maplibre_native_ffi_web_gpu_borrowed_textures_target_set_logical_size(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+);
+
+/**
+ * MaplibreNativeFfiWebGpuBorrowedTexturesTarget:physical-width: (setter set_physical_width) (getter get_physical_width)
+ *
+ * The `physical_width` member.
+ */
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_get_physical_width: (get-property physical-width)
+ *
+ * Gets `MaplibreNativeFfiWebGpuBorrowedTexturesTarget:physical-width`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_web_gpu_borrowed_textures_target_get_physical_width(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_set_physical_width: (set-property physical-width)
+ *
+ * Sets `MaplibreNativeFfiWebGpuBorrowedTexturesTarget:physical-width`.
+ */
+void maplibre_native_ffi_web_gpu_borrowed_textures_target_set_physical_width(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiWebGpuBorrowedTexturesTarget:physical-height: (setter set_physical_height) (getter get_physical_height)
+ *
+ * The `physical_height` member.
+ */
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_get_physical_height: (get-property physical-height)
+ *
+ * Gets `MaplibreNativeFfiWebGpuBorrowedTexturesTarget:physical-height`.
+ *
+ * Returns: the value
+ */
+guint32
+maplibre_native_ffi_web_gpu_borrowed_textures_target_get_physical_height(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_set_physical_height: (set-property physical-height)
+ *
+ * Sets `MaplibreNativeFfiWebGpuBorrowedTexturesTarget:physical-height`.
+ */
+void maplibre_native_ffi_web_gpu_borrowed_textures_target_set_physical_height(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self, guint32 value
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_get_textures:
+ *
+ * Gets the value that `maplibre_native_ffi_web_gpu_borrowed_textures_target_set_textures` sets.
+ *
+ * Returns: (transfer none) (element-type MaplibreNativeFfiWebGpuBorrowedTexture): the items
+ */
+GPtrArray* maplibre_native_ffi_web_gpu_borrowed_textures_target_get_textures(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_set_textures:
+ * @value: (array length=value_count): the items
+ *
+ * The `textures` member.
+ */
+void maplibre_native_ffi_web_gpu_borrowed_textures_target_set_textures(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self,
+  const MaplibreNativeFfiWebGpuBorrowedTexture* value, gsize value_count
+);
+
+/**
+ * MaplibreNativeFfiWebGpuBorrowedTexturesTarget:format: (setter set_format) (getter get_format)
+ *
+ * The textures' `GPUTextureFormat`, such as `rgba8unorm`.
+ */
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_get_format: (get-property format)
+ *
+ * Gets `MaplibreNativeFfiWebGpuBorrowedTexturesTarget:format`.
+ *
+ * Returns: (transfer none): the text
+ */
+const char* maplibre_native_ffi_web_gpu_borrowed_textures_target_get_format(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_set_format: (set-property format)
+ * @value: the UTF-8 text
+ *
+ * Sets `MaplibreNativeFfiWebGpuBorrowedTexturesTarget:format`.
+ */
+void maplibre_native_ffi_web_gpu_borrowed_textures_target_set_format(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self, const char* value
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_get_depth_textures:
+ *
+ * Gets the value that `maplibre_native_ffi_web_gpu_borrowed_textures_target_set_depth_textures` sets.
+ *
+ * Returns: (transfer none) (element-type MaplibreNativeFfiWebGpuBorrowedTexture): the items
+ */
+GPtrArray*
+maplibre_native_ffi_web_gpu_borrowed_textures_target_get_depth_textures(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_set_depth_textures:
+ * @value: (array length=value_count): the items
+ *
+ * The `depth_textures` member.
+ */
+void maplibre_native_ffi_web_gpu_borrowed_textures_target_set_depth_textures(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self,
+  const MaplibreNativeFfiWebGpuBorrowedTexture* value, gsize value_count
+);
+
+/**
+ * MaplibreNativeFfiWebGpuBorrowedTexturesTarget:depth-format: (setter set_depth_format) (getter get_depth_format)
+ *
+ * The depth textures' `GPUTextureFormat`, of
+ * `MaplibreNativeFfiGpuDeviceCapabilities.depth_stencil_formats`.
+ */
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_get_depth_format: (get-property depth-format)
+ *
+ * Gets `MaplibreNativeFfiWebGpuBorrowedTexturesTarget:depth-format`.
+ *
+ * Returns: (transfer none): the text
+ */
+const char*
+maplibre_native_ffi_web_gpu_borrowed_textures_target_get_depth_format(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self
+);
+
+/**
+ * maplibre_native_ffi_web_gpu_borrowed_textures_target_set_depth_format: (set-property depth-format)
+ * @value: the UTF-8 text
+ *
+ * Sets `MaplibreNativeFfiWebGpuBorrowedTexturesTarget:depth-format`.
+ */
+void maplibre_native_ffi_web_gpu_borrowed_textures_target_set_depth_format(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* self, const char* value
+);
+
+/**
+ * MaplibreNativeFfiWebCanvasTarget:
+ *
+ * A canvas to present to.
+ *
+ * The session makes the canvas's "webgpu" or "webgl2" context with the device's
+ * backend, and sets the canvas's size to `logical_size` at the map's scale
+ * factor. Attached without a device, it renders with the build's backend: a
+ * WebGPU build asks the browser for a device, and attaches once it has one. For
+ * an OpenGL device that wraps your WebGL2 context, the canvas must be the
+ * context's own.
+ *
+ * See `mln_web_canvas_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+/**
+ * maplibre_native_ffi_web_canvas_target_new: (constructor)
+ *
+ * Creates a `MaplibreNativeFfiWebCanvasTarget` whose members are zero or empty.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiWebCanvasTarget* maplibre_native_ffi_web_canvas_target_new(
+  void
+);
+
+/**
+ * MaplibreNativeFfiWebCanvasTarget:logical-size: (setter set_logical_size) (getter get_logical_size)
+ *
+ * The `logical_size` member.
+ */
+/**
+ * maplibre_native_ffi_web_canvas_target_get_logical_size: (get-property logical-size)
+ *
+ * Gets `MaplibreNativeFfiWebCanvasTarget:logical-size`.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_web_canvas_target_get_logical_size(
+  MaplibreNativeFfiWebCanvasTarget* self
+);
+
+/**
+ * maplibre_native_ffi_web_canvas_target_set_logical_size: (set-property logical-size)
+ * @value: the value
+ *
+ * Sets `MaplibreNativeFfiWebCanvasTarget:logical-size`.
+ */
+void maplibre_native_ffi_web_canvas_target_set_logical_size(
+  MaplibreNativeFfiWebCanvasTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+);
+
+/**
+ * MaplibreNativeFfiWebCanvasTarget:canvas: (setter set_canvas) (getter get_canvas)
+ *
+ * An `OffscreenCanvas`, such as one from
+ * `HTMLCanvasElement.transferControlToOffscreen()` that you posted to the
+ * library's Web Worker, or an `HTMLCanvasElement` when the library runs on the
+ * page's thread.
+ */
+/**
+ * maplibre_native_ffi_web_canvas_target_get_canvas: (get-property canvas)
+ *
+ * Gets `MaplibreNativeFfiWebCanvasTarget:canvas`.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_web_canvas_target_get_canvas(
+  MaplibreNativeFfiWebCanvasTarget* self
+);
+
+/**
+ * maplibre_native_ffi_web_canvas_target_set_canvas: (set-property canvas)
+ *
+ * Sets `MaplibreNativeFfiWebCanvasTarget:canvas`.
+ */
+void maplibre_native_ffi_web_canvas_target_set_canvas(
+  MaplibreNativeFfiWebCanvasTarget* self, guint32 value
+);
+
+/**
+ * MaplibreNativeFfiWebCanvasTarget:format: (setter set_format) (getter get_format)
+ *
+ * For a WebGPU device, the `GPUTextureFormat` to configure the canvas with,
+ * such as `bgra8unorm`. Empty for a format that the device's adapter prefers.
+ */
+/**
+ * maplibre_native_ffi_web_canvas_target_get_format: (get-property format)
+ *
+ * Gets `MaplibreNativeFfiWebCanvasTarget:format`.
+ *
+ * Returns: (transfer none): the text
+ */
+const char* maplibre_native_ffi_web_canvas_target_get_format(
+  MaplibreNativeFfiWebCanvasTarget* self
+);
+
+/**
+ * maplibre_native_ffi_web_canvas_target_set_format: (set-property format)
+ * @value: the UTF-8 text
+ *
+ * Sets `MaplibreNativeFfiWebCanvasTarget:format`.
+ */
+void maplibre_native_ffi_web_canvas_target_set_format(
+  MaplibreNativeFfiWebCanvasTarget* self, const char* value
+);
+
+/**
+ * MaplibreNativeFfiRenderTarget:
+ *
+ * What a render session renders into: one kind of target, and its descriptor.
+ *
+ * Every target has a size in logical pixels, which sets the map's size. The
+ * session renders it at the map's scale factor. A borrowed or exported ring
+ * hands each frame to you: acquire it with
+ * `maplibre_native_ffi_render_session_acquire_frame()`, and release it with
+ * your GPU's synchronization once you have read it.
+ *
+ * The session uses the objects that the descriptor names until a replacement or
+ * release of the target completes, a detach or release of the session
+ * completes, or an abandon of it returns, except as a kind's descriptor says. A
+ * window target presents without waiting for the display, so demand at most one
+ * frame per display refresh.
+ *
+ * See `mln_render_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+GType maplibre_native_ffi_render_target_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_RENDER_TARGET \
+  (maplibre_native_ffi_render_target_get_type())
+
+/**
+ * maplibre_native_ffi_render_target_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiRenderTarget* maplibre_native_ffi_render_target_copy(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_render_target_free(
+  MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_offscreen: (constructor)
+ * @value: the value
+ *
+ * The `offscreen` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget* maplibre_native_ffi_render_target_new_offscreen(
+  const MaplibreNativeFfiOffscreenTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_offscreen:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_offscreen`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_offscreen(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_offscreen:
+ *
+ * The `offscreen` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiOffscreenTarget*
+maplibre_native_ffi_render_target_get_offscreen(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_metal_layer: (constructor)
+ * @value: the value
+ *
+ * The `metal_layer` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_metal_layer(
+  MaplibreNativeFfiMetalLayerTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_metal_layer:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_metal_layer`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_metal_layer(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_metal_layer:
+ *
+ * The `metal_layer` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiMetalLayerTarget*
+maplibre_native_ffi_render_target_get_metal_layer(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_win32_window: (constructor)
+ * @value: the value
+ *
+ * The `win32_window` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_win32_window(
+  MaplibreNativeFfiWin32WindowTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_win32_window:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_win32_window`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_win32_window(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_win32_window:
+ *
+ * The `win32_window` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiWin32WindowTarget*
+maplibre_native_ffi_render_target_get_win32_window(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_xlib_window: (constructor)
+ * @value: the value
+ *
+ * The `xlib_window` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_xlib_window(
+  MaplibreNativeFfiXlibWindowTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_xlib_window:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_xlib_window`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_xlib_window(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_xlib_window:
+ *
+ * The `xlib_window` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiXlibWindowTarget*
+maplibre_native_ffi_render_target_get_xlib_window(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_wayland_surface: (constructor)
+ * @value: the value
+ *
+ * The `wayland_surface` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_wayland_surface(
+  MaplibreNativeFfiWaylandSurfaceTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_wayland_surface:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_wayland_surface`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_wayland_surface(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_wayland_surface:
+ *
+ * The `wayland_surface` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiWaylandSurfaceTarget*
+maplibre_native_ffi_render_target_get_wayland_surface(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_android_window: (constructor)
+ * @value: the value
+ *
+ * The `android_window` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_android_window(
+  MaplibreNativeFfiAndroidWindowTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_android_window:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_android_window`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_android_window(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_android_window:
+ *
+ * The `android_window` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiAndroidWindowTarget*
+maplibre_native_ffi_render_target_get_android_window(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_ohos_window: (constructor)
+ * @value: the value
+ *
+ * The `ohos_window` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_ohos_window(
+  MaplibreNativeFfiOhosWindowTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_ohos_window:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_ohos_window`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_ohos_window(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_ohos_window:
+ *
+ * The `ohos_window` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiOhosWindowTarget*
+maplibre_native_ffi_render_target_get_ohos_window(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_vulkan_surface: (constructor)
+ * @value: the value
+ *
+ * The `vulkan_surface` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_vulkan_surface(
+  const MaplibreNativeFfiVulkanSurfaceTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_vulkan_surface:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_vulkan_surface`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_vulkan_surface(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_vulkan_surface:
+ *
+ * The `vulkan_surface` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiVulkanSurfaceTarget*
+maplibre_native_ffi_render_target_get_vulkan_surface(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_open_gl_surface: (constructor)
+ * @value: the value
+ *
+ * The `open_gl_surface` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_open_gl_surface(
+  MaplibreNativeFfiOpenGlSurfaceTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_open_gl_surface:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_open_gl_surface`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_open_gl_surface(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_open_gl_surface:
+ *
+ * The `open_gl_surface` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiOpenGlSurfaceTarget*
+maplibre_native_ffi_render_target_get_open_gl_surface(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_metal_borrowed_textures: (constructor)
+ * @value: the value
+ *
+ * The `metal_borrowed_textures` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_metal_borrowed_textures(
+  MaplibreNativeFfiMetalBorrowedTexturesTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_metal_borrowed_textures:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_metal_borrowed_textures`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_metal_borrowed_textures(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_metal_borrowed_textures:
+ *
+ * The `metal_borrowed_textures` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiMetalBorrowedTexturesTarget*
+maplibre_native_ffi_render_target_get_metal_borrowed_textures(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_vulkan_borrowed_textures: (constructor)
+ * @value: the value
+ *
+ * The `vulkan_borrowed_textures` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_vulkan_borrowed_textures(
+  MaplibreNativeFfiVulkanBorrowedTexturesTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_vulkan_borrowed_textures:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_vulkan_borrowed_textures`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_vulkan_borrowed_textures(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_vulkan_borrowed_textures:
+ *
+ * The `vulkan_borrowed_textures` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiVulkanBorrowedTexturesTarget*
+maplibre_native_ffi_render_target_get_vulkan_borrowed_textures(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_open_gl_borrowed_textures: (constructor)
+ * @value: the value
+ *
+ * The `open_gl_borrowed_textures` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_open_gl_borrowed_textures(
+  MaplibreNativeFfiOpenGlBorrowedTexturesTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_open_gl_borrowed_textures:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_open_gl_borrowed_textures`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_open_gl_borrowed_textures(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_open_gl_borrowed_textures:
+ *
+ * The `open_gl_borrowed_textures` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiOpenGlBorrowedTexturesTarget*
+maplibre_native_ffi_render_target_get_open_gl_borrowed_textures(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_web_gpu_borrowed_textures: (constructor)
+ * @value: the value
+ *
+ * The `web_gpu_borrowed_textures` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_web_gpu_borrowed_textures(
+  MaplibreNativeFfiWebGpuBorrowedTexturesTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_web_gpu_borrowed_textures:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_web_gpu_borrowed_textures`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_web_gpu_borrowed_textures(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_web_gpu_borrowed_textures:
+ *
+ * The `web_gpu_borrowed_textures` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiWebGpuBorrowedTexturesTarget*
+maplibre_native_ffi_render_target_get_web_gpu_borrowed_textures(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_exported_ring: (constructor)
+ * @value: the value
+ *
+ * The `exported_ring` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_exported_ring(
+  MaplibreNativeFfiExportedRingTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_exported_ring:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_exported_ring`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_exported_ring(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_exported_ring:
+ *
+ * The `exported_ring` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiExportedRingTarget*
+maplibre_native_ffi_render_target_get_exported_ring(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_new_web_canvas: (constructor)
+ * @value: the value
+ *
+ * The `web_canvas` variant.
+ *
+ * Returns: (transfer full): the new value
+ */
+MaplibreNativeFfiRenderTarget* maplibre_native_ffi_render_target_new_web_canvas(
+  MaplibreNativeFfiWebCanvasTarget* value
+);
+
+/**
+ * maplibre_native_ffi_render_target_is_web_canvas:
+ *
+ * Whether the value holds `maplibre_native_ffi_render_target_get_web_canvas`.
+ *
+ * Returns: whether the value holds the variant
+ */
+gboolean maplibre_native_ffi_render_target_is_web_canvas(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+/**
+ * maplibre_native_ffi_render_target_get_web_canvas:
+ *
+ * The `web_canvas` variant.
+ *
+ * Returns: (transfer none): the value
+ */
+MaplibreNativeFfiWebCanvasTarget*
+maplibre_native_ffi_render_target_get_web_canvas(
+  const MaplibreNativeFfiRenderTarget* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiRenderTarget, maplibre_native_ffi_render_target_free
 )
 
 /**
@@ -13081,39 +16407,6 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   maplibre_native_ffi_runtime_event_offline_region_response_error_free
 )
 
-GType maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_get_type(
-  void
-) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT \
-  (maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_get_type())
-
-/**
- * maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit*
-maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_copy(
-  const MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit* self
-);
-
-/**
- * maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_free(
-  MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit* self
-);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit,
-  maplibre_native_ffi_runtime_event_offline_region_tile_count_limit_free
-)
-
 /**
  * MaplibreNativeFfiRuntimeEventGlyphs:
  *
@@ -13498,30 +16791,6 @@ maplibre_native_ffi_runtime_event_payload_is_offline_region_response_error(
  */
 MaplibreNativeFfiRuntimeEventOfflineRegionResponseError*
 maplibre_native_ffi_runtime_event_payload_get_offline_region_response_error(
-  const MaplibreNativeFfiRuntimeEventPayload* self
-);
-
-/**
- * maplibre_native_ffi_runtime_event_payload_is_offline_region_tile_count_limit:
- *
- * Whether the value holds `maplibre_native_ffi_runtime_event_payload_get_offline_region_tile_count_limit`.
- *
- * Returns: whether the value holds the variant
- */
-gboolean
-maplibre_native_ffi_runtime_event_payload_is_offline_region_tile_count_limit(
-  const MaplibreNativeFfiRuntimeEventPayload* self
-);
-
-/**
- * maplibre_native_ffi_runtime_event_payload_get_offline_region_tile_count_limit:
- *
- * The `offline_region_tile_count_limit` variant.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiRuntimeEventOfflineRegionTileCountLimit*
-maplibre_native_ffi_runtime_event_payload_get_offline_region_tile_count_limit(
   const MaplibreNativeFfiRuntimeEventPayload* self
 );
 
@@ -15572,942 +18841,120 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   maplibre_native_ffi_texture_readback_result_free
 )
 
-GType maplibre_native_ffi_vulkan_borrowed_texture_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_BORROWED_TEXTURE \
-  (maplibre_native_ffi_vulkan_borrowed_texture_get_type())
-
 /**
- * maplibre_native_ffi_vulkan_borrowed_texture_copy:
+ * MaplibreNativeFfiVulkanDeviceDescriptor:
  *
- * Copies the value.
+ * Your Vulkan device and queue, for
+ * `maplibre_native_ffi_gpu_device_wrap_vulkan()`.
  *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiVulkanBorrowedTexture*
-maplibre_native_ffi_vulkan_borrowed_texture_copy(
-  const MaplibreNativeFfiVulkanBorrowedTexture* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_vulkan_borrowed_texture_free(
-  MaplibreNativeFfiVulkanBorrowedTexture* self
-);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiVulkanBorrowedTexture,
-  maplibre_native_ffi_vulkan_borrowed_texture_free
-)
-
-/**
- * MaplibreNativeFfiVulkanContextDescriptor:
- *
- * The Vulkan device and queue that a render session uses.
- *
- * Keep these objects alive until a detach or release of the session completes,
- * or an abandon of it returns.
- *
- * See `mln_vulkan_context_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ * See `mln_vulkan_device_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
  */
 /**
- * maplibre_native_ffi_vulkan_context_descriptor_new: (constructor)
+ * maplibre_native_ffi_vulkan_device_descriptor_new: (constructor)
  *
- * Creates a `MaplibreNativeFfiVulkanContextDescriptor` whose members are zero or empty.
+ * Creates a `MaplibreNativeFfiVulkanDeviceDescriptor` whose members are zero or empty.
  *
  * Returns: (transfer full): the new value
  */
-MaplibreNativeFfiVulkanContextDescriptor*
-maplibre_native_ffi_vulkan_context_descriptor_new(void);
+MaplibreNativeFfiVulkanDeviceDescriptor*
+maplibre_native_ffi_vulkan_device_descriptor_new(void);
 
 /**
- * MaplibreNativeFfiVulkanContextDescriptor:instance: (setter set_instance) (getter get_instance)
- *
- * A `VkInstance`.
- */
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_get_instance: (get-property instance)
- *
- * Gets `MaplibreNativeFfiVulkanContextDescriptor:instance`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_vulkan_context_descriptor_get_instance(
-  MaplibreNativeFfiVulkanContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_set_instance: (set-property instance)
- *
- * Sets `MaplibreNativeFfiVulkanContextDescriptor:instance`.
- */
-void maplibre_native_ffi_vulkan_context_descriptor_set_instance(
-  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiVulkanContextDescriptor:physical-device: (setter set_physical_device) (getter get_physical_device)
- *
- * A `VkPhysicalDevice`.
- */
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_get_physical_device: (get-property physical-device)
- *
- * Gets `MaplibreNativeFfiVulkanContextDescriptor:physical-device`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_vulkan_context_descriptor_get_physical_device(
-  MaplibreNativeFfiVulkanContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_set_physical_device: (set-property physical-device)
- *
- * Sets `MaplibreNativeFfiVulkanContextDescriptor:physical-device`.
- */
-void maplibre_native_ffi_vulkan_context_descriptor_set_physical_device(
-  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiVulkanContextDescriptor:device: (setter set_device) (getter get_device)
- *
- * A `VkDevice`.
- */
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_get_device: (get-property device)
- *
- * Gets `MaplibreNativeFfiVulkanContextDescriptor:device`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_vulkan_context_descriptor_get_device(
-  MaplibreNativeFfiVulkanContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_set_device: (set-property device)
- *
- * Sets `MaplibreNativeFfiVulkanContextDescriptor:device`.
- */
-void maplibre_native_ffi_vulkan_context_descriptor_set_device(
-  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiVulkanContextDescriptor:graphics-queue: (setter set_graphics_queue) (getter get_graphics_queue)
- *
- * A `VkQueue` from `graphics_queue_family_index` that supports graphics. If you
- * submit to it too, set
- * `MaplibreNativeFfiRenderSessionAttachOptions:queue-lock`.
- */
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_get_graphics_queue: (get-property graphics-queue)
- *
- * Gets `MaplibreNativeFfiVulkanContextDescriptor:graphics-queue`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_vulkan_context_descriptor_get_graphics_queue(
-  MaplibreNativeFfiVulkanContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue: (set-property graphics-queue)
- *
- * Sets `MaplibreNativeFfiVulkanContextDescriptor:graphics-queue`.
- */
-void maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue(
-  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiVulkanContextDescriptor:graphics-queue-family-index: (setter set_graphics_queue_family_index) (getter get_graphics_queue_family_index)
- *
- * The `graphics_queue_family_index` member.
- */
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_get_graphics_queue_family_index: (get-property graphics-queue-family-index)
- *
- * Gets `MaplibreNativeFfiVulkanContextDescriptor:graphics-queue-family-index`.
- *
- * Returns: the value
- */
-guint32
-maplibre_native_ffi_vulkan_context_descriptor_get_graphics_queue_family_index(
-  MaplibreNativeFfiVulkanContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue_family_index: (set-property graphics-queue-family-index)
- *
- * Sets `MaplibreNativeFfiVulkanContextDescriptor:graphics-queue-family-index`.
- */
-void maplibre_native_ffi_vulkan_context_descriptor_set_graphics_queue_family_index(
-  MaplibreNativeFfiVulkanContextDescriptor* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiVulkanContextDescriptor:get-instance-proc-addr: (setter set_get_instance_proc_addr) (getter get_get_instance_proc_addr)
- *
- * Your `vkGetInstanceProcAddr`, or null to use the Vulkan loader's.
- */
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_get_get_instance_proc_addr: (get-property get-instance-proc-addr)
- *
- * Gets `MaplibreNativeFfiVulkanContextDescriptor:get-instance-proc-addr`.
- *
- * Returns: the value
- */
-gpointer
-maplibre_native_ffi_vulkan_context_descriptor_get_get_instance_proc_addr(
-  MaplibreNativeFfiVulkanContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_set_get_instance_proc_addr: (set-property get-instance-proc-addr)
- *
- * Sets `MaplibreNativeFfiVulkanContextDescriptor:get-instance-proc-addr`.
- */
-void maplibre_native_ffi_vulkan_context_descriptor_set_get_instance_proc_addr(
-  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiVulkanContextDescriptor:get-device-proc-addr: (setter set_get_device_proc_addr) (getter get_get_device_proc_addr)
- *
- * Your `vkGetDeviceProcAddr`, or null to look it up from the instance.
- */
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_get_get_device_proc_addr: (get-property get-device-proc-addr)
- *
- * Gets `MaplibreNativeFfiVulkanContextDescriptor:get-device-proc-addr`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_vulkan_context_descriptor_get_get_device_proc_addr(
-  MaplibreNativeFfiVulkanContextDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_context_descriptor_set_get_device_proc_addr: (set-property get-device-proc-addr)
- *
- * Sets `MaplibreNativeFfiVulkanContextDescriptor:get-device-proc-addr`.
- */
-void maplibre_native_ffi_vulkan_context_descriptor_set_get_device_proc_addr(
-  MaplibreNativeFfiVulkanContextDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureDescriptor:
- *
- * A ring of your Vulkan images, for
- * `maplibre_native_ffi_map_attach_vulkan_borrowed_texture()`.
- *
- * `logical_size` sets the map's size. `physical_width` and `physical_height`
- * give the images' size in pixels, which is usually `logical_size` times the
- * map's scale factor. Each image must have that size, `format`, and
- * VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, and belong to the context's device. The
- * ring holds up to `MAPLIBRE_NATIVE_FFI_TEXTURE_RING_MAX_DEPTH` distinct
- * images.
- *
- * The session uses the images until a replacement or release of the target
- * completes, a detach or release of the session completes, or an abandon of it
- * returns.
- *
- * See `mln_vulkan_borrowed_texture_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiVulkanBorrowedTextureDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiVulkanBorrowedTextureDescriptor*
-maplibre_native_ffi_vulkan_borrowed_texture_descriptor_new(void);
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureDescriptor:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_logical_size(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:logical-size`.
- */
-void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_logical_size(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureDescriptor:physical-width: (setter set_physical_width) (getter get_physical_width)
- *
- * The `physical_width` member.
- */
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_physical_width: (get-property physical-width)
- *
- * Gets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:physical-width`.
- *
- * Returns: the value
- */
-guint32
-maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_physical_width(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_physical_width: (set-property physical-width)
- *
- * Sets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:physical-width`.
- */
-void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_physical_width(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureDescriptor:physical-height: (setter set_physical_height) (getter get_physical_height)
- *
- * The `physical_height` member.
- */
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_physical_height: (get-property physical-height)
- *
- * Gets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:physical-height`.
- *
- * Returns: the value
- */
-guint32
-maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_physical_height(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_physical_height: (set-property physical-height)
- *
- * Sets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:physical-height`.
- */
-void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_physical_height(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureDescriptor:context: (setter set_context) (getter get_context)
+ * MaplibreNativeFfiVulkanDeviceDescriptor:context: (setter set_context) (getter get_context)
  *
  * The `context` member.
  */
 /**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_context: (get-property context)
+ * maplibre_native_ffi_vulkan_device_descriptor_get_context: (get-property context)
  *
- * Gets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:context`.
+ * Gets `MaplibreNativeFfiVulkanDeviceDescriptor:context`.
  *
  * Returns: (transfer none): the value
  */
 MaplibreNativeFfiVulkanContextDescriptor*
-maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_context(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self
+maplibre_native_ffi_vulkan_device_descriptor_get_context(
+  MaplibreNativeFfiVulkanDeviceDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_context: (set-property context)
+ * maplibre_native_ffi_vulkan_device_descriptor_set_context: (set-property context)
  * @value: the value
  *
- * Sets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:context`.
+ * Sets `MaplibreNativeFfiVulkanDeviceDescriptor:context`.
  */
-void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_context(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self,
+void maplibre_native_ffi_vulkan_device_descriptor_set_context(
+  MaplibreNativeFfiVulkanDeviceDescriptor* self,
   MaplibreNativeFfiVulkanContextDescriptor* value
 );
 
 /**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_textures:
+ * MaplibreNativeFfiVulkanDeviceDescriptor:queue-lock: (setter set_queue_lock) (getter get_queue_lock)
  *
- * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_textures` sets.
- *
- * Returns: (transfer none) (element-type MaplibreNativeFfiVulkanBorrowedTexture): the items
- */
-GPtrArray* maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_textures(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_textures:
- * @value: (array length=value_count): the items
- *
- * The `textures` member.
- */
-void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_textures(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self,
-  const MaplibreNativeFfiVulkanBorrowedTexture* value, gsize value_count
-);
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureDescriptor:format: (setter set_format) (getter get_format)
- *
- * The images' VkFormat.
+ * Your lock on `context.graphics_queue`, when you submit to it yourself. Give
+ * every device that wraps the queue the same lock.
  */
 /**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_format: (get-property format)
+ * maplibre_native_ffi_vulkan_device_descriptor_get_queue_lock: (get-property queue-lock)
  *
- * Gets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:format`.
- *
- * Returns: the value
- */
-guint32 maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_format(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_format: (set-property format)
- *
- * Sets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:format`.
- */
-void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_format(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureDescriptor:final-layout: (setter set_final_layout) (getter get_final_layout)
- *
- * The VkImageLayout that each frame leaves its image in.
- */
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_final_layout: (get-property final-layout)
- *
- * Gets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:final-layout`.
- *
- * Returns: the value
- */
-guint32 maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_final_layout(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_final_layout: (set-property final-layout)
- *
- * Sets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:final-layout`.
- */
-void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_final_layout(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self, guint32 value
-);
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureDescriptor:owner: (setter set_owner) (getter get_owner)
- *
- * The `owner` member.
- */
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_owner: (get-property owner)
- *
- * Gets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:owner`.
- *
- * Returns: the value
- */
-MaplibreNativeFfiVulkanImageOwner
-maplibre_native_ffi_vulkan_borrowed_texture_descriptor_get_owner(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_owner: (set-property owner)
- *
- * Sets `MaplibreNativeFfiVulkanBorrowedTextureDescriptor:owner`.
- */
-void maplibre_native_ffi_vulkan_borrowed_texture_descriptor_set_owner(
-  MaplibreNativeFfiVulkanBorrowedTextureDescriptor* self,
-  MaplibreNativeFfiVulkanImageOwner value
-);
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureReplacement:
- *
- * New Vulkan images for a borrowed ring, for
- * `maplibre_native_ffi_render_session_set_vulkan_borrowed_texture_target_async()`.
- *
- * The members and the images follow the rules of
- * `MaplibreNativeFfiVulkanBorrowedTextureDescriptor`. The ring keeps its depth,
- * context, `format`, `final_layout`, and `owner`, so give it as many images as
- * it attached with, in that format, on the same device.
- *
- * See `mln_vulkan_borrowed_texture_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_replacement_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiVulkanBorrowedTextureReplacement` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiVulkanBorrowedTextureReplacement*
-maplibre_native_ffi_vulkan_borrowed_texture_replacement_new(void);
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureReplacement:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiVulkanBorrowedTextureReplacement:logical-size`.
+ * Gets `MaplibreNativeFfiVulkanDeviceDescriptor:queue-lock`.
  *
  * Returns: (transfer none): the value
  */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_logical_size(
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement* self
+MaplibreNativeFfiQueueLock*
+maplibre_native_ffi_vulkan_device_descriptor_get_queue_lock(
+  MaplibreNativeFfiVulkanDeviceDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_logical_size: (set-property logical-size)
+ * maplibre_native_ffi_vulkan_device_descriptor_set_queue_lock: (set-property queue-lock)
  * @value: the value
  *
- * Sets `MaplibreNativeFfiVulkanBorrowedTextureReplacement:logical-size`.
+ * Sets `MaplibreNativeFfiVulkanDeviceDescriptor:queue-lock`.
  */
-void maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_logical_size(
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement* self,
-  const MaplibreNativeFfiLogicalSize* value
+void maplibre_native_ffi_vulkan_device_descriptor_set_queue_lock(
+  MaplibreNativeFfiVulkanDeviceDescriptor* self,
+  const MaplibreNativeFfiQueueLock* value
 );
 
 /**
- * MaplibreNativeFfiVulkanBorrowedTextureReplacement:physical-width: (setter set_physical_width) (getter get_physical_width)
+ * MaplibreNativeFfiVulkanDeviceDescriptor:enabled-extensions: (setter set_enabled_extensions) (getter get_enabled_extensions)
  *
- * The `physical_width` member.
+ * The names of the device extensions that you enabled on `context.device`, such
+ * as "VK_KHR_external_semaphore_fd". Vulkan offers no way to ask a device which
+ * extensions it has, so the device offers the export kinds and
+ * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_SYNC_FD` only when the extensions that they
+ * need are listed here, and none of them when the list is empty.
  */
 /**
- * maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_physical_width: (get-property physical-width)
+ * maplibre_native_ffi_vulkan_device_descriptor_get_enabled_extensions: (get-property enabled-extensions)
  *
- * Gets `MaplibreNativeFfiVulkanBorrowedTextureReplacement:physical-width`.
+ * Gets `MaplibreNativeFfiVulkanDeviceDescriptor:enabled-extensions`.
  *
- * Returns: the value
+ * Returns: (transfer none) (array zero-terminated=1): the texts
  */
-guint32
-maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_physical_width(
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement* self
+const char* const*
+maplibre_native_ffi_vulkan_device_descriptor_get_enabled_extensions(
+  MaplibreNativeFfiVulkanDeviceDescriptor* self
 );
 
 /**
- * maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_physical_width: (set-property physical-width)
+ * maplibre_native_ffi_vulkan_device_descriptor_set_enabled_extensions: (set-property enabled-extensions)
+ * @value: (array zero-terminated=1): the texts
  *
- * Sets `MaplibreNativeFfiVulkanBorrowedTextureReplacement:physical-width`.
+ * Sets `MaplibreNativeFfiVulkanDeviceDescriptor:enabled-extensions`.
  */
-void maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_physical_width(
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement* self, guint32 value
+void maplibre_native_ffi_vulkan_device_descriptor_set_enabled_extensions(
+  MaplibreNativeFfiVulkanDeviceDescriptor* self, const char* const* value
 );
-
-/**
- * MaplibreNativeFfiVulkanBorrowedTextureReplacement:physical-height: (setter set_physical_height) (getter get_physical_height)
- *
- * The `physical_height` member.
- */
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_physical_height: (get-property physical-height)
- *
- * Gets `MaplibreNativeFfiVulkanBorrowedTextureReplacement:physical-height`.
- *
- * Returns: the value
- */
-guint32
-maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_physical_height(
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_physical_height: (set-property physical-height)
- *
- * Sets `MaplibreNativeFfiVulkanBorrowedTextureReplacement:physical-height`.
- */
-void maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_physical_height(
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement* self, guint32 value
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_textures:
- *
- * Gets the value that `maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_textures` sets.
- *
- * Returns: (transfer none) (element-type MaplibreNativeFfiVulkanBorrowedTexture): the items
- */
-GPtrArray* maplibre_native_ffi_vulkan_borrowed_texture_replacement_get_textures(
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_textures:
- * @value: (array length=value_count): the items
- *
- * The `textures` member.
- */
-void maplibre_native_ffi_vulkan_borrowed_texture_replacement_set_textures(
-  MaplibreNativeFfiVulkanBorrowedTextureReplacement* self,
-  const MaplibreNativeFfiVulkanBorrowedTexture* value, gsize value_count
-);
-
-/**
- * MaplibreNativeFfiVulkanDeviceContextResult:
- *
- * A Vulkan device's context, as
- * `maplibre_native_ffi_vulkan_device_get_context()` reports it.
- *
- * See `mln_vulkan_device_context_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
- */
-GType maplibre_native_ffi_vulkan_device_context_result_get_type(
-  void
-) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_DEVICE_CONTEXT_RESULT \
-  (maplibre_native_ffi_vulkan_device_context_result_get_type())
-
-/**
- * maplibre_native_ffi_vulkan_device_context_result_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiVulkanDeviceContextResult` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiVulkanDeviceContextResult*
-maplibre_native_ffi_vulkan_device_context_result_new(void);
-
-/**
- * maplibre_native_ffi_vulkan_device_context_result_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiVulkanDeviceContextResult*
-maplibre_native_ffi_vulkan_device_context_result_copy(
-  const MaplibreNativeFfiVulkanDeviceContextResult* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_context_result_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_vulkan_device_context_result_free(
-  MaplibreNativeFfiVulkanDeviceContextResult* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_context_result_get_context:
- *
- * The `context` member.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiVulkanContextDescriptor*
-maplibre_native_ffi_vulkan_device_context_result_get_context(
-  const MaplibreNativeFfiVulkanDeviceContextResult* self
-);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiVulkanDeviceContextResult,
-  maplibre_native_ffi_vulkan_device_context_result_free
-)
-
-/**
- * MaplibreNativeFfiVulkanDeviceOptions:
- *
- * Options for `maplibre_native_ffi_vulkan_device_create()`.
- *
- * A member that a `has_` method reports on is unset until its property or
- * setter sets it.
- *
- * See `mln_vulkan_device_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
- */
-/**
- * maplibre_native_ffi_vulkan_device_options_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiVulkanDeviceOptions` whose members are zero, empty, or unset.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiVulkanDeviceOptions*
-maplibre_native_ffi_vulkan_device_options_new(void);
-
-/**
- * MaplibreNativeFfiVulkanDeviceOptions:presentation: (setter set_presentation) (getter get_presentation)
- *
- * Whether the device can present to a window. The instance then enables
- * VK_KHR_surface and the platform's surface extensions, and the device enables
- * VK_KHR_swapchain. Defaults to false.
- */
-/**
- * maplibre_native_ffi_vulkan_device_options_get_presentation: (get-property presentation)
- *
- * Gets `MaplibreNativeFfiVulkanDeviceOptions:presentation`.
- *
- * Returns: the value
- */
-gboolean maplibre_native_ffi_vulkan_device_options_get_presentation(
-  MaplibreNativeFfiVulkanDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_options_has_presentation:
- *
- * Whether `MaplibreNativeFfiVulkanDeviceOptions:presentation` is set.
- *
- * Returns: whether the member is set
- */
-gboolean maplibre_native_ffi_vulkan_device_options_has_presentation(
-  MaplibreNativeFfiVulkanDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_options_set_presentation: (set-property presentation)
- *
- * Sets `MaplibreNativeFfiVulkanDeviceOptions:presentation`.
- */
-void maplibre_native_ffi_vulkan_device_options_set_presentation(
-  MaplibreNativeFfiVulkanDeviceOptions* self, gboolean value
-);
-
-/**
- * MaplibreNativeFfiVulkanDeviceOptions:device-uuid: (setter set_device_uuid) (getter get_device_uuid)
- *
- * The 16-byte `deviceUUID` of the GPU to use, as `VkPhysicalDeviceIDProperties`
- * reports it.
- */
-/**
- * maplibre_native_ffi_vulkan_device_options_get_device_uuid: (get-property device-uuid)
- *
- * Gets `MaplibreNativeFfiVulkanDeviceOptions:device-uuid`.
- *
- * Returns: (transfer none) (nullable): the bytes
- */
-GBytes* maplibre_native_ffi_vulkan_device_options_get_device_uuid(
-  MaplibreNativeFfiVulkanDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_options_has_device_uuid:
- *
- * Whether `MaplibreNativeFfiVulkanDeviceOptions:device-uuid` is set.
- *
- * Returns: whether the member is set
- */
-gboolean maplibre_native_ffi_vulkan_device_options_has_device_uuid(
-  MaplibreNativeFfiVulkanDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_options_set_device_uuid: (set-property device-uuid)
- * @value: (nullable): the bytes
- *
- * Sets `MaplibreNativeFfiVulkanDeviceOptions:device-uuid`.
- */
-void maplibre_native_ffi_vulkan_device_options_set_device_uuid(
-  MaplibreNativeFfiVulkanDeviceOptions* self, GBytes* value
-);
-
-/**
- * MaplibreNativeFfiVulkanDeviceOptions:device-luid: (setter set_device_luid) (getter get_device_luid)
- *
- * The 8-byte `deviceLUID` of the GPU to use, as `VkPhysicalDeviceIDProperties`
- * reports it. On Windows, this is the GPU's DXGI adapter LUID.
- */
-/**
- * maplibre_native_ffi_vulkan_device_options_get_device_luid: (get-property device-luid)
- *
- * Gets `MaplibreNativeFfiVulkanDeviceOptions:device-luid`.
- *
- * Returns: (transfer none) (nullable): the bytes
- */
-GBytes* maplibre_native_ffi_vulkan_device_options_get_device_luid(
-  MaplibreNativeFfiVulkanDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_options_has_device_luid:
- *
- * Whether `MaplibreNativeFfiVulkanDeviceOptions:device-luid` is set.
- *
- * Returns: whether the member is set
- */
-gboolean maplibre_native_ffi_vulkan_device_options_has_device_luid(
-  MaplibreNativeFfiVulkanDeviceOptions* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_device_options_set_device_luid: (set-property device-luid)
- * @value: (nullable): the bytes
- *
- * Sets `MaplibreNativeFfiVulkanDeviceOptions:device-luid`.
- */
-void maplibre_native_ffi_vulkan_device_options_set_device_luid(
-  MaplibreNativeFfiVulkanDeviceOptions* self, GBytes* value
-);
-
-/**
- * MaplibreNativeFfiVulkanSurfaceDescriptor:
- *
- * A Vulkan surface to present to, for
- * `maplibre_native_ffi_map_attach_vulkan_surface()`.
- *
- * The device must have VK_KHR_swapchain enabled, and the queue family of
- * `graphics_queue_family_index` must support presenting to the surface. The
- * session creates the swapchain. It uses the surface until a replacement or
- * release of the target completes, a detach or release of the session
- * completes, or an abandon of it returns.
- *
- * See `mln_vulkan_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
- */
-/**
- * maplibre_native_ffi_vulkan_surface_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiVulkanSurfaceDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiVulkanSurfaceDescriptor*
-maplibre_native_ffi_vulkan_surface_descriptor_new(void);
-
-/**
- * MaplibreNativeFfiVulkanSurfaceDescriptor:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_vulkan_surface_descriptor_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiVulkanSurfaceDescriptor:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_vulkan_surface_descriptor_get_logical_size(
-  MaplibreNativeFfiVulkanSurfaceDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_surface_descriptor_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiVulkanSurfaceDescriptor:logical-size`.
- */
-void maplibre_native_ffi_vulkan_surface_descriptor_set_logical_size(
-  MaplibreNativeFfiVulkanSurfaceDescriptor* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiVulkanSurfaceDescriptor:context: (setter set_context) (getter get_context)
- *
- * The `context` member.
- */
-/**
- * maplibre_native_ffi_vulkan_surface_descriptor_get_context: (get-property context)
- *
- * Gets `MaplibreNativeFfiVulkanSurfaceDescriptor:context`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiVulkanContextDescriptor*
-maplibre_native_ffi_vulkan_surface_descriptor_get_context(
-  MaplibreNativeFfiVulkanSurfaceDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_surface_descriptor_set_context: (set-property context)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiVulkanSurfaceDescriptor:context`.
- */
-void maplibre_native_ffi_vulkan_surface_descriptor_set_context(
-  MaplibreNativeFfiVulkanSurfaceDescriptor* self,
-  MaplibreNativeFfiVulkanContextDescriptor* value
-);
-
-/**
- * MaplibreNativeFfiVulkanSurfaceDescriptor:surface: (setter set_surface) (getter get_surface)
- *
- * Your VkSurfaceKHR.
- */
-/**
- * maplibre_native_ffi_vulkan_surface_descriptor_get_surface: (get-property surface)
- *
- * Gets `MaplibreNativeFfiVulkanSurfaceDescriptor:surface`.
- *
- * Returns: the value
- */
-guint64 maplibre_native_ffi_vulkan_surface_descriptor_get_surface(
-  MaplibreNativeFfiVulkanSurfaceDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_surface_descriptor_set_surface: (set-property surface)
- *
- * Sets `MaplibreNativeFfiVulkanSurfaceDescriptor:surface`.
- */
-void maplibre_native_ffi_vulkan_surface_descriptor_set_surface(
-  MaplibreNativeFfiVulkanSurfaceDescriptor* self, guint64 value
-);
-
-GType maplibre_native_ffi_vulkan_surface_replacement_get_type(
-  void
-) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_VULKAN_SURFACE_REPLACEMENT \
-  (maplibre_native_ffi_vulkan_surface_replacement_get_type())
-
-/**
- * maplibre_native_ffi_vulkan_surface_replacement_copy:
- *
- * Copies the value.
- *
- * Returns: (transfer full): the copy
- */
-MaplibreNativeFfiVulkanSurfaceReplacement*
-maplibre_native_ffi_vulkan_surface_replacement_copy(
-  const MaplibreNativeFfiVulkanSurfaceReplacement* self
-);
-
-/**
- * maplibre_native_ffi_vulkan_surface_replacement_free:
- * @self: (transfer full) (nullable): the value
- *
- * Frees the value.
- */
-void maplibre_native_ffi_vulkan_surface_replacement_free(
-  MaplibreNativeFfiVulkanSurfaceReplacement* self
-);
-
-G_DEFINE_AUTOPTR_CLEANUP_FUNC(
-  MaplibreNativeFfiVulkanSurfaceReplacement,
-  maplibre_native_ffi_vulkan_surface_replacement_free
-)
 
 /**
  * MaplibreNativeFfiVulkanTextureFrame:
  *
  * The Vulkan image of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth image, as for
+ * `MaplibreNativeFfiMetalTextureFrame`. Otherwise they are zero.
  *
  * See `mln_vulkan_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -16647,179 +19094,54 @@ guint32 maplibre_native_ffi_vulkan_texture_frame_get_layout(
   const MaplibreNativeFfiVulkanTextureFrame* self
 );
 
+/**
+ * maplibre_native_ffi_vulkan_texture_frame_get_depth_image:
+ *
+ * The VkImage that holds the frame's depth and stencil.
+ *
+ * Returns: the value
+ */
+guint64 maplibre_native_ffi_vulkan_texture_frame_get_depth_image(
+  const MaplibreNativeFfiVulkanTextureFrame* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_texture_frame_get_depth_image_view:
+ *
+ * A VkImageView of the depth image's depth and stencil aspects.
+ *
+ * Returns: the value
+ */
+guint64 maplibre_native_ffi_vulkan_texture_frame_get_depth_image_view(
+  const MaplibreNativeFfiVulkanTextureFrame* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_texture_frame_get_depth_format:
+ *
+ * The depth image's VkFormat.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_texture_frame_get_depth_format(
+  const MaplibreNativeFfiVulkanTextureFrame* self
+);
+
+/**
+ * maplibre_native_ffi_vulkan_texture_frame_get_depth_layout:
+ *
+ * The VkImageLayout that the frame left the depth image in.
+ *
+ * Returns: the value
+ */
+guint32 maplibre_native_ffi_vulkan_texture_frame_get_depth_layout(
+  const MaplibreNativeFfiVulkanTextureFrame* self
+);
+
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   MaplibreNativeFfiVulkanTextureFrame,
   maplibre_native_ffi_vulkan_texture_frame_free
 )
-
-/**
- * MaplibreNativeFfiWaylandSurfaceDescriptor:
- *
- * A Wayland surface to present to, for
- * `maplibre_native_ffi_map_attach_wayland_surface()`.
- *
- * See `mln_wayland_surface_descriptor` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
- */
-/**
- * maplibre_native_ffi_wayland_surface_descriptor_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiWaylandSurfaceDescriptor` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiWaylandSurfaceDescriptor*
-maplibre_native_ffi_wayland_surface_descriptor_new(void);
-
-/**
- * MaplibreNativeFfiWaylandSurfaceDescriptor:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_wayland_surface_descriptor_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiWaylandSurfaceDescriptor:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_wayland_surface_descriptor_get_logical_size(
-  MaplibreNativeFfiWaylandSurfaceDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_wayland_surface_descriptor_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiWaylandSurfaceDescriptor:logical-size`.
- */
-void maplibre_native_ffi_wayland_surface_descriptor_set_logical_size(
-  MaplibreNativeFfiWaylandSurfaceDescriptor* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiWaylandSurfaceDescriptor:display: (setter set_display) (getter get_display)
- *
- * Your `wl_display*`.
- */
-/**
- * maplibre_native_ffi_wayland_surface_descriptor_get_display: (get-property display)
- *
- * Gets `MaplibreNativeFfiWaylandSurfaceDescriptor:display`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_wayland_surface_descriptor_get_display(
-  MaplibreNativeFfiWaylandSurfaceDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_wayland_surface_descriptor_set_display: (set-property display)
- *
- * Sets `MaplibreNativeFfiWaylandSurfaceDescriptor:display`.
- */
-void maplibre_native_ffi_wayland_surface_descriptor_set_display(
-  MaplibreNativeFfiWaylandSurfaceDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiWaylandSurfaceDescriptor:surface: (setter set_surface) (getter get_surface)
- *
- * Your `wl_surface*`, on `display`.
- */
-/**
- * maplibre_native_ffi_wayland_surface_descriptor_get_surface: (get-property surface)
- *
- * Gets `MaplibreNativeFfiWaylandSurfaceDescriptor:surface`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_wayland_surface_descriptor_get_surface(
-  MaplibreNativeFfiWaylandSurfaceDescriptor* self
-);
-
-/**
- * maplibre_native_ffi_wayland_surface_descriptor_set_surface: (set-property surface)
- *
- * Sets `MaplibreNativeFfiWaylandSurfaceDescriptor:surface`.
- */
-void maplibre_native_ffi_wayland_surface_descriptor_set_surface(
-  MaplibreNativeFfiWaylandSurfaceDescriptor* self, gpointer value
-);
-
-/**
- * MaplibreNativeFfiWaylandSurfaceReplacement:
- *
- * A new Wayland surface for
- * `maplibre_native_ffi_render_session_set_wayland_surface_target_async()`.
- *
- * See `mln_wayland_surface_replacement` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
- */
-/**
- * maplibre_native_ffi_wayland_surface_replacement_new: (constructor)
- *
- * Creates a `MaplibreNativeFfiWaylandSurfaceReplacement` whose members are zero or empty.
- *
- * Returns: (transfer full): the new value
- */
-MaplibreNativeFfiWaylandSurfaceReplacement*
-maplibre_native_ffi_wayland_surface_replacement_new(void);
-
-/**
- * MaplibreNativeFfiWaylandSurfaceReplacement:logical-size: (setter set_logical_size) (getter get_logical_size)
- *
- * The `logical_size` member.
- */
-/**
- * maplibre_native_ffi_wayland_surface_replacement_get_logical_size: (get-property logical-size)
- *
- * Gets `MaplibreNativeFfiWaylandSurfaceReplacement:logical-size`.
- *
- * Returns: (transfer none): the value
- */
-MaplibreNativeFfiLogicalSize*
-maplibre_native_ffi_wayland_surface_replacement_get_logical_size(
-  MaplibreNativeFfiWaylandSurfaceReplacement* self
-);
-
-/**
- * maplibre_native_ffi_wayland_surface_replacement_set_logical_size: (set-property logical-size)
- * @value: the value
- *
- * Sets `MaplibreNativeFfiWaylandSurfaceReplacement:logical-size`.
- */
-void maplibre_native_ffi_wayland_surface_replacement_set_logical_size(
-  MaplibreNativeFfiWaylandSurfaceReplacement* self,
-  const MaplibreNativeFfiLogicalSize* value
-);
-
-/**
- * MaplibreNativeFfiWaylandSurfaceReplacement:surface: (setter set_surface) (getter get_surface)
- *
- * Your `wl_surface*`, on the display that the session attached with.
- */
-/**
- * maplibre_native_ffi_wayland_surface_replacement_get_surface: (get-property surface)
- *
- * Gets `MaplibreNativeFfiWaylandSurfaceReplacement:surface`.
- *
- * Returns: the value
- */
-gpointer maplibre_native_ffi_wayland_surface_replacement_get_surface(
-  MaplibreNativeFfiWaylandSurfaceReplacement* self
-);
-
-/**
- * maplibre_native_ffi_wayland_surface_replacement_set_surface: (set-property surface)
- *
- * Sets `MaplibreNativeFfiWaylandSurfaceReplacement:surface`.
- */
-void maplibre_native_ffi_wayland_surface_replacement_set_surface(
-  MaplibreNativeFfiWaylandSurfaceReplacement* self, gpointer value
-);
 
 G_END_DECLS
 

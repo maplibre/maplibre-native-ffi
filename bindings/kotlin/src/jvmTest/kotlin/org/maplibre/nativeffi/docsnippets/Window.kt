@@ -4,18 +4,17 @@
 package org.maplibre.nativeffi.docsnippets
 
 import org.maplibre.nativeffi.FrameDemand
+import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapHandle
+import org.maplibre.nativeffi.NativePointer
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderResult
 import org.maplibre.nativeffi.RenderSessionAttachOptions
 import org.maplibre.nativeffi.RenderSessionHandle
-import org.maplibre.nativeffi.VulkanContextDescriptor
-import org.maplibre.nativeffi.VulkanSurfaceDescriptor
-import org.maplibre.nativeffi.VulkanSurfaceReplacement
+import org.maplibre.nativeffi.RenderTarget
 import org.maplibre.nativeffi.Wake
-import org.maplibre.nativeffi.attachVulkanSurface
-import org.maplibre.nativeffi.setVulkanSurfaceTarget
+import org.maplibre.nativeffi.WaylandSurfaceTarget
 
 // Stand-ins for the host's event loop, display timer, and graphics
 // thread.
@@ -66,10 +65,20 @@ private fun onFrameWake() {
 // #endregion frame-wake
 
 // #region resize
-private fun onWindowResized(width: UInt, height: UInt) {
-  // The window's new size in logical pixels.
+// Runs when the window changes size, or moves to a display with
+// another scale factor.
+private fun onWindowResized(
+  width: UInt,
+  height: UInt,
+  scaleFactor: Double,
+) {
+  // The window's new size in logical pixels, and its scale factor.
   session.discarding.resize(
-    LogicalSize(width = width, height = height),
+    LogicalExtent(
+      width = width,
+      height = height,
+      scaleFactor = scaleFactor,
+    ),
   )
 }
 
@@ -94,13 +103,19 @@ private suspend fun surfaceLost() {
   // #endregion lost-surface
 }
 
-private suspend fun surfaceRestored(newSurface: ULong) {
+private suspend fun surfaceRestored(
+  display: NativePointer,
+  newSurface: NativePointer,
+) {
   // #region lost-surface
   session
-    .setVulkanSurfaceTarget(
-      VulkanSurfaceReplacement(
-        logicalSize = LogicalSize(width = 800u, height = 600u),
-        surface = newSurface,
+    .setTarget(
+      RenderTarget.WaylandSurface(
+        WaylandSurfaceTarget(
+          logicalSize = LogicalSize(width = 800u, height = 600u),
+          display = display,
+          surface = newSurface,
+        ),
       ),
     )
     .await()
@@ -109,32 +124,35 @@ private suspend fun surfaceRestored(newSurface: ULong) {
 
 private suspend fun renderToWindow(
   map: MapHandle,
-  vulkan: VulkanContextDescriptor,
-  windowSurface: ULong,
+  display: NativePointer,
+  windowSurface: NativePointer,
 ) {
   // #region attach
+  // With no device, the session creates one on the platform's own
+  // backend.
   session =
-    map.attachVulkanSurface(
-      VulkanSurfaceDescriptor(
-        // The window's size in logical pixels. The map's scale factor
-        // turns it into pixels.
-        logicalSize = LogicalSize(width = 800u, height = 600u),
-        // Your VkInstance, VkPhysicalDevice,
-        // VkDevice, and graphics VkQueue.
-        context = vulkan,
-        // Your VkSurfaceKHR.
-        surface = windowSurface,
+    map.attach(
+      RenderTarget.WaylandSurface(
+        WaylandSurfaceTarget(
+          // The window's size in logical pixels. The map's scale
+          // factor turns it into pixels.
+          logicalSize = LogicalSize(width = 800u, height = 600u),
+          // Your wl_display and wl_surface.
+          display = display,
+          surface = windowSurface,
+        ),
       ),
-      RenderSessionAttachOptions(
-        driver = RenderDriverKind.CORE_WORKER,
-        redrawWake = Wake(::onRedrawWake),
-        frameWake = Wake(::onFrameWake),
-      ),
+      options =
+        RenderSessionAttachOptions(
+          driver = RenderDriverKind.CORE_WORKER,
+          redrawWake = Wake(::onRedrawWake),
+          frameWake = Wake(::onFrameWake),
+        ),
     )
   session.ready.await()
   // #endregion attach
 
-  onWindowResized(1024u, 768u)
+  onWindowResized(1024u, 768u, 2.0)
 
   // #region service
   val graphicsThreadOptions =

@@ -32,12 +32,10 @@ export function utf8(text: string): Uint8Array {
 
 /**
  * Whether the C API accepts HTTP header transforms on this platform. The
- * HTTP clients of OpenHarmony, the only platform of ArkTS, and of the browser
- * cannot keep a transformed header from following a cross-origin redirect, so
- * runtime.h documents that the C API refuses header transforms there.
+ * browser sends the requests and sets their headers itself, so runtime.h
+ * documents that the C API refuses header transforms there.
  */
-export const headerTransforms =
-  capabilities.host !== "arkts" && capabilities.host !== "browser";
+export const headerTransforms = capabilities.host !== "browser";
 
 /**
  * Sets a header transform, or checks the documented refusal where the
@@ -165,7 +163,7 @@ export const mapOptions: MapOptions = {
 export async function openRuntime(
   options: { runtime?: RuntimeOptions; provider?: ResourceProvider } = {},
 ): Promise<RuntimeFixture> {
-  const runtime = await RuntimeHandle.create(options.runtime);
+  const runtime = RuntimeHandle.create(options.runtime);
   teardown(() => releaseIfLive(() => runtime.release()));
   const events = await listen(runtime);
   await bounded(

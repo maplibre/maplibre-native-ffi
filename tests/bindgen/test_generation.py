@@ -14,7 +14,6 @@ from tools.bindgen.emitters import (
     gobject,
     kotlin,
     python,
-    rust,
     swift,
     typescript,
     zig,
@@ -22,13 +21,11 @@ from tools.bindgen.emitters import (
 from tools.bindgen.model import ModelError
 from tools.bindgen.schema import validate
 
-EMITTERS = (dart, dotnet, go, gobject, kotlin, python, rust, swift, typescript, zig)
+EMITTERS = (dart, dotnet, go, gobject, kotlin, python, swift, typescript, zig)
 
 # Protocol shapes an emitter's runtime cannot represent yet. Each emitter
 # reports these declarations as unsupported with its reason.
-PROTOCOL_GAPS = {
-    ("values", "rust"): {"mln_probe_roundtrip"},
-}
+PROTOCOL_GAPS: dict[tuple[str, str], set[str]] = {}
 
 
 # A complete record and the option bag that it converts to.
@@ -230,7 +227,7 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
 
     def test_every_binding_copies_an_array_that_a_view_lends(self):
         api = parse(groups=("borrowed_view",))
-        for emitter in (dart, dotnet, go, kotlin, python, rust, swift, typescript, zig):
+        for emitter in (dart, dotnet, go, kotlin, python, swift, typescript, zig):
             with self.subTest(emitter=emitter.__name__):
                 lowered = emitter.lower(api)
                 self.assertNotIn("mln_frame_get_texture", lowered.unsupported)
@@ -268,10 +265,6 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
             python: (
                 "call1((MapHandle::borrow(py, map)?, ",
                 "map = _adopt_value(map, 'MapHandle')",
-            ),
-            rust: (
-                "(state.callback)(&*MapHandle::borrow(map)?, ",
-                "Fn(&MapHandle, &str) + Send + Sync + 'static",
             ),
             swift: (
                 "guard let borrowedMap = try? MapHandle(borrowing: `map`) else { return }",
@@ -313,9 +306,6 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
             python: (
                 "reservation.commit();\n        result?;",
                 "return _answer(self, lambda: self._native.answer(text))",
-            ),
-            rust: (
-                "pub fn answer(self, text: &str) -> Result<()> {\n        self.consume_always(|query| {",
             ),
             swift: ("try handle.answer { live in",),
             typescript: (
@@ -360,9 +350,6 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
             python: (
                 "def to_options(self) -> ViewOptions:",
                 "return ViewOptions(zoom=self.zoom, center=self.center)",
-            ),
-            rust: (
-                "pub const fn to_options(self) -> ViewOptions { ViewOptions { zoom: Some(self.zoom), anchor: None, center: Some(self.center) } }",
             ),
             swift: (
                 "public func toOptions() -> ViewOptions {\n    ViewOptions(`zoom`: `zoom`, `center`: `center`)",

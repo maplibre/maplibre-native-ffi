@@ -3,7 +3,8 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Options for creating a frame pacer.
+/// Options for creating a frame pacer, or for
+/// <c>FramePacerHandle.SetOptions()</c>.
 /// </summary>
 /// <remarks>
 /// See <c>mln_frame_pacer_options</c> in the <see
@@ -17,4 +18,10 @@ public sealed record FramePacerOptions
     /// demand frames at every refresh.
     /// </summary>
     public uint? MaximumFramesPerSecond { get; init; }
+
+    /// <summary>
+    /// Removes the frame rate limit, so the pacer can demand frames at every
+    /// display refresh, as it does by default.
+    /// </summary>
+    public bool UnlimitedFramesPerSecond { get; init; }
 }

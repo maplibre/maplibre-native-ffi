@@ -2,14 +2,14 @@ include_guard(GLOBAL)
 
 include("${CMAKE_CURRENT_LIST_DIR}/platform/apple.cmake")
 
-# Apple Metal presets also build the C API as MaplibreNativeC.framework, which
-# `package-xcframework` combines into MaplibreNativeC.xcframework.
+# Apple Metal presets also install the C API as MaplibreNativeC.framework,
+# which `package-xcframework` combines into MaplibreNativeC.xcframework. The
+# framework's binary is the shared library under the framework's name and
+# install name. Swift Package Manager consumers get only the bundle, so it
+# carries the headers, the license notices, and the SBOM too.
 set(MLN_FFI_APPLE_FRAMEWORK_NAME MaplibreNativeC)
 
-function(mln_ffi_add_c_api_framework target implementation_target)
-  add_library(${target} SHARED)
-  mln_ffi_configure_shared_c_api_wrapper(${target} ${implementation_target})
-
+function(mln_ffi_install_c_api_framework target shared component)
   # App Store processing needs the platform, and MinimumOSVersion on iOS,
   # tvOS, and visionOS. The publish step replaces the project version with the
   # release's.
@@ -45,40 +45,47 @@ function(mln_ffi_add_c_api_framework target implementation_target)
     "${PROJECT_SOURCE_DIR}/cmake/apple/Info.plist.in" "${info_plist}"
     @ONLY)
 
-  set_target_properties(
-    ${target}
-    PROPERTIES
-      FRAMEWORK
-      TRUE
-      FRAMEWORK_VERSION
-      A
-      OUTPUT_NAME
-      "${MLN_FFI_APPLE_FRAMEWORK_NAME}"
-      MACOSX_FRAMEWORK_INFO_PLIST
-      "${info_plist}")
-endfunction()
-
-# The install adds the bundle's headers and resources, because Ninja copies
-# MACOSX_PACKAGE_LOCATION files only for a target that compiles its own sources.
-# Swift Package Manager consumers get only the bundle, so it carries the license
-# notices too.
-function(mln_ffi_install_c_api_framework target framework_target component)
-  install(
-    TARGETS ${framework_target}
-    FRAMEWORK DESTINATION Frameworks COMPONENT "${component}")
-  mln_ffi_install_apple_dsym(${framework_target} Frameworks "${component}")
-
-  # CMake gives an embedded Apple framework a flat bundle, and a macOS or Mac
-  # Catalyst one a versioned bundle.
+  # An embedded Apple framework is flat, and a macOS or Mac Catalyst one is
+  # versioned.
   set(framework "Frameworks/${MLN_FFI_APPLE_FRAMEWORK_NAME}.framework")
-  mln_ffi_apple_is_embedded(embedded)
   if(embedded)
     set(content "${framework}")
     set(resources "${content}")
+    set(install_name
+        "@rpath/${MLN_FFI_APPLE_FRAMEWORK_NAME}.framework/${MLN_FFI_APPLE_FRAMEWORK_NAME}"
+    )
   else()
     set(content "${framework}/Versions/A")
     set(resources "${content}/Resources")
+    set(install_name
+        "@rpath/${MLN_FFI_APPLE_FRAMEWORK_NAME}.framework/Versions/A/${MLN_FFI_APPLE_FRAMEWORK_NAME}"
+    )
   endif()
+
+  # The framework's binary is the shared library under another install name,
+  # so it is a copy that the build renames and signs again.
+  set(binary
+      "${CMAKE_CURRENT_BINARY_DIR}/framework/${MLN_FFI_APPLE_FRAMEWORK_NAME}")
+  add_custom_command(
+    OUTPUT "${binary}"
+    COMMAND "${CMAKE_COMMAND}" -E copy "${shared}" "${binary}"
+    COMMAND install_name_tool -id "${install_name}" "${binary}"
+    COMMAND codesign --force --sign - "${binary}"
+    DEPENDS "${shared}"
+    VERBATIM)
+  add_custom_target(${target}_framework ALL DEPENDS "${binary}")
+  install(
+    PROGRAMS "${binary}"
+    DESTINATION "${content}"
+    COMPONENT "${component}")
+  mln_ffi_install_apple_dsym(
+    "${binary}" "${content}/${MLN_FFI_APPLE_FRAMEWORK_NAME}" "${framework}.dSYM"
+    "${component}")
+  install(
+    FILES "${info_plist}"
+    DESTINATION "${resources}"
+    RENAME Info.plist
+    COMPONENT "${component}")
 
   install(
     FILES "${PROJECT_SOURCE_DIR}/include/maplibre_native_c.h"
@@ -92,16 +99,12 @@ function(mln_ffi_install_c_api_framework target framework_target component)
     PATTERN "*.h"
     PATTERN "binding_support.h" EXCLUDE)
   install(
-    FILES "${PROJECT_SOURCE_DIR}/include/mln/plugin/plugin_api.h"
-    DESTINATION "${content}/Headers/mln/plugin"
-    COMPONENT "${component}")
-  install(
     FILES "${PROJECT_SOURCE_DIR}/cmake/apple/module.modulemap"
     DESTINATION "${content}/Modules"
     COMPONENT "${component}")
-  # Upstream's iOS privacy manifest covers every Apple SDK.
+  # MapLibre Native's iOS privacy manifest, which covers every Apple SDK.
   install(
-    FILES "${MLN_FFI_SOURCE_DIR}/platform/ios/PrivacyInfo.xcprivacy"
+    FILES "${PROJECT_SOURCE_DIR}/cmake/apple/PrivacyInfo.xcprivacy"
     DESTINATION "${resources}"
     COMPONENT "${component}")
   install(
@@ -118,13 +121,19 @@ function(mln_ffi_install_c_api_framework target framework_target component)
     DESTINATION "${resources}"
     COMPONENT "${component}")
 
-  # CMake links only the binary and Resources at a versioned bundle's root.
+  # A versioned bundle links its binary and directories at its root.
   if(NOT embedded)
-    foreach(directory Headers Modules)
+    install(
+      CODE
+      "file(CREATE_LINK \"A\"
+        \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${framework}/Versions/Current\"
+        SYMBOLIC)"
+      COMPONENT "${component}")
+    foreach(entry ${MLN_FFI_APPLE_FRAMEWORK_NAME} Headers Modules Resources)
       install(
         CODE
-        "file(CREATE_LINK \"Versions/Current/${directory}\"
-          \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${framework}/${directory}\"
+        "file(CREATE_LINK \"Versions/Current/${entry}\"
+          \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${framework}/${entry}\"
           SYMBOLIC)"
         COMPONENT "${component}")
     endforeach()

@@ -1,21 +1,18 @@
 package org.maplibre.nativeffi.render
 
 import org.maplibre.nativeffi.AcquiredFrameHandle
-import org.maplibre.nativeffi.MapHandle
-import org.maplibre.nativeffi.RenderSessionAttachOptions
-import org.maplibre.nativeffi.RenderSessionHandle
-import org.maplibre.nativeffi.attachMetalBorrowedTexture
+import org.maplibre.nativeffi.GpuDeviceHandle
+import org.maplibre.nativeffi.QueueLock
 import org.maplibre.nativeffi.withMetalTexture
+import org.maplibre.nativeffi.wrapMetal
 
-internal actual fun TestGraphics.attachBackendBorrowedTexture(
-  map: MapHandle,
-  textures: List<TestTexture>,
+internal actual fun TestGraphics.wrapBackendDevice(
   context: TestGraphicsContext,
-  options: RenderSessionAttachOptions,
-): RenderSessionHandle =
+  queueLock: QueueLock,
+): GpuDeviceHandle =
   when (backend) {
-    TestBackend.METAL -> map.attachMetalBorrowedTexture(metalBorrowedTexture(textures), options)
-    else -> error("this target declares no attach for $backend")
+    TestBackend.METAL -> GpuDeviceHandle.wrapMetal(metalDevice(context))
+    else -> error("this target declares no device wrap for $backend")
   }
 
 internal actual fun TestGraphics.backendTextureSize(frame: AcquiredFrameHandle): Pair<UInt, UInt> =

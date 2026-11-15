@@ -46,70 +46,6 @@ function(mln_ffi_install_zig_libc)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
 endfunction()
 
-# The linker name for a dependency, since a find module's full path won't exist
-# on a consumer's machine.
-function(mln_ffi_link_name out_var entry)
-  set(MLN_FFI_NAME "${entry}")
-  if(MLN_FFI_NAME MATCHES "[/\\]")
-    get_filename_component(MLN_FFI_NAME "${MLN_FFI_NAME}" NAME)
-    string(REGEX REPLACE "^lib" "" MLN_FFI_NAME "${MLN_FFI_NAME}")
-    string(REGEX REPLACE "\\.(so(\\.[0-9.]+)?|a|dylib|tbd)$" "" MLN_FFI_NAME
-           "${MLN_FFI_NAME}")
-  endif()
-  string(REGEX REPLACE "\\.lib$" "" MLN_FFI_NAME "${MLN_FFI_NAME}")
-  set(${out_var} "${MLN_FFI_NAME}" PARENT_SCOPE)
-endfunction()
-
-# The system libraries and frameworks a consumer links with the complete static
-# archive. The archive holds the project's targets but not their system
-# dependencies, so the walk follows those targets too.
-function(mln_ffi_static_link_metadata libraries_var frameworks_var)
-  set(MLN_FFI_PENDING "")
-  foreach(
-    dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
-    get_target_property(
-      MLN_FFI_ENTRIES ${dependencies} INTERFACE_LINK_LIBRARIES)
-    if(MLN_FFI_ENTRIES AND NOT MLN_FFI_ENTRIES MATCHES "-NOTFOUND$")
-      list(APPEND MLN_FFI_PENDING ${MLN_FFI_ENTRIES})
-    endif()
-  endforeach()
-
-  set(MLN_FFI_STATIC_LIBRARIES "")
-  set(MLN_FFI_STATIC_FRAMEWORKS "")
-  set(MLN_FFI_SEEN "")
-  while(MLN_FFI_PENDING)
-    list(POP_FRONT MLN_FFI_PENDING MLN_FFI_ENTRY)
-    if("${MLN_FFI_ENTRY}" IN_LIST MLN_FFI_SEEN)
-      continue()
-    endif()
-    list(APPEND MLN_FFI_SEEN "${MLN_FFI_ENTRY}")
-    if(TARGET ${MLN_FFI_ENTRY})
-      # FindOpenGL names opengl32 on Windows through IMPORTED_LIBNAME.
-      foreach(property IMPORTED_LOCATION IMPORTED_LIBNAME
-              INTERFACE_LINK_LIBRARIES)
-        get_target_property(MLN_FFI_VALUE ${MLN_FFI_ENTRY} ${property})
-        if(MLN_FFI_VALUE AND NOT MLN_FFI_VALUE MATCHES "-NOTFOUND$")
-          list(APPEND MLN_FFI_PENDING ${MLN_FFI_VALUE})
-        endif()
-      endforeach()
-    elseif(MLN_FFI_ENTRY MATCHES "^-framework +(.+)$")
-      list(APPEND MLN_FFI_STATIC_FRAMEWORKS "${CMAKE_MATCH_1}")
-    elseif(MLN_FFI_ENTRY MATCHES "^\\$<LINK_ONLY:(.+)>$")
-      # A static library's private dependencies, such as libuv's on Windows.
-      list(APPEND MLN_FFI_PENDING "${CMAKE_MATCH_1}")
-    elseif(MLN_FFI_ENTRY MATCHES "^[-$]")
-      continue()
-    else()
-      mln_ffi_link_name(MLN_FFI_ENTRY_NAME "${MLN_FFI_ENTRY}")
-      list(APPEND MLN_FFI_STATIC_LIBRARIES "${MLN_FFI_ENTRY_NAME}")
-    endif()
-  endwhile()
-  list(REMOVE_DUPLICATES MLN_FFI_STATIC_LIBRARIES)
-  list(REMOVE_DUPLICATES MLN_FFI_STATIC_FRAMEWORKS)
-  set(${libraries_var} ${MLN_FFI_STATIC_LIBRARIES} PARENT_SCOPE)
-  set(${frameworks_var} ${MLN_FFI_STATIC_FRAMEWORKS} PARENT_SCOPE)
-endfunction()
-
 # The C ABI contract version that the headers declare, which the artifact
 # descriptor's schema version follows.
 function(mln_ffi_c_version out_var)
@@ -132,200 +68,147 @@ function(mln_ffi_json_string_array out_var)
   set(${out_var} "${MLN_FFI_JOINED}" PARENT_SCOPE)
 endfunction()
 
-function(mln_ffi_install_c_api_complete_static_archive target)
-  get_target_property(MLN_FFI_INSTALL_ARCHIVE ${target} MLN_FFI_INSTALL_ARCHIVE)
-  if(NOT MLN_FFI_INSTALL_ARCHIVE)
-    return()
-  endif()
-  install(
-    FILES "${MLN_FFI_INSTALL_ARCHIVE}"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-endfunction()
-
-function(mln_ffi_install_emscripten_options)
-  if(NOT EMSCRIPTEN)
-    return()
-  endif()
-  set(link_options)
-  set(compile_options)
-  foreach(
-    dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
-    foreach(kind LINK COMPILE)
-      get_target_property(options ${dependencies} INTERFACE_${kind}_OPTIONS)
-      if(options AND NOT options MATCHES "-NOTFOUND$")
-        string(TOLOWER "${kind}" kind_lower)
-        list(APPEND ${kind_lower}_options ${options})
-      endif()
-    endforeach()
-  endforeach()
-  if(NOT link_options)
-    return()
-  endif()
-  list(REMOVE_DUPLICATES link_options)
-
-  set(link_options_file "${CMAKE_CURRENT_BINARY_DIR}/emscripten-link-flags.txt")
-  list(JOIN link_options "\n" link_options_lines)
-  file(WRITE "${link_options_file}" "${link_options_lines}\n")
-  install(
-    FILES "${link_options_file}"
-    DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c"
-    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-
-  list(JOIN link_options " " pkg_config_link_options)
-  set(MLN_FFI_PKG_CONFIG_LIBS
-      "${MLN_FFI_PKG_CONFIG_LIBS} ${pkg_config_link_options}"
-      PARENT_SCOPE)
-
-  list(REMOVE_DUPLICATES compile_options)
-  set(MLN_FFI_CMAKE_LINK_OPTIONS "${link_options}" PARENT_SCOPE)
-  set(MLN_FFI_CMAKE_COMPILE_OPTIONS "${compile_options}" PARENT_SCOPE)
-  list(JOIN compile_options " " pkg_config_compile_options)
-  set(MLN_FFI_PKG_CONFIG_CFLAGS
-      "${MLN_FFI_PKG_CONFIG_CFLAGS} ${pkg_config_compile_options}"
-      PARENT_SCOPE)
-endfunction()
-
-function(mln_ffi_install_c_api_shared_target target)
-  install(
-    TARGETS ${target}
-    RUNTIME
-      DESTINATION "${CMAKE_INSTALL_BINDIR}"
-      COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
-    LIBRARY
-      DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-      COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
-    ARCHIVE
-      DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-      COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-  mln_ffi_install_apple_dsym(${target} "${CMAKE_INSTALL_LIBDIR}"
-                             "${MLN_FFI_NATIVE_COMPONENT}")
-endfunction()
-
-# Writes a dSYM beside an installed Apple binary from the unstripped build-tree
-# binary, so debuggers and crash reports can name what a stripping install
-# removes. Release builds have no debug information, so the dSYM holds only the
-# symbol table. CMake doesn't strip embedded Apple binaries, so this does.
-function(mln_ffi_install_apple_dsym target destination component)
+# Writes a dSYM for an installed Apple binary from the unstripped build-tree
+# binary, so debuggers and crash reports can name what stripping removes.
+# Release builds have no debug information, so the dSYM holds only the symbol
+# table. `binary` is the build-tree file, `installed` the binary's path under
+# the prefix, and `dsym` the dSYM's: beside a bare library, or beside the
+# bundle of a framework's binary.
+function(mln_ffi_install_apple_dsym binary installed dsym component)
   if(NOT APPLE)
     return()
   endif()
   find_program(MLN_FFI_DSYMUTIL NAMES dsymutil llvm-dsymutil REQUIRED)
-
-  get_target_property(framework ${target} FRAMEWORK)
-  if(framework)
-    set(bundle "${destination}/$<TARGET_BUNDLE_DIR_NAME:${target}>")
-  else()
-    set(bundle "${destination}/$<TARGET_FILE_NAME:${target}>")
-  endif()
   set(prefix "\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}")
-  set(dsym "${prefix}/${bundle}.dSYM")
-
+  set(dsym "${prefix}/${dsym}")
   # --quiet hides the warning that there's no debug information, and the
   # relocation list is empty but records the build tree's path.
-  set(code
-      "execute_process(
-        COMMAND \"${MLN_FFI_DSYMUTIL}\" --quiet \"$<TARGET_FILE:${target}>\"
-          -o \"${dsym}\"
+  install(
+    CODE
+    "execute_process(
+        COMMAND \"${MLN_FFI_DSYMUTIL}\" --quiet \"${binary}\" -o \"${dsym}\"
         COMMAND_ERROR_IS_FATAL ANY)
-      file(REMOVE_RECURSE \"${dsym}/Contents/Resources/Relocations\")")
-  mln_ffi_apple_is_embedded(embedded)
-  if(embedded)
-    # An embedded Apple framework is flat, with its binary at the bundle's root.
-    set(binary "${bundle}")
-    if(framework)
-      set(binary "${bundle}/$<TARGET_FILE_NAME:${target}>")
-    endif()
-    string(
-      APPEND code
-      "
+      file(REMOVE_RECURSE \"${dsym}/Contents/Resources/Relocations\")
       if(CMAKE_INSTALL_DO_STRIP)
         execute_process(
-          COMMAND \"${CMAKE_STRIP}\" -x \"${prefix}/${binary}\"
+          COMMAND \"${CMAKE_STRIP}\" -x \"${prefix}/${installed}\"
           COMMAND_ERROR_IS_FATAL ANY)
-      endif()")
-  endif()
-  install(CODE "${code}" COMPONENT "${component}")
+        execute_process(
+          COMMAND codesign --force --sign - \"${prefix}/${installed}\"
+          COMMAND_ERROR_IS_FATAL ANY)
+      endif()"
+    COMPONENT "${component}")
 endfunction()
+
+# Sets the artifact descriptor's backend fields: MLN_FFI_RENDER_BACKENDS_JSON,
+# the backends that the library carries as JSON strings, and
+# MLN_FFI_OPENGL_CONTEXT_PROVIDER_JSON, the OpenGL context provider as a JSON
+# string, or null for a build without OpenGL.
+macro(mln_ffi_artifact_backend_json)
+  set(MLN_FFI_RENDER_BACKENDS_JSON "")
+  foreach(backend IN LISTS MLN_FFI_RENDER_BACKENDS)
+    if(MLN_FFI_RENDER_BACKENDS_JSON)
+      string(APPEND MLN_FFI_RENDER_BACKENDS_JSON ", ")
+    endif()
+    string(APPEND MLN_FFI_RENDER_BACKENDS_JSON "\"${backend}\"")
+  endforeach()
+  set(MLN_FFI_OPENGL_CONTEXT_PROVIDER_JSON null)
+  if(MLN_FFI_OPENGL_CONTEXT_PROVIDER)
+    set(MLN_FFI_OPENGL_CONTEXT_PROVIDER_JSON
+        "\"${MLN_FFI_OPENGL_CONTEXT_PROVIDER}\"")
+  endif()
+endmacro()
 
 function(mln_ffi_install_c_api_library target)
   set(MLN_FFI_NATIVE_COMPONENT native)
-  set(MLN_FFI_LOADER_COMPONENT loader)
   mln_ffi_install_zig_libc()
 
-  get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
+  get_target_property(shared ${target} MLN_FFI_SHARED_FILE)
+  get_target_property(implib ${target} MLN_FFI_IMPLIB_FILE)
+  get_target_property(static ${target} MLN_FFI_STATIC_FILE)
+  get_target_property(native_libraries ${target} MLN_FFI_NATIVE_LIBRARIES_FILE)
+
   set(MLN_FFI_PKG_CONFIG_CFLAGS "")
   set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS "")
-  get_target_property(MLN_FFI_PKG_CONFIG_ARCHIVES mln_ffi_platform_dependencies
-                      MLN_FFI_PKG_CONFIG_ARCHIVES)
-  if(NOT MLN_FFI_PKG_CONFIG_ARCHIVES)
-    set(MLN_FFI_PKG_CONFIG_ARCHIVES "")
-  endif()
-  get_target_property(MLN_FFI_PKG_CONFIG_LIBS mln_ffi_platform_dependencies
-                      MLN_FFI_PKG_CONFIG_LIBS)
-  if(NOT MLN_FFI_PKG_CONFIG_LIBS)
-    set(MLN_FFI_PKG_CONFIG_LIBS "")
-  endif()
-  if(MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "STATIC_LIBRARY")
+  if(NOT shared)
     set(MLN_FFI_PKG_CONFIG_CFLAGS " -DMLN_STATIC")
-  endif()
-  if(UNIX AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
+  elseif(UNIX)
     set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS " -Wl,-rpath,\${libdir}")
   endif()
   mln_ffi_c_version(MLN_FFI_SCHEMA_VERSION)
+  mln_ffi_artifact_backend_json()
   set(MLN_FFI_ANDROID_JSON null)
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
     string(REGEX REPLACE "^android-" "" android_api "${ANDROID_PLATFORM}")
     set(MLN_FFI_ANDROID_JSON
         "{ \"abi\": \"${ANDROID_ABI}\", \"api\": ${android_api} }")
   endif()
-  mln_ffi_install_emscripten_options()
-  mln_ffi_static_link_metadata(MLN_FFI_STATIC_LINK_LIBRARIES
-                               MLN_FFI_STATIC_LINK_FRAMEWORKS)
-  mln_ffi_install_package_config(${target})
-  mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_LIBRARIES_JSON
-                            ${MLN_FFI_STATIC_LINK_LIBRARIES})
-  mln_ffi_json_string_array(MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON
-                            ${MLN_FFI_STATIC_LINK_FRAMEWORKS})
+  set(MLN_FFI_PKG_CONFIG_LIBS "")
+  # Filled in at build time from what rustc reports; see
+  # cmake/mln_ffi_package_metadata.cmake.
+  set(MLN_FFI_STATIC_LINK_LIBRARIES_JSON "%%LINK_LIBRARIES_JSON%%")
+  set(MLN_FFI_STATIC_LINK_FRAMEWORKS_JSON "%%LINK_FRAMEWORKS_JSON%%")
+  set(MLN_FFI_PKG_CONFIG_PRIVATE_LIBS "%%LINK_FLAGS%%")
+  mln_ffi_install_package_config(${target} config_template config_file)
 
   set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
   set(artifact_file
       "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c-artifact.json")
   configure_file(
-    "${PROJECT_SOURCE_DIR}/cmake/maplibre-native-c.pc.in" "${pc_file}"
+    "${PROJECT_SOURCE_DIR}/cmake/maplibre-native-c.pc.in" "${pc_file}.in"
     @ONLY)
   configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/artifact.json.in" "${artifact_file}.in"
     @ONLY)
-  # The commit is read at build time, so that a build after a new commit
-  # records it without a reconfigure.
+  # The commit and the static link libraries are read at build time, so a
+  # build after a new commit records it without a reconfigure.
   find_package(Git QUIET)
   add_custom_target(
-    ${target}_artifact_descriptor
+    ${target}_package_metadata
+    ALL
     COMMAND
       "${CMAKE_COMMAND}"
       "-DGIT=${GIT_EXECUTABLE}"
       "-DSOURCE_DIR=${PROJECT_SOURCE_DIR}"
-      "-DINPUT=${artifact_file}.in"
-      "-DOUTPUT=${artifact_file}"
+      "-DNATIVE_LIBRARIES=${native_libraries}"
+      "-DFILES=${artifact_file}.in|${artifact_file};${pc_file}.in|${pc_file};${config_template}|${config_file}"
       -P
-      "${PROJECT_SOURCE_DIR}/cmake/mln_ffi_artifact_commit.cmake"
-    BYPRODUCTS "${artifact_file}"
+      "${PROJECT_SOURCE_DIR}/cmake/mln_ffi_package_metadata.cmake"
+    BYPRODUCTS "${artifact_file}" "${pc_file}" "${config_file}"
+    COMMENT
+      "Writing the artifact descriptor, pkg-config file, and CMake package"
     VERBATIM)
-  add_dependencies(${target} ${target}_artifact_descriptor)
+  add_dependencies(${target}_package_metadata ${target}_build)
   mln_ffi_install_components(${target} "${artifact_file}")
 
-  if(MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "STATIC_LIBRARY")
-    mln_ffi_install_c_api_complete_static_archive(${target})
-  else()
-    mln_ffi_install_c_api_shared_target(${target})
+  if(shared)
+    get_filename_component(shared_name "${shared}" NAME)
+    if(WIN32)
+      install(
+        PROGRAMS "${shared}"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+      install(
+        FILES "${implib}"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+    else()
+      install(
+        PROGRAMS "${shared}"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+      mln_ffi_install_apple_dsym(
+        "${shared}" "${CMAKE_INSTALL_LIBDIR}/${shared_name}"
+        "${CMAKE_INSTALL_LIBDIR}/${shared_name}.dSYM"
+        "${MLN_FFI_NATIVE_COMPONENT}")
+    endif()
   endif()
-
-  if(TARGET ${target}_static)
-    mln_ffi_install_c_api_complete_static_archive(${target}_static)
-  endif()
-  if(TARGET ${target}_framework)
-    mln_ffi_install_c_api_framework(${target} ${target}_framework
+  install(
+    FILES "${static}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+  if(APPLE AND shared)
+    mln_ffi_install_c_api_framework(${target} "${shared}"
                                     "${MLN_FFI_NATIVE_COMPONENT}")
   endif()
 
@@ -345,11 +228,6 @@ function(mln_ffi_install_c_api_library target)
     FILES_MATCHING
     PATTERN "*.h"
     PATTERN "binding_support.h" EXCLUDE)
-  # plugin.h includes MapLibre Native's plugin API from upstream's path.
-  install(
-    FILES "${PROJECT_SOURCE_DIR}/include/mln/plugin/plugin_api.h"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/mln/plugin"
-    COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
   install(
     FILES "${PROJECT_SOURCE_DIR}/LICENSE"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c"
@@ -365,15 +243,6 @@ function(mln_ffi_install_c_api_library target)
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
   foreach(
     dependencies mln_ffi_platform_dependencies mln_ffi_render_dependencies)
-    get_target_property(MLN_FFI_INSTALL_LIBRARY_FILES ${dependencies}
-                        MLN_FFI_INSTALL_LIBRARY_FILES)
-    if(MLN_FFI_INSTALL_LIBRARY_FILES
-       AND NOT MLN_FFI_INSTALL_LIBRARY_FILES MATCHES "-NOTFOUND$")
-      install(
-        FILES ${MLN_FFI_INSTALL_LIBRARY_FILES}
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-    endif()
     # DLLs that the loader finds only beside the library that imports them.
     get_target_property(MLN_FFI_INSTALL_RUNTIME_FILES ${dependencies}
                         MLN_FFI_INSTALL_RUNTIME_FILES)
@@ -385,27 +254,4 @@ function(mln_ffi_install_c_api_library target)
         COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
     endif()
   endforeach()
-  # The host supplies the graphics implementation and its headers, so this
-  # component stays out of the package. The build task installs it for tests.
-  get_target_property(MLN_FFI_INSTALL_LOADER_FILES mln_ffi_render_dependencies
-                      MLN_FFI_INSTALL_LOADER_FILES)
-  if(MLN_FFI_INSTALL_LOADER_FILES
-     AND NOT MLN_FFI_INSTALL_LOADER_FILES MATCHES "-NOTFOUND$")
-    install(
-      FILES ${MLN_FFI_INSTALL_LOADER_FILES}
-      DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-      COMPONENT "${MLN_FFI_LOADER_COMPONENT}"
-      EXCLUDE_FROM_ALL)
-  endif()
-  get_target_property(
-    MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS mln_ffi_render_dependencies
-    MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS)
-  if(MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS
-     AND NOT MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS MATCHES "-NOTFOUND$")
-    install(
-      DIRECTORY ${MLN_FFI_INSTALL_LOADER_INCLUDE_DIRS}
-      DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-      COMPONENT "${MLN_FFI_LOADER_COMPONENT}"
-      EXCLUDE_FROM_ALL)
-  endif()
 endfunction()

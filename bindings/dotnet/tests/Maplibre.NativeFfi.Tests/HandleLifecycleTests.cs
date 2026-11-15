@@ -97,7 +97,11 @@ public sealed class HandleLifecycleTests
             _ = runtime.ReleaseAsync();
         });
         Assert.Equal(Status.InvalidState, error.Status);
-        Assert.Contains("live or pending children", error.Diagnostic, StringComparison.Ordinal);
+        Assert.Contains(
+            "release the runtime's maps first",
+            error.Diagnostic,
+            StringComparison.Ordinal
+        );
         await runtime.ClearResourceTransformAsync();
 
         await map.ReleaseAsync();

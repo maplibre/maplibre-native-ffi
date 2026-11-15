@@ -13,10 +13,6 @@ import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 val hostPlatform = HostPlatform.current()
 val androidApiLevel = catalogVersionInt("android-minSdk")
 val androidNdkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")
-val androidBackend =
-  AndroidTarget.parseBackend(
-    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND),
-  )
 val androidTargets =
   AndroidTarget.parseAbis(
     providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS),
@@ -48,7 +44,7 @@ val androidSdkPackages =
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
 // The JNI shim: the hand-written runtime and the declarations tools/bindgen generates.
 val jniSources = layout.projectDirectory.dir("src/androidMain/jni")
-// The C API library ships in the backend runtime AARs; the JNI shim is private to this
+// The C API library ships in the runtime AAR; the JNI shim is private to this
 // binding and ships in this module's AAR.
 val packagedAndroidRuntimeLibs = layout.buildDirectory.dir("generated/jniLibs/runtime")
 @Suppress("UNCHECKED_CAST")
@@ -57,7 +53,7 @@ val packagedAndroidBindingLibs =
 val packageAndroidRuntimeLibraries =
   tasks.register("packageAndroidRuntimeLibraries") {
     group = "build"
-    description = "Packages the MapLibre C library for the Android runtime AARs."
+    description = "Packages the MapLibre C library for the Android runtime AAR."
   }
 
 val packageAndroidBindingLibraries =
@@ -83,15 +79,15 @@ tasks.withType<Zip>().configureEach {
 }
 
 androidTargets.forEach { target ->
-  val install = nativeInstall(target.targetPlatform, androidBackend)
+  val install = nativeInstall(target.targetPlatform)
   val verifyLocalBuild =
     registerLocalBuildVerification("verifyAndroid${target.taskSuffix}LocalBuild", install)
   packageAndroidRuntimeLibraries.configure { dependsOn(verifyLocalBuild) }
   packageAndroidBindingLibraries.configure { dependsOn(verifyLocalBuild) }
   val installDir = install.prefix ?: return@forEach
-  val targetRoot = layout.buildDirectory.dir("android-native/$androidBackend/${target.cargoTarget}")
+  val targetRoot = layout.buildDirectory.dir("android-native/${target.cargoTarget}")
   val runtimePackageDir = packagedAndroidRuntimeLibs.map {
-    it.dir("$androidBackend/${target.cargoTarget}")
+    it.dir(target.cargoTarget)
   }
   val bindingPackageDir = packagedAndroidBindingLibs.map { it.dir(target.cargoTarget) }
   val nativeLibrary = installDir.resolve("lib/libmaplibre-native-c.so")
@@ -126,6 +122,7 @@ androidTargets.forEach { target ->
         jniSources.file("mln_jni_generated.c").asFile,
         "-L${installDir.resolve("lib")}",
         "-lmaplibre-native-c",
+        "-landroid",
         "-llog",
         // Android 15 devices may use 16 KB pages.
         "-Wl,-z,max-page-size=16384",

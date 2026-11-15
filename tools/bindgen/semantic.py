@@ -104,9 +104,9 @@ class HandlePlan:
     @property
     def scoped_dispose(self) -> str | None:
         """The operation that every other scope calls, such as TypeScript's
-        `Symbol.dispose`, .NET's `Dispose`, Kotlin's `AutoCloseable.close`,
-        Python's `with`, or Rust's `Drop`: the dispose, which is the release of
-        a handle that its release frees at once."""
+        `Symbol.dispose`, .NET's `Dispose`, Kotlin's `AutoCloseable.close`, or
+        Python's `with`: the dispose, which is the release of a handle that its
+        release frees at once."""
         return None if self.discard else self.dispose
 
 
@@ -447,7 +447,6 @@ class AbsencePlan:
 # - "release_async": a release that consumes its receiver and completes later.
 # - "answer": an immediate call that ends its receiver whatever it returns,
 #   but is no release.
-# - "thread_start": an immediate call that waits for a native thread to start.
 # - "attach": a completion that readies the owner the call creates at once.
 # - "command": a completion that reports map generations.
 # - "query": a completion that delivers a result.
@@ -461,7 +460,6 @@ OperationShape = Literal[
     "release",
     "release_async",
     "answer",
-    "thread_start",
     "attach",
     "command",
     "query",
@@ -479,7 +477,6 @@ def operation_shape(
     discard: bool,
     release: bool,
     consumes: str | None,
-    blocks: str | None,
     completion: CompletionPlan | None,
     result: ValuePlan | None,
     view: BorrowedViewPlan | None,
@@ -493,8 +490,6 @@ def operation_shape(
         return "release_async" if completion else "release"
     if consumes and not completion:
         return "answer"
-    if blocks:
-        return "thread_start"
     if completion:
         if completion.immediate_owners:
             return "attach"
@@ -535,9 +530,6 @@ class OperationPlan:
     drain: DrainPlan | None = None
     # The handle output that native may leave null on success.
     absence: AbsencePlan | None = None
-    # What an immediate call waits for before it returns, such as a native
-    # thread start, which some host threads cannot wait for.
-    blocks: str | None = None
     # Whether the call stays valid on its receiver after native accepted the
     # receiver's release, until the handle retires.
     after_release: bool = False
@@ -1617,7 +1609,6 @@ class Binder:
                 discard=discard,
                 release=release,
                 consumes=consumes,
-                blocks=metadata.get("blocks"),
                 completion=completion,
                 result=result,
                 view=view,
@@ -1640,7 +1631,6 @@ class Binder:
             member,
             drain=drain,
             absence=absence,
-            blocks=metadata.get("blocks"),
             after_release=metadata.get("after_release") == "true",
             factory=factory,
             unchecked=function.name == ABI_VERSION,

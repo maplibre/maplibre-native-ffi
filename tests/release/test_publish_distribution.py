@@ -9,7 +9,7 @@ import tempfile
 import unittest
 
 from native_package_release import XCFRAMEWORK_NAME
-from swift_artifact_bundle import bundle_name
+from swift_artifact_bundle import BUNDLE_NAME
 from test_distribution import linux_archive
 
 REPOSITORY = pathlib.Path(__file__).resolve().parents[2]
@@ -40,21 +40,20 @@ class PublishDistributionTest(unittest.TestCase):
         root = pathlib.Path(temporary.name)
         self.assets = root / "assets"
         self.assets.mkdir()
-        archive = self.assets / "maplibre-native-c-macos-arm64-metal.tar.gz"
+        archive = self.assets / "maplibre-native-c-macos-arm64.tar.gz"
         archive.write_bytes(b"native archive")
         self.archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         checksums = (
             f"{self.archive_digest}  {archive.name}\n{DIGEST}  {XCFRAMEWORK_NAME}\n"
         )
-        # The Swift package's artifact bundles take their backends and system
-        # libraries from these archives.
-        for preset, backend in (("egl", "opengl"), ("vulkan", "vulkan")):
-            linux = self.assets / f"maplibre-native-c-linux-gnu-x64-{preset}.tar.gz"
-            linux_archive(linux, backend)
-            checksums += (
-                f"{hashlib.sha256(linux.read_bytes()).hexdigest()}  {linux.name}\n"
-                f"{DIGEST}  {bundle_name(backend)}\n"
-            )
+        # The Swift package's artifact bundle takes its system libraries from
+        # this archive.
+        linux = self.assets / "maplibre-native-c-linux-gnu-x64.tar.gz"
+        linux_archive(linux)
+        checksums += (
+            f"{hashlib.sha256(linux.read_bytes()).hexdigest()}  {linux.name}\n"
+            f"{DIGEST}  {BUNDLE_NAME}\n"
+        )
         (self.assets / "SHA256SUMS").write_text(checksums)
         self.remote = root / "distribution.git"
         subprocess.run(
@@ -97,8 +96,8 @@ class PublishDistributionTest(unittest.TestCase):
             git(self.remote, "show", "main:recipes/maplibre-native-c/conandata.yml")
         )["sources"]
         self.assertEqual(set(sources), {"0.202611.0", "0.202611.1"})
-        self.assertIn("v0.202611.0/", sources["0.202611.0"]["macos-arm64-metal"]["url"])
-        self.assertIn("v0.202611.1/", sources["0.202611.1"]["macos-arm64-metal"]["url"])
+        self.assertIn("v0.202611.0/", sources["0.202611.0"]["macos-arm64"]["url"])
+        self.assertIn("v0.202611.1/", sources["0.202611.1"]["macos-arm64"]["url"])
 
     def test_a_release_publishes_the_xmake_repository_with_its_version(self) -> None:
         published = self.publish("v0.202611.0")
@@ -108,7 +107,7 @@ class PublishDistributionTest(unittest.TestCase):
             self.remote, "show", "v0.202611.0:packages/m/maplibre-native-c/xmake.lua"
         )
         self.assertIn(
-            f'add_versions("macos-arm64-metal:0.202611.0", "{self.archive_digest}")',
+            f'add_versions("macos-arm64:0.202611.0", "{self.archive_digest}")',
             recipe,
         )
 

@@ -75,7 +75,7 @@ def operation(
             return member_doc(value_types.bound, plan.function.name) + code, view_owner
         case "drain":
             return drained(plan, prepare(plan, value_types), value_types)
-        case "thread_start" | "owned" | "call":
+        case "owned" | "call":
             call = prepare(plan, value_types)
             if plan.result:
                 return returned(plan, call, value_types)

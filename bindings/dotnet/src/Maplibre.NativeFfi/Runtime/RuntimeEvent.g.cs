@@ -51,10 +51,6 @@ public readonly partial record struct RuntimeEvent(
             RuntimeEventOfflineRegionResponseError Value
         ) : PayloadValue;
 
-        public sealed record OfflineRegionTileCountLimit(
-            RuntimeEventOfflineRegionTileCountLimit Value
-        ) : PayloadValue;
-
         public sealed record Glyphs(RuntimeEventGlyphs Value) : PayloadValue;
 
         public sealed record Sprite(RuntimeEventSprite Value) : PayloadValue;

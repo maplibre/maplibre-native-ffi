@@ -45,20 +45,31 @@
     // #region attach-options
     let options = RenderSessionAttachOptions(
       driver: .coreWorker,
-      frameWake: Wake(callback: onFrameWake),
-      // Only if your renderer also submits to the graphics queue.
-      queueLock: QueueLock(lock: lockQueue, unlock: unlockQueue)
+      frameWake: Wake(callback: onFrameWake)
     )
     // #endregion attach-options
 
     // #region attach-borrowed
-    let ring = VulkanBorrowedTextureDescriptor(
+    // Your VkDevice and graphics queue.
+    let device = try GpuDeviceHandle.wrapVulkan(
+      descriptor: VulkanDeviceDescriptor(
+        context: vulkan,
+        // Only if your renderer also submits to the graphics queue.
+        queueLock: QueueLock(lock: lockQueue, unlock: unlockQueue),
+        // The device extensions that you enabled on your VkDevice.
+        enabledExtensions: [
+          "VK_KHR_swapchain",
+          "VK_KHR_external_semaphore_fd",
+        ]
+      )
+    )
+
+    let ring = VulkanBorrowedTexturesTarget(
       // The map's size in logical pixels.
       logicalSize: LogicalSize(width: 800, height: 600),
       // The size of your textures in device pixels.
       physicalWidth: 1600,
       physicalHeight: 1200,
-      context: vulkan,
       // Your VkImage and VkImageView for each texture of the ring.
       textures: [
         VulkanBorrowedTexture(image: images[0], imageView: views[0]),
@@ -68,17 +79,20 @@
       finalLayout: 5 // VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     )
 
-    session = try map.attachVulkanBorrowedTexture(
-      descriptor: ring,
+    session = try map.attach(
+      target: .vulkanBorrowedTextures(ring),
+      device: device,
       options: options
     )
+    // The session keeps the device until it detaches.
+    device.release()
     try await session.ready
     // #endregion attach-borrowed
 
     try drawFrame()
 
     // #region resize-borrowed
-    let resized = VulkanBorrowedTextureReplacement(
+    let resized = VulkanBorrowedTexturesTarget(
       logicalSize: LogicalSize(width: 1024, height: 768),
       physicalWidth: 2048,
       physicalHeight: 1536,
@@ -92,12 +106,12 @@
           image: newImages[1],
           imageView: newViews[1]
         ),
-      ]
+      ],
+      format: 37,
+      finalLayout: 5
     )
 
-    try await session.setVulkanBorrowedTextureTarget(
-      replacement: resized
-    )
+    try await session.setTarget(.vulkanBorrowedTextures(resized))
     // vkDestroyImageView and vkDestroyImage
     destroyTextures(images, views)
     // #endregion resize-borrowed

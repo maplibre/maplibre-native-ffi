@@ -22,8 +22,7 @@ code at the two endpoints, since a description can be stale.
 - Packaging and platforms: diff the release workflows and `tools/release/`,
   `CMakePresets.json`, and the support matrix that
   `docs/scripts/generate-support-matrix.py` prints at each endpoint.
-- The engine: the `third_party/maplibre-native` pin and
-  `patches/maplibre-native/`.
+- The engine: the `third_party/mln-rs` pin and `patches/mln-rs/`.
 
 Report the net change: something added and reworked within the range appears
 only in its final form, or not at all. Cover only the artifacts that the release

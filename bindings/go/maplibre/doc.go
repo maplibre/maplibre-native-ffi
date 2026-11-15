@@ -1,9 +1,9 @@
 // Package maplibre is the low-level Go binding for the MapLibre Native C API.
 //
-// A program links the C library by importing the module of a preset, such as
-// maplibre.org/maplibre-native-ffi/go-native/linux-gnu-x64-vulkan, for its side
-// effect. With the mln_pkgconfig build tag, it links a C library that
-// pkg-config finds instead.
+// A program links the C library by importing the module of a platform's preset,
+// such as maplibre.org/maplibre-native-ffi/go-native/linux-gnu-x64, for its side
+// effect. The library draws with every render backend of the platform. With the
+// mln_pkgconfig build tag, it links a C library that pkg-config finds instead.
 //
 // The first [RenderSessionHandle.ServiceDriverWork] call fixes a caller-driver
 // session's graphics thread, and the Go scheduler moves goroutines between OS

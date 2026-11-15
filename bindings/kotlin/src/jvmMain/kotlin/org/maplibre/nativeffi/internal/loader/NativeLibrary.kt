@@ -296,8 +296,7 @@ internal object NativeLibrary {
           "EGL.dll",
           "GLESv2.dll",
         )
-      osName.contains("mac") ->
-        listOf("libvulkan.1.dylib", "libvulkan.dylib", "libEGL.dylib", "libGLESv2.dylib")
+      osName.contains("mac") -> emptyList()
       else ->
         listOf(
           "libvulkan.so.1",

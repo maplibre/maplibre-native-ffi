@@ -29,8 +29,6 @@
     // Bindgen probe fixtures are inputs that the Dart formatter must not
     // rewrite.
     "../tests/bindgen/fixtures/probes/dart/**",
-    // Bindgen copies MapLibre Native's plugin header as upstream wrote it.
-    "../include/mln/**",
   ],
   // Docs snippets wrap at 70 columns, so they fit the docs site's code
   // blocks. Go and Zig formatters don't wrap lines.
@@ -113,10 +111,6 @@
       "**/*.swift",
     ],
     "commands": [
-      {
-        "command": "rustfmt --edition 2024 --config max_width=70",
-        "associations": ["**/maplibre-native-ffi/examples/**/*.rs"],
-      },
       {
         "command": "bash .mise/bin/dprint-dart format --output=show --page-width=70 --stdin-name={{file_path}}",
         "associations": ["**/docsnippets/**/*.dart"],

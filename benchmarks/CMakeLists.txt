@@ -6,7 +6,9 @@
 #     -DMLN_BENCH_VULKAN_INCLUDE_DIR=<Vulkan-Headers/include>
 #
 # The install needs its test-graphics component, which holds the host GPU
-# fixtures. A build of the repository adds the harness through
+# fixtures. MLN_BENCH_BACKEND picks which of the install's backends the harness
+# drives, by default the platform's default backend. A build of the repository
+# adds the harness through
 # cmake/hook.cmake instead, which also covers presets that cross-compile.
 cmake_minimum_required(VERSION 3.28)
 project(mln_ffi_bench LANGUAGES C CXX)
@@ -20,11 +22,15 @@ if(NOT EXISTS "${artifact}")
   message(FATAL_ERROR "${MLN_BENCH_INSTALL} has no ${artifact}")
 endif()
 file(READ "${artifact}" artifact_json)
-string(JSON MLN_FFI_RENDER_BACKEND GET "${artifact_json}" backend)
-string(JSON artifact_name GET "${artifact_json}" name)
-set(MLN_FFI_OPENGL_CONTEXT_PROVIDER "")
-if(artifact_name MATCHES "-(egl|wgl|webgl)$")
-  set(MLN_FFI_OPENGL_CONTEXT_PROVIDER "${CMAKE_MATCH_1}")
+string(
+  JSON MLN_FFI_DEFAULT_RENDER_BACKEND
+  GET "${artifact_json}" platform defaultBackend)
+string(
+  JSON MLN_FFI_OPENGL_CONTEXT_PROVIDER
+  ERROR_VARIABLE no_provider
+  GET "${artifact_json}" openglContextProvider)
+if(no_provider OR MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "null")
+  set(MLN_FFI_OPENGL_CONTEXT_PROVIDER "")
 endif()
 
 find_package(

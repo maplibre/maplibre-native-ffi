@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-#MISE description="Run portable Dart binding suites in a Flutter iOS simulator host."
+#MISE description="Run portable Dart binding suites in a Flutter iOS simulator host, with one of the preset's render backends."
+#MISE extends="ffi:test"
 #MISE depends=[{ task = "//:build", args = ["{{usage.preset}}"] }, { task = ":_native-prefix", args = ["{{usage.preset}}"] }]
 #MISE shell="bash"
-#USAGE arg "[preset]" default="ios-simulator-arm64-metal" { choices "ios-simulator-arm64-metal" }
 set -euo pipefail
+
+if [[ "$usage_preset" != ios-simulator-arm64 ]]; then
+  echo "The Dart iOS suite runs in an arm64 simulator; test ios-simulator-arm64 instead of $usage_preset." >&2
+  exit 2
+fi
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
 
 device=$(devices-cli get ios)
 app=.dart_tool/flutter_ios_test
@@ -21,11 +27,13 @@ flutter pub get
 # Flutter 3.47 can launch the app before it starts reading the simulator log,
 # miss the app's VM service address, and wait for it without limit
 # (flutter/flutter#181771). The bound turns that wait into a failure, and the
-# tool's verbose log and the app's own log show which step stalled.
+# tool's verbose log and the app's own log show which step stalled. The app
+# runs without this environment, so the backend under test is a define.
 : >test-results.txt
 status=0
 perl -e 'alarm shift; exec @ARGV' 300 \
   flutter test integration_test/binding_test.dart --device-id "$device" \
+  --dart-define=MLN_FFI_TEST_BACKEND="$MLN_FFI_TEST_BACKEND" \
   --timeout 2m --verbose --reporter silent \
   --file-reporter expanded:test-results.txt >flutter-test.log 2>&1 || status=$?
 cat test-results.txt

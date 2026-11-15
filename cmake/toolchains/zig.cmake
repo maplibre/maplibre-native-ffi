@@ -170,6 +170,27 @@ if(MLN_FFI_ZIG_SYSROOT)
        "${MLN_FFI_ZIG_SYSROOT}/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
 endif()
 
+# zig links FreeBSD's libc from stubs of its own, which leave out the base
+# system's libdevstat, libkvm, libmemstat, and libprocstat. The libc crate names
+# them for every Rust program, so rustc links them and lists them among the
+# static archive's link libraries, though the library calls none of them. Empty
+# linker scripts under their shared libraries' names stand in for them, in the
+# library's link and in a consumer's link of the archive. rustc asks for shared
+# libraries alone, and a script adds no dependency to what it links.
+if(MLN_FFI_ZIG_OS STREQUAL "freebsd")
+  set(MLN_FFI_ZIG_FREEBSD_STUBS "${MLN_FFI_ZIG_SHIM_DIR}/freebsd-libs")
+  file(MAKE_DIRECTORY "${MLN_FFI_ZIG_FREEBSD_STUBS}")
+  foreach(MLN_FFI_ZIG_FREEBSD_LIBRARY devstat kvm memstat procstat)
+    file(
+      WRITE "${MLN_FFI_ZIG_FREEBSD_STUBS}/lib${MLN_FFI_ZIG_FREEBSD_LIBRARY}.so"
+      "/* An empty stand-in; see cmake/toolchains/zig.cmake. */\n")
+  endforeach()
+  foreach(MLN_FFI_ZIG_LINK_KIND EXE SHARED MODULE)
+    string(APPEND CMAKE_${MLN_FFI_ZIG_LINK_KIND}_LINKER_FLAGS_INIT
+           " -L${MLN_FFI_ZIG_FREEBSD_STUBS}")
+  endforeach()
+endif()
+
 # zig builds libc++, libc++abi, and libunwind from source the first time a
 # target needs them, and those vendored headers carry nullability annotations
 # the rest of the tree does not use.

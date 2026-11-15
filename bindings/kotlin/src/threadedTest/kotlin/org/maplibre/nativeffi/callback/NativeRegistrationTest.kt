@@ -7,7 +7,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.withContext
+import org.maplibre.nativeffi.GpuDeviceHandle
+import org.maplibre.nativeffi.GpuDeviceOptions
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.NativePointer
@@ -96,47 +97,35 @@ class NativeRegistrationTest {
     HostFunctions().use { host ->
       withSmallMap {
         val lock = QueueLock.native(host.call, host.call, host.userData, host.release)
-        withTestTextures(WIDTH, HEIGHT, 1) { textures ->
-          if (TestGraphics.backend == TestBackend.VULKAN) {
+        if (TestGraphics.backend == TestBackend.VULKAN) {
+          withTestTextures(WIDTH, HEIGHT, 1) { textures ->
+            // The session keeps the device, and the device the lock, until the session detaches.
             withRenderSession(
               RenderDriverKind.CALLER_GRAPHICS_THREAD,
               attach = { options ->
-                TestGraphics.attachBorrowedTexture(map, textures, options.copy(queueLock = lock))
+                TestGraphics.attachBorrowedTexture(map, textures, options, queueLock = lock)
               },
             ) {
               setStyle(RED_BACKGROUND_STYLE)
               renderFrame()
-            }
-            host.released.awaitWithin("native to release the queue lock")
-            assertTrue(host.calls.load() > 0)
-          } else {
-            // Only a Vulkan target takes a queue lock, so native rejects one that reaches it.
-            withContext(TestGraphics.thread) {
-              assertFailsWithStatus(Status.UNSUPPORTED) {
-                TestGraphics.attachBorrowedTexture(
-                  map,
-                  textures,
-                  RenderSessionAttachOptions(
-                    driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
-                    queueLock = lock,
-                  ),
-                )
-              }
+              complete(session.detach(), "the detach")
             }
           }
-          assertEquals(1, host.releases.load())
-          withContext(TestGraphics.thread) {
-            assertFailsWith<IllegalStateException> {
-              TestGraphics.attachBorrowedTexture(
-                map,
-                textures,
-                RenderSessionAttachOptions(
-                  driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
-                  queueLock = lock,
-                ),
-              )
-            }
+          host.released.awaitWithin("native to release the queue lock")
+          assertTrue(host.calls.load() > 0)
+        } else {
+          // Only a Vulkan device takes a queue lock, so native rejects one that reaches it. The
+          // test names the backend, since a library with several may default to Vulkan.
+          assertFailsWithStatus(Status.UNSUPPORTED) {
+            GpuDeviceHandle.create(
+              GpuDeviceOptions(backend = TestGraphics.backend.renderBackend, queueLock = lock),
+            )
           }
+        }
+        assertEquals(1, host.releases.load())
+        // Native took the lock, so only the binding refuses a second use.
+        assertFailsWith<IllegalStateException> {
+          GpuDeviceHandle.create(GpuDeviceOptions(queueLock = lock))
         }
       }
       assertEquals(1, host.releases.load())

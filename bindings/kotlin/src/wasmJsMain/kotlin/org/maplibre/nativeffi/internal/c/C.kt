@@ -3,9 +3,7 @@
 
 package org.maplibre.nativeffi.internal.c
 
-import org.maplibre.nativeffi.internal.call.ThreadStart
-
-/** The C wrapper behind each C function, in the module that `loadWasmModule` loads. */
+/** Each C function, as the raw export of the module that `loadWasmModule` loads. */
 internal actual object C {
   actual fun mln_acquired_frame_discard(frame: Long, outDiagnostic: Long): Int =
     mln_kw_mln_acquired_frame_discard(frame, word(outDiagnostic))
@@ -42,6 +40,12 @@ internal actual object C {
     outFrame: Long,
     outDiagnostic: Long,
   ): Int = mln_kw_mln_acquired_frame_get_metal_texture(frame, word(outFrame), word(outDiagnostic))
+
+  actual fun mln_acquired_frame_get_opaque_fd(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_acquired_frame_get_opaque_fd(frame, word(outFrame), word(outDiagnostic))
 
   actual fun mln_acquired_frame_get_open_gl_texture(
     frame: Long,
@@ -83,17 +87,8 @@ internal actual object C {
     mln_kw_mln_acquired_frame_view_end(word(scope))
   }
 
-  actual fun mln_android_frame_pacer_create(
-    options: Long,
-    outPacer: Long,
-    outDiagnostic: Long,
-  ): Int = mln_kw_mln_android_frame_pacer_create(word(options), word(outPacer), word(outDiagnostic))
-
   actual fun mln_android_init(jniEnv: Long, context: Long, outDiagnostic: Long): Int =
     mln_kw_mln_android_init(word(jniEnv), word(context), word(outDiagnostic))
-
-  actual fun mln_apple_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_apple_frame_pacer_create(word(options), word(outPacer), word(outDiagnostic))
 
   actual fun mln_c_version(): Int = mln_kw_mln_c_version()
 
@@ -115,9 +110,53 @@ internal actual object C {
     mln_kw_mln_delivery_queue_release(queue)
   }
 
+  actual fun mln_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_frame_pacer_create(word(options), word(outPacer), word(outDiagnostic))
+
   actual fun mln_frame_pacer_release(pacer: Long) {
     mln_kw_mln_frame_pacer_release(pacer)
   }
+
+  actual fun mln_frame_pacer_set_options(pacer: Long, options: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_frame_pacer_set_options(pacer, word(options), word(outDiagnostic))
+
+  actual fun mln_gpu_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_gpu_device_create(word(options), word(outDevice), word(outDiagnostic))
+
+  actual fun mln_gpu_device_get_capabilities(
+    device: Long,
+    outCapabilities: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_gpu_device_get_capabilities(device, word(outCapabilities), word(outDiagnostic))
+
+  actual fun mln_gpu_device_get_vulkan_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_gpu_device_get_vulkan_context(device, word(outResult), word(outDiagnostic))
+
+  actual fun mln_gpu_device_release(device: Long) {
+    mln_kw_mln_gpu_device_release(device)
+  }
+
+  actual fun mln_gpu_device_wrap_metal(
+    descriptor: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_gpu_device_wrap_metal(word(descriptor), word(outDevice), word(outDiagnostic))
+
+  actual fun mln_gpu_device_wrap_open_gl(context: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_gpu_device_wrap_open_gl(word(context), word(outDevice), word(outDiagnostic))
+
+  actual fun mln_gpu_device_wrap_vulkan(
+    descriptor: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_gpu_device_wrap_vulkan(word(descriptor), word(outDevice), word(outDiagnostic))
+
+  actual fun mln_gpu_device_wrap_web_gpu(context: Long, outDevice: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_gpu_device_wrap_web_gpu(word(context), word(outDevice), word(outDiagnostic))
 
   actual fun mln_http_header_transform_response_set_header(
     response: Long,
@@ -172,6 +211,23 @@ internal actual object C {
       map,
       word(sourceId),
       word(options),
+      word(completion),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_map_add_custom_layer(
+    map: Long,
+    layerId: Long,
+    beforeLayerId: Long,
+    host: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_add_custom_layer(
+      map,
+      word(layerId),
+      word(beforeLayerId),
+      word(host),
       word(completion),
       word(outDiagnostic),
     )
@@ -265,285 +321,18 @@ internal actual object C {
   ): Int =
     mln_kw_mln_map_apply_camera_delta(map, word(delta), word(completion), word(outDiagnostic))
 
-  actual fun mln_map_attach_android_hardware_buffer_ring(
+  actual fun mln_map_attach(
     map: Long,
-    descriptor: Long,
+    target: Long,
     device: Long,
     options: Long,
     outSession: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_map_attach_android_hardware_buffer_ring(
+    mln_kw_mln_map_attach(
       map,
-      word(descriptor),
-      device,
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_android_surface(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_android_surface(
-      map,
-      word(descriptor),
-      device,
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_dma_buf_ring(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_dma_buf_ring(
-      map,
-      word(descriptor),
-      device,
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_dxgi_shared_texture_ring(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_dxgi_shared_texture_ring(
-      map,
-      word(descriptor),
-      device,
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_io_surface_ring(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_io_surface_ring(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_metal_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_metal_borrowed_texture(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_metal_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_metal_surface(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_offscreen(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    device: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_offscreen(
-      map,
-      word(descriptor),
-      word(options),
-      device,
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_open_gl_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_open_gl_borrowed_texture(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_open_gl_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_open_gl_surface(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_vulkan_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_vulkan_borrowed_texture(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_vulkan_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_vulkan_surface(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_wayland_surface(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_wayland_surface(
-      map,
-      word(descriptor),
-      device,
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_web_gpu_borrowed_texture(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_web_gpu_borrowed_texture(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_web_gpu_surface(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_web_gpu_surface(
-      map,
-      word(descriptor),
-      word(options),
-      word(outSession),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_map_attach_win32_window(
-    map: Long,
-    descriptor: Long,
-    device: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_attach_win32_window(
-      map,
-      word(descriptor),
+      word(target),
       device,
       word(options),
       word(outSession),
@@ -1053,12 +842,8 @@ internal actual object C {
   actual fun mln_map_request_still_image(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_kw_mln_map_request_still_image(map, word(completion), word(outDiagnostic))
 
-  actual fun mln_map_resize(
-    map: Long,
-    logicalSize: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int = mln_kw_mln_map_resize(map, word(logicalSize), word(completion), word(outDiagnostic))
+  actual fun mln_map_resize(map: Long, extent: Long, completion: Long, outDiagnostic: Long): Int =
+    mln_kw_mln_map_resize(map, word(extent), word(completion), word(outDiagnostic))
 
   actual fun mln_map_set_bounds(
     map: Long,
@@ -1455,18 +1240,8 @@ internal actual object C {
   actual fun mln_network_set_status(status: Int, outDiagnostic: Long): Int =
     mln_kw_mln_network_set_status(status, word(outDiagnostic))
 
-  actual fun mln_offscreen_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_offscreen_device_create(word(options), word(outDevice), word(outDiagnostic))
-
-  actual fun mln_offscreen_device_release(device: Long) {
-    mln_kw_mln_offscreen_device_release(device)
-  }
-
   actual fun mln_open_gl_supported_context_provider_mask(): Int =
     mln_kw_mln_open_gl_supported_context_provider_mask()
-
-  actual fun mln_plugin_get_register_function_v1(): Long =
-    unsignedWord(mln_kw_mln_plugin_get_register_function_v1())
 
   actual fun mln_projected_meters_for_lat_lng(
     coordinate: Long,
@@ -1659,32 +1434,14 @@ internal actual object C {
 
   actual fun mln_render_session_resize(
     session: Long,
-    logicalSize: Long,
+    extent: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_render_session_resize(
-      session,
-      word(logicalSize),
-      word(completion),
-      word(outDiagnostic),
-    )
+    mln_kw_mln_render_session_resize(session, word(extent), word(completion), word(outDiagnostic))
 
   actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     mln_kw_mln_render_session_service_driver_work(session, word(outDiagnostic))
-
-  actual fun mln_render_session_set_android_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_set_android_surface_target(
-      session,
-      word(replacement),
-      word(completion),
-      word(outDiagnostic),
-    )
 
   actual fun mln_render_session_set_frame_pacer(
     session: Long,
@@ -1692,132 +1449,15 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_kw_mln_render_session_set_frame_pacer(session, pacer, word(outDiagnostic))
 
-  actual fun mln_render_session_set_metal_borrowed_texture_target(
+  actual fun mln_render_session_set_target(
     session: Long,
-    replacement: Long,
+    target: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_kw_mln_render_session_set_metal_borrowed_texture_target(
+    mln_kw_mln_render_session_set_target(
       session,
-      word(replacement),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_render_session_set_metal_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_set_metal_surface_target(
-      session,
-      word(replacement),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_render_session_set_open_gl_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_set_open_gl_borrowed_texture_target(
-      session,
-      word(replacement),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_render_session_set_open_gl_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_set_open_gl_surface_target(
-      session,
-      word(replacement),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_render_session_set_vulkan_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_set_vulkan_borrowed_texture_target(
-      session,
-      word(replacement),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_render_session_set_vulkan_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_set_vulkan_surface_target(
-      session,
-      word(replacement),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_render_session_set_wayland_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_set_wayland_surface_target(
-      session,
-      word(replacement),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_render_session_set_web_gpu_borrowed_texture_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_set_web_gpu_borrowed_texture_target(
-      session,
-      word(replacement),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_render_session_set_web_gpu_surface_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_set_web_gpu_surface_target(
-      session,
-      word(replacement),
-      word(completion),
-      word(outDiagnostic),
-    )
-
-  actual fun mln_render_session_set_win32_window_target(
-    session: Long,
-    replacement: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_render_session_set_win32_window_target(
-      session,
-      word(replacement),
+      word(target),
       word(completion),
       word(outDiagnostic),
     )
@@ -1895,12 +1535,7 @@ internal actual object C {
     mln_kw_mln_runtime_clear_resource_transform(runtime, word(completion), word(outDiagnostic))
 
   actual fun mln_runtime_create(options: Long, outRuntime: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_runtime_create(
-      ThreadStart.staged(),
-      word(options),
-      word(outRuntime),
-      word(outDiagnostic),
-    )
+    mln_kw_mln_runtime_create(word(options), word(outRuntime), word(outDiagnostic))
 
   actual fun mln_runtime_create_map(
     runtime: Long,
@@ -2173,124 +1808,137 @@ internal actual object C {
 
   actual fun mln_supported_render_backend_mask(): Int = mln_kw_mln_supported_render_backend_mask()
 
-  actual fun mln_vulkan_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_vulkan_device_create(word(options), word(outDevice), word(outDiagnostic))
+  actual fun mln_web_alloc(size: Long, align: Long): Long =
+    unsignedWord(mln_kw_mln_web_alloc(word(size), word(align)))
 
-  actual fun mln_vulkan_device_get_context(
-    device: Long,
-    outResult: Long,
-    outDiagnostic: Long,
-  ): Int = mln_kw_mln_vulkan_device_get_context(device, word(outResult), word(outDiagnostic))
+  actual fun mln_web_free(pointer: Long, size: Long, align: Long) {
+    mln_kw_mln_web_free(word(pointer), word(size), word(align))
+  }
 
-  actual fun mln_vulkan_device_release(device: Long) {
-    mln_kw_mln_vulkan_device_release(device)
+  actual fun mln_web_object_release(`object`: Int) {
+    mln_kw_mln_web_object_release(`object`)
   }
 }
 
 private fun mln_kw_mln_acquired_frame_discard(p0: Long, p1: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_discard(p0, p1)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_discard(p0, p1)")
 
 private fun mln_kw_mln_acquired_frame_get_android_hardware_buffer(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_android_hardware_buffer(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_android_hardware_buffer(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_get_dma_buf(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_dma_buf(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_dma_buf(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_get_dxgi_shared_texture(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_dxgi_shared_texture(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_dxgi_shared_texture(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_get_io_surface(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_io_surface(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_io_surface(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_get_metal_texture(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_metal_texture(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_metal_texture(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_acquired_frame_get_opaque_fd(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_opaque_fd(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_get_open_gl_texture(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_open_gl_texture(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_open_gl_texture(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_get_producer_sync(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_producer_sync(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_producer_sync(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_get_result(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_result(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_result(p0, p1, p2)")
 
 private fun mln_kw_mln_acquired_frame_get_vulkan_texture(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_vulkan_texture(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_vulkan_texture(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_get_web_gpu_texture(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_get_web_gpu_texture(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_web_gpu_texture(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_acquired_frame_release(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_release(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_release(p0, p1, p2)")
 
 private fun mln_kw_mln_acquired_frame_view_begin(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_view_begin(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_view_begin(p0, p1, p2)")
 
 private fun mln_kw_mln_acquired_frame_view_end(p0: Int): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_acquired_frame_view_end(p0)")
-
-private fun mln_kw_mln_android_frame_pacer_create(p0: Int, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_android_frame_pacer_create(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_view_end(p0)")
 
 private fun mln_kw_mln_android_init(p0: Int, p1: Int, p2: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_android_init(p0, p1, p2)")
-
-private fun mln_kw_mln_apple_frame_pacer_create(p0: Int, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_apple_frame_pacer_create(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_android_init(p0, p1, p2)")
 
 private fun mln_kw_mln_c_version(): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_c_version()")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_c_version()")
 
 private fun mln_kw_mln_camera_for_tile(p0: Int, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_camera_for_tile(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_camera_for_tile(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_delivery_queue_create(p0: Int, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_create(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_delivery_queue_create(p0, p1, p2)")
 
 private fun mln_kw_mln_delivery_queue_dispatch(p0: Long, p1: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_dispatch(p0, p1)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_delivery_queue_dispatch(p0, p1)")
 
 private fun mln_kw_mln_delivery_queue_release(p0: Long): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_delivery_queue_release(p0)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_delivery_queue_release(p0)")
+
+private fun mln_kw_mln_frame_pacer_create(p0: Int, p1: Int, p2: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_frame_pacer_create(p0, p1, p2)")
 
 private fun mln_kw_mln_frame_pacer_release(p0: Long): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_frame_pacer_release(p0)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_frame_pacer_release(p0)")
+
+private fun mln_kw_mln_frame_pacer_set_options(p0: Long, p1: Int, p2: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_frame_pacer_set_options(p0, p1, p2)")
+
+private fun mln_kw_mln_gpu_device_create(p0: Int, p1: Int, p2: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_create(p0, p1, p2)")
+
+private fun mln_kw_mln_gpu_device_get_capabilities(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_get_capabilities(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_gpu_device_get_vulkan_context(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_get_vulkan_context(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_gpu_device_release(p0: Long): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_release(p0)")
+
+private fun mln_kw_mln_gpu_device_wrap_metal(p0: Int, p1: Int, p2: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_wrap_metal(p0, p1, p2)")
+
+private fun mln_kw_mln_gpu_device_wrap_open_gl(p0: Int, p1: Int, p2: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_wrap_open_gl(p0, p1, p2)")
+
+private fun mln_kw_mln_gpu_device_wrap_vulkan(p0: Int, p1: Int, p2: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_wrap_vulkan(p0, p1, p2)")
+
+private fun mln_kw_mln_gpu_device_wrap_web_gpu(p0: Int, p1: Int, p2: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_wrap_web_gpu(p0, p1, p2)")
 
 private fun mln_kw_mln_http_header_transform_response_set_header(
   p0: Int,
@@ -2299,28 +1947,26 @@ private fun mln_kw_mln_http_header_transform_response_set_header(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_http_header_transform_response_set_header(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_http_header_transform_response_set_header(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_lat_lng_for_projected_meters(p0: Int, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_lat_lng_for_projected_meters(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_lat_lng_for_projected_meters(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_log_clear_callback(p0: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_log_clear_callback(p0)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_log_clear_callback(p0)")
 
 private fun mln_kw_mln_log_set_async_severity_mask(p0: Int, p1: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_log_set_async_severity_mask(p0, p1)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_log_set_async_severity_mask(p0, p1)")
 
 private fun mln_kw_mln_log_set_callback(p0: Int, p1: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_log_set_callback(p0, p1)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_log_set_callback(p0, p1)")
 
 private fun mln_kw_mln_logical_extent_physical_size(p0: Int, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_logical_extent_physical_size(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_logical_extent_physical_size(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_add_custom_geometry_source(
@@ -2331,7 +1977,19 @@ private fun mln_kw_mln_map_add_custom_geometry_source(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_custom_geometry_source(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_add_custom_geometry_source(p0, p1, p2, p3, p4)",
+  )
+
+private fun mln_kw_mln_map_add_custom_layer(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+  p4: Int,
+  p5: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_add_custom_layer(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_add_custom_vector_source(
@@ -2342,7 +2000,7 @@ private fun mln_kw_mln_map_add_custom_vector_source(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_custom_vector_source(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_add_custom_vector_source(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_add_geo_json_source(
@@ -2354,7 +2012,7 @@ private fun mln_kw_mln_map_add_geo_json_source(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_geo_json_source(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_add_geo_json_source(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_add_image_source_image(
@@ -2367,12 +2025,12 @@ private fun mln_kw_mln_map_add_image_source_image(
   p6: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_image_source_image(p0, p1, p2, p3, p4, p5, p6)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_add_image_source_image(p0, p1, p2, p3, p4, p5, p6)",
   )
 
 private fun mln_kw_mln_map_add_style_layer_json(p0: Long, p1: Int, p2: Int, p3: Int, p4: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_style_layer_json(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_add_style_layer_json(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_add_style_source_json(
@@ -2383,15 +2041,15 @@ private fun mln_kw_mln_map_add_style_source_json(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_add_style_source_json(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_add_style_source_json(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_apply_camera_delta(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_apply_camera_delta(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_apply_camera_delta(p0, p1, p2, p3)",
   )
 
-private fun mln_kw_mln_map_attach_android_hardware_buffer_ring(
+private fun mln_kw_mln_map_attach(
   p0: Long,
   p1: Int,
   p2: Long,
@@ -2401,203 +2059,15 @@ private fun mln_kw_mln_map_attach_android_hardware_buffer_ring(
   p6: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_android_hardware_buffer_ring(p0, p1, p2, p3, p4, p5, p6)",
-  )
-
-private fun mln_kw_mln_map_attach_android_surface(
-  p0: Long,
-  p1: Int,
-  p2: Long,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-  p6: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_android_surface(p0, p1, p2, p3, p4, p5, p6)",
-  )
-
-private fun mln_kw_mln_map_attach_dma_buf_ring(
-  p0: Long,
-  p1: Int,
-  p2: Long,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-  p6: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_dma_buf_ring(p0, p1, p2, p3, p4, p5, p6)",
-  )
-
-private fun mln_kw_mln_map_attach_dxgi_shared_texture_ring(
-  p0: Long,
-  p1: Int,
-  p2: Long,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-  p6: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_dxgi_shared_texture_ring(p0, p1, p2, p3, p4, p5, p6)",
-  )
-
-private fun mln_kw_mln_map_attach_io_surface_ring(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_io_surface_ring(p0, p1, p2, p3, p4, p5)",
-  )
-
-private fun mln_kw_mln_map_attach_metal_borrowed_texture(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_metal_borrowed_texture(p0, p1, p2, p3, p4, p5)",
-  )
-
-private fun mln_kw_mln_map_attach_metal_surface(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_metal_surface(p0, p1, p2, p3, p4, p5)",
-  )
-
-private fun mln_kw_mln_map_attach_offscreen(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Long,
-  p4: Int,
-  p5: Int,
-  p6: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_offscreen(p0, p1, p2, p3, p4, p5, p6)",
-  )
-
-private fun mln_kw_mln_map_attach_open_gl_borrowed_texture(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_open_gl_borrowed_texture(p0, p1, p2, p3, p4, p5)",
-  )
-
-private fun mln_kw_mln_map_attach_open_gl_surface(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_open_gl_surface(p0, p1, p2, p3, p4, p5)",
-  )
-
-private fun mln_kw_mln_map_attach_vulkan_borrowed_texture(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_vulkan_borrowed_texture(p0, p1, p2, p3, p4, p5)",
-  )
-
-private fun mln_kw_mln_map_attach_vulkan_surface(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_vulkan_surface(p0, p1, p2, p3, p4, p5)",
-  )
-
-private fun mln_kw_mln_map_attach_wayland_surface(
-  p0: Long,
-  p1: Int,
-  p2: Long,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-  p6: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_wayland_surface(p0, p1, p2, p3, p4, p5, p6)",
-  )
-
-private fun mln_kw_mln_map_attach_web_gpu_borrowed_texture(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_web_gpu_borrowed_texture(p0, p1, p2, p3, p4, p5)",
-  )
-
-private fun mln_kw_mln_map_attach_web_gpu_surface(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_web_gpu_surface(p0, p1, p2, p3, p4, p5)",
-  )
-
-private fun mln_kw_mln_map_attach_win32_window(
-  p0: Long,
-  p1: Int,
-  p2: Long,
-  p3: Int,
-  p4: Int,
-  p5: Int,
-  p6: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_attach_win32_window(p0, p1, p2, p3, p4, p5, p6)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_attach(p0, p1, p2, p3, p4, p5, p6)",
   )
 
 private fun mln_kw_mln_map_begin_command_group(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_begin_command_group(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_begin_command_group(p0, p1, p2)")
 
 private fun mln_kw_mln_map_camera_for_geometry(p0: Long, p1: Int, p2: Int, p3: Int, p4: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_camera_for_geometry(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_camera_for_geometry(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_camera_for_lat_lng_bounds(
@@ -2608,7 +2078,7 @@ private fun mln_kw_mln_map_camera_for_lat_lng_bounds(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_camera_for_lat_lng_bounds(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_camera_for_lat_lng_bounds(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_camera_for_lat_lngs(
@@ -2620,12 +2090,12 @@ private fun mln_kw_mln_map_camera_for_lat_lngs(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_camera_for_lat_lngs(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_camera_for_lat_lngs(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_cancel_camera_transitions(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_cancel_camera_transitions(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_cancel_camera_transitions(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_map_cancel_camera_transitions_with_id(
@@ -2635,21 +2105,17 @@ private fun mln_kw_mln_map_cancel_camera_transitions_with_id(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_cancel_camera_transitions_with_id(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_cancel_camera_transitions_with_id(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_dispose(p0: Long, p1: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_dispose(p0, p1)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_dispose(p0, p1)")
 
 private fun mln_kw_mln_map_dump_debug_logs(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_dump_debug_logs(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_dump_debug_logs(p0, p1, p2)")
 
 private fun mln_kw_mln_map_end_command_group(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_end_command_group(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_end_command_group(p0, p1, p2)")
 
 private fun mln_kw_mln_map_fit_camera_to_geometry(
   p0: Long,
@@ -2659,7 +2125,7 @@ private fun mln_kw_mln_map_fit_camera_to_geometry(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_fit_camera_to_geometry(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_fit_camera_to_geometry(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_fit_camera_to_lat_lng_bounds(
@@ -2670,7 +2136,7 @@ private fun mln_kw_mln_map_fit_camera_to_lat_lng_bounds(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_fit_camera_to_lat_lng_bounds(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_fit_camera_to_lat_lng_bounds(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_fit_camera_to_lat_lngs(
@@ -2682,48 +2148,38 @@ private fun mln_kw_mln_map_fit_camera_to_lat_lngs(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_fit_camera_to_lat_lngs(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_fit_camera_to_lat_lngs(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_get_camera(p0: Long, p1: Int, p2: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_camera(p0, p1, p2)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_camera(p0, p1, p2)")
 
 private fun mln_kw_mln_map_get_feature_state(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_feature_state(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_feature_state(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_get_global_state(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_global_state(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_global_state(p0, p1, p2)")
 
 private fun mln_kw_mln_map_get_image_source_coordinates(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_image_source_coordinates(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_image_source_coordinates(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_get_loaded_style_json(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_loaded_style_json(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_loaded_style_json(p0, p1, p2)")
 
 private fun mln_kw_mln_map_get_snapshot(p0: Long, p1: Int, p2: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_snapshot(p0, p1, p2)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_snapshot(p0, p1, p2)")
 
 private fun mln_kw_mln_map_get_style_image(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_image(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_style_image(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_get_style_layer(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_layer(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_style_layer(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_get_style_layer_json(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_layer_json(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_style_layer_json(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_get_style_layer_property(
@@ -2734,31 +2190,29 @@ private fun mln_kw_mln_map_get_style_layer_property(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_layer_property(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_style_layer_property(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_get_style_light_property(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_light_property(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_style_light_property(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_get_style_root_property(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_root_property(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_style_root_property(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_get_style_source(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_source(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_style_source(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_get_style_transition_options(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_transition_options(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_style_transition_options(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_map_get_style_url(p0: Long, p1: Int, p2: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_get_style_url(p0, p1, p2)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_get_style_url(p0, p1, p2)")
 
 private fun mln_kw_mln_map_invalidate_custom_geometry_source_region(
   p0: Long,
@@ -2768,7 +2222,7 @@ private fun mln_kw_mln_map_invalidate_custom_geometry_source_region(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_invalidate_custom_geometry_source_region(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_invalidate_custom_geometry_source_region(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_invalidate_custom_geometry_source_tile(
@@ -2779,7 +2233,7 @@ private fun mln_kw_mln_map_invalidate_custom_geometry_source_tile(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_invalidate_custom_geometry_source_tile(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_invalidate_custom_geometry_source_tile(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_invalidate_custom_vector_source_region(
@@ -2790,7 +2244,7 @@ private fun mln_kw_mln_map_invalidate_custom_vector_source_region(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_invalidate_custom_vector_source_region(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_invalidate_custom_vector_source_region(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_invalidate_custom_vector_source_tile(
@@ -2801,38 +2255,30 @@ private fun mln_kw_mln_map_invalidate_custom_vector_source_tile(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_invalidate_custom_vector_source_tile(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_invalidate_custom_vector_source_tile(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_lat_lng_bounds_for_camera(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_lat_lng_bounds_for_camera(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_lat_lng_bounds_for_camera(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_list_style_layers(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_list_style_layers(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_list_style_layers(p0, p1, p2)")
 
 private fun mln_kw_mln_map_list_style_sources(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_list_style_sources(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_list_style_sources(p0, p1, p2)")
 
 private fun mln_kw_mln_map_move_style_layer(p0: Long, p1: Int, p2: Int, p3: Int, p4: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_move_style_layer(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_move_style_layer(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_projection_create(p0: Int, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_create(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_create(p0, p1, p2)")
 
 private fun mln_kw_mln_map_projection_get_camera(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_get_camera(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_get_camera(p0, p1, p2)")
 
 private fun mln_kw_mln_map_projection_is_location_occluded(
   p0: Long,
@@ -2841,12 +2287,12 @@ private fun mln_kw_mln_map_projection_is_location_occluded(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_is_location_occluded(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_is_location_occluded(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_projection_lat_lng_for_pixel(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_lat_lng_for_pixel(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_lat_lng_for_pixel(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_projection_lat_lng_for_pixel_unwrapped(
@@ -2856,7 +2302,7 @@ private fun mln_kw_mln_map_projection_lat_lng_for_pixel_unwrapped(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_lat_lng_for_pixel_unwrapped(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_lat_lng_for_pixel_unwrapped(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_projection_lat_lngs_for_pixels(
@@ -2867,7 +2313,7 @@ private fun mln_kw_mln_map_projection_lat_lngs_for_pixels(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_lat_lngs_for_pixels(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_lat_lngs_for_pixels(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_projection_lat_lngs_for_pixels_unwrapped(
@@ -2878,7 +2324,7 @@ private fun mln_kw_mln_map_projection_lat_lngs_for_pixels_unwrapped(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_lat_lngs_for_pixels_unwrapped(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_lat_lngs_for_pixels_unwrapped(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_projection_meters_per_pixel_at_latitude(
@@ -2888,12 +2334,12 @@ private fun mln_kw_mln_map_projection_meters_per_pixel_at_latitude(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_meters_per_pixel_at_latitude(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_meters_per_pixel_at_latitude(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_projection_pixel_for_lat_lng(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_pixel_for_lat_lng(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_pixel_for_lat_lng(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_projection_pixels_for_lat_lngs(
@@ -2904,57 +2350,49 @@ private fun mln_kw_mln_map_projection_pixels_for_lat_lngs(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_pixels_for_lat_lngs(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_pixels_for_lat_lngs(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_projection_release(p0: Long): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_release(p0)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_release(p0)")
 
 private fun mln_kw_mln_map_projection_set_camera(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_projection_set_camera(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_set_camera(p0, p1, p2)")
 
 private fun mln_kw_mln_map_release(p0: Long, p1: Int, p2: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_release(p0, p1, p2)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_release(p0, p1, p2)")
 
 private fun mln_kw_mln_map_remove_feature_state(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_remove_feature_state(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_remove_feature_state(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_remove_style_image(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_remove_style_image(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_remove_style_image(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_remove_style_layer(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_remove_style_layer(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_remove_style_layer(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_remove_style_source(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_remove_style_source(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_remove_style_source(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_request_repaint(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_request_repaint(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_request_repaint(p0, p1, p2)")
 
 private fun mln_kw_mln_map_request_still_image(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_request_still_image(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_request_still_image(p0, p1, p2)")
 
 private fun mln_kw_mln_map_resize(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_resize(p0, p1, p2, p3)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_resize(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_set_bounds(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_bounds(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_bounds(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_set_custom_geometry_source_tile_data(
   p0: Long,
@@ -2965,7 +2403,7 @@ private fun mln_kw_mln_map_set_custom_geometry_source_tile_data(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_geometry_source_tile_data(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_custom_geometry_source_tile_data(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_set_custom_geometry_source_tile_error(
@@ -2977,7 +2415,7 @@ private fun mln_kw_mln_map_set_custom_geometry_source_tile_error(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_geometry_source_tile_error(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_custom_geometry_source_tile_error(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_set_custom_vector_source_tile_data(
@@ -2990,7 +2428,7 @@ private fun mln_kw_mln_map_set_custom_vector_source_tile_data(
   p6: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_vector_source_tile_data(p0, p1, p2, p3, p4, p5, p6)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_custom_vector_source_tile_data(p0, p1, p2, p3, p4, p5, p6)",
   )
 
 private fun mln_kw_mln_map_set_custom_vector_source_tile_error(
@@ -3002,27 +2440,23 @@ private fun mln_kw_mln_map_set_custom_vector_source_tile_error(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_custom_vector_source_tile_error(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_custom_vector_source_tile_error(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_set_debug_flags(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_debug_flags(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_debug_flags(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_set_event_mask(p0: Long, p1: Long, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_event_mask(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_event_mask(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_set_feature_state(p0: Long, p1: Int, p2: Int, p3: Int, p4: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_feature_state(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_feature_state(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_free_camera_options(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_free_camera_options(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_free_camera_options(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_set_geo_json_source_data(
@@ -3033,7 +2467,7 @@ private fun mln_kw_mln_map_set_geo_json_source_data(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geo_json_source_data(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_geo_json_source_data(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_geo_json_source_synchronous_tiling(
@@ -3044,7 +2478,7 @@ private fun mln_kw_mln_map_set_geo_json_source_synchronous_tiling(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geo_json_source_synchronous_tiling(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_geo_json_source_synchronous_tiling(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_geo_json_source_url(
@@ -3055,7 +2489,7 @@ private fun mln_kw_mln_map_set_geo_json_source_url(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_geo_json_source_url(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_geo_json_source_url(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_global_state_property(
@@ -3066,7 +2500,7 @@ private fun mln_kw_mln_map_set_global_state_property(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_global_state_property(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_global_state_property(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_globe_free_bearing_enabled(
@@ -3076,7 +2510,7 @@ private fun mln_kw_mln_map_set_globe_free_bearing_enabled(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_globe_free_bearing_enabled(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_globe_free_bearing_enabled(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_set_image_source_coordinates(
@@ -3088,7 +2522,7 @@ private fun mln_kw_mln_map_set_image_source_coordinates(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_image_source_coordinates(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_image_source_coordinates(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_set_image_source_image(
@@ -3099,17 +2533,17 @@ private fun mln_kw_mln_map_set_image_source_image(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_image_source_image(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_image_source_image(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_image_source_url(p0: Long, p1: Int, p2: Int, p3: Int, p4: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_image_source_url(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_image_source_url(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_projection_mode(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_projection_mode(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_projection_mode(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_set_rendering_stats_view_enabled(
@@ -3119,7 +2553,7 @@ private fun mln_kw_mln_map_set_rendering_stats_view_enabled(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_rendering_stats_view_enabled(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_rendering_stats_view_enabled(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_set_style_image(
@@ -3131,13 +2565,11 @@ private fun mln_kw_mln_map_set_style_image(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_image(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_style_image(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_set_style_json(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_json(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_style_json(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_set_style_layer_property(
   p0: Long,
@@ -3148,7 +2580,7 @@ private fun mln_kw_mln_map_set_style_layer_property(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_layer_property(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_style_layer_property(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_map_set_style_light_property(
@@ -3159,7 +2591,7 @@ private fun mln_kw_mln_map_set_style_light_property(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_light_property(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_style_light_property(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_style_root_property(
@@ -3170,7 +2602,7 @@ private fun mln_kw_mln_map_set_style_root_property(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_root_property(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_style_root_property(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_style_source_volatile(
@@ -3181,102 +2613,71 @@ private fun mln_kw_mln_map_set_style_source_volatile(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_source_volatile(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_style_source_volatile(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_map_set_style_transition_options(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_transition_options(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_style_transition_options(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_set_style_url(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_style_url(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_style_url(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_set_tile_options(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_tile_options(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_tile_options(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_set_viewport_options(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_set_viewport_options(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_viewport_options(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_update_camera(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_map_update_camera(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_update_camera(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_network_get_status(p0: Int, p1: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_network_get_status(p0, p1)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_network_get_status(p0, p1)")
 
 private fun mln_kw_mln_network_set_status(p0: Int, p1: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_network_set_status(p0, p1)")
-
-private fun mln_kw_mln_offscreen_device_create(p0: Int, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_offscreen_device_create(p0, p1, p2)",
-  )
-
-private fun mln_kw_mln_offscreen_device_release(p0: Long): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_offscreen_device_release(p0)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_network_set_status(p0, p1)")
 
 private fun mln_kw_mln_open_gl_supported_context_provider_mask(): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_open_gl_supported_context_provider_mask()",
-  )
-
-private fun mln_kw_mln_plugin_get_register_function_v1(): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_plugin_get_register_function_v1()",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_open_gl_supported_context_provider_mask()",
   )
 
 private fun mln_kw_mln_projected_meters_for_lat_lng(p0: Int, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_projected_meters_for_lat_lng(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_projected_meters_for_lat_lng(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_frame_batch_release(p0: Long): Unit =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_frame_batch_release(p0)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_frame_batch_release(p0)")
 
 private fun mln_kw_mln_render_session_abandon(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_abandon(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_abandon(p0, p1, p2)")
 
 private fun mln_kw_mln_render_session_acquire_frame(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_acquire_frame(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_acquire_frame(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_barrier(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_barrier(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_barrier(p0, p1, p2)")
 
 private fun mln_kw_mln_render_session_clear_data(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_clear_data(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_clear_data(p0, p1, p2)")
 
 private fun mln_kw_mln_render_session_demand_frame(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_demand_frame(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_demand_frame(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_detach(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_detach(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_detach(p0, p1, p2)")
 
 private fun mln_kw_mln_render_session_dispose(p0: Long, p1: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_dispose(p0, p1)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_dispose(p0, p1)")
 
 private fun mln_kw_mln_render_session_drain_frame_results(
   p0: Long,
@@ -3285,17 +2686,17 @@ private fun mln_kw_mln_render_session_drain_frame_results(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_drain_frame_results(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_drain_frame_results(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_render_session_dump_debug_logs(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_dump_debug_logs(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_dump_debug_logs(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_get_capabilities(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_capabilities(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_get_capabilities(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_get_cluster_children(
@@ -3306,7 +2707,7 @@ private fun mln_kw_mln_render_session_get_cluster_children(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_cluster_children(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_get_cluster_children(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_render_session_get_cluster_expansion_zoom(
@@ -3317,7 +2718,7 @@ private fun mln_kw_mln_render_session_get_cluster_expansion_zoom(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_cluster_expansion_zoom(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_get_cluster_expansion_zoom(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_render_session_get_cluster_leaves(
@@ -3330,7 +2731,7 @@ private fun mln_kw_mln_render_session_get_cluster_leaves(
   p6: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_cluster_leaves(p0, p1, p2, p3, p4, p5, p6)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_get_cluster_leaves(p0, p1, p2, p3, p4, p5, p6)",
   )
 
 private fun mln_kw_mln_render_session_get_failure(
@@ -3341,12 +2742,12 @@ private fun mln_kw_mln_render_session_get_failure(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_failure(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_get_failure(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_render_session_get_snapshot(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_get_snapshot(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_get_snapshot(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_query_rendered_features(
@@ -3357,7 +2758,7 @@ private fun mln_kw_mln_render_session_query_rendered_features(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_query_rendered_features(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_query_rendered_features(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_render_session_query_source_features(
@@ -3368,171 +2769,58 @@ private fun mln_kw_mln_render_session_query_source_features(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_query_source_features(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_query_source_features(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_render_session_read_texture(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_read_texture(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_read_texture(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_reduce_memory_use(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_reduce_memory_use(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_reduce_memory_use(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_release(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_release(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_release(p0, p1, p2)")
 
 private fun mln_kw_mln_render_session_release_target(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_release_target(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_release_target(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_resize(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_resize(p0, p1, p2, p3)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_resize(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_render_session_service_driver_work(p0: Long, p1: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_service_driver_work(p0, p1)",
-  )
-
-private fun mln_kw_mln_render_session_set_android_surface_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_android_surface_target(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_service_driver_work(p0, p1)",
   )
 
 private fun mln_kw_mln_render_session_set_frame_pacer(p0: Long, p1: Long, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_frame_pacer(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_set_frame_pacer(p0, p1, p2)",
   )
 
-private fun mln_kw_mln_render_session_set_metal_borrowed_texture_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
+private fun mln_kw_mln_render_session_set_target(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_metal_borrowed_texture_target(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_render_session_set_metal_surface_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_metal_surface_target(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_render_session_set_open_gl_borrowed_texture_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_open_gl_borrowed_texture_target(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_render_session_set_open_gl_surface_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_open_gl_surface_target(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_render_session_set_vulkan_borrowed_texture_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_vulkan_borrowed_texture_target(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_render_session_set_vulkan_surface_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_vulkan_surface_target(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_render_session_set_wayland_surface_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_wayland_surface_target(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_render_session_set_web_gpu_borrowed_texture_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_web_gpu_borrowed_texture_target(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_render_session_set_web_gpu_surface_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_web_gpu_surface_target(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_render_session_set_win32_window_target(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_render_session_set_win32_window_target(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_set_target(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_resource_request_complete(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_request_complete(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_resource_request_complete(p0, p1, p2)")
 
 private fun mln_kw_mln_resource_request_is_cancelled(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_request_is_cancelled(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_resource_request_is_cancelled(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_resource_request_pass_through(p0: Long, p1: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_request_pass_through(p0, p1)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_resource_request_pass_through(p0, p1)")
 
 private fun mln_kw_mln_resource_request_release(p0: Long): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_request_release(p0)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_resource_request_release(p0)")
 
 private fun mln_kw_mln_resource_request_set_cancel_callback(
   p0: Long,
@@ -3541,52 +2829,50 @@ private fun mln_kw_mln_resource_request_set_cancel_callback(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_request_set_cancel_callback(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_resource_request_set_cancel_callback(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_resource_transform_request_complete(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_transform_request_complete(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_resource_transform_request_complete(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_resource_transform_request_fail(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_transform_request_fail(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_resource_transform_request_fail(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_resource_transform_request_release(p0: Long): Unit =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_resource_transform_request_release(p0)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_resource_transform_request_release(p0)",
   )
 
 private fun mln_kw_mln_runtime_clear_event_handler(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_clear_event_handler(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_clear_event_handler(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_runtime_clear_http_header_transform(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_clear_http_header_transform(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_clear_http_header_transform(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_runtime_clear_resource_provider(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_clear_resource_provider(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_clear_resource_provider(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_runtime_clear_resource_transform(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_clear_resource_transform(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_clear_resource_transform(p0, p1, p2)",
   )
 
-private fun mln_kw_mln_runtime_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_create(p0, p1, p2, p3)",
-  )
+private fun mln_kw_mln_runtime_create(p0: Int, p1: Int, p2: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_create(p0, p1, p2)")
 
 private fun mln_kw_mln_runtime_create_map(p0: Long, p1: Int, p2: Int, p3: Int, p4: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_create_map(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_create_map(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_runtime_create_offline_region(
@@ -3598,20 +2884,20 @@ private fun mln_kw_mln_runtime_create_offline_region(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_create_offline_region(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_create_offline_region(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_runtime_delete_offline_region(p0: Long, p1: Long, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_delete_offline_region(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_delete_offline_region(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_dispose(p0: Long, p1: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_dispose(p0, p1)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_dispose(p0, p1)")
 
 private fun mln_kw_mln_runtime_get_offline_region(p0: Long, p1: Long, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_get_offline_region(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_get_offline_region(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_get_offline_region_status(
@@ -3621,7 +2907,7 @@ private fun mln_kw_mln_runtime_get_offline_region_status(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_get_offline_region_status(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_get_offline_region_status(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_invalidate_offline_region(
@@ -3631,21 +2917,21 @@ private fun mln_kw_mln_runtime_invalidate_offline_region(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_invalidate_offline_region(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_invalidate_offline_region(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_list_offline_regions(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_list_offline_regions(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_list_offline_regions(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_runtime_merge_offline_regions(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_merge_offline_regions(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_merge_offline_regions(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_release(p0: Long, p1: Int, p2: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_release(p0, p1, p2)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_release(p0, p1, p2)")
 
 private fun mln_kw_mln_runtime_run_cache_database_operation(
   p0: Long,
@@ -3654,17 +2940,17 @@ private fun mln_kw_mln_runtime_run_cache_database_operation(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_run_cache_database_operation(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_run_cache_database_operation(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_set_event_handler(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_set_event_handler(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_set_event_handler(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_set_http_header_transform(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_set_http_header_transform(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_set_http_header_transform(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_set_maximum_ambient_cache_size(
@@ -3674,7 +2960,7 @@ private fun mln_kw_mln_runtime_set_maximum_ambient_cache_size(
   p3: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_set_maximum_ambient_cache_size(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_set_maximum_ambient_cache_size(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_set_offline_region_download_state(
@@ -3685,7 +2971,7 @@ private fun mln_kw_mln_runtime_set_offline_region_download_state(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_set_offline_region_download_state(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_set_offline_region_download_state(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_runtime_set_offline_region_observed(
@@ -3696,17 +2982,17 @@ private fun mln_kw_mln_runtime_set_offline_region_observed(
   p4: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_set_offline_region_observed(p0, p1, p2, p3, p4)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_set_offline_region_observed(p0, p1, p2, p3, p4)",
   )
 
 private fun mln_kw_mln_runtime_set_resource_provider(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_set_resource_provider(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_set_resource_provider(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_set_resource_transform(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_set_resource_transform(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_set_resource_transform(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_update_offline_region_metadata(
@@ -3718,12 +3004,12 @@ private fun mln_kw_mln_runtime_update_offline_region_metadata(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_runtime_update_offline_region_metadata(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_update_offline_region_metadata(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_style_expression_create(p0: Int, p1: Int, p2: Int, p3: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_create(p0, p1, p2, p3)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_style_expression_create(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_style_expression_evaluate(
@@ -3735,31 +3021,23 @@ private fun mln_kw_mln_style_expression_evaluate(
   p5: Int,
 ): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_evaluate(p0, p1, p2, p3, p4, p5)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_style_expression_evaluate(p0, p1, p2, p3, p4, p5)",
   )
 
 private fun mln_kw_mln_style_expression_get_info(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_get_info(p0, p1, p2)",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_style_expression_get_info(p0, p1, p2)")
 
 private fun mln_kw_mln_style_expression_release(p0: Long): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_style_expression_release(p0)")
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_style_expression_release(p0)")
 
 private fun mln_kw_mln_supported_render_backend_mask(): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_supported_render_backend_mask()",
-  )
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_supported_render_backend_mask()")
 
-private fun mln_kw_mln_vulkan_device_create(p0: Int, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_vulkan_device_create(p0, p1, p2)",
-  )
+private fun mln_kw_mln_web_alloc(p0: Int, p1: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_web_alloc(p0, p1)")
 
-private fun mln_kw_mln_vulkan_device_get_context(p0: Long, p1: Int, p2: Int): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_vulkan_device_get_context(p0, p1, p2)",
-  )
+private fun mln_kw_mln_web_free(p0: Int, p1: Int, p2: Int): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_web_free(p0, p1, p2)")
 
-private fun mln_kw_mln_vulkan_device_release(p0: Long): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')]._mln_kw_mln_vulkan_device_release(p0)")
+private fun mln_kw_mln_web_object_release(p0: Int): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_web_object_release(p0)")

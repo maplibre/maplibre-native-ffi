@@ -180,7 +180,21 @@ public extension MapHandle {
   /// Renders a still image of a static or tile map.
   ///
   /// The map's render session draws the image once every resource that the
-  /// image needs has loaded.
+  /// image needs has loaded. While the image waits, the session holds a demand
+  /// of its own for it, whose frame result carries
+  /// `frameDemandTokenStillImage`:
+  ///
+  /// - It waits for the map to load what the image needs, and while every
+  ///   texture of a borrowed ring holds a frame.
+  /// - It finishes with the image's frame, and the image completes once that
+  ///   frame's result is queued. Frames of your own demands complete no image.
+  /// - Your demands never replace it, nor it them.
+  /// - `RenderSessionHandle.barrier()` ends it with `RenderResult.noUpdate`,
+  ///   and a detach or `RenderSessionHandle.releaseTarget()` ends it with
+  ///   `RenderResult.targetNotReady`. The image gets a new demand once the
+  ///   barrier runs, the session has a target again, or the next session
+  ///   attaches.
+  /// - An image that fails ends its demand with `RenderResult.noUpdate`.
   ///
   /// See `mln_map_request_still_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -200,10 +214,11 @@ public extension MapHandle {
     }
   }
 
-  /// Sets the map's size.
+  /// Sets the map's size and scale factor.
   ///
-  /// A map with a render session takes its size from the session, so resize the
-  /// session with `RenderSessionHandle.resize()` instead.
+  /// The map keeps its loaded tiles. A map with a render session takes its size
+  /// and scale factor from the session, so resize the session with
+  /// `RenderSessionHandle.resize()` instead.
   ///
   /// See `mln_map_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -214,7 +229,7 @@ public extension MapHandle {
   /// - `Status.invalidState` when a render session attached to the map before
   ///   the resize applied.
   @discardableResult
-  func resize(logicalSize bindingArg0: LogicalSize) async throws
+  func resize(extent bindingArg0: LogicalExtent) async throws
     -> CommandCompletion
   {
     try await nativeCommand { raw, _, completion, diagnostic in mln_map_resize(
@@ -370,7 +385,7 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func resize(logicalSize bindingArg0: LogicalSize) throws {
+  func resize(extent bindingArg0: LogicalExtent) throws {
     try owner.nativeInvoke { raw, _, diagnostic in mln_map_resize(
       raw,
       bindingArg0.nativeValue(),

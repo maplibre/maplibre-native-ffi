@@ -93,10 +93,16 @@ static void on_frame_wake(void* user_data) {
 // #endregion frame-wake
 
 // #region resize
-static void on_window_resized(uint32_t width, uint32_t height) {
-  // The window's new size in logical pixels.
-  const mln_logical_size size = {.width = width, .height = height};
-  mln_render_session_resize(session, size, NULL, NULL);
+// Runs when the window changes size, or moves to a display with
+// another scale factor.
+static void on_window_resized(
+  uint32_t width, uint32_t height, double scale_factor
+) {
+  // The window's new size in logical pixels, and its scale factor.
+  const mln_logical_extent extent = {
+    .width = width, .height = height, .scale_factor = scale_factor
+  };
+  mln_render_session_resize(session, extent, NULL, NULL);
 }
 // #endregion resize
 
@@ -123,45 +129,44 @@ void mln_doc_window_surface_lost(void) {
 }
 
 void mln_doc_window_surface_restored(
-  mln_vulkan_non_dispatchable_handle new_surface
+  void* display, void* new_surface
 );
 
 void mln_doc_window_surface_restored(
-  mln_vulkan_non_dispatchable_handle new_surface
+  void* display, void* new_surface
 ) {
   // #region lost-surface
-  const mln_vulkan_surface_replacement replacement = {
-    .size = sizeof(mln_vulkan_surface_replacement),
-    .logical_size = {.width = 800, .height = 600},
-    .surface = new_surface,
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE,
+    .data.wayland_surface = {
+      .logical_size = {.width = 800, .height = 600},
+      .display = display,
+      .surface = new_surface,
+    },
   };
-  mln_render_session_set_vulkan_surface_target(
-    session, &replacement, &done, NULL
-  );
+  mln_render_session_set_target(session, &target, &done, NULL);
   // #endregion lost-surface
   wait_for_done();
 }
 
-void mln_doc_window(
-  mln_map map, mln_vulkan_context_descriptor vulkan,
-  mln_vulkan_non_dispatchable_handle window_surface
-);
+void mln_doc_window(mln_map map, void* display, void* window_surface);
 
 void mln_doc_window(
-  mln_map map, mln_vulkan_context_descriptor vulkan,
-  mln_vulkan_non_dispatchable_handle window_surface
+  mln_map map, void* display, void* window_surface
 ) {
   // #region attach
-  const mln_vulkan_surface_descriptor surface = {
-    .size = sizeof(mln_vulkan_surface_descriptor),
-    // The window's size in logical pixels. The map's scale factor
-    // turns it into pixels.
-    .logical_size = {.width = 800, .height = 600},
-    // Your VkInstance, VkPhysicalDevice,
-    // VkDevice, and graphics VkQueue.
-    .context = vulkan,
-    // Your VkSurfaceKHR.
-    .surface = window_surface,
+  const mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE,
+    .data.wayland_surface = {
+      // The window's size in logical pixels. The map's scale factor
+      // turns it into pixels.
+      .logical_size = {.width = 800, .height = 600},
+      // Your wl_display and wl_surface.
+      .display = display,
+      .surface = window_surface,
+    },
   };
   const mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options),
@@ -170,13 +175,15 @@ void mln_doc_window(
     .frame_wake = {.callback = on_frame_wake},
   };
 
-  mln_map_attach_vulkan_surface(
-    map, &surface, &options, &session, &done, NULL
+  // With no device, the session creates one on the platform's
+  // own backend.
+  mln_map_attach(
+    map, &target, MLN_HANDLE_NULL, &options, &session, &done, NULL
   );
   // #endregion attach
   wait_for_done();
 
-  on_window_resized(1024, 768);
+  on_window_resized(1024, 768, 2.0);
 
   // #region service
   const mln_render_session_attach_options graphics_thread_options = {
@@ -192,5 +199,5 @@ void mln_doc_window(
   mln_render_session_release(session, &done, NULL);
   wait_for_done();
 
-  destroy_surface();  // For example, with vkDestroySurfaceKHR.
+  destroy_surface();  // For example, with wl_surface_destroy.
 }

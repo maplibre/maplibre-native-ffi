@@ -1,7 +1,7 @@
 # Opt in with `mise -E msys2` after installing MSYS2's MINGW64 (x64) or
 # CLANGARM64 toolchain. Project tasks still run in Git Bash.
 [vars]
-host_native_preset = "mingw-{{ arch() }}-wgl"
+host_native_preset = "mingw-{{ arch() }}"
 
 [env]
 # This toolchain uses no Visual Studio environment.

@@ -58,7 +58,11 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// </summary>
     /// <remarks>
     /// <para>Because your GPU may still read the frame's texture, the session
-    /// never renders into that texture again.</para>
+    /// never renders into that texture again, even when
+    /// <c>RenderSessionHandle.SetTargetAsync()</c> gives it the texture again,
+    /// until <c>RenderSessionHandle.ReleaseTargetAsync()</c> releases the ring.
+    /// A view that is open on the frame keeps the frame's sync objects in place
+    /// until it ends.</para>
     /// <para>See <c>mln_acquired_frame_discard</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -68,7 +72,7 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
-    /// Gets the Android hardware buffer of an acquired frame.
+    /// Gets the Android hardware buffer of an exported ring's acquired frame.
     /// </summary>
     /// <remarks>
     /// <para>Wait for <c>AcquiredFrameHandle.WithProducerSync()</c> before you
@@ -78,9 +82,11 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// contents.</para>
     /// <para>See <c>mln_acquired_frame_get_android_hardware_buffer</c> in the
     /// <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html">C API reference</see>.</para>
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the session's ring
+    /// shares its textures in another way.</description></item>
     /// <item><description><c>Status.TargetLost</c> when the session failed, or
     /// you detached, abandoned, or disposed it.</description></item>
     /// </list>
@@ -121,7 +127,7 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
-    /// Gets the dmabuf of an acquired frame.
+    /// Gets the dmabuf of an exported ring's acquired frame.
     /// </summary>
     /// <remarks>
     /// <para>Wait for <c>AcquiredFrameHandle.WithProducerSync()</c> before you
@@ -134,9 +140,11 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// file descriptor with <c>dup</c>. A duplicate keeps the buffer's memory,
     /// but not its contents.</para>
     /// <para>See <c>mln_acquired_frame_get_dma_buf</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html">C API reference</see>.</para>
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the session's ring
+    /// shares its textures in another way.</description></item>
     /// <item><description><c>Status.TargetLost</c> when the session failed, or
     /// you detached, abandoned, or disposed it.</description></item>
     /// </list>
@@ -163,7 +171,7 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
-    /// Gets the DXGI shared texture of an acquired frame.
+    /// Gets the DXGI shared texture of an exported ring's acquired frame.
     /// </summary>
     /// <remarks>
     /// <para>Wait for <c>AcquiredFrameHandle.WithProducerSync()</c> before you
@@ -176,9 +184,11 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// after you release the frame, duplicate it with
     /// <c>DuplicateHandle</c>.</para>
     /// <para>See <c>mln_acquired_frame_get_dxgi_shared_texture</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html">C API reference</see>.</para>
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the session's ring
+    /// shares its textures in another way.</description></item>
     /// <item><description><c>Status.TargetLost</c> when the session failed, or
     /// you detached, abandoned, or disposed it.</description></item>
     /// </list>
@@ -216,7 +226,7 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
-    /// Gets the IOSurface of an acquired frame.
+    /// Gets the IOSurface of an exported ring's acquired frame.
     /// </summary>
     /// <remarks>
     /// <para>Wait for <c>AcquiredFrameHandle.WithProducerSync()</c> before you
@@ -227,9 +237,11 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// <c>CFRetain</c>, or a pixel buffer that wraps the surface, keeps the
     /// surface's memory, but not its contents.</para>
     /// <para>See <c>mln_acquired_frame_get_io_surface</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html">C API reference</see>.</para>
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the session's ring
+    /// shares its textures in another way.</description></item>
     /// <item><description><c>Status.TargetLost</c> when the session failed, or
     /// you detached, abandoned, or disposed it.</description></item>
     /// </list>
@@ -262,6 +274,12 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// Gets the Metal texture of an acquired frame.
     /// </summary>
     /// <remarks>
+    /// <para>It gets a borrowed ring's texture, or an exported ring's on a
+    /// Metal device: the texture of the IOSurface that
+    /// <c>AcquiredFrameHandle.WithIoSurface()</c> gets, and the frame's depth
+    /// texture with <c>RenderSessionAttachOptions.KeepDepth</c>. Wait for
+    /// <c>AcquiredFrameHandle.WithProducerSync()</c> before you use
+    /// them.</para>
     /// <para>See <c>mln_acquired_frame_get_metal_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -297,9 +315,61 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     }
 
     /// <summary>
+    /// Gets the memory of an exported ring's acquired frame, as an opaque file
+    /// descriptor.
+    /// </summary>
+    /// <remarks>
+    /// <para>Wait for <c>AcquiredFrameHandle.WithProducerSync()</c> before you
+    /// read the image. Once you release or discard the frame, the session may
+    /// render into the image again.</para>
+    /// <para>The session owns the file descriptor, so don't close it. An import
+    /// takes the descriptor, so import a duplicate from <c>dup</c>. Memory that
+    /// you import keeps the image's memory, but not its contents.</para>
+    /// <para>See <c>mln_acquired_frame_get_opaque_fd</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the session's ring
+    /// shares its textures in another way.</description></item>
+    /// <item><description><c>Status.TargetLost</c> when the session failed, or
+    /// you detached, abandoned, or disposed it.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("android")]
+    [global::System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    public void WithOpaqueFd(Action<OpaqueFdFrameView> callback)
+    {
+        using var call = Enter(this);
+        var outFrame = new mln_opaque_fd_frame { size = (uint)sizeof(mln_opaque_fd_frame) };
+        ArgumentNullException.ThrowIfNull(callback);
+        var viewScope = new NativeViewScope();
+        void* token = null;
+        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        try
+        {
+            Check(NativeMethods.mln_acquired_frame_get_opaque_fd(Handle, &outFrame, Diagnostic));
+            callback(new OpaqueFdFrameView(CopyOpaqueFdFrame(outFrame), viewScope));
+        }
+        finally
+        {
+            viewScope.Expire();
+            NativeMethods.mln_acquired_frame_view_end(token);
+        }
+    }
+
+    /// <summary>
     /// Gets the OpenGL texture of an acquired frame.
     /// </summary>
     /// <remarks>
+    /// <para>It gets a borrowed ring's texture, or an exported ring's on an
+    /// OpenGL device: the texture of the dmabuf that
+    /// <c>AcquiredFrameHandle.WithDmaBuf()</c> gets, and the frame's depth
+    /// texture with <c>RenderSessionAttachOptions.KeepDepth</c>, in the
+    /// device's share group. An exported ring's textures hold the frame upside
+    /// down from OpenGL's rows, top row first, as a dmabuf's readers take it,
+    /// so negate clip y to draw into them. Wait for
+    /// <c>AcquiredFrameHandle.WithProducerSync()</c> before you use
+    /// them.</para>
     /// <para>See <c>mln_acquired_frame_get_open_gl_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -389,6 +459,12 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// Gets the Vulkan image of an acquired frame.
     /// </summary>
     /// <remarks>
+    /// <para>It gets a borrowed ring's image, or an exported ring's on a Vulkan
+    /// device: the image whose memory the ring shares, and the frame's depth
+    /// image with <c>RenderSessionAttachOptions.KeepDepth</c>. An exported
+    /// ring's frame releases them to VK_QUEUE_FAMILY_EXTERNAL, so acquire them
+    /// from there. Wait for <c>AcquiredFrameHandle.WithProducerSync()</c>
+    /// before you use them.</para>
     /// <para>See <c>mln_acquired_frame_get_vulkan_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -430,11 +506,12 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
     /// Gives an acquired frame back to the session once you're done reading it.
     /// </summary>
     /// <remarks>
-    /// <para><c>consumerCompletion</c> says when your GPU work that reads the
-    /// texture finishes. Pass <c>GpuSyncKind.CpuComplete</c> when that work has
-    /// already finished. The session waits for that point before it renders
-    /// into the texture again. If that wait fails, such as for an OpenGL fence
-    /// outside the session's share group, the session fails.</para>
+    /// <para><c>consumerCompletion</c> says when your GPU work on the texture,
+    /// and on its depth texture, finishes. Pass <c>GpuSyncKind.CpuComplete</c>
+    /// when that work has already finished. The session waits for that point
+    /// before it renders into the textures again. If that wait fails, such as
+    /// for an OpenGL fence outside the session's share group, the session
+    /// fails.</para>
     /// <para>See <c>mln_acquired_frame_release</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>

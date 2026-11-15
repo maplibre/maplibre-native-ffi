@@ -60,26 +60,26 @@ jobs:
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.run_id }}
-          name: native-package-linux-gnu-x64-vulkan-${{ env.RELEASE_SHA }}
+          name: native-package-linux-gnu-x64-${{ env.RELEASE_SHA }}
           path: build/packages/native/docs-input
       - name: Install packaged native artifact
         run: >-
-          mise run install-native-package linux-gnu-x64-vulkan
-          build/packages/native/docs-input/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
+          mise run install-native-package linux-gnu-x64
+          build/packages/native/docs-input/maplibre-native-c-linux-gnu-x64.tar.gz
       # The live demo loads the browser modules that the CI run built and
       # tested, from where the binding's build installs them.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.run_id }}
-          name: typescript-addon-emscripten-wasm32-webgl-${{ env.RELEASE_SHA }}
-          path: bindings/typescript/native/build/emscripten-wasm32-webgl/install
+          name: typescript-addon-web-wasm32-webgl-${{ env.RELEASE_SHA }}
+          path: bindings/typescript/native/build/web-wasm32-webgl/install
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.run_id }}
-          name: typescript-addon-emscripten-wasm32-webgpu-${{ env.RELEASE_SHA }}
-          path: bindings/typescript/native/build/emscripten-wasm32-webgpu/install
+          name: typescript-addon-web-wasm32-webgpu-${{ env.RELEASE_SHA }}
+          path: bindings/typescript/native/build/web-wasm32-webgpu/install
       - run: mise run //examples/browser:build
       - run: mise run //docs:build
         env:

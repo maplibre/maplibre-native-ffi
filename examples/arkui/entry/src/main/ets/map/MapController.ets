@@ -1,7 +1,7 @@
 // A continuous map on an XComponent's surface. The component reports its
 // surface when the platform creates one, and the controller attaches a session
-// to it, or gives an attached session the new surface. Everything else matches
-// the browser example in examples/browser.
+// to the surface's window, or gives an attached session the new window.
+// Everything else matches the browser example in examples/browser.
 
 import {
   CameraUpdateMode,
@@ -9,15 +9,16 @@ import {
   LogicalSize,
   MapHandle,
   MapMode,
-  ohosFramePacerCreate,
   RenderDriverKind,
   RenderResult,
   RenderSessionHandle,
+  RenderTarget,
   RuntimeEvent,
   RuntimeEventFlag,
   RuntimeEventType,
   RuntimeHandle,
 } from '@maplibre/native-ffi';
+import { releaseWindow, windowFromSurfaceId } from 'libohos_window.so';
 
 const styleUrl = 'https://tiles.openfreemap.org/styles/liberty';
 
@@ -82,7 +83,7 @@ export class MapController {
   setSize(size: LogicalSize): void {
     this.size = size;
     if (this.session !== undefined && this.target !== undefined) {
-      this.session.discarding.resize(size);
+      this.session.discarding.resize({ width: size.width, height: size.height, scaleFactor: this.scaleFactor });
     } else {
       this.retarget();
     }
@@ -109,7 +110,7 @@ export class MapController {
 
   private async startMap(): Promise<void> {
     this.showStatus('Loading the library…');
-    const runtime = await RuntimeHandle.create();
+    const runtime = RuntimeHandle.create();
     if (this.disposed) {
       runtime.dispose();
       return;
@@ -145,7 +146,7 @@ export class MapController {
     });
     // The pacer demands each frame at the display's next refresh after the map
     // changes, so the session needs no redraw wake.
-    this.pacer = ohosFramePacerCreate();
+    this.pacer = FramePacerHandle.create();
     await map.ready;
     if (this.disposed) {
       return;
@@ -179,19 +180,29 @@ export class MapController {
         return;
       }
       this.target = surface;
-      if (this.session === undefined) {
-        // The session renders on a library thread, in a graphics context that
-        // the library makes for the window.
-        const session = map.attachOhosSurface({ logicalSize: size, surfaceId: surface }, undefined, {
-          driver: RenderDriverKind.coreWorker,
-          frameWake: { callback: () => this.drainFrameResults() },
-        });
-        this.session = session;
-        session.setFramePacer(this.pacer);
-        await session.ready;
-      } else {
-        await this.session.setOhosSurfaceTarget({ logicalSize: size, surfaceId: surface });
+      // The session takes its own reference to the window before the call
+      // returns, so the controller releases its reference right after.
+      const window = windowFromSurfaceId(surface);
+      const target: RenderTarget = { kind: 'ohosWindow', value: { logicalSize: size, window: window } };
+      let done: Promise<void>;
+      try {
+        if (this.session === undefined) {
+          // The session renders on a library thread, in a graphics context
+          // that the library makes for the window.
+          const session = map.attach(target, undefined, {
+            driver: RenderDriverKind.coreWorker,
+            frameWake: { callback: () => this.drainFrameResults() },
+          });
+          this.session = session;
+          session.setFramePacer(this.pacer);
+          done = session.ready;
+        } else {
+          done = this.session.setTarget(target);
+        }
+      } finally {
+        releaseWindow(window);
       }
+      await done;
     });
   }
 

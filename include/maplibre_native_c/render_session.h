@@ -75,8 +75,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
 typedef uint32_t mln_frame_demand_flags;
 
 /**
- * The token of the frame results that a session adds when it renders an image
- * for mln_map_request_still_image(). Your own demands can't use it.
+ * The token of the frame results of the demand that a session holds for an
+ * image of mln_map_request_still_image(), which says how that demand runs.
+ * Your own demands can't use it.
  */
 #define MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE UINT64_MAX
 
@@ -104,6 +105,11 @@ typedef struct mln_render_frame_result {
   bool needs_repaint;
   /** The camera and extent that a rendered frame shows. */
   mln_map_view view;
+  /**
+   * Where a rendered frame drew the map, for drawing into its frame with
+   * depth. All zero for a demand that rendered nothing.
+   */
+  mln_frame_projection frame_projection;
   mln_render_mode mode;
 } mln_render_frame_result;
 
@@ -157,6 +163,88 @@ typedef struct mln_render_abandon_result {
   uint32_t reserved MLN_BINDING("kind=reserved");
 } mln_render_abandon_result;
 
+/**
+ * Attaches a render session that renders the map into `target`.
+ *
+ * The session renders on `device`. When `device` is null, the session creates
+ * a device with the default options, and releases it when the session ends.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_ARGUMENT when a borrowed ring has depth textures, but
+ *   not one for each of its textures.
+ * - MLN_STATUS_INVALID_STATE when the map already has a render session, or a
+ *   window is minimized or has no client area.
+ * - MLN_STATUS_UNSUPPORTED when the device's
+ *   mln_gpu_device_capabilities.target_kinds lacks the target's kind, or, for
+ *   a null `device`, when no backend of this build renders to it, when
+ *   `options` sets `keep_depth` for a target other than an exported ring, or
+ *   when a borrowed ring's depth format isn't one of the device's
+ *   mln_gpu_device_capabilities.depth_stencil_formats.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE when a window was minimized or had no client
+ *   area when the attach ran.
+ * - MLN_STATUS_UNSUPPORTED when the GPU or the graphics driver can't present
+ *   to the window.
+ * - MLN_STATUS_NATIVE_ERROR when `device` is null and the platform can't
+ *   create a device, or when the library can't create its graphics context or
+ *   present to the window.
+ */
+MLN_BINDING("execution=lifecycle")
+MLN_API mln_status mln_map_attach(
+  mln_map map, const mln_render_target* target,
+  mln_gpu_device device MLN_BINDING("nullable=true"),
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Replaces the window, surface, or borrowed ring that the session renders to,
+ * and resizes the map to it.
+ *
+ * Use it to give the session a target again after
+ * mln_render_session_release_target(), to move it to another window or
+ * surface, or to give a borrowed ring new textures, such as of a new size. The
+ * session renders to `target` with the device that it attached with. Once the
+ * replacement completes, the session no longer uses the old target. A
+ * borrowed ring takes only a ring of the kind it attached with, with as many
+ * textures, with depth textures only when it attached with them, and with the
+ * same formats, final layouts, and owner. Release every acquired frame of a
+ * borrowed ring first. Once the replacement completes, the session has also
+ * stopped waiting on the consumer sync of the textures that the new ring
+ * doesn't have, as mln_render_session_release_target() says, so you can reuse
+ * or destroy them.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_ARGUMENT when a borrowed ring gets more or fewer
+ *   textures than it attached with, or depth textures but not one for each
+ *   texture.
+ * - MLN_STATUS_INVALID_STATE when a window is minimized or has no client
+ *   area, or while you hold one of a borrowed ring's acquired frames.
+ * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into an
+ *   exported ring, when `target` is offscreen or an exported ring, when a
+ *   session that presents gets a borrowed ring or a borrowed ring gets
+ *   anything else, or when no backend of this build renders to the target's
+ *   kind. An exported ring takes a new size from mln_render_session_resize()
+ *   instead.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE when a window was minimized or had no client
+ *   area when the replacement ran.
+ * - MLN_STATUS_UNSUPPORTED when the session's device can't render to
+ *   `target`, the new target needs a different color format or pre-rotation
+ *   support than the old one, or a borrowed ring's new textures differ from
+ *   the old ones in their formats, final layouts, or owner, or in having
+ *   depth textures. Attach a new session instead.
+ * - MLN_STATUS_NATIVE_ERROR when the library can't render to the new target.
+ */
+MLN_BINDING("execution=operation")
+MLN_API mln_status mln_render_session_set_target(
+  mln_render_session session, const mln_render_target* target,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
 /** Reads what the session supports. */
 MLN_API mln_status mln_render_session_get_capabilities(
   mln_render_session session,
@@ -208,6 +296,8 @@ MLN_API mln_status mln_render_session_get_failure(
  * the same flags.
  *
  * Returns:
+ * - MLN_STATUS_INVALID_ARGUMENT when `demand.token` is
+ *   MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE.
  * - MLN_STATUS_TARGET_LOST or MLN_STATUS_NATIVE_ERROR, as
  *   mln_render_session_snapshot.failure_status reports, when the session has
  *   failed.
@@ -224,12 +314,20 @@ typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_frame_pacer_option_field : uint32_t {
   MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1U << 0U,
+  /**
+   * Removes the frame rate limit, so the pacer can demand frames at every
+   * display refresh, as it does by default. It can't be combined with
+   * MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND.
+   */
+  MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND = 1U << 1U,
 } mln_frame_pacer_option_field;
 
 /** A set of mln_frame_pacer_option_field bits. */
 typedef uint32_t mln_frame_pacer_option_fields;
 
-/** Options for creating a frame pacer. */
+/**
+ * Options for creating a frame pacer, or for mln_frame_pacer_set_options().
+ */
 typedef struct mln_frame_pacer_options {
   uint32_t size;
   mln_frame_pacer_option_fields fields;
@@ -242,6 +340,70 @@ typedef struct mln_frame_pacer_options {
     "mask=fields;bit=MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND"
   );
 } mln_frame_pacer_options;
+
+/**
+ * Creates a frame pacer that follows the platform's display.
+ *
+ * On iOS, macOS, and tvOS, the pacer follows the display through a
+ * `CADisplayLink`. You can call it on any thread, and the pacer needs no run
+ * loop of yours. On macOS, it follows the main display, the one with the menu
+ * bar. With mln_frame_pacer_options.maximum_frames_per_second, the pacer also
+ * asks the system for that refresh rate. On iPhone, a rate above 60 needs
+ * `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
+ *
+ * On Android, the pacer follows the display through the calling thread's
+ * `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
+ * main thread, and keep that thread running its looper while sessions use the
+ * pacer. `AChoreographer` can stop while the phone's display is off, even while
+ * a Surface on another display, such as an Android Auto projection, still shows
+ * the map. The pacer then keeps demanding frames from a timer on the looper,
+ * within the frame rate limit, until vsyncs arrive again.
+ *
+ * On OpenHarmony, the pacer follows the display through `OH_NativeVSync`. You
+ * can call it on any thread, and the pacer needs no event loop of yours.
+ *
+ * Returns:
+ * - MLN_STATUS_UNSUPPORTED on the other platforms, such as visionOS, Linux, and
+ *   Windows, where the library has no source of display refreshes.
+ * - MLN_STATUS_INVALID_STATE on Android when the calling thread has no
+ *   `ALooper`.
+ * - MLN_STATUS_NATIVE_ERROR on iOS, macOS, and tvOS when the system has no
+ *   display to follow, and on OpenHarmony when the system can't report the
+ *   display's refreshes to the process.
+ */
+MLN_API mln_status mln_frame_pacer_create(
+  const mln_frame_pacer_options* options MLN_BINDING("nullable=true"),
+  mln_frame_pacer* out_pacer MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Changes a frame pacer's settings.
+ *
+ * Settings that `options` doesn't set keep their current values. To remove the
+ * frame rate limit, set MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND. You
+ * can call it on any thread.
+ *
+ * The sessions that the pacer serves follow the new settings from the next
+ * display refresh, including a refresh that they already wait for. The pacer
+ * counts a new limit from the last frames it demanded, so a higher limit can
+ * demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
+ * the system for the new limit's refresh rate, or for the display's own rate
+ * once the limit is removed.
+ *
+ * Returns:
+ * - MLN_STATUS_INVALID_ARGUMENT when `pacer` is the null handle or names no
+ *   frame pacer, or when `options` sets `maximum_frames_per_second` to 0 or
+ *   sets both MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND and
+ *   MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND. The pacer keeps its
+ *   settings.
+ * - MLN_STATUS_INVALID_STATE when you released `pacer`, even while sessions
+ *   still use it.
+ */
+MLN_API mln_status mln_frame_pacer_set_options(
+  mln_frame_pacer pacer, const mln_frame_pacer_options* options,
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
 
 /**
  * Sets the frame pacer that demands the session's frames.
@@ -340,7 +502,9 @@ MLN_API mln_status mln_acquired_frame_get_result(
  *
  * Lifetimes:
  * The object that `out_sync` names belongs to the session. It stays valid until
- * you release or discard the frame, or the session is abandoned or disposed.
+ * you release or discard the frame, or the session is abandoned or disposed. A
+ * view from mln_acquired_frame_view_begin() keeps it valid until
+ * mln_acquired_frame_view_end().
  */
 MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_producer_sync(
@@ -351,11 +515,11 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
 /**
  * Gives an acquired frame back to the session once you're done reading it.
  *
- * `consumer_completion` says when your GPU work that reads the texture
- * finishes. Pass MLN_GPU_SYNC_CPU_COMPLETE when that work has already finished.
- * The session waits for that point before it renders into the texture again.
- * If that wait fails, such as for an OpenGL fence outside the session's share
- * group, the session fails.
+ * `consumer_completion` says when your GPU work on the texture, and on its
+ * depth texture, finishes. Pass MLN_GPU_SYNC_CPU_COMPLETE when that work has
+ * already finished. The session waits for that point before it renders into
+ * the textures again. If that wait fails, such as for an OpenGL fence outside
+ * the session's share group, the session fails.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when
@@ -398,18 +562,21 @@ MLN_API void mln_acquired_frame_view_end(
 ) MLN_NOEXCEPT;
 
 /**
- * Resizes the session's target and its map.
+ * Resizes the session's target and its map, and sets the map's scale factor.
  *
- * The session renders at the map's scale factor. Release every acquired frame
- * first. You can call it once the attach call returns. While the attach runs,
- * the resize waits for it to complete.
+ * Use it when the window changes size, or moves to a display with another
+ * scale factor. The map keeps its loaded tiles, and draws its next frame at
+ * the new size and scale factor. You can call it once the attach call returns.
+ * While the attach runs, the resize waits for it to complete.
+ *
+ * An exported ring gets textures of the new size. The frames that you hold
+ * keep their textures, of the old size, until you release or discard them.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders into a borrowed ring. Give
  *   it new textures of the new size instead.
- * - MLN_STATUS_INVALID_STATE while you hold one of the session's acquired
- *   frames, or when the session failed, or you detached, abandoned, released,
- *   or disposed it.
+ * - MLN_STATUS_INVALID_STATE when the session failed, or you detached,
+ *   abandoned, released, or disposed it.
  *
  * Completes with:
  * - MLN_STATUS_TARGET_LOST when the session loses its target before the resize
@@ -417,7 +584,7 @@ MLN_API void mln_acquired_frame_view_end(
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_render_session_resize(
-  mln_render_session session, mln_logical_size logical_size,
+  mln_render_session session, mln_logical_extent extent,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -430,16 +597,22 @@ MLN_API mln_status mln_render_session_resize(
  * still pending, and later ones until you give the session a new target,
  * finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once the release completes,
  * you can destroy the old target. An Android or OpenHarmony window can go away
- * sooner, as mln_map_attach_android_surface() and mln_map_attach_ohos_surface()
- * say.
+ * sooner, as mln_android_window_target and mln_ohos_window_target say.
+ *
+ * For a borrowed ring, a completed release also means that the session has
+ * stopped waiting on the consumer sync that you released its frames with, so
+ * you can reuse or destroy the textures. The session waits about a second at
+ * most for that sync, and logs a warning when the wait runs out. It checks the
+ * sync without blocking a thread: keep servicing a session driven by
+ * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD until the release completes. The
+ * session keeps nothing of the released textures: a texture that a later target
+ * gives it again is a new one, even one that you discarded a frame of.
  *
  * Returns:
- * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into Android
- *   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
- *   allocates.
+ * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into an
+ *   exported ring.
  *
  * Completes with:
- * - MLN_STATUS_UNSUPPORTED when the target is a WebGL canvas.
  * - MLN_STATUS_TARGET_LOST when the session loses its target before the
  *   release runs.
  */
@@ -516,6 +689,10 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  *
  * It accepts a released or disposed session until that release or disposal
  * finishes.
+ *
+ * Returns:
+ * - MLN_STATUS_BUSY when called while a service of the session already runs on
+ *   this thread, from a callback that the service runs.
  */
 MLN_BINDING("after_release=true")
 MLN_API mln_status mln_render_session_service_driver_work(
@@ -552,6 +729,12 @@ MLN_API mln_status mln_render_session_detach(
  * Abandon keeps the session's OpenGL and WebGPU objects until the process
  * exits, and reports how many it kept. Detach the session instead to free
  * them.
+ *
+ * A session lets go of your graphics objects later when you call this on the
+ * thread that runs its graphics work: from a callback that the session runs
+ * there, once the callback returns, and for a session driven by
+ * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, at your next
+ * mln_render_session_service_driver_work() for it.
  *
  * Returns:
  * - MLN_STATUS_BUSY while mln_render_session_service_driver_work() runs for the
@@ -604,7 +787,10 @@ MLN_API mln_status mln_render_session_dispose(
  * Gives up an acquired frame without saying when your GPU stops reading it.
  *
  * Because your GPU may still read the frame's texture, the session never
- * renders into that texture again.
+ * renders into that texture again, even when mln_render_session_set_target()
+ * gives it the texture again, until mln_render_session_release_target()
+ * releases the ring. A view that is open on the frame keeps the frame's sync
+ * objects in place until it ends.
  */
 MLN_API mln_status mln_acquired_frame_discard(
   mln_acquired_frame frame, mln_diagnostic* out_diagnostic

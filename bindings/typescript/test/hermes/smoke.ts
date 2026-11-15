@@ -7,7 +7,7 @@ const host = globalThis as typeof globalThis & {
 };
 async function run(): Promise<void> {
   host.__mlnReleaseEarly();
-  const runtime = await RuntimeHandle.create();
+  const runtime = RuntimeHandle.create();
   const map = runtime.createMap({
     initialExtent: { width: 32, height: 32, scaleFactor: 1 },
   });

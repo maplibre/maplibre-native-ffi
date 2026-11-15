@@ -1,5 +1,0 @@
-[tasks.prepare-release]
-description = "Pin a release's native archives in the sys crate and stamp the crate versions, before publishing."
-usage = 'arg "<tag>" help="The release tag, such as v0.202610.2"'
-dir = "../.."
-run = 'python3 tools/release/rust_release.py . "$usage_tag"'

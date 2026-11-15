@@ -131,11 +131,6 @@ def _compiler_arguments(clang: str, sdk: str | None) -> tuple[str, ...]:
         raise ModelError([f"cannot discover compiler headers: {error}"]) from error
 
 
-# Upstream's headers that include/ carries beside the C API's own, as MapLibre
-# Native's plugin ABI. They declare no part of the C API.
-UPSTREAM_DIRECTORY = "mln"
-
-
 @dataclass(frozen=True)
 class Macro:
     """An object-like macro with an expansion, which may be a constant."""
@@ -212,11 +207,11 @@ class Extractor:
         return "\n".join(reversed(lines))
 
     def owned(self, cursor: cindex.Cursor) -> bool:
-        if not cursor.location.file:
-            return False
-        path = Path(cursor.location.file.name).resolve()
-        return path.is_relative_to(self.include_directory) and not path.is_relative_to(
-            self.include_directory / UPSTREAM_DIRECTORY
+        return bool(
+            cursor.location.file
+            and Path(cursor.location.file.name)
+            .resolve()
+            .is_relative_to(self.include_directory)
         )
 
     def metadata(self, cursor: cindex.Cursor) -> dict[str, str]:
@@ -572,8 +567,8 @@ def parse_headers(
 ) -> Api:
     """Parse every public header in one C23 translation unit.
 
-    `clang_args` supplies target defines and include paths, including the
-    installed MapLibre Native plugin headers. Pass `headers` for fixture tests.
+    `clang_args` supplies target defines and include paths. Pass `headers` for
+    fixture tests.
     Compiler errors are fatal;
     partial ASTs never reach an emitter. The result carries each declaration's
     complete metadata: its annotations together with the defaults that its C
@@ -605,7 +600,6 @@ def extract_headers(
         found = {
             path.relative_to(include_directory)
             for path in include_directory.rglob("*.h")
-            if not path.is_relative_to(include_directory / UPSTREAM_DIRECTORY)
         }
         headers = tuple(path.as_posix() for path in sorted(found))
     if not headers:

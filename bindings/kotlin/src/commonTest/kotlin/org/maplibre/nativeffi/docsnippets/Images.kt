@@ -12,9 +12,10 @@ import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.LogicalSize
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.MapOptions
-import org.maplibre.nativeffi.OffscreenDescriptor
+import org.maplibre.nativeffi.OffscreenTarget
 import org.maplibre.nativeffi.RenderDriverKind
 import org.maplibre.nativeffi.RenderSessionAttachOptions
+import org.maplibre.nativeffi.RenderTarget
 import org.maplibre.nativeffi.RuntimeHandle
 import org.maplibre.nativeffi.cameraForTile
 
@@ -45,12 +46,15 @@ private suspend fun images(runtime: RuntimeHandle) {
 
   // #region attach
   val session =
-    map.attachOffscreen(
-      OffscreenDescriptor(LogicalSize(width = 800u, height = 600u)),
-      // The library renders on its own thread.
-      RenderSessionAttachOptions(
-        driver = RenderDriverKind.CORE_WORKER,
+    map.attach(
+      RenderTarget.Offscreen(
+        OffscreenTarget(LogicalSize(width = 800u, height = 600u)),
       ),
+      // The library renders on its own thread.
+      options =
+        RenderSessionAttachOptions(
+          driver = RenderDriverKind.CORE_WORKER,
+        ),
     )
   session.ready.await()
   // #endregion attach

@@ -2,9 +2,6 @@
 
 import type {
   AndroidHardwareBufferFrame,
-  AndroidHardwareBufferRingDescriptor,
-  AndroidSurfaceDescriptor,
-  AndroidSurfaceReplacement,
   BoundOptions,
   CacheDatabaseOperation,
   CameraDelta,
@@ -16,20 +13,21 @@ import type {
   CameraUpdate,
   CanonicalTileId,
   CustomGeometrySourceOptions,
+  CustomLayerHost,
   CustomVectorSourceOptions,
   DmaBufFrame,
-  DmaBufRingDescriptor,
   DxgiSharedTextureFrame,
-  DxgiSharedTextureRingDescriptor,
   FeatureStateSelector,
   FrameDemand,
   FramePacerOptions,
   FreeCameraOptions,
   GeoJsonSourceOptions,
+  GpuDeviceCapabilities,
+  GpuDeviceOptions,
+  GpuDeviceVulkanContextResult,
   GpuSync,
   HttpHeaderTransform,
   IoSurfaceFrame,
-  IoSurfaceRingDescriptor,
   LatLng,
   LatLngBounds,
   LogHandler,
@@ -43,25 +41,16 @@ import type {
   MapTileOptions,
   MapView,
   MapViewportOptions,
-  MetalBorrowedTextureDescriptor,
-  MetalBorrowedTextureReplacement,
-  MetalSurfaceDescriptor,
-  MetalSurfaceReplacement,
+  MetalDeviceDescriptor,
   MetalTextureFrame,
   NetworkStatus,
   OfflineRegionDefinition,
   OfflineRegionDownloadState,
   OfflineRegionInfo,
   OfflineRegionStatus,
-  OffscreenDescriptor,
-  OffscreenDeviceOptions,
-  OhosSurfaceDescriptor,
-  OhosSurfaceReplacement,
-  OpenGlBorrowedTextureDescriptor,
-  OpenGlBorrowedTextureReplacement,
+  OpaqueFdFrame,
+  OpenGlContextDescriptor,
   OpenGlContextProviderFlag,
-  OpenGlSurfaceDescriptor,
-  OpenGlSurfaceReplacement,
   OpenGlTextureFrame,
   PremultipliedRgba8Image,
   ProjectedMeters,
@@ -72,6 +61,7 @@ import type {
   RenderSessionAttachOptions,
   RenderSessionCapabilities,
   RenderSessionSnapshot,
+  RenderTarget,
   RenderedFeature,
   RenderedFeatureQueryOptions,
   RenderedQueryGeometry,
@@ -96,23 +86,11 @@ import type {
   StyleTransitionOptions,
   StyleVectorTileEncoding,
   TextureReadbackResult,
-  VulkanBorrowedTextureDescriptor,
-  VulkanBorrowedTextureReplacement,
-  VulkanDeviceContextResult,
-  VulkanDeviceOptions,
-  VulkanSurfaceDescriptor,
-  VulkanSurfaceReplacement,
+  VulkanDeviceDescriptor,
   VulkanTextureFrame,
   Wake,
-  WaylandSurfaceDescriptor,
-  WaylandSurfaceReplacement,
-  WebGpuBorrowedTextureDescriptor,
-  WebGpuBorrowedTextureReplacement,
-  WebGpuSurfaceDescriptor,
-  WebGpuSurfaceReplacement,
+  WebGpuContextDescriptor,
   WebGpuTextureFrame,
-  Win32WindowDescriptor,
-  Win32WindowReplacement,
 } from "./generated_values.ts";
 import { native } from "./internal/addon.ts";
 import {
@@ -122,7 +100,6 @@ import {
   query,
   run,
   submitRun,
-  threadStart,
 } from "./internal/completions.ts";
 import { type NativeRegistration } from "./internal/native_registrations.ts";
 import {
@@ -144,64 +121,6 @@ import {
   defineCallbacks,
   withRegistrations,
 } from "./internal/realm.ts";
-
-/**
- * Creates a frame pacer that follows the display through the calling thread's
- * `AChoreographer`.
- *
- * Call it on a thread with an `ALooper`, such as the app's main thread, and
- * keep that thread running its looper while sessions use the pacer.
- *
- * `AChoreographer` can stop while the phone's display is off, even while a
- * Surface on another display, such as an Android Auto projection, still shows
- * the map. The pacer then keeps demanding frames from a timer on the looper,
- * within the frame rate limit, until vsyncs arrive again.
- *
- * See `mln_android_frame_pacer_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
- *
- * Errors:
- *
- * - `Status.invalidState` when the calling thread has no `ALooper`.
- */
-export function androidFramePacerCreate(
-  options?: FramePacerOptions,
-): FramePacerHandle {
-  const handle = native.mln_android_frame_pacer_create(options);
-  return adopt(
-    handle,
-    () => new FramePacerHandle(ADOPT, handle),
-    (disposed) => native.mln_frame_pacer_release(disposed, undefined),
-  );
-}
-
-/**
- * Creates a frame pacer that follows the display through a `CADisplayLink`.
- *
- * You can call it on any thread. The pacer needs no run loop of yours. On
- * macOS, it follows the main display, the one with the menu bar.
- *
- * With `FramePacerOptions.maximumFramesPerSecond`, the pacer also asks the
- * system for that refresh rate. On iPhone, a rate above 60 needs
- * `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
- *
- * See `mln_apple_frame_pacer_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
- *
- * Errors:
- *
- * - `Status.nativeError` when the system has no display to follow.
- */
-export function appleFramePacerCreate(
-  options?: FramePacerOptions,
-): FramePacerHandle {
-  const handle = native.mln_apple_frame_pacer_create(options);
-  return adopt(
-    handle,
-    () => new FramePacerHandle(ADOPT, handle),
-    (disposed) => native.mln_frame_pacer_release(disposed, undefined),
-  );
-}
 
 /**
  * Returns the API epoch of the library.
@@ -263,21 +182,6 @@ export function getNetworkStatus(): NetworkStatus {
 }
 
 /**
- * Returns the function that registers a plugin's style layer types.
- *
- * Pass the function to the plugin's registration entry point before loading a
- * style that uses the plugin's layer types. Plugin callbacks run on library
- * threads and can keep running while the process exits, so they must not use
- * state that the process destroys at exit.
- *
- * See `mln_plugin_get_register_function_v1` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
- */
-export function getPluginRegisterFunctionV1(): bigint {
-  return native.mln_plugin_get_register_function_v1();
-}
-
-/**
  * Gives the library the Java VM and the app context that it needs on Android.
  *
  * Call it before creating a runtime. `jniEnv` is the calling thread's
@@ -311,31 +215,6 @@ export function logicalExtentPhysicalSize(extent: LogicalExtent): {
   readonly height: number;
 } {
   return native.mln_logical_extent_physical_size(extent);
-}
-
-/**
- * Creates a frame pacer that follows the display through OpenHarmony's
- * `OH_NativeVSync`.
- *
- * You can call it on any thread. The pacer needs no event loop of yours.
- *
- * See `mln_ohos_frame_pacer_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
- *
- * Errors:
- *
- * - `Status.nativeError` when the system can't report the display's refreshes
- *   to the process.
- */
-export function ohosFramePacerCreate(
-  options?: FramePacerOptions,
-): FramePacerHandle {
-  const handle = native.mln_ohos_frame_pacer_create(options);
-  return adopt(
-    handle,
-    () => new FramePacerHandle(ADOPT, handle),
-    (disposed) => native.mln_frame_pacer_release(disposed, undefined),
-  );
 }
 
 /**
@@ -415,6 +294,43 @@ export function supportedRenderBackendMask(): RenderBackendFlag {
 }
 
 /**
+ * Allocates `size` bytes of the instance's memory, aligned to `align`, a power
+ * of two, for the descriptors and buffers that you pass the library.
+ *
+ * Returns null when `size` is 0, `align` isn't a power of two, or the memory
+ * can't grow. The memory's `buffer` detaches when it grows, so make new views
+ * of it after each call.
+ *
+ * See `mln_web_alloc` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/web_8h.html).
+ */
+export function webAlloc(size: bigint, align: bigint): bigint {
+  return native.mln_web_alloc(size, align);
+}
+
+/**
+ * Frees what `webAlloc()` allocated, with the same `size` and `align`. Freeing
+ * null does nothing.
+ *
+ * See `mln_web_free` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/web_8h.html).
+ */
+export function webFree(pointer: bigint, size: bigint, align: bigint): void {
+  native.mln_web_free(pointer, size, align);
+}
+
+/**
+ * Releases a handle that you made. Releasing 0, or a handle that names no
+ * object, does nothing.
+ *
+ * See `mln_web_object_release` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/web_8h.html).
+ */
+export function webObjectRelease(object: number): void {
+  native.mln_web_object_release(object);
+}
+
+/**
  * A rendered frame that the caller holds to read or show.
  *
  * See `mln_acquired_frame` in the
@@ -439,7 +355,10 @@ export class AcquiredFrameHandle extends Owner {
    * Gives up an acquired frame without saying when your GPU stops reading it.
    *
    * Because your GPU may still read the frame's texture, the session never
-   * renders into that texture again.
+   * renders into that texture again, even when
+   * `RenderSessionHandle.setTarget()` gives it the texture again, until
+   * `RenderSessionHandle.releaseTarget()` releases the ring. A view that is
+   * open on the frame keeps the frame's sync objects in place until it ends.
    *
    * See `mln_acquired_frame_discard` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -466,11 +385,11 @@ export class AcquiredFrameHandle extends Owner {
   /**
    * Gives an acquired frame back to the session once you're done reading it.
    *
-   * `consumerCompletion` says when your GPU work that reads the texture
-   * finishes. Pass `GpuSyncKind.cpuComplete` when that work has already
-   * finished. The session waits for that point before it renders into the
-   * texture again. If that wait fails, such as for an OpenGL fence outside the
-   * session's share group, the session fails.
+   * `consumerCompletion` says when your GPU work on the texture, and on its
+   * depth texture, finishes. Pass `GpuSyncKind.cpuComplete` when that work has
+   * already finished. The session waits for that point before it renders into
+   * the textures again. If that wait fails, such as for an OpenGL fence outside
+   * the session's share group, the session fails.
    *
    * See `mln_acquired_frame_release` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -487,7 +406,7 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Gets the Android hardware buffer of an acquired frame.
+   * Gets the Android hardware buffer of an exported ring's acquired frame.
    *
    * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
    * buffer. Once you release or discard the frame, the session may render into
@@ -495,10 +414,12 @@ export class AcquiredFrameHandle extends Owner {
    * keeps the buffer's memory, but not its contents.
    *
    * See `mln_acquired_frame_get_android_hardware_buffer` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    *
    * Errors:
    *
+   * - `Status.unsupported` when the session's ring shares its textures in
+   *   another way.
    * - `Status.targetLost` when the session failed, or you detached, abandoned,
    *   or disposed it.
    */
@@ -522,7 +443,7 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Gets the dmabuf of an acquired frame.
+   * Gets the dmabuf of an exported ring's acquired frame.
    *
    * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
    * buffer. Once you release or discard the frame, the session may render into
@@ -534,10 +455,12 @@ export class AcquiredFrameHandle extends Owner {
    * `dup`. A duplicate keeps the buffer's memory, but not its contents.
    *
    * See `mln_acquired_frame_get_dma_buf` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    *
    * Errors:
    *
+   * - `Status.unsupported` when the session's ring shares its textures in
+   *   another way.
    * - `Status.targetLost` when the session failed, or you detached, abandoned,
    *   or disposed it.
    */
@@ -559,7 +482,7 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Gets the DXGI shared texture of an acquired frame.
+   * Gets the DXGI shared texture of an exported ring's acquired frame.
    *
    * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
    * texture. Once you release or discard the frame, the session may render into
@@ -571,10 +494,12 @@ export class AcquiredFrameHandle extends Owner {
    * you release the frame, duplicate it with `DuplicateHandle`.
    *
    * See `mln_acquired_frame_get_dxgi_shared_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    *
    * Errors:
    *
+   * - `Status.unsupported` when the session's ring shares its textures in
+   *   another way.
    * - `Status.targetLost` when the session failed, or you detached, abandoned,
    *   or disposed it.
    */
@@ -596,7 +521,7 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
-   * Gets the IOSurface of an acquired frame.
+   * Gets the IOSurface of an exported ring's acquired frame.
    *
    * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
    * surface. Once you release or discard the frame, the session may render into
@@ -606,10 +531,12 @@ export class AcquiredFrameHandle extends Owner {
    * surface's memory, but not its contents.
    *
    * See `mln_acquired_frame_get_io_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    *
    * Errors:
    *
+   * - `Status.unsupported` when the session's ring shares its textures in
+   *   another way.
    * - `Status.targetLost` when the session failed, or you detached, abandoned,
    *   or disposed it.
    */
@@ -632,6 +559,12 @@ export class AcquiredFrameHandle extends Owner {
 
   /**
    * Gets the Metal texture of an acquired frame.
+   *
+   * It gets a borrowed ring's texture, or an exported ring's on a Metal device:
+   * the texture of the IOSurface that `AcquiredFrameHandle.withIoSurface()`
+   * gets, and the frame's depth texture with
+   * `RenderSessionAttachOptions.keepDepth`. Wait for
+   * `AcquiredFrameHandle.withProducerSync()` before you use them.
    *
    * See `mln_acquired_frame_get_metal_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -659,7 +592,55 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
+   * Gets the memory of an exported ring's acquired frame, as an opaque file
+   * descriptor.
+   *
+   * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
+   * image. Once you release or discard the frame, the session may render into
+   * the image again.
+   *
+   * The session owns the file descriptor, so don't close it. An import takes
+   * the descriptor, so import a duplicate from `dup`. Memory that you import
+   * keeps the image's memory, but not its contents.
+   *
+   * See `mln_acquired_frame_get_opaque_fd` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the session's ring shares its textures in
+   *   another way.
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
+   */
+  withOpaqueFd<T>(use: (view: ScopedOpaqueFdFrame) => T): T {
+    return new ViewScope(
+      ADOPT,
+      this,
+      (handle) => native.mln_acquired_frame_view_begin(handle),
+      (scope) => native.mln_acquired_frame_view_end(scope),
+    ).use((scope) =>
+      use(
+        new ScopedOpaqueFdFrame(
+          ADOPT,
+          scope,
+          native.mln_acquired_frame_get_opaque_fd(this.id),
+        ),
+      ),
+    );
+  }
+
+  /**
    * Gets the OpenGL texture of an acquired frame.
+   *
+   * It gets a borrowed ring's texture, or an exported ring's on an OpenGL
+   * device: the texture of the dmabuf that `AcquiredFrameHandle.withDmaBuf()`
+   * gets, and the frame's depth texture with
+   * `RenderSessionAttachOptions.keepDepth`, in the device's share group. An
+   * exported ring's textures hold the frame upside down from OpenGL's rows, top
+   * row first, as a dmabuf's readers take it, so negate clip y to draw into
+   * them. Wait for `AcquiredFrameHandle.withProducerSync()` before you use
+   * them.
    *
    * See `mln_acquired_frame_get_open_gl_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -716,6 +697,12 @@ export class AcquiredFrameHandle extends Owner {
 
   /**
    * Gets the Vulkan image of an acquired frame.
+   *
+   * It gets a borrowed ring's image, or an exported ring's on a Vulkan device:
+   * the image whose memory the ring shares, and the frame's depth image with
+   * `RenderSessionAttachOptions.keepDepth`. An exported ring's frame releases
+   * them to VK_QUEUE_FAMILY_EXTERNAL, so acquire them from there. Wait for
+   * `AcquiredFrameHandle.withProducerSync()` before you use them.
    *
    * See `mln_acquired_frame_get_vulkan_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -799,6 +786,49 @@ export class FramePacerHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
+   * Creates a frame pacer that follows the platform's display.
+   *
+   * On iOS, macOS, and tvOS, the pacer follows the display through a
+   * `CADisplayLink`. You can call it on any thread, and the pacer needs no run
+   * loop of yours. On macOS, it follows the main display, the one with the menu
+   * bar. With `FramePacerOptions.maximumFramesPerSecond`, the pacer also asks
+   * the system for that refresh rate. On iPhone, a rate above 60 needs
+   * `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
+   *
+   * On Android, the pacer follows the display through the calling thread's
+   * `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
+   * main thread, and keep that thread running its looper while sessions use the
+   * pacer. `AChoreographer` can stop while the phone's display is off, even
+   * while a Surface on another display, such as an Android Auto projection,
+   * still shows the map. The pacer then keeps demanding frames from a timer on
+   * the looper, within the frame rate limit, until vsyncs arrive again.
+   *
+   * On OpenHarmony, the pacer follows the display through `OH_NativeVSync`. You
+   * can call it on any thread, and the pacer needs no event loop of yours.
+   *
+   * See `mln_frame_pacer_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` on the other platforms, such as visionOS, Linux, and
+   *   Windows, where the library has no source of display refreshes.
+   * - `Status.invalidState` on Android when the calling thread has no
+   *   `ALooper`.
+   * - `Status.nativeError` on iOS, macOS, and tvOS when the system has no
+   *   display to follow, and on OpenHarmony when the system can't report the
+   *   display's refreshes to the process.
+   */
+  static create(options?: FramePacerOptions): FramePacerHandle {
+    const handle = native.mln_frame_pacer_create(options);
+    return adopt(
+      handle,
+      () => new FramePacerHandle(ADOPT, handle),
+      (disposed) => native.mln_frame_pacer_release(disposed, undefined),
+    );
+  }
+
+  /**
    * Releases a frame pacer.
    *
    * Render sessions that use the pacer stay paced until you release them or set
@@ -812,8 +842,248 @@ export class FramePacerHandle extends Owner {
       native.mln_frame_pacer_release(handle, token),
     );
   }
+
+  /**
+   * Changes a frame pacer's settings.
+   *
+   * Settings that `options` doesn't set keep their current values. To remove
+   * the frame rate limit, set `FramePacerOptions.unlimitedFramesPerSecond`. You
+   * can call it on any thread.
+   *
+   * The sessions that the pacer serves follow the new settings from the next
+   * display refresh, including a refresh that they already wait for. The pacer
+   * counts a new limit from the last frames it demanded, so a higher limit can
+   * demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
+   * the system for the new limit's refresh rate, or for the display's own rate
+   * once the limit is removed.
+   *
+   * See `mln_frame_pacer_set_options` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` when you released `pacer`, even while sessions
+   *   still use it.
+   */
+  setOptions(options: FramePacerOptions): void {
+    native.mln_frame_pacer_set_options(this.id, options);
+  }
 }
 defineDisposers(FramePacerHandle, "release", "release");
+
+/**
+ * A GPU, and the queue that render sessions on it share.
+ *
+ * See `mln_gpu_device` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
+export class GpuDeviceHandle extends Owner {
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
+    super(key, handle, "GpuDeviceHandle", { registrations });
+  }
+  /**
+   * Calls `release()`, for `await using`.
+   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.asyncDispose]: () => Promise<void>;
+  /**
+   * Calls `release()`, for `using`.
+   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
+   */
+  declare [Symbol.dispose]: () => void;
+
+  /**
+   * Creates a GPU device that the library owns, for render sessions to share.
+   *
+   * The sessions on a device share its GPU and queue: one `VkDevice` and queue,
+   * one `MTLDevice` and command queue, or one OpenGL share group.
+   * `MapHandle.attach()` creates a device of its own when it gets none. Create
+   * one to share it among the sessions of many maps, or to pick the backend or
+   * the GPU. A Vulkan device enables the presentation, timeline semaphore,
+   * external memory, and external semaphore extensions that its GPU offers.
+   *
+   * See `mln_gpu_device_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when this build or platform lacks `backend`, when
+   *   the device can't render with `open_gl_client_api`, when options name a
+   *   GPU that the backend can't select (an OpenGL device takes no
+   *   `adapter_index`, `adapter_uuid`, or `adapter_luid`, and only a Vulkan
+   *   device takes `adapter_uuid` or `adapter_luid`), when a device that
+   *   doesn't render with Vulkan gets a `queue_lock`, or in a browser for every
+   *   backend: WebGPU makes devices asynchronously, and a WebGL2 context needs
+   *   a canvas. Attach without a device, which the session makes itself, or
+   *   wrap your WebGL2 context.
+   * - `Status.notFound` when no GPU matches `adapter_index`, `adapter_uuid`, or
+   *   `adapter_luid`.
+   * - `Status.nativeError` when the platform can't create the device.
+   */
+  static create(options?: GpuDeviceOptions): GpuDeviceHandle {
+    return withRegistrations((registrations) => {
+      const handle = native.mln_gpu_device_create(options);
+      return adopt(
+        handle,
+        () => new GpuDeviceHandle(ADOPT, handle, registrations),
+        (disposed) => native.mln_gpu_device_release(disposed, undefined),
+      );
+    });
+  }
+
+  /**
+   * Reads what the device can do.
+   *
+   * Check `export_kinds` before you attach an exported ring, to choose between
+   * the ring and a way of your own to show the map.
+   *
+   * See `mln_gpu_device_get_capabilities` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+   */
+  getCapabilities(): GpuDeviceCapabilities {
+    return native.mln_gpu_device_get_capabilities(this.id);
+  }
+
+  /**
+   * Gets the Vulkan instance, device, and graphics queue of a Vulkan device.
+   *
+   * Use them to make the images of a borrowed ring, or a surface, that sessions
+   * on the device render to. The sessions on the device share its graphics
+   * queue. To submit to the queue yourself, create the device with
+   * `GpuDeviceOptions.queueLock`.
+   *
+   * See `mln_gpu_device_get_vulkan_context` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the device doesn't render with Vulkan.
+   */
+  getVulkanContext(): GpuDeviceVulkanContextResult {
+    return native.mln_gpu_device_get_vulkan_context(this.id);
+  }
+
+  /**
+   * Releases a GPU device.
+   *
+   * Render sessions on the device keep using it until they detach, or their
+   * release finishes.
+   *
+   * See `mln_gpu_device_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+   */
+  release(): void {
+    closeSync(this, (handle, token) =>
+      native.mln_gpu_device_release(handle, token),
+    );
+  }
+
+  /**
+   * Wraps your Metal device and command queue, so that sessions render on them.
+   *
+   * See `mln_gpu_device_wrap_metal` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.metal`.
+   */
+  static wrapMetal(descriptor: MetalDeviceDescriptor): GpuDeviceHandle {
+    const handle = native.mln_gpu_device_wrap_metal(descriptor);
+    return adopt(
+      handle,
+      () => new GpuDeviceHandle(ADOPT, handle),
+      (disposed) => native.mln_gpu_device_release(disposed, undefined),
+    );
+  }
+
+  /**
+   * Makes an OpenGL device whose share group is your context's.
+   *
+   * Each session on the device makes a context of its own that shares objects
+   * with yours, so that it can render into your textures and present to your
+   * surfaces. A device that the library creates is a share group of its own.
+   *
+   * WebGL has no share groups: a WebGL device is your context. Its sessions
+   * present to a web canvas target whose canvas is the context's own, and take
+   * turns in the context. The library resets the context's state that it tracks
+   * at the start of each frame, and leaves it undefined after.
+   *
+   * See `mln_gpu_device_wrap_open_gl` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
+   *   the context's platform.
+   * - `Status.nativeError` when the platform rejects the context.
+   */
+  static wrapOpenGl(context: OpenGlContextDescriptor): GpuDeviceHandle {
+    const handle = native.mln_gpu_device_wrap_open_gl(context);
+    return adopt(
+      handle,
+      () => new GpuDeviceHandle(ADOPT, handle),
+      (disposed) => native.mln_gpu_device_release(disposed, undefined),
+    );
+  }
+
+  /**
+   * Wraps your Vulkan device and queue, so that sessions render on them.
+   *
+   * Sessions on the device render into your images, present to your surfaces,
+   * and submit to your queue, under your queue lock when you give one. Sessions
+   * of several devices that wrap one queue never submit to it at once.
+   *
+   * See `mln_gpu_device_wrap_vulkan` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.vulkan`.
+   * - `Status.nativeError` when the library can't load the device's functions.
+   */
+  static wrapVulkan(descriptor: VulkanDeviceDescriptor): GpuDeviceHandle {
+    return withRegistrations((registrations) => {
+      const handle = native.mln_gpu_device_wrap_vulkan(descriptor);
+      return adopt(
+        handle,
+        () => new GpuDeviceHandle(ADOPT, handle, registrations),
+        (disposed) => native.mln_gpu_device_release(disposed, undefined),
+      );
+    });
+  }
+
+  /**
+   * Wraps your WebGPU device, so that sessions render on it, into your textures
+   * and your canvases.
+   *
+   * See `mln_gpu_device_wrap_web_gpu` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` in every build: the library's WebGPU (wgpu) can't
+   *   wrap a `GPUDevice` yet (https://github.com/louwers/mln-rs/issues/263).
+   *   Attach a web canvas target without a device, and the session asks the
+   *   browser for one.
+   */
+  static wrapWebGpu(context: WebGpuContextDescriptor): GpuDeviceHandle {
+    const handle = native.mln_gpu_device_wrap_web_gpu(context);
+    return adopt(
+      handle,
+      () => new GpuDeviceHandle(ADOPT, handle),
+      (disposed) => native.mln_gpu_device_release(disposed, undefined),
+    );
+  }
+}
+defineDisposers(GpuDeviceHandle, "release", "release");
 
 /**
  * A map, with its style and camera.
@@ -890,6 +1160,50 @@ export class MapHandle extends Owner {
           this.id,
           sourceId,
           options,
+          completion,
+        );
+        registrations.commit(rootsOf(this));
+      }),
+    );
+  }
+
+  /**
+   * Adds a layer that draws with your own GPU commands, through `host`.
+   *
+   * The layer goes below the layer named `beforeLayerId`, or above every layer
+   * when `beforeLayerId` is empty. Its type is `custom`, and it takes the
+   * `visibility`, `minzoom`, and `maxzoom` properties, but no paint properties.
+   * `MapHandle.removeStyleLayer()` removes it.
+   *
+   * Runs on the thread that runs the session's graphics work: a library thread,
+   * or yours with `RenderDriverKind.callerGraphicsThread`. It can't call the
+   * library.
+   *
+   * It can't call the library.
+   *
+   * See `mln_map_add_custom_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the style has no layer named `beforeLayerId`.
+   * - `Status.alreadyExists` when the style already has a layer named
+   *   `layerId`.
+   * - `Status.invalidState` while the style isn't loaded, as
+   *   `MapHandle.setStyleUrl()` describes.
+   */
+  addCustomLayer(
+    layerId: string,
+    beforeLayerId?: string,
+    host?: CustomLayerHost,
+  ): Promise<CommandCompletion> {
+    return withRegistrations((registrations) =>
+      command((completion) => {
+        native.mln_map_add_custom_layer(
+          this.id,
+          layerId,
+          beforeLayerId,
+          host,
           completion,
         );
         registrations.commit(rootsOf(this));
@@ -1100,878 +1414,45 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Creates a session that renders the map into a ring of Android hardware
-   * buffers that the library allocates.
-   *
-   * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
-   * buffer with `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
-   * `RenderSessionHandle.resize()` gives the ring new buffers of the new size.
-   *
-   * A Vulkan build renders with `device`, or, when `device` is null, with a
-   * device that the library creates. An OpenGL build uses an EGL context on the
-   * default display, and `device` must be null. Attach with
-   * `RenderDriverKind.coreWorker`.
-   *
-   * To show the buffers through Android's UI, such as with
-   * `Bitmap.wrapHardwareBuffer`, attach without `GpuSyncKindFlag.syncFd` in
-   * `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes
-   * before you acquire it. Keep each frame acquired until the next one replaces
-   * it on screen, then release it with `GpuSyncKind.cpuComplete`. Give the ring
-   * 3 buffers, so the session can render while you hold two frames.
-   *
-   * See `mln_map_attach_android_hardware_buffer_ring` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when Android is older than 8.0, API level 26, or
-   *   when the graphics context can't render into hardware buffers: the Vulkan
-   *   device lacks VK_ANDROID_external_memory_android_hardware_buffer, or the
-   *   EGL display lacks EGL_ANDROID_get_native_client_buffer or
-   *   EGL_ANDROID_image_native_buffer.
-   * - `Status.nativeError` when the library can't create its Vulkan device or
-   *   initialize the default EGL display.
-   */
-  attachAndroidHardwareBufferRing(
-    descriptor: AndroidHardwareBufferRingDescriptor,
-    device: VulkanDeviceHandle | undefined,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_android_hardware_buffer_ring(
-            this.id,
-            descriptor,
-            device?.id,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that presents the map to an Android window, with a
-   * graphics context that the library creates.
-   *
-   * A Vulkan build presents with `device`, or, when `device` is null, with a
-   * device that the library creates. An OpenGL build uses an EGL context on the
-   * default display, and `device` must be null. Attach with
-   * `RenderDriverKind.coreWorker`.
-   *
-   * When the platform destroys the window, such as in
-   * `SurfaceHolder.Callback.surfaceDestroyed`, release the target with
-   * `RenderSessionHandle.releaseTarget()`, or give the session a new window
-   * with `RenderSessionHandle.setAndroidSurfaceTarget()`, without waiting for
-   * that to complete. The session keeps its own reference to the window and
-   * stays usable for the next window. A frame to the destroyed window finishes
-   * with `RenderResult.targetNotReady`, or with `RenderResult.rendered` if the
-   * window went away while the frame was presenting.
-   *
-   * See `mln_map_attach_android_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.invalidArgument` when `surface` has no window, such as after the
-   *   platform destroyed it.
-   * - `Status.unsupported` when you created `device` without
-   *   `VulkanDeviceOptions.presentation`.
-   * - `Status.unsupported` when the GPU or the Vulkan loader can't present.
-   * - `Status.nativeError` when the library can't create the graphics context
-   *   or the window's surface.
-   */
-  attachAndroidSurface(
-    descriptor: AndroidSurfaceDescriptor,
-    device: VulkanDeviceHandle | undefined,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_android_surface(
-            this.id,
-            descriptor,
-            device?.id,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map into a ring of dmabufs that the
-   * library allocates.
-   *
-   * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
-   * buffer with `AcquiredFrameHandle.withDmaBuf()`.
-   * `RenderSessionHandle.resize()` gives the ring new buffers of the new size.
-   *
-   * A Vulkan build renders with `device`, or, when `device` is null, with a
-   * device that the library creates. An OpenGL build uses an EGL context of its
-   * own, and `device` must be null. Attach with `RenderDriverKind.coreWorker`.
-   *
-   * For a reader that waits on no sync file, such as a Wayland compositor
-   * without explicit synchronization, attach without `GpuSyncKindFlag.syncFd`
-   * in `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
-   * finishes before you acquire it. Keep each frame acquired until its reader
-   * is done with the buffer. Give the ring 3 buffers, so the session can render
-   * while you hold two frames.
-   *
-   * See `mln_map_attach_dma_buf_ring` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/linux_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when the graphics context can't render into a dmabuf
-   *   of any of `formats`.
-   * - `Status.nativeError` when the library can't create its Vulkan device or
-   *   initialize an EGL display.
-   */
-  attachDmaBufRing(
-    descriptor: DmaBufRingDescriptor,
-    device: VulkanDeviceHandle | undefined,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_dma_buf_ring(
-            this.id,
-            descriptor,
-            device?.id,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map into a ring of DXGI shared textures
-   * that the library allocates.
-   *
-   * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
-   * texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
-   * `RenderSessionHandle.resize()` gives the ring new textures of the new size.
-   *
-   * The session renders with the Vulkan device `device`, or, when `device` is
-   * null, with one that the library creates. The textures belong to the
-   * device's GPU, so open them on a D3D11 or D3D12 device of the same adapter.
-   * To pick the GPU, create `device` with `VulkanDeviceOptions.deviceLuid` set
-   * to your adapter's LUID. Attach with `RenderDriverKind.coreWorker`.
-   *
-   * For a reader that waits on no fence, such as Flutter's texture registrar,
-   * attach without `GpuSyncKindFlag.d3d12Fence` in
-   * `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes
-   * before you acquire it. Release a frame with `GpuSyncKind.cpuComplete` only
-   * once the reader has finished with its texture.
-   *
-   * See `mln_map_attach_dxgi_shared_texture_ring` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` in an OpenGL build, or when the GPU can't share the
-   *   textures: D3D11 has no adapter with the Vulkan device's LUID or can't
-   *   share textures through NT handles, or the device lacks
-   *   VK_KHR_external_memory_win32 or can't import D3D11 textures.
-   * - `Status.nativeError` when the library can't create its Vulkan device or a
-   *   D3D11 device on the adapter.
-   */
-  attachDxgiSharedTextureRing(
-    descriptor: DxgiSharedTextureRingDescriptor,
-    device: VulkanDeviceHandle | undefined,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_dxgi_shared_texture_ring(
-            this.id,
-            descriptor,
-            device?.id,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map into a ring of IOSurfaces that the
-   * library allocates.
-   *
-   * Acquire each frame with `RenderSessionHandle.acquireFrame()`, and get its
-   * surface with `AcquiredFrameHandle.withIoSurface()`.
-   * `RenderSessionHandle.resize()` gives the ring new surfaces of the new size.
-   * Attach with `RenderDriverKind.coreWorker`.
-   *
-   * To hand frames to a reader that can't wait on an event, such as Flutter's
-   * `copyPixelBuffer`, attach without `GpuSyncKindFlag.metalSharedEvent` in
-   * `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes
-   * before you acquire it. Release a frame with `GpuSyncKind.cpuComplete` only
-   * once the reader has finished with its surface.
-   *
-   * See `mln_map_attach_io_surface_ring` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/apple_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.metal`.
-   * - `Status.nativeError` when `context` names no device and the system has no
-   *   Metal device.
-   */
-  attachIoSurfaceRing(
-    descriptor: IoSurfaceRingDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_io_surface_ring(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map into a ring of your Metal textures.
-   *
-   * See `mln_map_attach_metal_borrowed_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.metal`, or when the target supports none of the
-   *   `producer_sync_kinds` in `options`.
-   */
-  attachMetalBorrowedTexture(
-    descriptor: MetalBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_metal_borrowed_texture(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map to a Metal layer.
-   *
-   * See `mln_map_attach_metal_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.metal`.
-   */
-  attachMetalSurface(
-    descriptor: MetalSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_metal_surface(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Attaches a render session that renders the map offscreen.
-   *
-   * Read each image's pixels with `RenderSessionHandle.readTexture()`.
+   * Attaches a render session that renders the map into `target`.
    *
    * The session renders on `device`. When `device` is null, the session creates
    * a device with the default options, and releases it when the session ends.
    *
-   * See `mln_map_attach_offscreen` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
+   * See `mln_map_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    *
    * Errors:
    *
-   * - `Status.invalidState` when the map already has a render session.
+   * - `Status.invalidArgument` when a borrowed ring has depth textures, but not
+   *   one for each of its textures.
+   * - `Status.invalidState` when the map already has a render session, or a
+   *   window is minimized or has no client area.
+   * - `Status.unsupported` when the device's
+   *   `GpuDeviceCapabilities.targetKinds` lacks the target's kind, or, for a
+   *   null `device`, when no backend of this build renders to it, when
+   *   `options` sets `keep_depth` for a target other than an exported ring, or
+   *   when a borrowed ring's depth format isn't one of the device's
+   *   `GpuDeviceCapabilities.depthStencilFormats`.
+   * - `Status.invalidState` when a window was minimized or had no client area
+   *   when the attach ran.
+   * - `Status.unsupported` when the GPU or the graphics driver can't present to
+   *   the window.
    * - `Status.nativeError` when `device` is null and the platform can't create
-   *   a device.
+   *   a device, or when the library can't create its graphics context or
+   *   present to the window.
    */
-  attachOffscreen(
-    descriptor: OffscreenDescriptor,
-    options: RenderSessionAttachOptions,
-    device?: OffscreenDeviceHandle,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_offscreen(
-            this.id,
-            descriptor,
-            options,
-            device?.id,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that presents the map to an OpenHarmony window, with a
-   * graphics context that the library creates.
-   *
-   * A Vulkan build presents with `device`, or, when `device` is null, with a
-   * device that the library creates. An OpenGL build uses an EGL context on the
-   * default display, and `device` must be null. Attach with
-   * `RenderDriverKind.coreWorker`.
-   *
-   * When the platform destroys the window, such as in an `XComponent`'s
-   * `onSurfaceDestroyed` callback, release the target with
-   * `RenderSessionHandle.releaseTarget()`, or give the session a new window
-   * with `RenderSessionHandle.setOhosSurfaceTarget()`, without waiting for that
-   * to complete. The session keeps its own reference to the window and stays
-   * usable for the next window. A frame to the destroyed window finishes with
-   * `RenderResult.targetNotReady`, or with `RenderResult.rendered` if the
-   * window went away while the frame was presenting.
-   *
-   * See `mln_map_attach_ohos_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.invalidArgument` when no surface in this process has
-   *   `OhosSurfaceDescriptor.surfaceId`, such as after the platform destroyed
-   *   it.
-   * - `Status.unsupported` when you created `device` without
-   *   `VulkanDeviceOptions.presentation`.
-   * - `Status.unsupported` when the GPU or the Vulkan loader can't present.
-   * - `Status.nativeError` when the library can't create the graphics context
-   *   or the window's surface.
-   */
-  attachOhosSurface(
-    descriptor: OhosSurfaceDescriptor,
-    device: VulkanDeviceHandle | undefined,
+  attach(
+    target: RenderTarget,
+    device: GpuDeviceHandle | undefined,
     options: RenderSessionAttachOptions,
   ): RenderSessionHandle {
     return withRegistrations((registrations) =>
       attach(
         (completion) =>
-          native.mln_map_attach_ohos_surface(
+          native.mln_map_attach(
             this.id,
-            descriptor,
-            device?.id,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map into a ring of your OpenGL textures.
-   *
-   * See `mln_map_attach_open_gl_borrowed_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
-   *   the context's platform, or when the target supports none of the
-   *   `producer_sync_kinds` in `options`.
-   */
-  attachOpenGlBorrowedTexture(
-    descriptor: OpenGlBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_open_gl_borrowed_texture(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map to an OpenGL surface.
-   *
-   * See `mln_map_attach_open_gl_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `openGlSupportedContextProviderMask()` lacks
-   *   the context's platform.
-   */
-  attachOpenGlSurface(
-    descriptor: OpenGlSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_open_gl_surface(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map into a ring of your Vulkan images.
-   *
-   * See `mln_map_attach_vulkan_borrowed_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.vulkan`, or when the target supports none of the
-   *   `producer_sync_kinds` in `options`.
-   */
-  attachVulkanBorrowedTexture(
-    descriptor: VulkanBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_vulkan_borrowed_texture(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map to a Vulkan surface.
-   *
-   * See `mln_map_attach_vulkan_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.vulkan`.
-   */
-  attachVulkanSurface(
-    descriptor: VulkanSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_vulkan_surface(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that presents the map to a Wayland surface, with a
-   * graphics context that the library creates.
-   *
-   * A Vulkan build presents with `device`, or, when `device` is null, with a
-   * device that the library creates. An OpenGL build uses an EGL context on the
-   * display, and `device` must be null. Attach with
-   * `RenderDriverKind.coreWorker`.
-   *
-   * The session presents without waiting for the compositor, so demand at most
-   * one frame per display refresh.
-   *
-   * Keep the surface until a release or replacement of the target, or a detach
-   * of the session, completes. Keep the display connected until the session's
-   * detach completes. In an OpenGL build, if you also use EGL on the display,
-   * initialize it before you attach.
-   *
-   * See `mln_map_attach_wayland_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when you created `device` without
-   *   `VulkanDeviceOptions.presentation`.
-   * - `Status.unsupported` when the GPU or the Vulkan loader can't present to
-   *   Wayland.
-   * - `Status.nativeError` when the library can't create the graphics context
-   *   or present to the surface.
-   */
-  attachWaylandSurface(
-    descriptor: WaylandSurfaceDescriptor,
-    device: VulkanDeviceHandle | undefined,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_wayland_surface(
-            this.id,
-            descriptor,
-            device?.id,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map into a ring of your WebGPU textures.
-   *
-   * See `mln_map_attach_web_gpu_borrowed_texture` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.webGpu`, or when the target supports none of the
-   *   `producer_sync_kinds` in `options`.
-   */
-  attachWebGpuBorrowedTexture(
-    descriptor: WebGpuBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_web_gpu_borrowed_texture(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that renders the map to a WebGPU surface.
-   *
-   * See `mln_map_attach_web_gpu_surface` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.webGpu`.
-   */
-  attachWebGpuSurface(
-    descriptor: WebGpuSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_web_gpu_surface(
-            this.id,
-            descriptor,
-            options,
-            completion,
-          ),
-        (handle, ready) =>
-          adopt(
-            handle,
-            () =>
-              new RenderSessionHandle(
-                ADOPT,
-                handle,
-                this,
-                ready,
-                registrations,
-              ),
-            (disposed) =>
-              native.mln_render_session_dispose(disposed, undefined),
-          ),
-      ),
-    );
-  }
-
-  /**
-   * Creates a session that presents the map to a Win32 window, with a graphics
-   * context that the library creates.
-   *
-   * A Vulkan build presents with `device`, or, when `device` is null, with a
-   * device that the library creates. An OpenGL build uses a WGL context, and
-   * `device` must be null. Attach with `RenderDriverKind.coreWorker`.
-   *
-   * An OpenGL build sets the window's pixel format, so don't set one yourself.
-   *
-   * The session presents without waiting for the display, so demand at most one
-   * frame per display refresh. While the window is minimized, frame demands
-   * finish with `RenderResult.targetNotReady`.
-   *
-   * Keep the window until a release or replacement of the target, or a detach
-   * of the session, completes.
-   *
-   * See `mln_map_attach_win32_window` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.invalidArgument` when `window` isn't a window, or, in an OpenGL
-   *   build, already has another pixel format.
-   * - `Status.invalidState` when `window` is minimized or has no client area.
-   * - `Status.unsupported` when you created `device` without
-   *   `VulkanDeviceOptions.presentation`.
-   * - `Status.invalidState` when `window` was minimized before the attach ran.
-   * - `Status.unsupported` when the GPU or the Vulkan loader can't present.
-   * - `Status.nativeError` when the library can't create the graphics context
-   *   or present to the window.
-   */
-  attachWin32Window(
-    descriptor: Win32WindowDescriptor,
-    device: VulkanDeviceHandle | undefined,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionHandle {
-    return withRegistrations((registrations) =>
-      attach(
-        (completion) =>
-          native.mln_map_attach_win32_window(
-            this.id,
-            descriptor,
+            target,
             device?.id,
             options,
             completion,
@@ -2803,7 +2284,20 @@ export class MapHandle extends Owner {
    * Renders a still image of a static or tile map.
    *
    * The map's render session draws the image once every resource that the image
-   * needs has loaded.
+   * needs has loaded. While the image waits, the session holds a demand of its
+   * own for it, whose frame result carries `FRAME_DEMAND_TOKEN_STILL_IMAGE`:
+   *
+   * - It waits for the map to load what the image needs, and while every
+   *   texture of a borrowed ring holds a frame.
+   * - It finishes with the image's frame, and the image completes once that
+   *   frame's result is queued. Frames of your own demands complete no image.
+   * - Your demands never replace it, nor it them.
+   * - `RenderSessionHandle.barrier()` ends it with `RenderResult.noUpdate`, and
+   *   a detach or `RenderSessionHandle.releaseTarget()` ends it with
+   *   `RenderResult.targetNotReady`. The image gets a new demand once the
+   *   barrier runs, the session has a target again, or the next session
+   *   attaches.
+   * - An image that fails ends its demand with `RenderResult.noUpdate`.
    *
    * See `mln_map_request_still_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2821,10 +2315,11 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Sets the map's size.
+   * Sets the map's size and scale factor.
    *
-   * A map with a render session takes its size from the session, so resize the
-   * session with `RenderSessionHandle.resize()` instead.
+   * The map keeps its loaded tiles. A map with a render session takes its size
+   * and scale factor from the session, so resize the session with
+   * `RenderSessionHandle.resize()` instead.
    *
    * See `mln_map_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2835,9 +2330,9 @@ export class MapHandle extends Owner {
    * - `Status.invalidState` when a render session attached to the map before
    *   the resize applied.
    */
-  resize(logicalSize: LogicalSize): Promise<CommandCompletion> {
+  resize(extent: LogicalExtent): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_map_resize(this.id, logicalSize, completion),
+      native.mln_map_resize(this.id, extent, completion),
     );
   }
 
@@ -3616,6 +3111,40 @@ export class MapHandleDiscarding {
   }
 
   /**
+   * Adds a layer that draws with your own GPU commands, through `host`.
+   *
+   * The layer goes below the layer named `beforeLayerId`, or above every layer
+   * when `beforeLayerId` is empty. Its type is `custom`, and it takes the
+   * `visibility`, `minzoom`, and `maxzoom` properties, but no paint properties.
+   * `MapHandle.removeStyleLayer()` removes it.
+   *
+   * Runs on the thread that runs the session's graphics work: a library thread,
+   * or yours with `RenderDriverKind.callerGraphicsThread`. It can't call the
+   * library.
+   *
+   * It can't call the library.
+   *
+   * See `mln_map_add_custom_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  addCustomLayer(
+    layerId: string,
+    beforeLayerId?: string,
+    host?: CustomLayerHost,
+  ): void {
+    withRegistrations((registrations) => {
+      native.mln_map_add_custom_layer(
+        this.#owner.id,
+        layerId,
+        beforeLayerId,
+        host,
+        undefined,
+      );
+      registrations.commit(rootsOf(this.#owner));
+    });
+  }
+
+  /**
    * Adds a source whose vector tiles come from callbacks.
    *
    * See `mln_map_add_custom_vector_source` in the
@@ -4044,10 +3573,11 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Sets the map's size.
+   * Sets the map's size and scale factor.
    *
-   * A map with a render session takes its size from the session, so resize the
-   * session with `RenderSessionHandle.resize()` instead.
+   * The map keeps its loaded tiles. A map with a render session takes its size
+   * and scale factor from the session, so resize the session with
+   * `RenderSessionHandle.resize()` instead.
    *
    * See `mln_map_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4056,8 +3586,8 @@ export class MapHandleDiscarding {
    *
    * - `Status.invalidState` when the map has a render session.
    */
-  resize(logicalSize: LogicalSize): void {
-    native.mln_map_resize(this.#owner.id, logicalSize, undefined);
+  resize(extent: LogicalExtent): void {
+    native.mln_map_resize(this.#owner.id, extent, undefined);
   }
 
   /**
@@ -4782,76 +4312,6 @@ export class MapProjectionHandle extends Owner {
 defineDisposers(MapProjectionHandle, "release", "release");
 
 /**
- * A GPU device that the library creates to render maps offscreen.
- *
- * See `mln_offscreen_device` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
- */
-export class OffscreenDeviceHandle extends Owner {
-  /**
-   * Created by the API, which passes a key that only it holds.
-   *
-   * @internal
-   */
-  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
-    super(key, handle, "OffscreenDeviceHandle", { registrations });
-  }
-  /**
-   * Calls `release()`, for `await using`.
-   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.asyncDispose]: () => Promise<void>;
-  /**
-   * Calls `release()`, for `using`.
-   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.dispose]: () => void;
-
-  /**
-   * Creates a GPU device for rendering maps offscreen.
-   *
-   * `MapHandle.attachOffscreen()` creates a device of its own when it gets
-   * none. Create one to share it among the sessions on many maps, or to pick a
-   * GPU.
-   *
-   * In a browser WebGPU build, attach without a device instead.
-   *
-   * See `mln_offscreen_device_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` in a browser WebGPU build, or when the device can't
-   *   render with `client_api`.
-   * - `Status.nativeError` when `adapter_index` names no GPU, or the platform
-   *   can't create the device.
-   */
-  static create(options?: OffscreenDeviceOptions): OffscreenDeviceHandle {
-    const handle = native.mln_offscreen_device_create(options);
-    return adopt(
-      handle,
-      () => new OffscreenDeviceHandle(ADOPT, handle),
-      (disposed) => native.mln_offscreen_device_release(disposed, undefined),
-    );
-  }
-
-  /**
-   * Releases an offscreen device.
-   *
-   * Render sessions on the device keep working until they detach.
-   *
-   * See `mln_offscreen_device_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/offscreen_8h.html).
-   */
-  release(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_offscreen_device_release(handle, token),
-    );
-  }
-}
-defineDisposers(OffscreenDeviceHandle, "release", "release");
-
-/**
  * A render session draws a map into a surface or a texture.
  *
  * See `mln_render_session` in the
@@ -4912,6 +4372,12 @@ export class RenderSessionHandle extends Owner {
    * Abandon keeps the session's OpenGL and WebGPU objects until the process
    * exits, and reports how many it kept. Detach the session instead to free
    * them.
+   *
+   * A session lets go of your graphics objects later when you call this on the
+   * thread that runs its graphics work: from a callback that the session runs
+   * there, once the callback returns, and for a session driven by
+   * `RenderDriverKind.callerGraphicsThread`, at your next
+   * `RenderSessionHandle.serviceDriverWork()` for it.
    *
    * See `mln_render_session_abandon` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -5008,6 +4474,8 @@ export class RenderSessionHandle extends Owner {
    *
    * Errors:
    *
+   * - `Status.invalidArgument` when `demand.token` is
+   *   `FRAME_DEMAND_TOKEN_STILL_IMAGE`.
    * - `Status.targetLost` or `Status.nativeError`, as
    *   `RenderSessionSnapshot.failureStatus` reports, when the session has
    *   failed.
@@ -5237,7 +4705,8 @@ export class RenderSessionHandle extends Owner {
    * Finds the features that the session drew in an area of the screen.
    *
    * The query reads the last frame that the session rendered. A feature that
-   * several layers draw appears once for each layer.
+   * several layers draw appears once for each layer. The topmost layer's
+   * features come first, and the bottom layer's last.
    *
    * See `mln_render_session_query_rendered_features` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
@@ -5354,18 +4823,24 @@ export class RenderSessionHandle extends Owner {
    * are still pending, and later ones until you give the session a new target,
    * finish with `RenderResult.targetNotReady`. Once the release completes, you
    * can destroy the old target. An Android or OpenHarmony window can go away
-   * sooner, as `MapHandle.attachAndroidSurface()` and
-   * `MapHandle.attachOhosSurface()` say.
+   * sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
+   *
+   * For a borrowed ring, a completed release also means that the session has
+   * stopped waiting on the consumer sync that you released its frames with, so
+   * you can reuse or destroy the textures. The session waits about a second at
+   * most for that sync, and logs a warning when the wait runs out. It checks
+   * the sync without blocking a thread: keep servicing a session driven by
+   * `RenderDriverKind.callerGraphicsThread` until the release completes. The
+   * session keeps nothing of the released textures: a texture that a later
+   * target gives it again is a new one, even one that you discarded a frame of.
    *
    * See `mln_render_session_release_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    *
    * Errors:
    *
-   * - `Status.unsupported` when the session renders offscreen or into Android
-   *   hardware buffers, dmabufs, DXGI shared textures, or IOSurfaces that it
-   *   allocates.
-   * - `Status.unsupported` when the target is a WebGL canvas.
+   * - `Status.unsupported` when the session renders offscreen or into an
+   *   exported ring.
    * - `Status.targetLost` when the session loses its target before the release
    *   runs.
    */
@@ -5376,11 +4851,15 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Resizes the session's target and its map.
+   * Resizes the session's target and its map, and sets the map's scale factor.
    *
-   * The session renders at the map's scale factor. Release every acquired frame
-   * first. You can call it once the attach call returns. While the attach runs,
-   * the resize waits for it to complete.
+   * Use it when the window changes size, or moves to a display with another
+   * scale factor. The map keeps its loaded tiles, and draws its next frame at
+   * the new size and scale factor. You can call it once the attach call
+   * returns. While the attach runs, the resize waits for it to complete.
+   *
+   * An exported ring gets textures of the new size. The frames that you hold
+   * keep their textures, of the old size, until you release or discard them.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -5389,15 +4868,14 @@ export class RenderSessionHandle extends Owner {
    *
    * - `Status.unsupported` when the session renders into a borrowed ring. Give
    *   it new textures of the new size instead.
-   * - `Status.invalidState` while you hold one of the session's acquired
-   *   frames, or when the session failed, or you detached, abandoned, released,
-   *   or disposed it.
+   * - `Status.invalidState` when the session failed, or you detached,
+   *   abandoned, released, or disposed it.
    * - `Status.targetLost` when the session loses its target before the resize
    *   applies.
    */
-  resize(logicalSize: LogicalSize): Promise<CommandCompletion> {
+  resize(extent: LogicalExtent): Promise<CommandCompletion> {
     return command((completion) =>
-      native.mln_render_session_resize(this.id, logicalSize, completion),
+      native.mln_render_session_resize(this.id, extent, completion),
     );
   }
 
@@ -5415,41 +4893,14 @@ export class RenderSessionHandle extends Owner {
    *
    * See `mln_render_session_service_driver_work` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   */
-  serviceDriverWork(): void {
-    native.mln_render_session_service_driver_work(this.id);
-  }
-
-  /**
-   * Replaces the Android window that the session presents to.
-   *
-   * Use it to give the session a window again after
-   * `RenderSessionHandle.releaseTarget()`, to move it to another window, or to
-   * resize it. Once the replacement completes, the session no longer uses the
-   * old window.
-   *
-   * See `mln_render_session_set_android_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
    *
    * Errors:
    *
-   * - `Status.invalidArgument` when `surface` has no window, such as after the
-   *   platform destroyed it.
-   * - `Status.unsupported` when, in a Vulkan build, the new window needs a
-   *   different color format or pre-rotation support than the old one. Attach a
-   *   new session instead.
-   * - `Status.nativeError` when the library can't create the window's surface.
+   * - `Status.busy` when called while a service of the session already runs on
+   *   this thread, from a callback that the service runs.
    */
-  setAndroidSurfaceTarget(
-    replacement: AndroidSurfaceReplacement,
-  ): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_android_surface_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
+  serviceDriverWork(): void {
+    native.mln_render_session_service_driver_work(this.id);
   }
 
   /**
@@ -5476,279 +4927,49 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Replaces the Metal textures that a borrowed ring renders into.
+   * Replaces the window, surface, or borrowed ring that the session renders to,
+   * and resizes the map to it.
    *
-   * Use it to resize the ring, or to give the session textures again after
-   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-   * Once the replacement completes, the session no longer uses the old
-   * textures.
+   * Use it to give the session a target again after
+   * `RenderSessionHandle.releaseTarget()`, to move it to another window or
+   * surface, or to give a borrowed ring new textures, such as of a new size.
+   * The session renders to `target` with the device that it attached with. Once
+   * the replacement completes, the session no longer uses the old target. A
+   * borrowed ring takes only a ring of the kind it attached with, with as many
+   * textures, with depth textures only when it attached with them, and with the
+   * same formats, final layouts, and owner. Release every acquired frame of a
+   * borrowed ring first. Once the replacement completes, the session has also
+   * stopped waiting on the consumer sync of the textures that the new ring
+   * doesn't have, as `RenderSessionHandle.releaseTarget()` says, so you can
+   * reuse or destroy them.
    *
-   * See `mln_render_session_set_metal_borrowed_texture_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when the new textures have a different pixel format
-   *   than the old ones. Attach a new session to change it.
-   */
-  setMetalBorrowedTextureTarget(
-    replacement: MetalBorrowedTextureReplacement,
-  ): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_metal_borrowed_texture_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Replaces the Metal layer that the session renders to.
-   *
-   * Use it to give the session a layer again after
-   * `RenderSessionHandle.releaseTarget()`, to move it to another layer, or to
-   * resize it. Once the replacement completes, the session no longer uses the
-   * old layer.
-   *
-   * See `mln_render_session_set_metal_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  setMetalSurfaceTarget(replacement: MetalSurfaceReplacement): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_metal_surface_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Replaces the OpenHarmony window that the session presents to.
-   *
-   * Use it to give the session a window again after
-   * `RenderSessionHandle.releaseTarget()`, to move it to another window, or to
-   * resize it. Once the replacement completes, the session no longer uses the
-   * old window.
-   *
-   * See `mln_render_session_set_ohos_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/ohos_8h.html).
+   * See `mln_render_session_set_target` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    *
    * Errors:
    *
-   * - `Status.invalidArgument` when no surface in this process has
-   *   `OhosSurfaceReplacement.surfaceId`, such as after the platform destroyed
-   *   it.
-   * - `Status.unsupported` when, in a Vulkan build, the new window needs a
-   *   different color format or pre-rotation support than the old one. Attach a
-   *   new session instead.
-   * - `Status.nativeError` when the library can't create the window's surface.
+   * - `Status.invalidArgument` when a borrowed ring gets more or fewer textures
+   *   than it attached with, or depth textures but not one for each texture.
+   * - `Status.invalidState` when a window is minimized or has no client area,
+   *   or while you hold one of a borrowed ring's acquired frames.
+   * - `Status.unsupported` when the session renders offscreen or into an
+   *   exported ring, when `target` is offscreen or an exported ring, when a
+   *   session that presents gets a borrowed ring or a borrowed ring gets
+   *   anything else, or when no backend of this build renders to the target's
+   *   kind. An exported ring takes a new size from
+   *   `RenderSessionHandle.resize()` instead.
+   * - `Status.invalidState` when a window was minimized or had no client area
+   *   when the replacement ran.
+   * - `Status.unsupported` when the session's device can't render to `target`,
+   *   the new target needs a different color format or pre-rotation support
+   *   than the old one, or a borrowed ring's new textures differ from the old
+   *   ones in their formats, final layouts, or owner, or in having depth
+   *   textures. Attach a new session instead.
+   * - `Status.nativeError` when the library can't render to the new target.
    */
-  setOhosSurfaceTarget(replacement: OhosSurfaceReplacement): Promise<void> {
+  setTarget(target: RenderTarget): Promise<void> {
     return run((completion) =>
-      native.mln_render_session_set_ohos_surface_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Replaces the OpenGL textures that a borrowed ring renders into.
-   *
-   * Use it to resize the ring, or to give the session textures again after
-   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-   * Once the replacement completes, the session no longer uses the old
-   * textures.
-   *
-   * See `mln_render_session_set_open_gl_borrowed_texture_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  setOpenGlBorrowedTextureTarget(
-    replacement: OpenGlBorrowedTextureReplacement,
-  ): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_open_gl_borrowed_texture_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Replaces the OpenGL surface that the session presents to.
-   *
-   * Use it to give the session a surface again after
-   * `RenderSessionHandle.releaseTarget()`, to move it to another surface, or to
-   * resize it. Once the replacement completes, the session no longer uses the
-   * old surface.
-   *
-   * See `mln_render_session_set_open_gl_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  setOpenGlSurfaceTarget(replacement: OpenGlSurfaceReplacement): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_open_gl_surface_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Replaces the Vulkan images that a borrowed ring renders into.
-   *
-   * Use it to resize the ring, or to give the session images again after
-   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-   * Once the replacement completes, the session no longer uses the old images.
-   *
-   * See `mln_render_session_set_vulkan_borrowed_texture_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  setVulkanBorrowedTextureTarget(
-    replacement: VulkanBorrowedTextureReplacement,
-  ): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_vulkan_borrowed_texture_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Replaces the Vulkan surface that the session presents to.
-   *
-   * Use it to give the session a surface again after
-   * `RenderSessionHandle.releaseTarget()`, to move it to another surface, or to
-   * resize it. Once the replacement completes, the session no longer uses the
-   * old surface.
-   *
-   * See `mln_render_session_set_vulkan_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when the new surface needs a different color format
-   *   or pre-rotation support than the old one. Attach a new session instead.
-   */
-  setVulkanSurfaceTarget(replacement: VulkanSurfaceReplacement): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_vulkan_surface_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Replaces the Wayland surface that the session presents to.
-   *
-   * Use it to give the session a surface again after
-   * `RenderSessionHandle.releaseTarget()`, to move it to another surface, or to
-   * resize it. Once the replacement completes, the session no longer uses the
-   * old surface.
-   *
-   * See `mln_render_session_set_wayland_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wayland_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when, in a Vulkan build, the new surface needs a
-   *   different color format than the old one. Attach a new session instead.
-   * - `Status.nativeError` when the library can't present to the new surface.
-   */
-  setWaylandSurfaceTarget(
-    replacement: WaylandSurfaceReplacement,
-  ): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_wayland_surface_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Replaces the WebGPU textures that a borrowed ring renders into.
-   *
-   * Use it to resize the ring, or to give the session textures again after
-   * `RenderSessionHandle.releaseTarget()`. Release every acquired frame first.
-   * Once the replacement completes, the session no longer uses the old
-   * textures.
-   *
-   * See `mln_render_session_set_web_gpu_borrowed_texture_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  setWebGpuBorrowedTextureTarget(
-    replacement: WebGpuBorrowedTextureReplacement,
-  ): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_web_gpu_borrowed_texture_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Replaces the WebGPU surface that the session presents to.
-   *
-   * Use it to give the session a surface again after
-   * `RenderSessionHandle.releaseTarget()`, to move it to another surface, or to
-   * resize it. Once the replacement completes, the session no longer uses the
-   * old surface.
-   *
-   * See `mln_render_session_set_web_gpu_surface_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  setWebGpuSurfaceTarget(replacement: WebGpuSurfaceReplacement): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_web_gpu_surface_target(
-        this.id,
-        replacement,
-        completion,
-      ),
-    );
-  }
-
-  /**
-   * Replaces the Win32 window that the session presents to.
-   *
-   * Use it to give the session a window again after
-   * `RenderSessionHandle.releaseTarget()`, to move it to another window, or to
-   * resize it. Once the replacement completes, the session no longer uses the
-   * old window.
-   *
-   * See `mln_render_session_set_win32_window_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/win32_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.invalidArgument` when `window` isn't a window, or, in an OpenGL
-   *   build, already has another pixel format.
-   * - `Status.invalidState` when `window` is minimized or has no client area.
-   * - `Status.invalidState` when `window` was minimized before the replacement
-   *   ran.
-   * - `Status.unsupported` when, in a Vulkan build, the new window needs a
-   *   different color format than the old one. Attach a new session instead.
-   * - `Status.nativeError` when the library can't present to the new window.
-   */
-  setWin32WindowTarget(replacement: Win32WindowReplacement): Promise<void> {
-    return run((completion) =>
-      native.mln_render_session_set_win32_window_target(
-        this.id,
-        replacement,
-        completion,
-      ),
+      native.mln_render_session_set_target(this.id, target, completion),
     );
   }
 }
@@ -5773,11 +4994,15 @@ export class RenderSessionHandleDiscarding {
   }
 
   /**
-   * Resizes the session's target and its map.
+   * Resizes the session's target and its map, and sets the map's scale factor.
    *
-   * The session renders at the map's scale factor. Release every acquired frame
-   * first. You can call it once the attach call returns. While the attach runs,
-   * the resize waits for it to complete.
+   * Use it when the window changes size, or moves to a display with another
+   * scale factor. The map keeps its loaded tiles, and draws its next frame at
+   * the new size and scale factor. You can call it once the attach call
+   * returns. While the attach runs, the resize waits for it to complete.
+   *
+   * An exported ring gets textures of the new size. The frames that you hold
+   * keep their textures, of the old size, until you release or discard them.
    *
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -5786,12 +5011,11 @@ export class RenderSessionHandleDiscarding {
    *
    * - `Status.unsupported` when the session renders into a borrowed ring. Give
    *   it new textures of the new size instead.
-   * - `Status.invalidState` while you hold one of the session's acquired
-   *   frames, or when the session failed, or you detached, abandoned, released,
-   *   or disposed it.
+   * - `Status.invalidState` when the session failed, or you detached,
+   *   abandoned, released, or disposed it.
    */
-  resize(logicalSize: LogicalSize): void {
-    native.mln_render_session_resize(this.#owner.id, logicalSize, undefined);
+  resize(extent: LogicalExtent): void {
+    native.mln_render_session_resize(this.#owner.id, extent, undefined);
   }
 }
 
@@ -6074,11 +5298,15 @@ export class RuntimeHandle extends Owner {
    * Creates a runtime.
    *
    * A runtime holds maps and the resource loading, cache, and offline regions
-   * that they share. In a browser, create runtimes on a Web Worker, not on the
-   * main thread.
+   * that they share.
    *
-   * Resolves once the call completes, so a browser page, which cannot block,
-   * can call it.
+   * In a browser, the library runs on the thread that loaded its module and
+   * never blocks it: commands, render sessions, completions, wakes and
+   * callbacks all run on that thread, in tasks of the library's own after the
+   * call that started them returns. Wait for a completion with a callback, or
+   * yield to the event loop; a blocking wait can't end. Load the module on a
+   * dedicated Web Worker, so that the map's work doesn't delay the page. On the
+   * page's thread it works too, but every frame and style parse runs there.
    *
    * See `mln_runtime_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
@@ -6087,16 +5315,15 @@ export class RuntimeHandle extends Owner {
    *
    * - `Status.invalidArgument` when the cache database file that `options`
    *   names can't be opened or created.
+   * - `Status.unsupported` in a browser for a cache path: the browser caches
+   *   the runtime's requests.
    */
-  static create(options?: RuntimeOptions): Promise<RuntimeHandle> {
-    return threadStart(
-      (start) => native.mln_runtime_create(options, start),
-      (handle) =>
-        adopt(
-          handle,
-          () => new RuntimeHandle(ADOPT, handle),
-          (disposed) => native.mln_runtime_dispose(disposed, undefined),
-        ),
+  static create(options?: RuntimeOptions): RuntimeHandle {
+    const handle = native.mln_runtime_create(options);
+    return adopt(
+      handle,
+      () => new RuntimeHandle(ADOPT, handle),
+      (disposed) => native.mln_runtime_dispose(disposed, undefined),
     );
   }
 
@@ -6274,8 +5501,6 @@ export class RuntimeHandle extends Owner {
    *
    * - `Status.invalidArgument` when `sideDatabasePath` isn't a readable
    *   database file.
-   * - `Status.nativeError` when the merge would exceed the tile limit that
-   *   `RuntimeEventType.offlineRegionTileCountLimitExceeded` describes.
    */
   mergeOfflineRegions(
     sideDatabasePath: string,
@@ -6341,16 +5566,16 @@ export class RuntimeHandle extends Owner {
   /**
    * Adds headers to the runtime's HTTP requests.
    *
-   * The transform replaces the one set before. In a browser or on OpenHarmony,
-   * serve the requests with `RuntimeHandle.setResourceProvider()` instead.
+   * The transform replaces the one set before. A redirect to another origin
+   * drops its headers. In a browser, serve the requests with
+   * `RuntimeHandle.setResourceProvider()` instead.
    *
    * See `mln_runtime_set_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    *
    * Errors:
    *
-   * - `Status.unsupported` when the library runs in a browser or on
-   *   OpenHarmony.
+   * - `Status.unsupported` when the library runs in a browser.
    */
   setHttpHeaderTransform(
     transform: HttpHeaderTransform,
@@ -6587,16 +5812,16 @@ export class RuntimeHandleDiscarding {
   /**
    * Adds headers to the runtime's HTTP requests.
    *
-   * The transform replaces the one set before. In a browser or on OpenHarmony,
-   * serve the requests with `RuntimeHandle.setResourceProvider()` instead.
+   * The transform replaces the one set before. A redirect to another origin
+   * drops its headers. In a browser, serve the requests with
+   * `RuntimeHandle.setResourceProvider()` instead.
    *
    * See `mln_runtime_set_http_header_transform` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    *
    * Errors:
    *
-   * - `Status.unsupported` when the library runs in a browser or on
-   *   OpenHarmony.
+   * - `Status.unsupported` when the library runs in a browser.
    */
   setHttpHeaderTransform(transform: HttpHeaderTransform): void {
     withRegistrations((registrations) => {
@@ -6746,93 +5971,6 @@ export class StyleExpressionHandle extends Owner {
   }
 }
 defineDisposers(StyleExpressionHandle, "release", "release");
-
-/**
- * A Vulkan instance, device, and queue that the library creates and owns.
- *
- * See `mln_vulkan_device` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
- */
-export class VulkanDeviceHandle extends Owner {
-  /**
-   * Created by the API, which passes a key that only it holds.
-   *
-   * @internal
-   */
-  constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
-    super(key, handle, "VulkanDeviceHandle", { registrations });
-  }
-  /**
-   * Calls `release()`, for `await using`.
-   * Hosts without `Symbol.asyncDispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.asyncDispose]: () => Promise<void>;
-  /**
-   * Calls `release()`, for `using`.
-   * Hosts without `Symbol.dispose`, such as ArkTS, leave it undefined.
-   */
-  declare [Symbol.dispose]: () => void;
-
-  /**
-   * Creates a Vulkan instance, device, and graphics queue for render sessions.
-   *
-   * Attach sessions with the context from `VulkanDeviceHandle.getContext()`, in
-   * place of a device of your own. Without `device_uuid` or `device_luid`, it
-   * prefers a discrete GPU. The device enables the external memory and
-   * semaphore extensions that the GPU offers.
-   *
-   * See `mln_vulkan_device_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
-   *   `RenderBackendFlag.vulkan`, or when `presentation` is true and the Vulkan
-   *   loader or the GPU can't present.
-   * - `Status.notFound` when no GPU matches `device_uuid` and `device_luid`.
-   * - `Status.nativeError` when there is no Vulkan loader, no GPU has a
-   *   graphics queue, or Vulkan can't create the instance or the device.
-   */
-  static create(options?: VulkanDeviceOptions): VulkanDeviceHandle {
-    const handle = native.mln_vulkan_device_create(options);
-    return adopt(
-      handle,
-      () => new VulkanDeviceHandle(ADOPT, handle),
-      (disposed) => native.mln_vulkan_device_release(disposed, undefined),
-    );
-  }
-
-  /**
-   * Gets the context to attach render sessions to the device with.
-   *
-   * Pass it as the context of `MapHandle.attachVulkanSurface()` or
-   * `MapHandle.attachVulkanBorrowedTexture()`. The sessions on the device share
-   * its graphics queue. To submit to the queue yourself, set
-   * `RenderSessionAttachOptions.queueLock` on each session.
-   *
-   * See `mln_vulkan_device_get_context` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
-   */
-  getContext(): VulkanDeviceContextResult {
-    return native.mln_vulkan_device_get_context(this.id);
-  }
-
-  /**
-   * Releases a Vulkan device.
-   *
-   * Render sessions that attached with the device's context keep using it until
-   * they detach or their release finishes.
-   *
-   * See `mln_vulkan_device_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/vulkan_8h.html).
-   */
-  release(): void {
-    closeSync(this, (handle, token) =>
-      native.mln_vulkan_device_release(handle, token),
-    );
-  }
-}
-defineDisposers(VulkanDeviceHandle, "release", "release");
 
 /**
  * A `AndroidHardwareBufferFrame` whose native objects stay valid only while the
@@ -7094,6 +6232,83 @@ export class ScopedMetalTextureFrame {
   get pixelFormat(): MetalTextureFrame["pixelFormat"] {
     return this.#value.pixelFormat;
   }
+
+  get depthTexture(): MetalTextureFrame["depthTexture"] {
+    return this.#scope.active(this.#value).depthTexture;
+  }
+
+  get depthPixelFormat(): MetalTextureFrame["depthPixelFormat"] {
+    return this.#value.depthPixelFormat;
+  }
+}
+
+/**
+ * A `OpaqueFdFrame` whose native objects stay valid only while the
+ * callback of {@link AcquiredFrameHandle.withOpaqueFd} runs. Its other members stay
+ * readable after the callback returns.
+ */
+export class ScopedOpaqueFdFrame {
+  readonly #value: OpaqueFdFrame;
+  readonly #scope: ViewScope;
+
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, scope: ViewScope, value: OpaqueFdFrame) {
+    checkKey(key);
+    this.#value = value;
+    this.#scope = scope;
+  }
+
+  get width(): OpaqueFdFrame["width"] {
+    return this.#value.width;
+  }
+
+  get height(): OpaqueFdFrame["height"] {
+    return this.#value.height;
+  }
+
+  get scaleFactor(): OpaqueFdFrame["scaleFactor"] {
+    return this.#value.scaleFactor;
+  }
+
+  get slot(): OpaqueFdFrame["slot"] {
+    return this.#value.slot;
+  }
+
+  get fd(): OpaqueFdFrame["fd"] {
+    return this.#scope.active(this.#value).fd;
+  }
+
+  get allocationSize(): OpaqueFdFrame["allocationSize"] {
+    return this.#value.allocationSize;
+  }
+
+  get dedicated(): OpaqueFdFrame["dedicated"] {
+    return this.#value.dedicated;
+  }
+
+  get format(): OpaqueFdFrame["format"] {
+    return this.#value.format;
+  }
+
+  get depthFd(): OpaqueFdFrame["depthFd"] {
+    return this.#scope.active(this.#value).depthFd;
+  }
+
+  get depthAllocationSize(): OpaqueFdFrame["depthAllocationSize"] {
+    return this.#value.depthAllocationSize;
+  }
+
+  get depthDedicated(): OpaqueFdFrame["depthDedicated"] {
+    return this.#value.depthDedicated;
+  }
+
+  get depthFormat(): OpaqueFdFrame["depthFormat"] {
+    return this.#value.depthFormat;
+  }
 }
 
 /**
@@ -7138,6 +6353,14 @@ export class ScopedOpenGlTextureFrame {
 
   get target(): OpenGlTextureFrame["target"] {
     return this.#value.target;
+  }
+
+  get depthTexture(): OpenGlTextureFrame["depthTexture"] {
+    return this.#scope.active(this.#value).depthTexture;
+  }
+
+  get depthInternalFormat(): OpenGlTextureFrame["depthInternalFormat"] {
+    return this.#value.depthInternalFormat;
   }
 }
 
@@ -7196,6 +6419,22 @@ export class ScopedVulkanTextureFrame {
   get layout(): VulkanTextureFrame["layout"] {
     return this.#value.layout;
   }
+
+  get depthImage(): VulkanTextureFrame["depthImage"] {
+    return this.#scope.active(this.#value).depthImage;
+  }
+
+  get depthImageView(): VulkanTextureFrame["depthImageView"] {
+    return this.#scope.active(this.#value).depthImageView;
+  }
+
+  get depthFormat(): VulkanTextureFrame["depthFormat"] {
+    return this.#value.depthFormat;
+  }
+
+  get depthLayout(): VulkanTextureFrame["depthLayout"] {
+    return this.#value.depthLayout;
+  }
 }
 
 /**
@@ -7238,16 +6477,20 @@ export class ScopedWebGpuTextureFrame {
     return this.#scope.active(this.#value).texture;
   }
 
-  get textureView(): WebGpuTextureFrame["textureView"] {
-    return this.#scope.active(this.#value).textureView;
-  }
-
   get device(): WebGpuTextureFrame["device"] {
     return this.#scope.active(this.#value).device;
   }
 
   get format(): WebGpuTextureFrame["format"] {
-    return this.#value.format;
+    return this.#scope.active(this.#value).format;
+  }
+
+  get depthTexture(): WebGpuTextureFrame["depthTexture"] {
+    return this.#scope.active(this.#value).depthTexture;
+  }
+
+  get depthFormat(): WebGpuTextureFrame["depthFormat"] {
+    return this.#scope.active(this.#value).depthFormat;
   }
 }
 

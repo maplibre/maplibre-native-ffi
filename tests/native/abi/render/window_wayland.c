@@ -7,12 +7,9 @@
 #include <string.h>
 
 #include "support/frames.h"
+#include "support/host_graphics.h"
 #include "support/test_support.h"
 #include "support/wayland_compositor.h"
-
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-#include <vulkan/vulkan_core.h>
-#endif
 
 enum { window_size = 64 };
 
@@ -31,103 +28,37 @@ static void expect_red_frame(
   TEST_ASSERT_EQUAL_HEX8(0xff, frame.center[3]);
 }
 
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-static mln_vulkan_device create_device(
-  bool presentation, const uint8_t* device_uuid
+static mln_render_target wayland_target(
+  mln_test_wayland* wayland, void* surface
 ) {
-  mln_vulkan_device_options options = {
-    .size = sizeof(mln_vulkan_device_options)
+  mln_render_target target = {
+    .size = sizeof(mln_render_target),
+    .kind = MLN_RENDER_TARGET_KIND_WAYLAND_SURFACE,
   };
-  options.fields = MLN_VULKAN_DEVICE_OPTION_PRESENTATION;
-  options.presentation = presentation;
-  if (device_uuid != NULL) {
-    options.fields |= MLN_VULKAN_DEVICE_OPTION_DEVICE_UUID;
-    options.device_uuid =
-      (mln_buffer_view){.data = device_uuid, .size = VK_UUID_SIZE};
-  }
-  mln_vulkan_device device = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_vulkan_device_create(&options, &device, MLN_TEST_DIAGNOSTIC));
-  return device;
-}
-
-// Finds the CPU's Vulkan device, such as lavapipe, through the instance of a
-// device that the library creates.
-static void find_cpu_device(uint8_t out_uuid[VK_UUID_SIZE]) {
-  const mln_vulkan_device probe = create_device(false, NULL);
-  mln_vulkan_device_context_result result = {.size = sizeof(result)};
-  MLN_TEST_OK(
-    mln_vulkan_device_get_context(probe, &result, MLN_TEST_DIAGNOSTIC)
-  );
-  const PFN_vkGetInstanceProcAddr get_instance_proc_addr =
-    (PFN_vkGetInstanceProcAddr)(uintptr_t)result.context.get_instance_proc_addr;
-  VkInstance instance = (VkInstance)result.context.instance;
-  const PFN_vkEnumeratePhysicalDevices enumerate =
-    (PFN_vkEnumeratePhysicalDevices)get_instance_proc_addr(
-      instance, "vkEnumeratePhysicalDevices"
-    );
-  const PFN_vkGetPhysicalDeviceProperties2 get_properties =
-    (PFN_vkGetPhysicalDeviceProperties2)get_instance_proc_addr(
-      instance, "vkGetPhysicalDeviceProperties2"
-    );
-  VkPhysicalDevice devices[16];
-  uint32_t count = 16;
-  const VkResult listed = enumerate(instance, &count, devices);
-  bool found = false;
-  for (uint32_t index = 0; index < count && !found; ++index) {
-    VkPhysicalDeviceIDProperties ids = {
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES,
-    };
-    VkPhysicalDeviceProperties2 properties = {
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
-      .pNext = &ids,
-    };
-    get_properties(devices[index], &properties);
-    if (properties.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU) {
-      memcpy(out_uuid, ids.deviceUUID, VK_UUID_SIZE);
-      found = true;
-    }
-  }
-  mln_vulkan_device_release(probe);
-  TEST_ASSERT_TRUE(listed == VK_SUCCESS || listed == VK_INCOMPLETE);
-  TEST_ASSERT_TRUE_MESSAGE(found, "no CPU Vulkan device, such as lavapipe");
-}
-#endif
-
-// The device that a case presents with. A GPU's driver presents through
-// dmabufs, whose memory the test compositor can't map, so a Vulkan build
-// presents with the CPU's device, which uses shared memory, as Mesa's EGL does
-// when a compositor offers no dmabufs.
-static mln_vulkan_device create_presenting_device(void) {
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  uint8_t uuid[VK_UUID_SIZE] = {0};
-  find_cpu_device(uuid);
-  return create_device(true, uuid);
-#else
-  return MLN_HANDLE_NULL;
-#endif
+  target.data.wayland_surface = (mln_wayland_surface_target){
+    .logical_size = {.width = window_size, .height = window_size},
+    .display = mln_test_wayland_display(wayland),
+    .surface = surface,
+  };
+  return target;
 }
 
 // Submits an attach to `surface` without waiting for it. The fixture holds the
 // session once the call succeeds.
 static mln_status start_attach(
-  mln_map map, mln_test_wayland* wayland, void* surface,
-  mln_vulkan_device device, mln_render_driver_kind driver,
-  mln_test_completion* completion, mln_test_render_fixture* fixture
+  mln_map map, mln_test_wayland* wayland, void* surface, mln_gpu_device device,
+  mln_render_driver_kind driver, mln_test_completion* completion,
+  mln_test_render_fixture* fixture
 ) {
-  const mln_wayland_surface_descriptor descriptor = {
-    .size = sizeof(mln_wayland_surface_descriptor),
-    .logical_size = {.width = window_size, .height = window_size},
-    .display = mln_test_wayland_display(wayland),
-    .surface = surface,
-  };
+  const mln_render_target target = wayland_target(wayland, surface);
   mln_render_session_attach_options options = {
     .size = sizeof(mln_render_session_attach_options), .driver = driver
   };
   options.frame_wake = mln_test_pulse_wake();
   fixture->driver = driver;
-  const mln_status status = mln_map_attach_wayland_surface(
-    map, &descriptor, device, &options, &fixture->session,
-    &completion->descriptor, MLN_TEST_DIAGNOSTIC
+  const mln_status status = mln_map_attach(
+    map, &target, device, &options, &fixture->session, &completion->descriptor,
+    MLN_TEST_DIAGNOSTIC
   );
   if (status != MLN_STATUS_OK) mln_test_completion_reject(completion);
   return status;
@@ -139,13 +70,13 @@ static void attach(
   mln_map map, mln_test_wayland* wayland, void* surface,
   mln_test_render_fixture* fixture
 ) {
-  const mln_vulkan_device device = create_presenting_device();
+  const mln_gpu_device device = mln_test_create_presenting_device();
   mln_test_completion completion = mln_test_completion_default(0);
   const mln_status attached = start_attach(
     map, wayland, surface, device, MLN_RENDER_DRIVER_CORE_WORKER, &completion,
     fixture
   );
-  mln_vulkan_device_release(device);
+  mln_gpu_device_release(device);
   MLN_TEST_OK(attached);
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &completion));
   mln_test_completion_destroy(&completion);
@@ -160,17 +91,15 @@ static void render_frame(const mln_test_render_fixture* fixture) {
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
 }
 
-static void set_surface(const mln_test_render_fixture* fixture, void* surface) {
-  const mln_wayland_surface_replacement replacement = {
-    .size = sizeof(mln_wayland_surface_replacement),
-    .logical_size = {.width = window_size, .height = window_size},
-    .surface = surface,
-  };
+static void set_surface(
+  const mln_test_render_fixture* fixture, mln_test_wayland* wayland,
+  void* surface
+) {
+  const mln_render_target target = wayland_target(wayland, surface);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, fixture,
-    mln_render_session_set_wayland_surface_target(
-      fixture->session, &replacement, &completion.descriptor,
-      MLN_TEST_DIAGNOSTIC
+    mln_render_session_set_target(
+      fixture->session, &target, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
 }
@@ -208,7 +137,8 @@ static mln_map create_red_map(mln_runtime runtime) {
 }
 
 // A Wayland client sizes the surface's buffers itself, so a resize has to
-// reach them.
+// reach them, and so does a scale factor that changes, such as when the
+// window moves to another display.
 static void a_session_presents_to_a_surface_at_its_size(void) {
   const mln_runtime runtime = mln_test_create_runtime();
   const mln_map map = create_red_map(runtime);
@@ -225,7 +155,19 @@ static void a_session_presents_to_a_surface_at_its_size(void) {
     MLN_TEST_RENDER_AWAIT(
       MLN_STATUS_OK, &fixture,
       mln_render_session_resize(
-        fixture.session, (mln_logical_size){.width = 96, .height = 48},
+        fixture.session,
+        (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
+        &completion.descriptor, MLN_TEST_DIAGNOSTIC
+      )
+    );
+    render_frame(&fixture);
+    expect_red_frame(wayland, surfaces[0], 96, 48);
+
+    MLN_TEST_RENDER_AWAIT(
+      MLN_STATUS_OK, &fixture,
+      mln_render_session_resize(
+        fixture.session,
+        (mln_logical_extent){.width = 48, .height = 24, .scale_factor = 2.0},
         &completion.descriptor, MLN_TEST_DIAGNOSTIC
       )
     );
@@ -259,11 +201,11 @@ static void a_session_presents_to_each_surface_that_it_gets(void) {
         fixture.session, &completion.descriptor, MLN_TEST_DIAGNOSTIC
       )
     );
-    set_surface(&fixture, surfaces[1]);
+    set_surface(&fixture, wayland, surfaces[1]);
     render_frame(&fixture);
     expect_red_frame(wayland, surfaces[1], window_size, window_size);
 
-    set_surface(&fixture, surfaces[0]);
+    set_surface(&fixture, wayland, surfaces[0]);
     render_frame(&fixture);
     expect_red_frame(wayland, surfaces[0], window_size, window_size);
   }
@@ -327,41 +269,23 @@ static void a_wayland_surface_rejects_the_callers_graphics_thread(void) {
   destroy_map_and_runtime(map, runtime);
 }
 
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-static void a_device_without_presentation_cannot_present(void) {
-  const mln_runtime runtime = mln_test_create_runtime();
-  const mln_map map = mln_test_create_map(runtime);
-  mln_test_wayland* wayland = NULL;
-  void* surfaces[1] = {NULL};
-  mln_vulkan_device device = MLN_HANDLE_NULL;
-  if (TEST_PROTECT()) {
-    mln_test_wayland_start(&wayland);
-    surfaces[0] = mln_test_wayland_create_surface(wayland);
-    device = create_device(false, NULL);
-    mln_test_render_fixture fixture = {0};
-    mln_test_completion completion = mln_test_completion_default(0);
-    MLN_TEST_STATUS(
-      MLN_STATUS_UNSUPPORTED,
-      start_attach(
-        map, wayland, surfaces[0], device, MLN_RENDER_DRIVER_CORE_WORKER,
-        &completion, &fixture
-      )
-    );
-    mln_test_completion_destroy(&completion);
-    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, fixture.session);
-  }
-  mln_vulkan_device_release(device);
-  stop_wayland(wayland, surfaces, 1);
-  destroy_map_and_runtime(map, runtime);
+// A device that presents to Wayland surfaces says so.
+static void the_presenting_device_reports_wayland_surfaces(void) {
+  const mln_gpu_device device = mln_test_create_presenting_device();
+  mln_gpu_device_capabilities capabilities = {.size = sizeof(capabilities)};
+  MLN_TEST_OK(
+    mln_gpu_device_get_capabilities(device, &capabilities, MLN_TEST_DIAGNOSTIC)
+  );
+  mln_gpu_device_release(device);
+  TEST_ASSERT_NOT_EQUAL_UINT32(
+    0, capabilities.target_kinds & MLN_RENDER_TARGET_KIND_FLAG_WAYLAND_SURFACE
+  );
 }
-#endif
 
 MLN_TEST_GROUP {
   RUN_TEST(a_session_presents_to_a_surface_at_its_size);
   RUN_TEST(a_session_presents_to_each_surface_that_it_gets);
   RUN_TEST(a_session_presents_to_a_hidden_surface_and_detaches);
   RUN_TEST(a_wayland_surface_rejects_the_callers_graphics_thread);
-#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  RUN_TEST(a_device_without_presentation_cannot_present);
-#endif
+  RUN_TEST(the_presenting_device_reports_wayland_surfaces);
 }
