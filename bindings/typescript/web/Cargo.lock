@@ -3,6 +3,12 @@
 version = 4
 
 [[package]]
+name = "ab_glyph_rasterizer"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "366ffbaa4442f4684d91e2cd7c5ea7c4ed8add41959a31447066e279e432b618"
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -448,6 +454,24 @@ checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "etagere"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ecb5c40d5683a270e077688f53a99eac51c1cb1ae5ba63b55590370cb3536bf"
+dependencies = [
+ "euclid",
+]
+
+[[package]]
+name = "euclid"
+version = "0.22.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1a05365e3b1c6d1650318537c7460c6923f1abdd272ad6842baa2b509957a06"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -1571,6 +1595,7 @@ dependencies = [
 name = "mln-rs-conversion"
 version = "0.0.11"
 dependencies = [
+ "foldhash 0.2.0",
  "geojson",
  "mln-rs-feature",
  "serde",
@@ -1629,6 +1654,7 @@ dependencies = [
 name = "mln-rs-geojson-vt"
 version = "0.0.11"
 dependencies = [
+ "foldhash 0.2.0",
  "geo-traits",
  "geo-types",
  "mln-rs-feature",
@@ -1762,6 +1788,7 @@ version = "0.0.11"
 dependencies = [
  "bytemuck",
  "earcut",
+ "etagere",
  "geo-types",
  "glam",
  "mln-rs-actor",
@@ -1773,7 +1800,6 @@ dependencies = [
  "mln-rs-map-types",
  "mln-rs-math",
  "mln-rs-polylabel",
- "mln-rs-shelf-pack",
  "mln-rs-storage",
  "mln-rs-style",
  "mln-rs-style-types",
@@ -1821,10 +1847,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mln-rs-shelf-pack"
-version = "0.0.11"
-
-[[package]]
 name = "mln-rs-sprite"
 version = "0.0.11"
 dependencies = [
@@ -1855,6 +1877,7 @@ dependencies = [
  "objc2",
  "objc2-foundation",
  "parking_lot",
+ "percent-encoding",
  "pmtiles",
  "rusqlite",
  "rustls",
@@ -1925,6 +1948,7 @@ dependencies = [
 name = "mln-rs-supercluster"
 version = "0.0.11"
 dependencies = [
+ "foldhash 0.2.0",
  "geo-types",
  "mln-rs-feature",
  "mln-rs-geometry",
@@ -1953,6 +1977,7 @@ dependencies = [
 name = "mln-rs-text"
 version = "0.0.11"
 dependencies = [
+ "ab_glyph_rasterizer",
  "buffa",
  "flate2",
  "harfrust",
@@ -2007,6 +2032,7 @@ dependencies = [
  "bytemuck",
  "csscolorparser",
  "flate2",
+ "foldhash 0.2.0",
  "geo-types",
  "httpdate",
  "js-sys",
