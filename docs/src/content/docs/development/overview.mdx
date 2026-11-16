@@ -44,11 +44,10 @@ render backend that the platform's package carries: Vulkan and OpenGL off Apple
 platforms, and Metal on them. A release build takes a few minutes, most of it in
 link-time optimization.
 
-After you change a header, run `mise run bindings:generate`. `include/` is the
-source of truth for the C API, and mln-rs keeps a copy in
-`crates/mln_c/include`. Configuring a preset fails while the two differ, so
-bring mln-rs's copy in line in the same change, with a patch until mln-rs takes
-it.
+mln-rs defines the C API in `crates/mln_c/include`, and `include/` is a copy.
+After the submodule or its patches change the headers, run
+`mise run sync-c-headers`, then `mise run bindings:generate`. Configuring a
+preset fails while `include/` differs from mln-rs's headers.
 
 `mise run check` runs the linters, and `mise run fix` fixes what it can; the
 pre-commit hook does the same for staged files. `mise run //docs:dev` serves
