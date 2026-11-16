@@ -13,7 +13,7 @@ Read these when the task needs them:
   commands, other targets such as Windows under Wine, engine patches, CI, and
   releases.
 - [Guidelines](docs/src/content/docs/development/guidelines.mdx): read before
-  you change the public API or documentation.
+  you change a binding's API or the documentation.
 
 ## Priorities
 
@@ -27,14 +27,14 @@ require one. Don't repeat validation that native code already does.
 
 The library is [mln-rs](https://github.com/louwers/mln-rs), the Rust port of
 MapLibre Native, at the `third_party/mln-rs` submodule's pinned commit with the
-patches in `patches/mln-rs/` applied. Its `crates/mln_c` crate implements the C
-API, and the native build compiles it with Cargo. Answer questions about library
-behavior from that source. `include/` stays the source of truth for the C API:
-configuring a preset fails while mln-rs's copy in `crates/mln_c/include` differs
-from it. If the submodule is empty, run `mise deps` to check it out and apply
-the patches. Every `mise run`, `mise exec`, and commit hook does the same, which
-discards submodule edits that no patch holds. Save a change to mln-rs to its
-patch before you run any of them.
+patches in `patches/mln-rs/` applied. Its `crates/mln_c` crate defines the C API
+in its headers and implements it, and the native build compiles it with Cargo.
+Answer questions about library behavior from that source. `include/` is a copy
+of those headers, which `mise run sync-c-headers` refreshes; configuring a
+preset fails while the two differ. If the submodule is empty, run `mise deps` to
+check it out and apply the patches. Every `mise run`, `mise exec`, and commit
+hook does the same, which discards submodule edits that no patch holds. Save a
+change to mln-rs to its patch before you run any of them.
 
 After a rebase, run `mise deps` before you stage anything.
 `git submodule update` skips this submodule. Before you push, check
