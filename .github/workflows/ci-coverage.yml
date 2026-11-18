@@ -46,7 +46,7 @@ jobs:
         id: plan
         uses: sargunv/rubberstamp/actions/plan@971af366b2649956a949eb48f2670cc66ba43988 # main
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
           # The plan reads CMakePresets.json and docs/support-gaps.toml.
@@ -71,7 +71,7 @@ jobs:
     if: github.event.pull_request.state != 'closed'
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -107,7 +107,7 @@ jobs:
     steps:
       # The pages quote the latest release versions from the release tags.
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
           fetch-tags: true
@@ -170,10 +170,10 @@ jobs:
     env:
       MISE_NO_HOOKS: "1"
     steps:
-      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
         with:
           cache: false
           install_args: node aqua:jqlang/jq
@@ -217,10 +217,10 @@ jobs:
     env:
       MISE_NO_HOOKS: "1"
     steps:
-      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
         with:
           cache: false
           install_args: core:node aqua:pnpm/pnpm aqua:jqlang/jq
@@ -267,7 +267,7 @@ jobs:
       # Blacksmith's checkout clones from a mirror next to its runners.
       - name: Check out repository
         if: startsWith(matrix.runner, 'blacksmith-')
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Check out repository
@@ -379,7 +379,7 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'android-multi')
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -406,7 +406,7 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'apple-xcframework')
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -442,10 +442,10 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'swift-package')
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
         with:
           cache: false
           install_args: python
@@ -467,7 +467,7 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'swift-artifact-bundles')
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -508,10 +508,10 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'vcpkg-registry')
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
         with:
           cache: false
           install_args: python aqua:Kitware/CMake ninja sccache
@@ -539,10 +539,10 @@ jobs:
       - target
     if: contains(fromJSON(needs.plan.outputs.jobs), 'conan-recipes')
     steps:
-      - uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+      - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
         with:
           cache: false
           install_args: python aqua:astral-sh/uv aqua:Kitware/CMake
@@ -565,10 +565,10 @@ jobs:
     if: contains(fromJSON(needs.plan.outputs.jobs), 'xmake-package')
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
         with:
           cache: false
           install_args: python
@@ -676,7 +676,7 @@ jobs:
       MISE_TASK_SKIP: //:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -704,7 +704,7 @@ jobs:
       MISE_TASK_SKIP: //:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -734,7 +734,7 @@ jobs:
       MISE_TASK_SKIP: //:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -762,7 +762,7 @@ jobs:
       MISE_TASK_SKIP: //:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -793,7 +793,7 @@ jobs:
       MISE_TASK_SKIP: //:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -823,7 +823,7 @@ jobs:
       MISE_TASK_SKIP: //:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -853,7 +853,7 @@ jobs:
       MISE_TASK_SKIP: //:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -883,7 +883,7 @@ jobs:
       MISE_TASK_SKIP: //:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -910,7 +910,7 @@ jobs:
       MISE_TASK_SKIP: //:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -937,7 +937,7 @@ jobs:
       MISE_TASK_SKIP: //:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -966,7 +966,7 @@ jobs:
       MISE_TASK_SKIP: //:build,//bindings/typescript:build
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
       - name: Set up CI dependencies
@@ -1037,10 +1037,10 @@ jobs:
       issue: ${{ steps.render.outputs.issue }}
     steps:
       - name: Check out repository
-        uses: useblacksmith/checkout@2b9fe87d796feea153b455ec2f3125b471a7b0e7 # v1.8.2
+        uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
+      - uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
         with:
           cache: false
           install_args: python
