@@ -85,11 +85,15 @@ if [[ "$usage_preset" == macos-x64 ]]; then
 fi
 if [[ "$usage_preset" == linux-gnu-riscv64 ]]; then
   # Build hooks strip QEMU's loader environment, so run inside the target OS.
+  # Dart 3.14's on-demand VM service often never publishes a URI under QEMU;
+  # pass --enable-vm-service through docker --env so this task script stays
+  # free of nested quotes (mise wraps it in bash -c).
   exec docker run --rm --platform linux/riscv64 \
     --volume "$MISE_MONOREPO_ROOT:$MISE_MONOREPO_ROOT" \
     --volume "${PUB_CACHE:-$HOME/.pub-cache}:${PUB_CACHE:-$HOME/.pub-cache}:ro" \
     --env PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}" \
     --env MLN_FFI_TEST_BACKEND \
+    --env DART_VM_OPTIONS=--enable-vm-service=0 \
     --workdir "$PWD" \
     "dart:{{vars.dart_version}}" sh -euc '
       # LLVM 19 lavapipe fails to JIT RISC-V shaders; match the QEMU roots.
@@ -98,9 +102,6 @@ if [[ "$usage_preset" == linux-gnu-riscv64 ]]; then
       apt-get install --yes --quiet --no-install-recommends \
         libegl1 libgles2 libvulkan1 mesa-vulkan-drivers
       export LIBGL_ALWAYS_SOFTWARE=true MLN_TEST_TIMEOUT_SCALE=5
-      # Dart 3.14's on-demand VM service often never publishes a URI under
-      # QEMU; start it with the process so collection tests can force GC.
-      export DART_VM_OPTIONS="--enable-vm-service=0 --disable-service-auth-codes"
       exec dart test
     '
 fi
