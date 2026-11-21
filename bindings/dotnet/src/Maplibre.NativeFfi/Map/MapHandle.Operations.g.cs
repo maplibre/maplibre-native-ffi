@@ -270,9 +270,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_add_image_source_image(
             Handle,
             scope.Utf8(sourceId),
-            scope.Array<mln_lat_lng, LatLng>(
-                coordinates,
-                static (item, scope) => NativeLatLng(item)
+            scope.Array<mln_lat_lng, LatLng>(coordinates, static (item, scope) =>
+                NativeLatLng(item)
             ),
             checked((nuint)coordinates.Length),
             &nativeImage,
@@ -592,9 +591,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_camera_for_lat_lngs(
             Handle,
-            scope.Array<mln_lat_lng, LatLng>(
-                coordinates,
-                static (item, scope) => NativeLatLng(item)
+            scope.Array<mln_lat_lng, LatLng>(coordinates, static (item, scope) =>
+                NativeLatLng(item)
             ),
             checked((nuint)coordinates.Length),
             fitOptions is null ? null : &nativeFitOptions,
@@ -792,9 +790,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_fit_camera_to_lat_lngs(
             Handle,
-            scope.Array<mln_lat_lng, LatLng>(
-                coordinates,
-                static (item, scope) => NativeLatLng(item)
+            scope.Array<mln_lat_lng, LatLng>(coordinates, static (item, scope) =>
+                NativeLatLng(item)
             ),
             checked((nuint)coordinates.Length),
             &nativeUpdate,
@@ -2213,9 +2210,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeStatus = NativeMethods.mln_map_set_image_source_coordinates(
             Handle,
             scope.Utf8(sourceId),
-            scope.Array<mln_lat_lng, LatLng>(
-                coordinates,
-                static (item, scope) => NativeLatLng(item)
+            scope.Array<mln_lat_lng, LatLng>(coordinates, static (item, scope) =>
+                NativeLatLng(item)
             ),
             checked((nuint)coordinates.Length),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2779,9 +2775,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_add_image_source_image(
                     receiverHandle,
                     scope.Utf8(sourceId),
-                    scope.Array<mln_lat_lng, LatLng>(
-                        coordinates,
-                        static (item, scope) => NativeLatLng(item)
+                    scope.Array<mln_lat_lng, LatLng>(coordinates, static (item, scope) =>
+                        NativeLatLng(item)
                     ),
                     checked((nuint)coordinates.Length),
                     &nativeImage,
@@ -2931,9 +2926,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             Check(
                 NativeMethods.mln_map_fit_camera_to_lat_lngs(
                     receiverHandle,
-                    scope.Array<mln_lat_lng, LatLng>(
-                        coordinates,
-                        static (item, scope) => NativeLatLng(item)
+                    scope.Array<mln_lat_lng, LatLng>(coordinates, static (item, scope) =>
+                        NativeLatLng(item)
                     ),
                     checked((nuint)coordinates.Length),
                     &nativeUpdate,
@@ -3348,9 +3342,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_set_image_source_coordinates(
                     receiverHandle,
                     scope.Utf8(sourceId),
-                    scope.Array<mln_lat_lng, LatLng>(
-                        coordinates,
-                        static (item, scope) => NativeLatLng(item)
+                    scope.Array<mln_lat_lng, LatLng>(coordinates, static (item, scope) =>
+                        NativeLatLng(item)
                     ),
                     checked((nuint)coordinates.Length),
                     null,

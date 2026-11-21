@@ -348,10 +348,35 @@ function(mln_ffi_library_files)
   endforeach()
 endfunction()
 
+# llvm-* from the pinned Rust toolchain's llvm-tools. Apple and Windows
+# presets do not take their binutils from zig.cmake.
+function(mln_ffi_rust_llvm_tool tool out_var)
+  find_program(MLN_FFI_RUSTC NAMES rustc REQUIRED)
+  execute_process(
+    COMMAND "${MLN_FFI_RUSTC}" --print sysroot
+    OUTPUT_VARIABLE sysroot OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY)
+  execute_process(
+    COMMAND "${MLN_FFI_RUSTC}" --print host-tuple
+    OUTPUT_VARIABLE host OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY)
+  set(path
+      "${sysroot}/lib/rustlib/${host}/bin/llvm-${tool}${CMAKE_EXECUTABLE_SUFFIX}"
+  )
+  if(NOT EXISTS "${path}")
+    message(
+      FATAL_ERROR
+        "The Rust toolchain has no llvm-${tool}; add its llvm-tools component")
+  endif()
+  set(${out_var} "${path}" PARENT_SCOPE)
+endfunction()
+
 # The commands that turn Cargo's static archive into the package's. An ELF
 # archive comes out as one relocatable object whose only global symbols are the
 # C API's, so the Rust standard library, compiler-builtins, and C dependencies
-# inside it never meet a consumer's own copies, such as a Rust host's.
+# inside it never meet a consumer's own copies, such as a Rust host's. Apple and
+# COFF archives keep Cargo's members, minus the LLVM LTO sections that Go 1.27
+# cgo rejects in #cgo LDFLAGS.
 function(mln_ffi_static_archive_commands out_var input output)
   get_target_property(format mln_ffi_platform_dependencies
                       MLN_FFI_ARCHIVE_FORMAT)
@@ -373,6 +398,13 @@ function(mln_ffi_static_archive_commands out_var input output)
         # The final link keeps one COMDAT group of each name and discards the
         # rest, which would drop members that the now local code still uses.
         --remove-section=.group
+        # Go 1.27's isDisallowedLTOSection rejects .llvmbc and .llvmcmd in
+        # archives named by #cgo LDFLAGS. rustc 1.100 still emits those, and
+        # .llvm_lto, even with -Cembed-bitcode=no; strip them from every ELF
+        # archive (Linux, Android, OpenHarmony, FreeBSD).
+        --remove-section=.llvmbc
+        --remove-section=.llvmcmd
+        --remove-section=.llvm_lto
         "${object}"
         COMMAND
         "${CMAKE_COMMAND}"
@@ -394,6 +426,23 @@ function(mln_ffi_static_archive_commands out_var input output)
         rm
         -f
         "${object}")
+  elseif(format STREQUAL "apple" OR format STREQUAL "coff")
+    # Go 1.27's isDisallowedLTOSection also rejects Mach-O __LLVM,__bitcode
+    # (and COFF .llvmbc) in archives named by #cgo LDFLAGS. rustc 1.100 still
+    # emits those even with -Cembed-bitcode=no; strip them from each member.
+    mln_ffi_rust_llvm_tool(ar llvm_ar)
+    mln_ffi_rust_llvm_tool(objcopy llvm_objcopy)
+    set(commands
+        COMMAND
+        "${CMAKE_COMMAND}"
+        -P
+        "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/strip_lto_archive.cmake"
+        --
+        "${llvm_ar}"
+        "${llvm_objcopy}"
+        "${input}"
+        "${output}"
+        "${format}")
   else()
     set(commands COMMAND "${CMAKE_COMMAND}" -E copy "${input}" "${output}")
   endif()

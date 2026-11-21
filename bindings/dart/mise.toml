@@ -2,7 +2,7 @@
 # The root installs this Dart too. Naming it here keeps it ahead of the older
 # Dart that Flutter bundles.
 "core:dart" = "{{vars.dart_version}}"
-"core:flutter" = { version = "3.47.9", os = [
+"core:flutter" = { version = "3.50.1", os = [
   "linux/x64",
   "macos/arm64",
   "windows/x64",
@@ -85,6 +85,10 @@ if [[ "$usage_preset" == macos-x64 ]]; then
 fi
 if [[ "$usage_preset" == linux-gnu-riscv64 ]]; then
   # Build hooks strip QEMU's loader environment, so run inside the target OS.
+  # Dart 3.14's on-demand VM service is slow under QEMU. Keep `dart test`
+  # (no VM flags: `--disable-dart-dev --enable-vm-service` looks for a
+  # snapshot the docker SDK does not ship). The GC helper scales its wait
+  # to MLN_TEST_TIMEOUT_SCALE.
   exec docker run --rm --platform linux/riscv64 \
     --volume "$MISE_MONOREPO_ROOT:$MISE_MONOREPO_ROOT" \
     --volume "${PUB_CACHE:-$HOME/.pub-cache}:${PUB_CACHE:-$HOME/.pub-cache}:ro" \
