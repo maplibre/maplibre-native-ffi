@@ -58,11 +58,21 @@ foreach(member IN LISTS members)
       WORKING_DIRECTORY "${scratch}"
       RESULT_VARIABLE status
       ERROR_VARIABLE error OUTPUT_QUIET)
-    if(status AND NOT error MATCHES "not found|does not exist|no such")
-      message(
-        FATAL_ERROR "${objcopy} --remove-section=${section} ${member}: ${error}"
-      )
+    if(NOT status)
+      continue()
     endif()
+    if(error MATCHES "not found|does not exist|no such")
+      continue()
+    endif()
+    # rustc 1.100 Windows staticlibs also carry import-library members named
+    # like advapi32.dll. llvm-objcopy cannot parse those; keep them as rustc
+    # wrote them.
+    if(error MATCHES
+       "unsupported object file format|not recognized as a valid object")
+      break()
+    endif()
+    message(
+      FATAL_ERROR "${objcopy} --remove-section=${section} ${member}: ${error}")
   endforeach()
   list(APPEND objects "${member_name}")
 endforeach()
@@ -71,8 +81,13 @@ file(REMOVE "${output}")
 if(NOT objects)
   message(FATAL_ERROR "${input} contained no archive members to keep")
 endif()
+# A rustc staticlib has hundreds of members. Passing them on argv exceeds
+# Windows' command-line limit (os error 206 / "name too long").
+set(rsp "${scratch}/members.rsp")
+string(REPLACE ";" "\n" rsp_body "${objects}")
+file(WRITE "${rsp}" "${rsp_body}\n")
 execute_process(
-  COMMAND "${ar}" qc "${output}" ${objects}
+  COMMAND "${ar}" qc "${output}" "@${rsp}"
   WORKING_DIRECTORY "${scratch}"
   COMMAND_ERROR_IS_FATAL ANY)
 execute_process(COMMAND "${ar}" s "${output}" COMMAND_ERROR_IS_FATAL ANY)
