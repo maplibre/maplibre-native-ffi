@@ -5,6 +5,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -17,6 +18,12 @@ import 'fixture.dart';
 /// The VM service serves on loopback only. A collection clears weak
 /// references and runs native finalizers before its reply arrives.
 Future<void> collectGarbage() => within(_collect(), 'garbage collection');
+
+/// linux-gnu-riscv64 runs Dart tests under QEMU. Dart 3.14's VM service
+/// isolate never publishes a loopback URI there, so forced GC cannot run.
+final Object collectGarbageSkip = Abi.current() == Abi.linuxRiscv64
+    ? 'Dart VM service has no loopback URI on linux-gnu-riscv64'
+    : false;
 
 /// How long one controlWebServer or WebSocket attempt may take.
 ///

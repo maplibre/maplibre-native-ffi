@@ -55,20 +55,25 @@ void main() {
   // tests wait for the VM service on the same budget as collectGarbage.
   final timeout = Timeout(waitDeadline * 3);
 
-  test('a map keeps its runtime and the runtime callbacks alive', () async {
-    final styleLoaded = Completer<RuntimeHandle>();
-    final map = await _mapWithoutItsRuntime(styleLoaded);
-    // A closure in the helper would share its context with the runtime.
-    addTearDown(() => releaseIfLive(map.release));
-    await collectGarbage();
+  test(
+    'a map keeps its runtime and the runtime callbacks alive',
+    () async {
+      final styleLoaded = Completer<RuntimeHandle>();
+      final map = await _mapWithoutItsRuntime(styleLoaded);
+      // A closure in the helper would share its context with the runtime.
+      addTearDown(() => releaseIfLive(map.release));
+      await collectGarbage();
 
-    // Only the runtime roots its event handler, so the handler runs only if
-    // the map kept the runtime through the collection.
-    await expectCommitted(map.setStyleJson(emptyStyle));
-    final runtime = await within(styleLoaded.future, 'the style load event');
-    await within(map.release(), 'map release');
-    await within(runtime.release(), 'runtime release');
-  }, timeout: timeout);
+      // Only the runtime roots its event handler, so the handler runs only if
+      // the map kept the runtime through the collection.
+      await expectCommitted(map.setStyleJson(emptyStyle));
+      final runtime = await within(styleLoaded.future, 'the style load event');
+      await within(map.release(), 'map release');
+      await within(runtime.release(), 'runtime release');
+    },
+    timeout: timeout,
+    skip: collectGarbageSkip,
+  );
 
   for (final identicalCallback in [false, true]) {
     test(
@@ -96,6 +101,7 @@ void main() {
         await receiver.calls.close();
       },
       timeout: timeout,
+      skip: collectGarbageSkip,
     );
   }
 }
