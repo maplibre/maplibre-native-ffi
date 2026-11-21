@@ -373,6 +373,13 @@ function(mln_ffi_static_archive_commands out_var input output)
         # The final link keeps one COMDAT group of each name and discards the
         # rest, which would drop members that the now local code still uses.
         --remove-section=.group
+        # Go 1.27's isDisallowedLTOSection rejects .llvmbc and .llvmcmd in
+        # archives named by #cgo LDFLAGS. rustc 1.100 still emits those, and
+        # .llvm_lto, even with -Cembed-bitcode=no; strip them from every ELF
+        # archive (Linux, Android, OpenHarmony, FreeBSD).
+        --remove-section=.llvmbc
+        --remove-section=.llvmcmd
+        --remove-section=.llvm_lto
         "${object}"
         COMMAND
         "${CMAKE_COMMAND}"

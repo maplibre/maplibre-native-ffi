@@ -1,7 +1,7 @@
 [tools]
 # Node, Bun, and Deno run the same addon and the same suite. Bun and Deno are
 # declared here because only this binding uses them.
-"core:bun" = "1.4.4"
+"core:bun" = "1.4.5"
 "core:deno" = "2.9.8"
 
 [tasks.api]

@@ -39,45 +39,40 @@ public sealed class RenderTests
     [MemberData(nameof(Backends))]
     public void ACustomLayerDrawsInTheSessionsPassUntilItLeavesTheStyle(TestGraphicsBackend backend)
     {
-        RenderFixture.Run(
-            backend,
-            fixture =>
+        RenderFixture.Run(backend, fixture =>
+        {
+            var passes = new List<CustomLayerRenderParameters.PassValue>();
+            var deinitialized = 0;
+            var host = new CustomLayerHost(
+                Prerender: null,
+                Render: parameters => passes.Add(parameters.Pass),
+                Deinitialize: () => deinitialized++,
+                ContextLost: null
+            );
+            fixture.Await(fixture.Session.Ready, "the session to be ready");
+
+            var added = fixture.Await(
+                fixture.Map.AddCustomLayerAsync("custom", null, host),
+                "the custom layer"
+            );
+            RenderUpdate(fixture, added);
+            Assert.NotEmpty(passes);
+            var expected = backend switch
             {
-                var passes = new List<CustomLayerRenderParameters.PassValue>();
-                var deinitialized = 0;
-                var host = new CustomLayerHost(
-                    Prerender: null,
-                    Render: parameters => passes.Add(parameters.Pass),
-                    Deinitialize: () => deinitialized++,
-                    ContextLost: null
-                );
-                fixture.Await(fixture.Session.Ready, "the session to be ready");
+                TestGraphicsBackend.Metal => typeof(CustomLayerRenderParameters.PassValue.Metal),
+                TestGraphicsBackend.Vulkan => typeof(CustomLayerRenderParameters.PassValue.Vulkan),
+                _ => typeof(CustomLayerRenderParameters.PassValue.OpenGl),
+            };
+            Assert.All(passes, pass => Assert.IsType(expected, pass));
+            Assert.Equal(0, deinitialized);
 
-                var added = fixture.Await(
-                    fixture.Map.AddCustomLayerAsync("custom", null, host),
-                    "the custom layer"
-                );
-                RenderUpdate(fixture, added);
-                Assert.NotEmpty(passes);
-                var expected = backend switch
-                {
-                    TestGraphicsBackend.Metal =>
-                        typeof(CustomLayerRenderParameters.PassValue.Metal),
-                    TestGraphicsBackend.Vulkan =>
-                        typeof(CustomLayerRenderParameters.PassValue.Vulkan),
-                    _ => typeof(CustomLayerRenderParameters.PassValue.OpenGl),
-                };
-                Assert.All(passes, pass => Assert.IsType(expected, pass));
-                Assert.Equal(0, deinitialized);
-
-                var removed = fixture.Await(
-                    fixture.Map.RemoveStyleLayerAsync("custom"),
-                    "the layer's removal"
-                );
-                RenderUpdate(fixture, removed);
-                Assert.Equal(1, deinitialized);
-            }
-        );
+            var removed = fixture.Await(
+                fixture.Map.RemoveStyleLayerAsync("custom"),
+                "the layer's removal"
+            );
+            RenderUpdate(fixture, removed);
+            Assert.Equal(1, deinitialized);
+        });
     }
 
     // Renders frames until one shows the change that the completion reports.
@@ -95,45 +90,36 @@ public sealed class RenderTests
     [MemberData(nameof(Backends))]
     public void ADrainBeforeAnyDemandReturnsNoValue(TestGraphicsBackend backend)
     {
-        RenderFixture.Run(
-            backend,
-            fixture =>
-            {
-                var session = fixture.Session;
-                fixture.Await(session.Ready, "the session to be ready");
-                // Native writes a null batch and a null frame, which read as no results and
-                // no frame.
-                Assert.Empty(session.DrainFrameResults());
-                Assert.Null(session.AcquireFrame());
-            }
-        );
+        RenderFixture.Run(backend, fixture =>
+        {
+            var session = fixture.Session;
+            fixture.Await(session.Ready, "the session to be ready");
+            // Native writes a null batch and a null frame, which read as no results and
+            // no frame.
+            Assert.Empty(session.DrainFrameResults());
+            Assert.Null(session.AcquireFrame());
+        });
     }
 
     [Theory]
     [MemberData(nameof(Backends))]
     public void ACallerDrivenSessionIsServicedFromAManagedThread(TestGraphicsBackend backend)
     {
-        RenderFixture.Run(
-            backend,
-            fixture =>
-            {
-                var session = fixture.Session;
-                // Only the graphics thread services the session, and it has not yet.
-                Assert.False(session.Ready.IsCompleted);
-                fixture.Await(session.Ready, "the session to be ready");
-                Assert.Equal(
-                    RenderDriverKind.CallerGraphicsThread,
-                    session.GetCapabilities().Driver
-                );
+        RenderFixture.Run(backend, fixture =>
+        {
+            var session = fixture.Session;
+            // Only the graphics thread services the session, and it has not yet.
+            Assert.False(session.Ready.IsCompleted);
+            fixture.Await(session.Ready, "the session to be ready");
+            Assert.Equal(RenderDriverKind.CallerGraphicsThread, session.GetCapabilities().Driver);
 
-                Assert.Equal(RenderResult.Rendered, fixture.RenderFrame().Disposition);
+            Assert.Equal(RenderResult.Rendered, fixture.RenderFrame().Disposition);
 
-                var detach = session.DetachAsync();
-                Assert.False(detach.IsCompleted);
-                fixture.Await(detach, "the session to detach");
-                Assert.Equal(RenderSessionState.Detached, session.GetSnapshot().State);
-            }
-        );
+            var detach = session.DetachAsync();
+            Assert.False(detach.IsCompleted);
+            fixture.Await(detach, "the session to detach");
+            Assert.Equal(RenderSessionState.Detached, session.GetSnapshot().State);
+        });
     }
 
     [Theory]
@@ -142,21 +128,18 @@ public sealed class RenderTests
         TestGraphicsBackend backend
     )
     {
-        RenderFixture.Run(
-            backend,
-            fixture =>
-            {
-                var session = fixture.Session;
-                fixture.Await(session.Ready, "the session to be ready");
-                Assert.Equal(RenderResult.Rendered, fixture.RenderFrame().Disposition);
+        RenderFixture.Run(backend, fixture =>
+        {
+            var session = fixture.Session;
+            fixture.Await(session.Ready, "the session to be ready");
+            Assert.Equal(RenderResult.Rendered, fixture.RenderFrame().Disposition);
 
-                // The released session detaches at a service, so the release completes only
-                // after one ran.
-                Assert.True(fixture.ReleaseSession() > 0);
-                var stale = Assert.Throws<MaplibreException>(session.ServiceDriverWork);
-                Assert.Equal(Status.InvalidState, stale.Status);
-            }
-        );
+            // The released session detaches at a service, so the release completes only
+            // after one ran.
+            Assert.True(fixture.ReleaseSession() > 0);
+            var stale = Assert.Throws<MaplibreException>(session.ServiceDriverWork);
+            Assert.Equal(Status.InvalidState, stale.Status);
+        });
     }
 
     [Fact]
@@ -197,78 +180,69 @@ public sealed class RenderTests
     [MemberData(nameof(Backends))]
     public void ABorrowedFrameViewExpiresWithItsScope(TestGraphicsBackend backend)
     {
-        RenderFixture.Run(
-            backend,
-            fixture =>
+        RenderFixture.Run(backend, fixture =>
+        {
+            var session = fixture.Session;
+            fixture.Await(session.Ready, "the session to be ready");
+            var rendered = fixture.RenderFrame();
+            var frame = session.AcquireFrame()
+                ?? throw new InvalidOperationException("No rendered frame is ready");
+            var done = new GpuSync { Kind = GpuSyncKind.CpuComplete };
+            Assert.Equal(rendered.FrameGeneration, frame.GetResult().FrameGeneration);
+
+            Func<uint>? escapedWidth = null;
+            Action? escapedTexture = null;
+            void Inside(Func<uint> width, Action texture)
             {
-                var session = fixture.Session;
-                fixture.Await(session.Ready, "the session to be ready");
-                var rendered = fixture.RenderFrame();
-                var frame =
-                    session.AcquireFrame()
-                    ?? throw new InvalidOperationException("No rendered frame is ready");
-                var done = new GpuSync { Kind = GpuSyncKind.CpuComplete };
-                Assert.Equal(rendered.FrameGeneration, frame.GetResult().FrameGeneration);
-
-                Func<uint>? escapedWidth = null;
-                Action? escapedTexture = null;
-                void Inside(Func<uint> width, Action texture)
-                {
-                    Assert.Equal(RenderFixture.Width, width());
-                    texture();
-                    // The view borrows the frame, so neither the session nor the frame can end
-                    // while it is in scope.
-                    var busy = Assert.Throws<MaplibreException>(() => session.Abandon());
-                    Assert.Equal(Status.Busy, busy.Status);
-                    var inUse = Assert.Throws<MaplibreException>(() => frame.Release(done));
-                    Assert.Equal(Status.Busy, inUse.Status);
-                    escapedWidth = width;
-                    escapedTexture = texture;
-                }
-                switch (backend)
-                {
-                    case TestGraphicsBackend.Metal
-                        when OperatingSystem.IsMacOS()
-                            || OperatingSystem.IsIOS()
-                            || OperatingSystem.IsTvOS()
-                            || OperatingSystem.IsMacCatalyst():
-                        frame.WithMetalTexture(view =>
-                            Inside(() => view.Width, () => _ = view.Texture)
-                        );
-                        break;
-                    case TestGraphicsBackend.Vulkan
-                        when OperatingSystem.IsAndroid()
-                            || OperatingSystem.IsLinux()
-                            || OperatingSystem.IsMacOS()
-                            || OperatingSystem.IsWindows():
-                        frame.WithVulkanTexture(view =>
-                            Inside(() => view.Width, () => _ = view.Image)
-                        );
-                        break;
-                    default:
-                        frame.WithOpenGlTexture(view =>
-                            Inside(() => view.Width, () => _ = view.Texture)
-                        );
-                        break;
-                }
-
-                // Only the texture that the frame lends expires with the scope.
-                Assert.NotNull(escapedWidth);
-                Assert.NotNull(escapedTexture);
-                Assert.Equal(RenderFixture.Width, escapedWidth());
-                Assert.Throws<MaplibreException>(() => escapedTexture());
-                Assert.False(frame.IsClosed);
-                frame.Release(done);
-                Assert.True(frame.IsClosed);
-                Assert.Equal(
-                    $"AcquiredFrameHandle(id=0x{frame.Id:x}, closed=true)",
-                    frame.ToString()
-                );
-                // A discard after the release does nothing.
-                frame.Discard();
-                Assert.Throws<MaplibreException>(() => frame.GetResult());
+                Assert.Equal(RenderFixture.Width, width());
+                texture();
+                // The view borrows the frame, so neither the session nor the frame can end
+                // while it is in scope.
+                var busy = Assert.Throws<MaplibreException>(() => session.Abandon());
+                Assert.Equal(Status.Busy, busy.Status);
+                var inUse = Assert.Throws<MaplibreException>(() => frame.Release(done));
+                Assert.Equal(Status.Busy, inUse.Status);
+                escapedWidth = width;
+                escapedTexture = texture;
             }
-        );
+            switch (backend)
+            {
+                case TestGraphicsBackend.Metal
+                    when OperatingSystem.IsMacOS()
+                        || OperatingSystem.IsIOS()
+                        || OperatingSystem.IsTvOS()
+                        || OperatingSystem.IsMacCatalyst():
+                    frame.WithMetalTexture(view =>
+                        Inside(() => view.Width, () => _ = view.Texture)
+                    );
+                    break;
+                case TestGraphicsBackend.Vulkan
+                    when OperatingSystem.IsAndroid()
+                        || OperatingSystem.IsLinux()
+                        || OperatingSystem.IsMacOS()
+                        || OperatingSystem.IsWindows():
+                    frame.WithVulkanTexture(view => Inside(() => view.Width, () => _ = view.Image));
+                    break;
+                default:
+                    frame.WithOpenGlTexture(view =>
+                        Inside(() => view.Width, () => _ = view.Texture)
+                    );
+                    break;
+            }
+
+            // Only the texture that the frame lends expires with the scope.
+            Assert.NotNull(escapedWidth);
+            Assert.NotNull(escapedTexture);
+            Assert.Equal(RenderFixture.Width, escapedWidth());
+            Assert.Throws<MaplibreException>(() => escapedTexture());
+            Assert.False(frame.IsClosed);
+            frame.Release(done);
+            Assert.True(frame.IsClosed);
+            Assert.Equal($"AcquiredFrameHandle(id=0x{frame.Id:x}, closed=true)", frame.ToString());
+            // A discard after the release does nothing.
+            frame.Discard();
+            Assert.Throws<MaplibreException>(() => frame.GetResult());
+        });
     }
 
     [Fact]

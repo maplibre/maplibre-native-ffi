@@ -11,7 +11,7 @@ MLN_FFI_SWIFT_DOCC = "1"
 # one it needs first.
 [tasks.project]
 description = "Write the SwiftUI example's Xcode project, and an XCFramework of the C library's local Apple builds for it to link."
-tools = { "aqua:yonaskolb/XcodeGen" = "2.46.0" }
+tools = { "aqua:yonaskolb/XcodeGen" = "2.48.0" }
 run = '''
 frameworks=()
 for preset in ios-arm64 ios-simulator-arm64 macos-arm64; do

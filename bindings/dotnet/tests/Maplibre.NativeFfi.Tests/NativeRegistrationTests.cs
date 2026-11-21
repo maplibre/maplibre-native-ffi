@@ -114,16 +114,13 @@ public sealed unsafe class NativeRegistrationTests
             host.Free();
             return;
         }
-        RenderFixture.RunWithQueueLock(
-            queueLock,
-            fixture =>
-            {
-                fixture.Await(fixture.Session.Ready, "the session to be ready");
-                fixture.RenderFrame();
-                Assert.True(host.Locks > 0);
-                Assert.Equal(0, host.Releases);
-            }
-        );
+        RenderFixture.RunWithQueueLock(queueLock, fixture =>
+        {
+            fixture.Await(fixture.Session.Ready, "the session to be ready");
+            fixture.RenderFrame();
+            Assert.True(host.Locks > 0);
+            Assert.Equal(0, host.Releases);
+        });
         host.WaitForRelease();
     }
 
