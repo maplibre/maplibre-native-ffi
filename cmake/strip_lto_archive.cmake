@@ -9,10 +9,12 @@
 # extract both Darwin and COFF rustc staticlibs; MSVC lib.exe cannot.
 #
 # rustc Windows staticlibs mix COFF objects with import-library members that
-# share names (advapi32.dll, *_imports.lib). Extract-all plus GLOB would
-# collapse duplicates and shuffle order; the linker then misses those import
-# symbols. Walk `ar t` order, extract each instance with xN, and pack with
-# `ar q` so names and order stay as rustc wrote them.
+# share names (advapi32.dll, *_imports.lib), and object members whose archive
+# names are the rustc compile path (C:\a\rust\...\foo.o). Extract-all plus
+# GLOB would collapse duplicates; extracting to ${slot}/${member} misses the
+# basename llvm-ar actually writes. Walk `ar t` order, extract each instance
+# with xN --output into a unique slot, and pack by basename so names and
+# order stay as rustc wrote them.
 
 set(dash 0)
 while(dash LESS CMAKE_ARGC)
@@ -76,6 +78,11 @@ foreach(member IN LISTS members)
   if(member MATCHES "^__\\." OR member STREQUAL "/" OR member STREQUAL "//")
     continue()
   endif()
+  string(REPLACE "\\" "/" member_unix "${member}")
+  get_filename_component(member_name "${member_unix}" NAME)
+  if(member_name STREQUAL "")
+    continue()
+  endif()
   math(EXPR index "${index}+1")
   string(MAKE_C_IDENTIFIER "${member}" key)
   if(NOT DEFINED count_${key})
@@ -84,15 +91,29 @@ foreach(member IN LISTS members)
   math(EXPR count_${key} "${count_${key}}+1")
   set(slot "${scratch}/${index}")
   file(MAKE_DIRECTORY "${slot}")
+  # --output keeps members whose archive names are rustc compile paths from
+  # writing to C:\a\rust\...; xN still matches the name `ar t` printed.
   execute_process(
-    COMMAND "${ar}" xN "${count_${key}}" "${input}" "${member}"
-    WORKING_DIRECTORY "${slot}"
+    COMMAND
+      "${ar}"
+      --output
+      "${slot}"
+      xN
+      "${count_${key}}"
+      "${input}"
+      "${member}"
     COMMAND_ERROR_IS_FATAL ANY)
-  set(object "${slot}/${member}")
+  set(object "${slot}/${member_name}")
   if(NOT EXISTS "${object}")
-    message(
-      FATAL_ERROR
-        "${ar} xN ${count_${key}} ${input} ${member}: missing ${object}")
+    file(GLOB_RECURSE extracted LIST_DIRECTORIES FALSE "${slot}/*")
+    list(LENGTH extracted extracted_n)
+    if(extracted_n EQUAL 1)
+      list(GET extracted 0 object)
+    else()
+      message(
+        FATAL_ERROR
+          "${ar} xN ${count_${key}} ${input} ${member}: missing ${object}")
+    endif()
   endif()
   foreach(section IN LISTS sections)
     execute_process(
@@ -115,7 +136,13 @@ foreach(member IN LISTS members)
     message(
       FATAL_ERROR "${objcopy} --remove-section=${section} ${object}: ${error}")
   endforeach()
-  list(APPEND objects "${index}/${member}")
+  # Unique slot paths so duplicate basenames stay distinct on disk; ar q
+  # records the basename, including advapi32.dll and colliding *.o names.
+  set(packed "${slot}/${member_name}")
+  if(NOT object STREQUAL packed)
+    file(COPY_FILE "${object}" "${packed}")
+  endif()
+  list(APPEND objects "${index}/${member_name}")
 endforeach()
 
 file(REMOVE "${output}")
