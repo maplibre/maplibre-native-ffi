@@ -18,13 +18,35 @@ import 'fixture.dart';
 /// references and runs native finalizers before its reply arrives.
 Future<void> collectGarbage() => within(_collect(), 'garbage collection');
 
+Future<WebSocket> _connectService() async {
+  final deadline = DateTime.now().add(waitDeadline);
+  while (true) {
+    // Dart 3.14 can enable the service with a null URI, or return the URI
+    // before loopback accepts the WebSocket. Both showed up under QEMU.
+    final service = await developer.Service.controlWebServer(enable: true);
+    final uri = service.serverUri;
+    if (uri != null) {
+      try {
+        return await WebSocket.connect(
+          uri.replace(scheme: 'ws', path: '${uri.path}ws').toString(),
+        );
+      } on SocketException {
+        if (DateTime.now().isAfter(deadline)) {
+          rethrow;
+        }
+      } on HttpException {
+        if (DateTime.now().isAfter(deadline)) {
+          rethrow;
+        }
+      }
+    } else if (DateTime.now().isAfter(deadline)) {
+      throw StateError('VM service did not publish a URI');
+    }
+  }
+}
+
 Future<void> _collect() async {
-  final previous = await developer.Service.getInfo();
-  final service = await developer.Service.controlWebServer(enable: true);
-  final uri = service.serverUri!;
-  final socket = await WebSocket.connect(
-    uri.replace(scheme: 'ws', path: '${uri.path}ws').toString(),
-  );
+  final socket = await _connectService();
   final replies = StreamIterator(
     socket.map(
       (message) => jsonDecode(message as String) as Map<String, dynamic>,
@@ -49,8 +71,7 @@ Future<void> _collect() async {
   } finally {
     await replies.cancel();
     await socket.close();
-    if (previous.serverUri == null) {
-      await developer.Service.controlWebServer(enable: false);
-    }
+    // Leave the VM service up. Dart 3.14 runs tests in concurrent isolates
+    // that share loopback, and shutting the server races the next collection.
   }
 }

@@ -448,7 +448,7 @@ runs:
         # without a runtime keeps every later run from getting one. The version
         # is the only part of that key this action exposes, so a patch bump is
         # what retires the entry.
-        vulkan_version: 1.4.363.0
+        vulkan_version: 1.4.363.1
         cache: true
         stripdown: true
         # The SDK alone carries vulkan-1.lib but not the loader it imports, so
@@ -542,7 +542,7 @@ runs:
         GITHUB_TOKEN: ${{ github.token }}
       with:
         # Match `min_version` in .config/mise.toml.
-        version: 2026.10.24
+        version: 2026.11.11
         cache: false
         bootstrap: true
 
@@ -713,7 +713,10 @@ runs:
           "SCCACHE_IDLE_TIMEOUT=0"
           "CMAKE_C_COMPILER_LAUNCHER=sccache"
           "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
-          "RUSTC_WRAPPER=sccache"
+          # sccache 0.17–0.19 expand cargo's rustc @argfile and re-spawn rustc
+          # without one, which exceeds Windows' command-line limit under rustc
+          # 1.100 (mozilla/sccache#2787, mozilla/sccache#3053). CMake still
+          # uses sccache as the C/C++ launcher.
           # sccache declines to cache incrementally compiled crates, which is
           # the cargo default for the dev profile that `cargo test` uses.
           "CARGO_INCREMENTAL=0"

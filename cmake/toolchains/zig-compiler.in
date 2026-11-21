@@ -10,7 +10,8 @@
 # the intended one, so incoming target flags are dropped.
 #
 # Rust adds the Cortex-A53 erratum 843419 executable-link workaround even to
-# build scripts. Zig rejects it; our ARM64 CI hosts use newer cores. The Rust
+# build scripts. Zig rejects it; our ARM64 CI hosts use newer cores. rustc 1.100
+# also passes --no-rosegment; Zig 0.17's lld rejects it on LoongArch. The Rust
 # platform archive leaves executable-link workarounds to the consumer's linker.
 args=""
 quote() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
@@ -18,9 +19,9 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --target=*) shift; continue ;;
     --target | -target) shift 2; continue ;;
-    -Wl,--fix-cortex-a53-843419) shift; continue ;;
+    -Wl,--fix-cortex-a53-843419 | -Wl,--no-rosegment | --no-rosegment) shift; continue ;;
     -Xlinker)
-      if [ "${2-}" = --fix-cortex-a53-843419 ]; then
+      if [ "${2-}" = --fix-cortex-a53-843419 ] || [ "${2-}" = --no-rosegment ]; then
         shift 2; continue
       fi
       ;;

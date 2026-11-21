@@ -24,11 +24,13 @@ if ! grep -q '^ARCHS = arm64$' ios/Flutter/Debug.xcconfig; then
   printf '\nARCHS = arm64\n' >>ios/Flutter/Debug.xcconfig
 fi
 flutter pub get
-# Flutter 3.47 can launch the app before it starts reading the simulator log,
-# miss the app's VM service address, and wait for it without limit
-# (flutter/flutter#181771). The bound turns that wait into a failure, and the
-# tool's verbose log and the app's own log show which step stalled. The app
-# runs without this environment, so the backend under test is a define.
+# Flutter can launch the app before it starts reading the simulator log, miss
+# the app's VM service address, and wait for it without limit
+# (flutter/flutter#181771). The fix is flutter/flutter#193142 (c3ed85e on
+# master); 3.50.1 still diverges from that commit. The bound turns that wait
+# into a failure, and the tool's verbose log and the app's own log show which
+# step stalled. The app runs without this environment, so the backend under
+# test is a define.
 : >test-results.txt
 status=0
 perl -e 'alarm shift; exec @ARGV' 300 \

@@ -12,9 +12,8 @@ public sealed class PublicApiSurfaceTests
         var publicTypes = typeof(MaplibreNative).Assembly.GetExportedTypes();
 
         Assert.DoesNotContain(publicTypes, type => type.Namespace?.Contains(".Internal") == true);
-        Assert.DoesNotContain(
-            publicTypes,
-            type => type.Name.StartsWith("mln_", StringComparison.Ordinal)
+        Assert.DoesNotContain(publicTypes, type =>
+            type.Name.StartsWith("mln_", StringComparison.Ordinal)
         );
         Assert.DoesNotContain(publicTypes, type => type.Name == "NativeMethods");
     }
