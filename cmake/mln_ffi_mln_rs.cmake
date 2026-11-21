@@ -441,7 +441,8 @@ function(mln_ffi_static_archive_commands out_var input output)
         "${llvm_ar}"
         "${llvm_objcopy}"
         "${input}"
-        "${output}")
+        "${output}"
+        "${format}")
   else()
     set(commands COMMAND "${CMAKE_COMMAND}" -E copy "${input}" "${output}")
   endif()

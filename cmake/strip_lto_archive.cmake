@@ -2,9 +2,17 @@
 # accepts it in #cgo LDFLAGS (isDisallowedLTOSection).
 #
 # cmake -P cmake/strip_lto_archive.cmake -- <ar> <objcopy> <input> <output>
+# <format>
 #
-# ar, objcopy, input, and output follow `--`. ar should be llvm-ar, which can
+# ar, objcopy, input, output, and format follow `--`. format is apple or coff
+# (llvm-ar --format=darwin or --format=coff). ar should be llvm-ar, which can
 # extract both Darwin and COFF rustc staticlibs; MSVC lib.exe cannot.
+#
+# rustc Windows staticlibs mix COFF objects with import-library members that
+# share names (advapi32.dll, *_imports.lib). Extract-all plus GLOB would
+# collapse duplicates and shuffle order; the linker then misses those import
+# symbols. Walk `ar t` order, extract each instance with xN, and pack with
+# `ar q` so names and order stay as rustc wrote them.
 
 set(dash 0)
 while(dash LESS CMAKE_ARGC)
@@ -17,10 +25,11 @@ math(EXPR ar_i "${dash}+1")
 math(EXPR objcopy_i "${dash}+2")
 math(EXPR input_i "${dash}+3")
 math(EXPR output_i "${dash}+4")
-if(dash GREATER_EQUAL CMAKE_ARGC OR output_i GREATER_EQUAL CMAKE_ARGC)
+math(EXPR format_i "${dash}+5")
+if(dash GREATER_EQUAL CMAKE_ARGC OR format_i GREATER_EQUAL CMAKE_ARGC)
   message(
     FATAL_ERROR
-      "usage: cmake -P strip_lto_archive.cmake -- <ar> <objcopy> <input> <output>"
+      "usage: cmake -P strip_lto_archive.cmake -- <ar> <objcopy> <input> <output> <format>"
   )
 endif()
 
@@ -28,6 +37,15 @@ set(ar "${CMAKE_ARGV${ar_i}}")
 set(objcopy "${CMAKE_ARGV${objcopy_i}}")
 set(input "${CMAKE_ARGV${input_i}}")
 set(output "${CMAKE_ARGV${output_i}}")
+set(format "${CMAKE_ARGV${format_i}}")
+if(format STREQUAL "apple")
+  set(ar_format darwin)
+elseif(format STREQUAL "coff")
+  set(ar_format coff)
+else()
+  message(
+    FATAL_ERROR "strip_lto_archive format must be apple or coff, got ${format}")
+endif()
 
 # Go 1.27 cmd/cgo isDisallowedLTOSection: ELF/COFF .llvmbc/.llvmcmd/.llvm_lto
 # and Mach-O __LLVM,__bitcode/__cmdline/__asm. rustc 1.100 still emits them
@@ -40,22 +58,45 @@ set(scratch "${output}.lto-strip")
 file(REMOVE_RECURSE "${scratch}")
 file(MAKE_DIRECTORY "${scratch}")
 execute_process(
-  COMMAND "${ar}" x "${input}"
-  WORKING_DIRECTORY "${scratch}"
+  COMMAND "${ar}" t "${input}"
+  OUTPUT_VARIABLE listing OUTPUT_STRIP_TRAILING_WHITESPACE
   COMMAND_ERROR_IS_FATAL ANY)
+string(REPLACE "\r\n" "\n" listing "${listing}")
+string(REPLACE "\r" "\n" listing "${listing}")
+string(REPLACE "\n" ";" members "${listing}")
 
-file(GLOB members LIST_DIRECTORIES FALSE "${scratch}/*")
 set(objects)
+set(index 0)
 foreach(member IN LISTS members)
-  get_filename_component(member_name "${member}" NAME)
-  # Apple ar writes a table of contents member; leave it out of the new archive.
-  if(member_name MATCHES "^__\\.")
+  if(member STREQUAL "")
     continue()
+  endif()
+  # Apple ar writes a table of contents member; COFF archives start with
+  # linker members named / and //. `ar s` rebuilds both; leave them out.
+  if(member MATCHES "^__\\." OR member STREQUAL "/" OR member STREQUAL "//")
+    continue()
+  endif()
+  math(EXPR index "${index}+1")
+  string(MAKE_C_IDENTIFIER "${member}" key)
+  if(NOT DEFINED count_${key})
+    set(count_${key} 0)
+  endif()
+  math(EXPR count_${key} "${count_${key}}+1")
+  set(slot "${scratch}/${index}")
+  file(MAKE_DIRECTORY "${slot}")
+  execute_process(
+    COMMAND "${ar}" xN "${count_${key}}" "${input}" "${member}"
+    WORKING_DIRECTORY "${slot}"
+    COMMAND_ERROR_IS_FATAL ANY)
+  set(object "${slot}/${member}")
+  if(NOT EXISTS "${object}")
+    message(
+      FATAL_ERROR
+        "${ar} xN ${count_${key}} ${input} ${member}: missing ${object}")
   endif()
   foreach(section IN LISTS sections)
     execute_process(
-      COMMAND "${objcopy}" "--remove-section=${section}" "${member}"
-      WORKING_DIRECTORY "${scratch}"
+      COMMAND "${objcopy}" "--remove-section=${section}" "${object}"
       RESULT_VARIABLE status
       ERROR_VARIABLE error OUTPUT_QUIET)
     if(NOT status)
@@ -72,9 +113,9 @@ foreach(member IN LISTS members)
       break()
     endif()
     message(
-      FATAL_ERROR "${objcopy} --remove-section=${section} ${member}: ${error}")
+      FATAL_ERROR "${objcopy} --remove-section=${section} ${object}: ${error}")
   endforeach()
-  list(APPEND objects "${member_name}")
+  list(APPEND objects "${index}/${member}")
 endforeach()
 
 file(REMOVE "${output}")
@@ -82,12 +123,15 @@ if(NOT objects)
   message(FATAL_ERROR "${input} contained no archive members to keep")
 endif()
 # A rustc staticlib has hundreds of members. Passing them on argv exceeds
-# Windows' command-line limit (os error 206 / "name too long").
+# Windows' command-line limit (os error 206 / "name too long"). posix quoting
+# keeps long COFF names intact; --format=coff/darwin avoids BSD's 16-char
+# member-name limit that GNU ar reports as "name too long".
 set(rsp "${scratch}/members.rsp")
 string(REPLACE ";" "\n" rsp_body "${objects}")
 file(WRITE "${rsp}" "${rsp_body}\n")
 execute_process(
-  COMMAND "${ar}" qc "${output}" "@${rsp}"
+  COMMAND
+    "${ar}" --format=${ar_format} --rsp-quoting=posix qc "${output}" "@${rsp}"
   WORKING_DIRECTORY "${scratch}"
   COMMAND_ERROR_IS_FATAL ANY)
 execute_process(COMMAND "${ar}" s "${output}" COMMAND_ERROR_IS_FATAL ANY)
