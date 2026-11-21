@@ -51,6 +51,10 @@ final class _WakeReceiver {
 }
 
 void main() {
+  // QEMU scales waitDeadline past package:test's 30s default, so these
+  // tests wait for the VM service on the same budget as collectGarbage.
+  final timeout = Timeout(waitDeadline * 3);
+
   test('a map keeps its runtime and the runtime callbacks alive', () async {
     final styleLoaded = Completer<RuntimeHandle>();
     final map = await _mapWithoutItsRuntime(styleLoaded);
@@ -64,7 +68,7 @@ void main() {
     final runtime = await within(styleLoaded.future, 'the style load event');
     await within(map.release(), 'map release');
     await within(runtime.release(), 'runtime release');
-  });
+  }, timeout: timeout);
 
   for (final identicalCallback in [false, true]) {
     test(
@@ -91,6 +95,7 @@ void main() {
         await calls.cancel();
         await receiver.calls.close();
       },
+      timeout: timeout,
     );
   }
 }

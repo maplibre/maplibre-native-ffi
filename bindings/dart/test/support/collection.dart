@@ -18,6 +18,16 @@ import 'fixture.dart';
 /// references and runs native finalizers before its reply arrives.
 Future<void> collectGarbage() => within(_collect(), 'garbage collection');
 
+/// How long one controlWebServer or WebSocket attempt may take.
+///
+/// QEMU (linux-gnu-riscv64) scales [waitDeadline] to 50s; a 2s cap aborted
+/// enablement before the service isolate bound loopback.
+Duration get _attemptTimeout {
+  final scaled = waitDeadline ~/ 3;
+  const floor = Duration(seconds: 2);
+  return scaled < floor ? floor : scaled;
+}
+
 Future<WebSocket> _connectService() async {
   final deadline = DateTime.now().add(waitDeadline);
   Object? lastError;
@@ -26,21 +36,22 @@ Future<WebSocket> _connectService() async {
     // before loopback accepts the WebSocket, or hang in controlWebServer /
     // WebSocket.connect. All three showed up under QEMU (linux-gnu-riscv64).
     try {
-      final service = await developer.Service.controlWebServer(
-        enable: true,
-        silenceOutput: true,
-      ).timeout(const Duration(seconds: 2));
-      final uri = service.serverUri;
+      var info = await developer.Service.getInfo().timeout(_attemptTimeout);
+      if (info.serverWebSocketUri == null) {
+        info = await developer.Service.controlWebServer(
+          enable: true,
+          silenceOutput: true,
+        ).timeout(_attemptTimeout);
+      }
+      final uri = info.serverWebSocketUri;
       if (uri != null) {
         final host = switch (uri.host) {
           'localhost' || '::1' => '127.0.0.1',
           final value => value,
         };
         return await WebSocket.connect(
-          uri
-              .replace(scheme: 'ws', host: host, path: '${uri.path}ws')
-              .toString(),
-        ).timeout(const Duration(seconds: 2));
+          uri.replace(host: host).toString(),
+        ).timeout(_attemptTimeout);
       }
     } on SocketException catch (error) {
       lastError = error;
@@ -55,6 +66,10 @@ Future<WebSocket> _connectService() async {
       }
       throw StateError('VM service did not publish a URI');
     }
+    // Let the service isolate bind loopback; a tight await loop starves it.
+    final idle = Completer<void>();
+    Timer(Duration.zero, idle.complete);
+    await idle.future;
   }
 }
 
