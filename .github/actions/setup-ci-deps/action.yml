@@ -713,7 +713,10 @@ runs:
           "SCCACHE_IDLE_TIMEOUT=0"
           "CMAKE_C_COMPILER_LAUNCHER=sccache"
           "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
-          "RUSTC_WRAPPER=sccache"
+          # sccache 0.17–0.19 expand cargo's rustc @argfile and re-spawn rustc
+          # without one, which exceeds Windows' command-line limit under rustc
+          # 1.100 (mozilla/sccache#2787, mozilla/sccache#3053). CMake still
+          # uses sccache as the C/C++ launcher.
           # sccache declines to cache incrementally compiled crates, which is
           # the cargo default for the dev profile that `cargo test` uses.
           "CARGO_INCREMENTAL=0"

@@ -156,8 +156,11 @@ SKIP_YARN_COREPACK_CHECK = "1"
 # backend belongs to CI, which configures it in
 # .github/actions/setup-ci-deps: those keys carry the toolchain paths of the
 # runner that produced them, so a contributor machine reads its own disk cache
-# instead. CI wraps rustc there as well, where it turns incremental compilation
-# off to suit sccache; cargo runs unwrapped here so the dev profile keeps it.
+# instead. CI wraps rustc there on Unix, where it turns incremental compilation
+# off to suit sccache. Windows leaves rustc unwrapped: sccache 0.17–0.19 expand
+# cargo's rustc @argfile and re-spawn rustc without one, which exceeds Windows'
+# command-line limit under rustc 1.100 (mozilla/sccache#2787,
+# mozilla/sccache#3053). cargo runs unwrapped here so the dev profile keeps it.
 CMAKE_C_COMPILER_LAUNCHER = "sccache"
 CMAKE_CXX_COMPILER_LAUNCHER = "sccache"
 
