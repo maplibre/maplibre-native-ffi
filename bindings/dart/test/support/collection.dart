@@ -20,26 +20,39 @@ Future<void> collectGarbage() => within(_collect(), 'garbage collection');
 
 Future<WebSocket> _connectService() async {
   final deadline = DateTime.now().add(waitDeadline);
+  Object? lastError;
   while (true) {
-    // Dart 3.14 can enable the service with a null URI, or return the URI
-    // before loopback accepts the WebSocket. Both showed up under QEMU.
-    final service = await developer.Service.controlWebServer(enable: true);
-    final uri = service.serverUri;
-    if (uri != null) {
-      try {
+    // Dart 3.14 can enable the service with a null URI, return the URI
+    // before loopback accepts the WebSocket, or hang in controlWebServer /
+    // WebSocket.connect. All three showed up under QEMU (linux-gnu-riscv64).
+    try {
+      final service = await developer.Service.controlWebServer(
+        enable: true,
+        silenceOutput: true,
+      ).timeout(const Duration(seconds: 2));
+      final uri = service.serverUri;
+      if (uri != null) {
+        final host = switch (uri.host) {
+          'localhost' || '::1' => '127.0.0.1',
+          final value => value,
+        };
         return await WebSocket.connect(
-          uri.replace(scheme: 'ws', path: '${uri.path}ws').toString(),
-        );
-      } on SocketException {
-        if (DateTime.now().isAfter(deadline)) {
-          rethrow;
-        }
-      } on HttpException {
-        if (DateTime.now().isAfter(deadline)) {
-          rethrow;
-        }
+          uri
+              .replace(scheme: 'ws', host: host, path: '${uri.path}ws')
+              .toString(),
+        ).timeout(const Duration(seconds: 2));
       }
-    } else if (DateTime.now().isAfter(deadline)) {
+    } on SocketException catch (error) {
+      lastError = error;
+    } on HttpException catch (error) {
+      lastError = error;
+    } on TimeoutException catch (error) {
+      lastError = error;
+    }
+    if (DateTime.now().isAfter(deadline)) {
+      if (lastError != null) {
+        Error.throwWithStackTrace(lastError, StackTrace.current);
+      }
       throw StateError('VM service did not publish a URI');
     }
   }

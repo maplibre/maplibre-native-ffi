@@ -98,6 +98,9 @@ if [[ "$usage_preset" == linux-gnu-riscv64 ]]; then
       apt-get install --yes --quiet --no-install-recommends \
         libegl1 libgles2 libvulkan1 mesa-vulkan-drivers
       export LIBGL_ALWAYS_SOFTWARE=true MLN_TEST_TIMEOUT_SCALE=5
+      # Dart 3.14's on-demand VM service often never publishes a URI under
+      # QEMU; start it with the process so collection tests can force GC.
+      export DART_VM_OPTIONS="--enable-vm-service=0 --disable-service-auth-codes"
       exec dart test
     '
 fi
