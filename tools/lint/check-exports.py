@@ -53,8 +53,8 @@ def declared_functions() -> set[str]:
     """The functions that a public header declares with MLN_API."""
     functions: set[str] = set()
     for header in sorted((ROOT / "include").rglob("*.h")):
-        text = BLOCK_COMMENT.sub(" ", header.read_text(encoding="utf-8"))
-        text = text.replace("\\\n", "")
+        text = header.read_text(encoding="utf-8").replace("\\\n", "")
+        text = BLOCK_COMMENT.sub(" ", text)
         # The MLN_API definitions themselves are preprocessor lines.
         text = "\n".join(
             line
