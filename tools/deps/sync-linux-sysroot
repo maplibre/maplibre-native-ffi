@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lays out the target-architecture EGL, OpenGL ES, and Vulkan loaders that
+# Lays out the target-architecture EGL and OpenGL ES loaders that
 # CMake's OpenGL lookup finds, for an architecture that the build host's
 # multiarch directories lack. cmake/toolchains/zig.cmake runs this for a preset
 # that sets MLN_FFI_ZIG_SYSROOT, and finds the loaders there.
@@ -59,8 +59,7 @@ staging=$(cd "$staging" && pwd)
   cd /tmp
   apt-get download -qq \
     "libegl-dev:$1" "libegl1:$1" \
-    "libgles-dev:$1" "libgles2:$1" \
-    "libvulkan-dev:$1" "libvulkan1:$1" >&2
+    "libgles-dev:$1" "libgles2:$1" >&2
   for package in ./*.deb; do
     dpkg-deb --fsys-tarfile "$package"
   done

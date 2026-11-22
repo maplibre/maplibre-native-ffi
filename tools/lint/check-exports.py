@@ -54,6 +54,7 @@ def declared_functions() -> set[str]:
     functions: set[str] = set()
     for header in sorted((ROOT / "include").rglob("*.h")):
         text = BLOCK_COMMENT.sub(" ", header.read_text(encoding="utf-8"))
+        text = text.replace("\\\n", "")
         # The MLN_API definitions themselves are preprocessor lines.
         text = "\n".join(
             line
