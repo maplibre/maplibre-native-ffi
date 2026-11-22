@@ -50,6 +50,8 @@ pub fn update(self: *Gestures) void {
     const at = self.tick_at orelse return;
     const now = c.SDL_GetTicksNS();
     if (now < at) return;
+    // The tick consumes its deadline, so the next frame tick waits a refresh.
+    self.tick_at = null;
     var diagnostic: maplibre.Diagnostic = .{};
     var result = self.recognizer.tick(allocator, milliseconds(now), &diagnostic) catch
         return self.view.fail(diagnostic.message());

@@ -89,7 +89,12 @@ fun Modifier.mapGestures(
             // across pointers, so the recognizer measures the release speed from each.
             val moves =
               event.changes
-                .filter { it.pressed && !it.changedToDownIgnoreConsumed() && it.positionChanged() }
+                .filter {
+                  it.pressed &&
+                    !it.changedToDownIgnoreConsumed() &&
+                    !it.isConsumed &&
+                    (it.positionChanged() || it.historical.isNotEmpty())
+                }
                 .flatMap { change ->
                   change.historical.map { Triple(change, it.position, it.uptimeMillis) } +
                     Triple(change, change.position, change.uptimeMillis)

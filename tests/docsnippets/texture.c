@@ -199,10 +199,7 @@ void mln_doc_texture(
   ) {
     return;  // The session keeps the old textures.
   }
-  // #endregion resize-borrowed
-  wait_for_done();
-
-  // #region resize-borrowed
+  wait_for_done();  // Until on_replaced runs.
   if (replaced_status != MLN_STATUS_OK) {
     return;  // The session keeps the old textures.
   }
