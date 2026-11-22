@@ -1,7 +1,8 @@
 # Sourced by a binding's test task as `source tools/env/test-backend.sh <preset>
 # [backend]`. Exports MLN_FFI_TEST_BACKEND, the render backend whose suites run:
-# the one named, which the preset's install must carry, or else the platform's
-# default backend, or for a browser package that lacks it, the one it carries.
+# the one named, which the preset's install must carry, or else the first of its
+# backends that docs/support-gaps.toml lets the target test, in the package's
+# order of preference.
 # The suites draw with that backend alone, as a host would.
 # shellcheck shell=bash
 
@@ -12,7 +13,13 @@ if [[ ! -f "$mln_ffi_test_descriptor" ]]; then
 fi
 MLN_FFI_TEST_BACKEND=${2:-}
 if [[ -z "$MLN_FFI_TEST_BACKEND" ]]; then
-  MLN_FFI_TEST_BACKEND=$(jq -r '.platform.defaultBackend as $default | if (.backends | index($default)) then $default else .backends[0] end' "$mln_ffi_test_descriptor")
+  MLN_FFI_TEST_BACKEND=$(python3 -c '
+import sys
+sys.path.insert(0, sys.argv[1])
+from tools.ci import gaps, plan
+target = plan.target_named(sys.argv[2])
+print((gaps.tested_backends("c", target) or target.backends)[0])
+' "$MISE_MONOREPO_ROOT" "$1")
 elif ! jq -e --arg backend "$MLN_FFI_TEST_BACKEND" '.backends | index($backend)' "$mln_ffi_test_descriptor" >/dev/null; then
   echo "error: $1 carries no $MLN_FFI_TEST_BACKEND backend; it carries $(jq -r '.backends | join(", ")' "$mln_ffi_test_descriptor")" >&2
   exit 2
