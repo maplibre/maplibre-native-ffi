@@ -167,6 +167,14 @@ link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 # Medium integration work with an established toolchain and approach.
 
 [[entry]]
+bindings = ["c"]
+platforms = ["windows", "windows-mingw"]
+backends = ["d3d12"]
+operations = ["test"]
+status = "path-known"
+reason = "The test graphics fixtures that every binding's suite draws with create no D3D12 device or textures yet, and the runners need DXC and a WARP device to render without a GPU."
+
+[[entry]]
 bindings = ["gobject"]
 platforms = ["windows", "windows-mingw"]
 status = "path-known"

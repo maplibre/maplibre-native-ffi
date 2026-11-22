@@ -7,6 +7,7 @@
 const std = @import("std");
 const Translator = @import("translate_c").Translator;
 
+/// A render backend that the binding's tests can draw with.
 pub const RenderBackend = enum {
     metal,
     opengl,
@@ -48,11 +49,13 @@ fn carries(backends: []const []const u8, backend: []const u8) bool {
 const descriptor_sub_path = "share/maplibre-native-c/artifact.json";
 const pin_sub_path = "bindings/zig/native_release.json";
 
-/// A native install prefix and the target and render backend it serves.
+/// A native install prefix, the target it serves, and the render backends it
+/// carries, the first of them its default.
 pub const Native = struct {
     prefix: std.Build.LazyPath,
     target: std.Build.ResolvedTarget,
-    backend: RenderBackend,
+    backends: []const []const u8,
+    default_backend: []const u8,
 };
 
 const BuildOptions = struct {
@@ -62,11 +65,6 @@ const BuildOptions = struct {
     system_root: ?std.Build.LazyPath,
     libc_file: ?std.Build.LazyPath,
 };
-
-fn parseRenderBackend(value: []const u8) RenderBackend {
-    return std.meta.stringToEnum(RenderBackend, value) orelse
-        std.debug.panic("unsupported render backend: {s}", .{value});
-}
 
 /// The filesystem path of a path option, which configuration reads before any
 /// step runs.
@@ -116,13 +114,8 @@ fn servesTarget(b: *std.Build, platform: Platform, target: std.Target) bool {
     return query.cpu_arch.? == target.cpu.arch and query.os_tag.? == target.os.tag and abi == target.abi;
 }
 
-fn requestName(b: *std.Build, target: std.Target, backend: ?RenderBackend) []const u8 {
-    return b.fmt("{t}-{t}-{t} with {s}", .{
-        target.cpu.arch,
-        target.os.tag,
-        target.abi,
-        if (backend) |selected| b.fmt("the {t} backend", .{selected}) else "its default backend",
-    });
+fn targetName(b: *std.Build, target: std.Target) []const u8 {
+    return b.fmt("{t}-{t}-{t}", .{ target.cpu.arch, target.os.tag, target.abi });
 }
 
 fn targetOption(b: *std.Build, descriptor: ?ArtifactDescriptor) std.Build.ResolvedTarget {
@@ -136,11 +129,10 @@ fn targetOption(b: *std.Build, descriptor: ?ArtifactDescriptor) std.Build.Resolv
     return b.standardTargetOptions(.{ .default_target = if (native_host) .{} else artifact_query });
 }
 
-/// The release archive for the request, which the published package declares
-/// as a lazy dependency named by the archive, and the backend it serves: the
-/// selected one, or the platform's default. Zig fetches it when a build first
+/// The release archive for the target, which the published package declares as
+/// a lazy dependency named by the archive. Zig fetches it when a build first
 /// asks for it.
-fn publishedNative(b: *std.Build, target: std.Target, backend: ?RenderBackend) struct { std.Build.LazyPath, []const u8 } {
+fn publishedNative(b: *std.Build, target: std.Build.ResolvedTarget) Native {
     const pin_path = b.path(pin_sub_path);
     const pin_file = configurePath(b, pin_path);
     const contents = std.Io.Dir.cwd().readFileAlloc(b.graph.io, pin_file, b.allocator, .unlimited) catch |err| switch (err) {
@@ -154,19 +146,22 @@ fn publishedNative(b: *std.Build, target: std.Target, backend: ?RenderBackend) s
         artifacts: []const PinnedArtifact,
     }, b.allocator, contents, .{ .ignore_unknown_fields = true }) catch
         std.debug.panic("invalid native release pin: {s}", .{pin_file});
-    var chosen: ?struct { PinnedArtifact, []const u8 } = null;
     for (pin.value.platforms) |platform| {
-        if (!servesTarget(b, platform, target)) continue;
-        const wanted = if (backend) |selected| @tagName(selected) else platform.defaultBackend;
+        if (!servesTarget(b, platform, target.result)) continue;
         for (pin.value.artifacts) |artifact| {
-            if (std.mem.eql(u8, artifact.platform, platform.id) and carries(artifact.backends, wanted)) chosen = .{ artifact, wanted };
+            if (!std.mem.eql(u8, artifact.platform, platform.id)) continue;
+            return .{
+                .prefix = b.dependency(artifact.archive, .{}).path(""),
+                .target = target,
+                .backends = artifact.backends,
+                .default_backend = platform.defaultBackend,
+            };
         }
     }
-    const artifact, const served = chosen orelse std.debug.panic("release {s} has no native archive for {s}; pass -Dlocal-build to use your own build", .{
+    std.debug.panic("release {s} has no native archive for {s}; pass -Dlocal-build to use your own build", .{
         pin.value.tag,
-        requestName(b, target, backend),
+        targetName(b, target.result),
     });
-    return .{ b.dependency(artifact.archive, .{}).path(""), served };
 }
 
 fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
@@ -177,28 +172,20 @@ fn resolveNative(b: *std.Build, local_build: ?std.Build.LazyPath) Native {
         .emscripten => @panic("The Zig binding does not support the browser"),
         else => {},
     }
-    const selected_backend = b.option(
-        RenderBackend,
-        "backend",
-        "Render backend that the build draws with: one of the native artifact's, by default the target's default backend",
-    );
-
-    const prefix: std.Build.LazyPath, const backend = if (local) |install| local: {
-        // A prefix serves one target, with each backend that it carries.
-        const descriptor = install.descriptor;
-        const wanted = if (selected_backend) |selected| @tagName(selected) else descriptor.platform.defaultBackend;
-        if (!servesTarget(b, descriptor.platform, target.result) or !carries(descriptor.backends, wanted)) {
-            std.debug.panic("-Dlocal-build names an install prefix built by {s}, which cannot serve {s}", .{
-                descriptor.name,
-                requestName(b, target.result, selected_backend),
-            });
-        }
-        break :local .{ .{ .cwd_relative = install.prefix }, wanted };
-    } else publishedNative(b, target.result, selected_backend);
+    const install = local orelse return publishedNative(b, target);
+    // A prefix serves one target, with each backend of its platform.
+    const descriptor = install.descriptor;
+    if (!servesTarget(b, descriptor.platform, target.result)) {
+        std.debug.panic("-Dlocal-build names an install prefix built by {s}, which cannot serve {s}", .{
+            descriptor.name,
+            targetName(b, target.result),
+        });
+    }
     return .{
-        .prefix = prefix,
+        .prefix = .{ .cwd_relative = install.prefix },
         .target = target,
-        .backend = parseRenderBackend(backend),
+        .backends = descriptor.backends,
+        .default_backend = descriptor.platform.defaultBackend,
     };
 }
 
@@ -429,11 +416,27 @@ fn addShutdownProbe(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *
     return probe;
 }
 
+/// The backend that the binding's tests draw with, as a host would with one:
+/// the one that -Dbackend names, or else the install's default.
+fn testBackend(b: *std.Build, native: Native) RenderBackend {
+    const selected = b.option(
+        RenderBackend,
+        "backend",
+        "Render backend that the binding's tests draw with: one of the install's, by default its default backend",
+    );
+    const name = if (selected) |backend| @tagName(backend) else native.default_backend;
+    if (!carries(native.backends, name)) {
+        std.debug.panic("the native install carries no {s} backend for the tests to draw with", .{name});
+    }
+    return std.meta.stringToEnum(RenderBackend, name) orelse
+        std.debug.panic("the binding's tests can't draw with the {s} backend; pass -Dbackend", .{name});
+}
+
 fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native_ffi: *std.Build.Module) *std.Build.Step.Compile {
     const tests = addTestCompile(b, options, b.path("bindings/zig/tests/main.zig"));
     tests.root_module.addImport("maplibre_native_ffi", maplibre_native_ffi);
     addTestGraphics(b, tests.root_module, options);
-    addRenderBackendOptions(b, tests.root_module, options.native.backend);
+    addRenderBackendOptions(b, tests.root_module, testBackend(b, options.native));
     return tests;
 }
 

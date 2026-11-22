@@ -45,6 +45,7 @@ BACKEND_LABELS = {
     "vulkan": "Vulkan",
     "opengl": "OpenGL",
     "metal": "Metal",
+    "d3d12": "D3D12",
     "webgpu": "WebGPU",
 }
 BACKEND_ORDER = list(BACKEND_LABELS)

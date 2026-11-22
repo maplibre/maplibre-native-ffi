@@ -36,9 +36,7 @@
         "MLN_FFI_TARGET_PLATFORM": "linux-gnu-x64",
         "MLN_FFI_ZIG_TARGET": "x86_64-linux-gnu",
         "MLN_FFI_RUST_TARGET": "x86_64-unknown-linux-gnu",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
-        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -58,9 +56,7 @@
         "MLN_FFI_TARGET_PLATFORM": "linux-gnu-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-linux-gnu",
         "MLN_FFI_RUST_TARGET": "aarch64-unknown-linux-gnu",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
-        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -113,9 +109,7 @@
         "MLN_FFI_ZIG_TARGET": "riscv64-linux-gnu",
         "MLN_FFI_RUST_TARGET": "riscv64gc-unknown-linux-gnu",
         "MLN_FFI_ZIG_SYSROOT": "${sourceDir}/build/sysroot/riscv64",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
-        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -158,9 +152,7 @@
         "MLN_FFI_ZIG_TARGET": "loongarch64-linux-gnu",
         "MLN_FFI_RUST_TARGET": "loongarch64-unknown-linux-gnu",
         "MLN_FFI_ZIG_SYSROOT": "${sourceDir}/build/sysroot/loongarch64",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
-        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -203,9 +195,7 @@
         "MLN_FFI_TARGET_PLATFORM": "freebsd-x64",
         "MLN_FFI_ZIG_TARGET": "x86_64-freebsd",
         "MLN_FFI_RUST_TARGET": "x86_64-unknown-freebsd",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
-        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -230,7 +220,6 @@
         "MLN_FFI_TARGET_PLATFORM": "macos-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-macos",
         "MLN_FFI_RUST_TARGET": "aarch64-apple-darwin",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal",
         "MLN_FFI_RENDER_BACKENDS": "metal"
       },
       "vendor": {
@@ -267,7 +256,6 @@
         "CMAKE_OSX_DEPLOYMENT_TARGET": "15.0",
         "MLN_FFI_TARGET_PLATFORM": "ios-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-ios",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal",
         "MLN_FFI_RENDER_BACKENDS": "metal"
       },
       "vendor": {
@@ -288,7 +276,6 @@
         "CMAKE_OSX_DEPLOYMENT_TARGET": "15.0",
         "MLN_FFI_TARGET_PLATFORM": "tvos-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-tvos",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal",
         "MLN_FFI_RENDER_BACKENDS": "metal"
       },
       "vendor": {
@@ -309,7 +296,6 @@
         "CMAKE_OSX_DEPLOYMENT_TARGET": "1.0",
         "MLN_FFI_TARGET_PLATFORM": "visionos-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-visionos",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal",
         "MLN_FFI_RENDER_BACKENDS": "metal"
       },
       "vendor": {
@@ -327,9 +313,7 @@
       "cacheVariables": {
         "ANDROID_PLATFORM": "android-24",
         "ANDROID_STL": "c++_static",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl",
-        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -434,9 +418,7 @@
       "cacheVariables": {
         "OHOS_STL": "c++_shared",
         "OHOS_COMPATIBLE_SDK_VERSION": "20",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "opengl",
-        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl"
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl"
       }
     },
     {
@@ -486,9 +468,7 @@
       "toolchainFile": "${fileDir}/cmake/toolchains/clang-cl.cmake",
       "cacheVariables": {
         "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
-        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "wgl"
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;d3d12;opengl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -544,9 +524,7 @@
         "MLN_FFI_TARGET_PLATFORM": "windows-mingw-x64",
         "MLN_FFI_ZIG_TARGET": "x86_64-windows-gnu",
         "MLN_FFI_RUST_TARGET": "x86_64-pc-windows-gnu",
-        "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
-        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "wgl"
+        "MLN_FFI_RENDER_BACKENDS": "vulkan;d3d12;opengl"
       },
       "vendor": {
         "maplibre-native-ffi": {
@@ -624,8 +602,7 @@
       "displayName": "Browser WASM32 WebGL",
       "inherits": "_web-wasm32",
       "cacheVariables": {
-        "MLN_FFI_RENDER_BACKENDS": "opengl",
-        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "webgl"
+        "MLN_FFI_RENDER_BACKENDS": "opengl"
       }
     },
     {

@@ -2,6 +2,7 @@
 # has an interface target, mln_ffi_render_dependencies_<backend>, and
 # mln_ffi_render_dependencies links every one of them. It is what the library's
 # consumers link.
+include(render/d3d12)
 include(render/metal)
 include(render/opengl)
 include(render/vulkan)

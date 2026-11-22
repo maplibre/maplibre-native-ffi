@@ -28,16 +28,10 @@ Future<void> main(List<String> arguments) async {
 
     final code = input.config.code;
     final platform = _targetPlatform(code);
-    final backend = _selectedBackend(input, code.targetOS);
     final localBuild = input.userDefines.path('local_build');
     final prefix = localBuild == null
-        ? await _download(input, output, platform, backend, _releaseUrl(input))
-        : _localPrefix(
-            Uri.directory(localBuild.toFilePath()),
-            platform,
-            backend,
-            code.targetOS,
-          );
+        ? await _download(input, output, platform, _releaseUrl(input))
+        : _localPrefix(Uri.directory(localBuild.toFilePath()), platform);
 
     // A download is unpacked under its pinned digest, so the pin file, which
     // is already a dependency, covers it. Declaring the files unpacked during
@@ -92,29 +86,6 @@ String _targetPlatform(CodeConfig code) {
   };
 }
 
-/// The backend that the application selects for [os], which the served
-/// library must carry, or null to take a library with the platform's default
-/// backend.
-String? _selectedBackend(BuildInput input, OS os) =>
-    switch (input.userDefines['backend']) {
-      null => null,
-      final Map<Object?, Object?> backends => switch (backends[os.name]) {
-        null => null,
-        final String backend
-            when backend == 'opengl' ||
-                backend == 'metal' ||
-                backend == 'vulkan' =>
-          backend,
-        final other => throw FormatException(
-          '$_defines.backend.${os.name} must be opengl, metal, or vulkan; '
-          'found $other',
-        ),
-      },
-      final other => throw FormatException(
-        '$_defines.backend must map an OS to a backend; found $other',
-      ),
-    };
-
 /// The base URL of the release downloads: the GitHub releases, or else a mirror
 /// that the application names, which serves each release tag as a directory.
 String _releaseUrl(BuildInput input) =>
@@ -129,21 +100,15 @@ String _releaseUrl(BuildInput input) =>
 
 /// Resolves a local build: an install prefix, or a directory holding installs
 /// one level down, such as a CMake build root.
-Uri _localPrefix(Uri directory, String platform, String? backend, OS os) {
-  final request = _request(platform, backend);
+Uri _localPrefix(Uri directory, String platform) {
   if (_descriptor(directory).existsSync()) {
     // A prefix serves one platform, so a build for several targets names a
-    // directory of installs instead. Without a selected backend, the prefix
-    // serves with whichever backends it carries.
-    final descriptor = _readDescriptor(directory);
-    final built = _platform(descriptor);
-    final backends = _backends(descriptor);
-    if (!_matchesLocalPlatform(built['id'], platform) ||
-        (backend != null && !backends.contains(backend))) {
+    // directory of installs instead.
+    final built = _platform(_readDescriptor(directory))['id'];
+    if (!_matchesLocalPlatform(built, platform)) {
       throw StateError(
-        '$_defines.local_build names an install prefix built for '
-        '${built['id']} with ${backends.join(', ')}, '
-        'which cannot serve $request.',
+        '$_defines.local_build names an install prefix built for $built, '
+        'which cannot serve $platform.',
       );
     }
     return directory;
@@ -155,46 +120,26 @@ Uri _localPrefix(Uri directory, String platform, String? backend, OS os) {
       for (final child in root.listSync().whereType<Directory>())
         for (final prefix in [child.uri.resolve('install/'), child.uri])
           if (_descriptor(prefix).existsSync() &&
-              _serves(_readDescriptor(prefix), platform, backend))
+              _matchesLocalPlatform(
+                _platform(_readDescriptor(prefix))['id'],
+                platform,
+              ))
             prefix,
   ]..sort((a, b) => a.path.compareTo(b.path));
   final named =
       '$_defines.local_build names ${directory.toFilePath()}, which holds';
   if (matches.length > 1) {
     throw StateError(
-      '$named several installs for $request:'
+      '$named several installs for $platform:'
       '${matches.map((prefix) => '\n  ${prefix.toFilePath()}').join()}\n'
       'Remove all but one, or name one of them as the install prefix.',
     );
   }
   if (matches.isEmpty) {
-    throw StateError(
-      '$named no install for $request. Build it, or select another backend '
-      'in $_defines.backend.${os.name}.',
-    );
+    throw StateError('$named no install for $platform. Build it first.');
   }
   return matches.single;
 }
-
-String _request(String platform, String? backend) => backend == null
-    ? '$platform with its default backend'
-    : '$platform with $backend';
-
-/// Whether [descriptor] describes an install for [platform] that carries the
-/// [backend] selected for it, or without one, the platform's default backend.
-bool _serves(
-  Map<String, Object?> descriptor,
-  String platform,
-  String? backend,
-) {
-  final built = _platform(descriptor);
-  return _matchesLocalPlatform(built['id'], platform) &&
-      _backends(descriptor).contains(backend ?? built['defaultBackend']);
-}
-
-/// The render backends that an install or a release archive carries.
-List<String> _backends(Map<String, Object?> entry) =>
-    (entry['backends']! as List<Object?>).cast<String>();
 
 // A local Windows DLL uses the same C ABI whether MSVC or MinGW built it.
 bool _matchesLocalPlatform(Object? built, String requested) =>
@@ -211,14 +156,13 @@ Map<String, Object?> _readDescriptor(Uri prefix) =>
 File _descriptor(Uri prefix) =>
     File.fromUri(prefix.resolve('share/maplibre-native-c/artifact.json'));
 
-/// Downloads and unpacks the pinned release's archive for [platform] that
-/// carries the [backend] selected for it, or without one, the platform's
-/// default backend, unless an earlier build already did.
+/// Downloads and unpacks the pinned release's archive for [platform], which
+/// carries each of the platform's backends, unless an earlier build already
+/// did.
 Future<Uri> _download(
   BuildInput input,
   BuildOutputBuilder output,
   String platform,
-  String? backend,
   String releaseUrl,
 ) async {
   final pinFile = File.fromUri(input.packageRoot.resolve(_pinPath));
@@ -231,22 +175,15 @@ Future<Uri> _download(
   output.dependencies.add(pinFile.absolute.uri);
   final pin = jsonDecode(pinFile.readAsStringSync()) as Map<String, Object?>;
   final tag = pin['tag']! as String;
-  final published = (pin['platforms']! as List<Object?>)
-      .cast<Map<String, Object?>>()
-      .where((entry) => entry['id'] == platform)
-      .firstOrNull;
-  final wanted = backend ?? published?['defaultBackend'];
   final entries = [
-    if (published != null)
-      for (final entry
-          in (pin['artifacts']! as List<Object?>).cast<Map<String, Object?>>())
-        if (entry['platform'] == platform && _backends(entry).contains(wanted))
-          entry,
+    for (final entry
+        in (pin['artifacts']! as List<Object?>).cast<Map<String, Object?>>())
+      if (entry['platform'] == platform) entry,
   ];
   if (entries.length != 1) {
     throw UnsupportedError(
       '$tag publishes ${entries.isEmpty ? 'no' : entries.length} archives '
-      'for ${_request(platform, backend)}; expected one.',
+      'for $platform; expected one.',
     );
   }
   final archiveName = entries.single['archive']! as String;

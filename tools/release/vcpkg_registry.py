@@ -67,7 +67,8 @@ file(INSTALL "${CMAKE_CURRENT_LIST_DIR}/usage"
 USAGE = """\
 Available archives cover Linux (glibc), macOS, Windows, FreeBSD x64, and
 Android, each with every render backend of its platform: Vulkan and OpenGL
-(EGL, or WGL on Windows) off Apple platforms, and Metal on macOS. An
+(EGL) on Linux, FreeBSD, and Android, Vulkan, D3D12, and OpenGL (WGL) on
+Windows, and Metal on macOS. An
 unsupported platform or architecture fails during installation. Both shared and
 static targets use the release's Release binaries:
 

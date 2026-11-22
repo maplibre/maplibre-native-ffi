@@ -13,8 +13,8 @@ mise run //examples/sdl:run
 ```
 
 The task builds this machine's default preset, whose library carries every
-render backend of the platform: Vulkan and OpenGL on Linux, FreeBSD, and
-Windows, and Metal on macOS.
+render backend of the platform: Vulkan and OpenGL on Linux and FreeBSD, Vulkan,
+D3D12, and OpenGL on Windows, and Metal on macOS.
 
 To build the Windows preset with the MSVC SDK on Linux and run the app under
 Wine, as the development overview describes:
