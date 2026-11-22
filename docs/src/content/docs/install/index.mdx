@@ -33,7 +33,8 @@ On Windows, D3D12 compiles its shaders at run time with
 [DXC](https://github.com/microsoft/DirectXShaderCompiler/releases), which your
 app ships: `dxcompiler.dll`, 1.8.2502 or later, beside your app's executable or
 in another directory of the DLL search path. The library doesn't look in its own
-directory. Without DXC, the library renders on another backend.
+directory. Without DXC, a device on the platform's default takes another
+backend, and a device that you create or wrap for D3D12 fails as unsupported.
 
 In a browser, a package carries one backend, so that a page downloads only the
 one it draws with: WebGPU, the default, or WebGL 2.

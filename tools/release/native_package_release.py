@@ -365,6 +365,15 @@ def artifact_index(tag: str, archives: list[pathlib.Path]) -> dict:
             raise SystemExit(
                 f"{archive.name} describes {platform['id']} unlike another archive"
             )
+        # A native platform's one archive carries all of its backends, and a
+        # build picks it by platform alone.
+        if not platform["id"].startswith("web-"):
+            for artifact in artifacts:
+                if artifact["platform"] == platform["id"]:
+                    raise SystemExit(
+                        f"{archive.name} and {artifact['archive']} are both "
+                        f"archives of {platform['id']}"
+                    )
         for backend in descriptor["backends"]:
             other = carriers.setdefault((platform["id"], backend), archive.name)
             if other != archive.name:

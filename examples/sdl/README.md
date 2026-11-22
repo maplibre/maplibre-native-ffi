@@ -47,10 +47,11 @@ the display's pixel density.
 X11 window as an `xlib_window`, its `HWND` as a `win32_window`, or a
 `CAMetalLayer` from SDL's Metal view as a `metal_layer`. With no GPU device, the
 session creates one on the platform's default backend: Metal on macOS, and
-elsewhere Vulkan, or OpenGL where the system has no Vulkan driver. It renders on
-a library thread. The wakes and the event handler run on library threads too, so
-they set flags and push an SDL event that wakes the main loop, which acts on
-them. A redraw wake asks for a frame, and a frame wake drains the frame results.
+elsewhere Vulkan, then D3D12 on Windows, or OpenGL where the system has neither.
+It renders on a library thread. The wakes and the event handler run on library
+threads too, so they set flags and push an SDL event that wakes the main loop,
+which acts on them. A redraw wake asks for a frame, and a frame wake drains the
+frame results.
 
 On macOS, `RenderSession.setFramePacing` with SDL's Metal view paces the frames
 to the display of the window, and the session demands them itself. Elsewhere,

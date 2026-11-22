@@ -31,11 +31,12 @@ copies beside it. An app outside this repository references the
 
 `MapView.cs` is an `HwndHost` that holds the map's window, a Win32 child window.
 `MapController.cs` attaches a render session to it with `Attach` and a Win32
-window target. The session renders on a library thread with a Vulkan device that
-the library creates, and presents to the window itself. The session can't pace
-its own frames on Windows, so a redraw wake asks for a frame, and the controller
-demands it at WPF's next frame, from `CompositionTarget.Rendering`, which the
-desktop compositor paces to the display. WPF renders frames only while something
+window target. The session renders on a library thread with a device that the
+library creates on the platform's default backend, Vulkan, then D3D12, or
+OpenGL, and presents to the window itself. The session can't pace its own frames
+on Windows, so a redraw wake asks for a frame, and the controller demands it at
+WPF's next frame, from `CompositionTarget.Rendering`, which the desktop
+compositor paces to the display. WPF renders frames only while something
 subscribes to that event, so an idle map costs nothing. A frame wake drains the
 frame results. While the window is minimized, the frames finish without
 presenting.
