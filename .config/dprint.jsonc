@@ -10,6 +10,9 @@
   // Patterns with a directory component are relative to this config file.
   "excludes": [
     "../third_party/**",
+    // mln-rs's headers, copied as they are there.
+    "../include/maplibre_native_c.h",
+    "../include/maplibre_native_c/**",
     "../.github/workflows/ci-*.yml",
     "../.github/workflows/_ci-*.yml",
     "**/*-lock.yaml",

@@ -44,11 +44,10 @@ render backend that the platform's package carries: Vulkan and OpenGL off Apple
 platforms, and Metal on them. A release build takes a few minutes, most of it in
 link-time optimization.
 
-After you change a header, run `mise run bindings:generate`. `include/` is the
-source of truth for the C API, and mln-rs keeps a copy in
-`crates/mln_c/include`. Configuring a preset fails while the two differ, so
-bring mln-rs's copy in line in the same change, with a patch until mln-rs takes
-it.
+mln-rs defines the C API in `crates/mln_c/include`, and `include/` is a copy.
+After the submodule or its patches change the headers, run
+`mise run sync-c-headers`, then `mise run bindings:generate`. Configuring a
+preset fails while `include/` differs from mln-rs's headers.
 
 `mise run check` runs the linters, and `mise run fix` fixes what it can; the
 pre-commit hook does the same for staged files. `mise run //docs:dev` serves
@@ -161,9 +160,10 @@ Test a patch with mln-rs's own tests, which `cargo test` runs from
 `third_party/mln-rs`. CI doesn't run these tests, so list the ones you ran in
 the pull request.
 
-To update mln-rs, check out the commit in the submodule, run `mise deps` to
-reapply the patches, and run the binding suites. mln-rs tests the C API with its
-ABI suite in `tools/c-abi-test`.
+To update mln-rs, check out the commit in the submodule and stage it, run
+`mise deps` to reapply the patches, run `mise run sync-c-headers` and
+`mise run bindings:generate`, and run the binding suites. mln-rs tests the C API
+with its ABI suite in `tools/c-abi-test`.
 
 ## CI
 

@@ -1,10 +1,10 @@
 # Builds the C library from mln-rs, the Rust port of MapLibre Native that the
 # third_party/mln-rs submodule vendors. Its `mln_c` crate (package mln-rs-c)
-# implements the C API that include/ declares. Cargo builds the crate as a
-# shared library and a static archive for the preset's Rust target, and this
-# file gives both the names, install names, and symbols that the package has
-# always had, so the CMake package, pkg-config, the artifact descriptor, and the
-# bindings see no difference.
+# defines the C API in crates/mln_c/include and implements it. Cargo builds the
+# crate as a shared library and a static archive for the preset's Rust target,
+# and this file gives both the names, install names, and symbols that the
+# package has always had, so the CMake package, pkg-config, the artifact
+# descriptor, and the bindings see no difference.
 #
 # Each preset builds the crate with the Cargo features of the render backends
 # that its platform carries, and no others, so the library reports exactly those
@@ -21,12 +21,10 @@ set(MLN_FFI_SHIM_PERMISSIONS
     WORLD_READ
     WORLD_EXECUTE)
 
-# include/ is the source of truth for the C API, and mln-rs keeps a copy of it
-# in crates/mln_c/include, which its own ABI tests compile against. A copy that
-# differs means that the crate implements another API than the one this
-# repository publishes, so the configure step fails until the two agree: copy
-# include/ over the crate's copy in a patch under patches/mln-rs/, or update the
-# submodule to a commit that already has the change.
+# include/ is a copy of mln-rs's headers, which the package installs and the
+# bindings compile against. A copy that differs from the crate's publishes
+# another API than the one the crate implements, so the configure step fails
+# until `mise run sync-c-headers` brings it in line.
 function(mln_ffi_check_mln_rs_headers)
   set(ours "${PROJECT_SOURCE_DIR}/include")
   set(theirs "${MLN_FFI_MLN_RS_DIR}/crates/mln_c/include")
@@ -60,9 +58,8 @@ function(mln_ffi_check_mln_rs_headers)
     message(
       FATAL_ERROR
         "include/ and third_party/mln-rs/crates/mln_c/include differ:\n  ${differences}\n"
-        "include/ is the source of truth. Bring mln-rs's copy in line with a "
-        "patch in patches/mln-rs/, or update the submodule to a commit that has "
-        "the change. See the development overview.")
+        "include/ is a copy of mln-rs's headers: run `mise run sync-c-headers`. "
+        "To change the C API, change mln-rs. See the development overview.")
   endif()
 endfunction()
 
