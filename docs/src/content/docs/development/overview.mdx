@@ -160,9 +160,10 @@ Test a patch with mln-rs's own tests, which `cargo test` runs from
 `third_party/mln-rs`. CI doesn't run these tests, so list the ones you ran in
 the pull request.
 
-To update mln-rs, check out the commit in the submodule, run `mise deps` to
-reapply the patches, and run the binding suites. mln-rs tests the C API with its
-ABI suite in `tools/c-abi-test`.
+To update mln-rs, check out the commit in the submodule and stage it, run
+`mise deps` to reapply the patches, run `mise run sync-c-headers` and
+`mise run bindings:generate`, and run the binding suites. mln-rs tests the C API
+with its ABI suite in `tools/c-abi-test`.
 
 ## CI
 
