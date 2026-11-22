@@ -5,5 +5,5 @@
 #MISE shell="bash"
 set -euo pipefail
 
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" kotlin-jvm
 exec "$MISE_MONOREPO_ROOT/scripts/test-kotlin-android-device.sh" "$usage_preset"

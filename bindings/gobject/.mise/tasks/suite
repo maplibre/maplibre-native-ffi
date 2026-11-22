@@ -9,7 +9,7 @@ set -euo pipefail
 # prefix it installed into, beside a copy of the native install, and the
 # target's device runner exports MLN_FFI_TEST_BACKEND.
 if [[ -z "${MLN_FFI_GOBJECT_PREFIX:-}" ]]; then
-  source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "${usage_preset?}" "${usage_backend:-}"
+  source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "${usage_preset?}" "${usage_backend:-}" gobject
 fi
 : "${MLN_FFI_TEST_BACKEND:?MLN_FFI_TEST_BACKEND must name the render backend under test}"
 install_dir=${MLN_FFI_GOBJECT_PREFIX:-"$MISE_MONOREPO_ROOT/build/$usage_preset/install"}

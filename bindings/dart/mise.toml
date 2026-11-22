@@ -49,7 +49,7 @@ depends = [
   ] },
 ]
 run = '''
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" dart
 exec "$MISE_MONOREPO_ROOT/scripts/test-dart-android-device.sh" "$usage_preset"
 '''
 
@@ -79,7 +79,7 @@ depends = [
   ":check-publish",
 ]
 run = '''
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" dart
 if [[ "$usage_preset" == macos-x64 ]]; then
   exec mise run :_test-macos-x64
 fi
@@ -104,7 +104,7 @@ fi
 exec dart test
 '''
 run_windows = '''
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" dart
 # The DLL loads its own dependencies from the prefix it was installed into.
 export PATH="$(cygpath -u "$MISE_MONOREPO_ROOT/build/$usage_preset/install/bin")${PATH:+:${PATH}}"
 dart test

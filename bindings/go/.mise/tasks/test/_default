@@ -16,7 +16,7 @@ case "$usage_preset" in
     ;;
 esac
 
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" go
 source "$MISE_MONOREPO_ROOT/tools/env/go-native-env.sh" "$usage_preset"
 export GOCACHE="$MISE_MONOREPO_ROOT/build/$usage_preset/go-cache"
 source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset" "$MLN_FFI_TEST_BACKEND"

@@ -17,7 +17,7 @@ if [[ -n "$goos" ]]; then
   done
   exit 0
 fi
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "" go
 source "$MISE_MONOREPO_ROOT/bindings/go/test-tags.sh" "$usage_preset" "$MLN_FFI_TEST_BACKEND"
 # Go's test cache cannot see the native library, so always rerun the suite.
 exec go test -count=1 -tags "$go_test_tags" ./...
