@@ -295,6 +295,25 @@ final class MapGestures: NSObject {
       return handle(.delta(delta), at: event.timestamp)
     }
 
+    /// Drops the drag and the pinch, and lets go of the held keys, once the
+    /// view can't see their ends: when it or its window loses focus.
+    func cancel() {
+      let now = CACurrentMediaTime()
+      if dragButton != nil {
+        dragButton = nil
+        handle(.pointerCancel(GesturePointer(id: Self.mouse)), at: now)
+      }
+      if magnifying || rotating {
+        magnifying = false
+        rotating = false
+        handle(
+          .pinch(GesturePinch(center: ScreenPoint(), scale: 1, phase: .cancel)),
+          at: now
+        )
+      }
+      handle(.modes([]), at: now)
+    }
+
     /// One of the trackpad's two streams, as part of one pinch: the first to
     /// begin begins it, and the last to end ends it.
     private func pinch(

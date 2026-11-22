@@ -82,12 +82,13 @@ def encode(values, value, source):
         if value.counted_inline:
             # The elements in use, then zeroed storage up to the extent.
             native = value.element.native
-            items = f"{'try ' if encode_throws(value.element) else ''}{source}.map {{ {encode(values, value.element, '$0')} }}"
+            throws = encode_throws(value.element)
+            items = f"{'try ' if throws else ''}{source}.map {{ {encode(values, value.element, '$0')} }}"
             slots = ", ".join(
                 f"{i} < items.count ? items[{i}] : {native}()"
                 for i in range(value.extent)
             )
-            return f"{{ () throws -> ({', '.join([native] * value.extent)}) in let items = {items}; return ({slots}) }}()"
+            return f"{'try ' if throws else ''}{{ () {'throws ' if throws else ''}-> ({', '.join([native] * value.extent)}) in let items = {items}; return ({slots}) }}()"
         if value.extent is not None:
             # Swift's imported fixed C arrays use tuples rather than Array.
             count = value.extent

@@ -312,13 +312,17 @@ function addGestures(map: RemoteMap): void {
     });
   });
 
-  canvas.addEventListener("pointercancel", (event) => {
+  // A pointer that the canvas loses without a release ends with no tap or
+  // glide. One that it released is already gone from `pointers`.
+  const cancelPointer = (event: PointerEvent) => {
     if (!pointers.delete(event.pointerId)) return;
     map.gesture(event, {
       kind: "pointerCancel",
       value: { id: event.pointerId },
     });
-  });
+  };
+  canvas.addEventListener("pointercancel", cancelPointer);
+  canvas.addEventListener("lostpointercapture", cancelPointer);
 
   canvas.addEventListener("blur", (event) => {
     const ids = [...pointers];

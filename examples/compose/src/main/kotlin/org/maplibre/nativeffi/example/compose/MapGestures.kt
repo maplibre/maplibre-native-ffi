@@ -45,8 +45,16 @@ fun Modifier.mapGestures(
 
     coroutineScope {
       var ticks: Job? = null
+      // The recognizer's clock only goes forward, but an event's samples can be older than the
+      // last frame that ticked it.
+      var clock = 0L
 
-      fun tick(timeMillis: Long): GestureResult? = recognizer()?.tick(timeMillis.toDouble())
+      fun time(timeMillis: Long): Double {
+        clock = maxOf(clock, timeMillis)
+        return clock.toDouble()
+      }
+
+      fun tick(timeMillis: Long): GestureResult? = recognizer()?.tick(time(timeMillis))
 
       // Answers the result's events, and ticks the recognizer when the result asks: every frame
       // while the map glides or eases, or once at a time, as when a press may become a long press.
@@ -67,7 +75,7 @@ fun Modifier.mapGestures(
       }
 
       fun handle(input: GestureInput, change: PointerInputChange, timeMillis: Long) {
-        val result = recognizer()?.handle(input, timeMillis.toDouble()) ?: return
+        val result = recognizer()?.handle(input, time(timeMillis)) ?: return
         if (result.handled) change.consume()
         follow(result)
       }
@@ -77,6 +85,20 @@ fun Modifier.mapGestures(
         awaitPointerEventScope {
           while (true) {
             val event = awaitPointerEvent()
+            // The samples that the event batched for the pointers that moved, in time order
+            // across pointers, so the recognizer measures the release speed from each.
+            val moves =
+              event.changes
+                .filter { it.pressed && !it.changedToDownIgnoreConsumed() && it.positionChanged() }
+                .flatMap { change ->
+                  change.historical.map { Triple(change, it.position, it.uptimeMillis) } +
+                    Triple(change, change.position, change.uptimeMillis)
+                }
+                .sortedBy { it.third }
+            for ((change, position, timeMillis) in moves) {
+              val moved = GesturePointer(change.id.value.toUInt(), point(position))
+              handle(GestureInput.PointerMove(moved), change, timeMillis)
+            }
             for (change in event.changes) {
               val pointer = GesturePointer(change.id.value.toUInt(), point(change.position))
               when {
@@ -98,18 +120,14 @@ fun Modifier.mapGestures(
                     GesturePointerDown(pointer.id, kind(change.type), pointer.position, modes)
                   handle(GestureInput.PointerDown(down), change, change.uptimeMillis)
                 }
-                change.changedToUpIgnoreConsumed() -> {
+                // Compose cancels a gesture, as when a parent takes the pointers, with releases
+                // that are already consumed.
+                change.changedToUpIgnoreConsumed() && change.id in pressed -> {
                   pressed -= change.id
-                  handle(GestureInput.PointerUp(pointer), change, change.uptimeMillis)
-                }
-                change.pressed && change.positionChanged() -> {
-                  // The samples that the event batched, so the recognizer measures the release
-                  // speed from each.
-                  for (sample in change.historical) {
-                    val moved = pointer.copy(position = point(sample.position))
-                    handle(GestureInput.PointerMove(moved), change, sample.uptimeMillis)
-                  }
-                  handle(GestureInput.PointerMove(pointer), change, change.uptimeMillis)
+                  val input =
+                    if (change.isConsumed) GestureInput.PointerCancel(pointer)
+                    else GestureInput.PointerUp(pointer)
+                  handle(input, change, change.uptimeMillis)
                 }
               }
             }
@@ -118,7 +136,7 @@ fun Modifier.mapGestures(
       } finally {
         // Compose cancels this when the view leaves, as on a rotation, but the map and its
         // recognizer live on, so the pointers that are still down end without a tap or a glide.
-        val now = SystemClock.uptimeMillis().toDouble()
+        val now = time(SystemClock.uptimeMillis())
         for (id in pressed) {
           recognizer()?.handle(GestureInput.PointerCancel(GesturePointer(id.value.toUInt())), now)
         }

@@ -25,6 +25,8 @@ button: ?u8 = null,
 /// The touches that are down.
 touches: [10]?u32 = @splat(null),
 modes: maplibre.GestureMode = .{},
+/// The scale that Wayland last reported for the pinch, since it began.
+pinch_scale: f32 = 1,
 /// When the recognizer next needs a tick, on SDL's clock in nanoseconds, and
 /// the timer that wakes the event loop for it.
 tick_at: ?u64 = null,
@@ -140,9 +142,21 @@ fn pinch(self: *Gestures, event: *const c.SDL_PinchFingerEvent) void {
     var x: f32 = 0;
     var y: f32 = 0;
     _ = c.SDL_GetMouseState(&x, &y);
+    // SDL passes on Wayland's scale since the pinch began, where other
+    // platforms report the change since the last update.
+    var scale: f32 = 1;
+    if (event.type == c.SDL_EVENT_PINCH_BEGIN) self.pinch_scale = 1;
+    if (event.type == c.SDL_EVENT_PINCH_UPDATE) {
+        scale = event.scale;
+        const driver = c.SDL_GetCurrentVideoDriver();
+        if (driver != null and std.mem.eql(u8, std.mem.span(driver), "wayland")) {
+            scale = event.scale / self.pinch_scale;
+            self.pinch_scale = event.scale;
+        }
+    }
     self.input(event.timestamp, .{ .pinch = .{
         .center = self.point(x, y),
-        .scale = if (event.type == c.SDL_EVENT_PINCH_UPDATE) event.scale else 1,
+        .scale = scale,
         .phase = switch (event.type) {
             c.SDL_EVENT_PINCH_BEGIN => .begin,
             c.SDL_EVENT_PINCH_UPDATE => .update,
@@ -203,11 +217,13 @@ fn input(self: *Gestures, timestamp: u64, gesture_input: maplibre.GestureInput) 
 }
 
 /// Wakes the event loop when the recognizer next needs a tick: at the next
-/// refresh of the window's display, or at the time it asks for.
+/// refresh of the window's display, or at the time it asks for. A frame tick
+/// that is already due by then stays, so input faster than the display can't
+/// put it off.
 fn schedule(self: *Gestures, result: maplibre.GestureResult) void {
     const now = c.SDL_GetTicksNS();
     self.tick_at = switch (result.next_tick) {
-        .frame => now + refreshPeriod(self.view.window),
+        .frame => @min(self.tick_at orelse std.math.maxInt(u64), now + refreshPeriod(self.view.window)),
         .at => @intFromFloat(@max(0, result.next_tick_ms) * std.time.ns_per_ms),
         else => null,
     };

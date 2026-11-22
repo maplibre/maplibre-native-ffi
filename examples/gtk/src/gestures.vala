@@ -53,10 +53,17 @@ namespace Example {
 		}
 
 		private bool on_event (Gdk.Event event) {
-			if (event.get_pointer_emulated ()) {
+			var type = event.get_event_type ();
+			// A touchscreen's primary contact also arrives as button and motion
+			// events, which the touch events already carry. GDK marks that
+			// contact's own touch events as emulating too, so keep those.
+			if (event.get_pointer_emulated ()
+				&& (type == Gdk.EventType.BUTTON_PRESS
+					|| type == Gdk.EventType.MOTION_NOTIFY
+					|| type == Gdk.EventType.BUTTON_RELEASE)) {
 				return false;
 			}
-			switch (event.get_event_type ()) {
+			switch (type) {
 			case Gdk.EventType.BUTTON_PRESS:
 				// The primary button drags, the secondary one rotates and
 				// tilts, and the others mean nothing to the map.

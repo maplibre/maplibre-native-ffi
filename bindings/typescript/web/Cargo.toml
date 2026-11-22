@@ -37,8 +37,8 @@ wasm-bindgen = "=0.2.130"
 [build-dependencies]
 cc = "1.11.1"
 
-# mln-rs's release profile, which `just c-web` builds the library's own
-# browser package with.
+# mln-rs's release profile, which its `c-web:build` task builds the library's
+# own browser package with.
 [profile.release]
 lto = "fat"
 codegen-units = 1

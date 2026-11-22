@@ -67,7 +67,7 @@ for each Android preset.
 The `web-wasm32-webgpu` and `web-wasm32-webgl` presets each build mln-rs's
 browser package with one backend, so that a page downloads only the one it draws
 with: a wasm-bindgen module for `wasm32-unknown-unknown`, built with mln-rs's
-own `just c-web` recipe. Their tools come with `-E web`:
+own `c-web:build` task script. Their tools come with `-E web`:
 `mise -E web run build web-wasm32-webgpu` installs the package under
 `share/maplibre-native-c/web`, and
 `mise -E web run //bindings/kotlin:test:wasm <preset>` runs the Kotlin/Wasm

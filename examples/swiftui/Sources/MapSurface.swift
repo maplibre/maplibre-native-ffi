@@ -136,9 +136,31 @@ import SwiftUI
       super.viewDidMoveToWindow()
       viewDidChangeBackingProperties()
       controller.setView(window == nil ? nil : self)
-      if window == nil {
+      NotificationCenter.default.removeObserver(
+        self,
+        name: NSWindow.didResignKeyNotification,
+        object: nil
+      )
+      if let window {
+        NotificationCenter.default.addObserver(
+          self,
+          selector: #selector(windowDidResignKey),
+          name: NSWindow.didResignKeyNotification,
+          object: window
+        )
+      } else {
+        gestures.cancel()
         gestures.stop()
       }
+    }
+
+    @objc private func windowDidResignKey(_: Notification) {
+      gestures.cancel()
+    }
+
+    override func resignFirstResponder() -> Bool {
+      gestures.cancel()
+      return super.resignFirstResponder()
     }
 
     /// The window moved to a display of another density.

@@ -76,7 +76,7 @@ function handle(message: ToWorker): void {
       break;
     case "gesture": {
       // The page's clock starts at its own time origin.
-      const time = message.time - performance.timeOrigin;
+      const time = clock(message.time - performance.timeOrigin);
       for (const input of message.inputs) {
         scheduleTick(recognizer!.handle(input, time));
       }
@@ -107,7 +107,16 @@ function scheduleTick({ nextTick, nextTickMs }: GestureResult): void {
 }
 
 function tick(): void {
-  scheduleTick(recognizer!.tick(performance.now()));
+  scheduleTick(recognizer!.tick(clock(performance.now())));
+}
+
+// The recognizer's clock only goes forward, but an input can arrive after a
+// tick at a later time than its own.
+let lastTime = 0;
+
+function clock(time: number): number {
+  lastTime = Math.max(lastTime, time);
+  return lastTime;
 }
 
 function view(): View {
