@@ -39,8 +39,8 @@ import org.maplibre.nativeffi.smallMapOptions
 import org.maplibre.nativeffi.withMap
 
 /**
- * Android's HTTP client, which calls Java and so runs here rather than in the C suite, whose test
- * executables have no Java VM. The cases mirror tests/native/abi/platform/transport.c.
+ * Android's HTTP client, which calls Java and so runs here rather than in mln-rs's C ABI suite,
+ * whose test executables have no Java VM.
  */
 class AndroidHttpTransportTest {
   @Test

@@ -5,28 +5,14 @@ function(mln_ffi_configure_opengl_dependencies target)
       mln_ffi_import_egl()
       # Headers alone: the library defines its own EGL entry points and resolves
       # the client library at run time, so the loader stays the host's to
-      # supply. The test harness links one below, standing in for a host.
+      # supply. The test graphics fixtures try this one first.
       target_link_libraries(${target} INTERFACE ${CMAKE_DL_LIBS})
       get_target_property(MLN_FFI_EGL_INCLUDE_DIRS MLN_FFI::EGL
                           INTERFACE_INCLUDE_DIRECTORIES)
-      get_target_property(MLN_FFI_EGL_LIBRARY MLN_FFI::EGL IMPORTED_LOCATION)
-      get_filename_component(
-        MLN_FFI_EGL_LIBRARY_DIR "${MLN_FFI_EGL_LIBRARY}"
-        DIRECTORY)
       target_include_directories(
         ${target}
         SYSTEM
         INTERFACE "${MLN_FFI_EGL_INCLUDE_DIRS}")
-      set_target_properties(
-        ${target}
-        PROPERTIES
-          MLN_FFI_INCLUDE_DIRS "${MLN_FFI_EGL_INCLUDE_DIRS}"
-          MLN_FFI_RUNTIME_DIRS "${MLN_FFI_EGL_LIBRARY_DIR}")
-      if(BUILD_TESTING)
-        set_property(
-          TARGET ${target}
-          PROPERTY MLN_FFI_TEST_LINK_LIBRARIES MLN_FFI::EGL MLN_FFI::GLESv2)
-      endif()
     elseif(CMAKE_SYSTEM_NAME MATCHES "^(Android|OHOS)$")
       find_library(MLN_FFI_EGL_LIBRARY NAMES EGL REQUIRED)
       find_library(MLN_FFI_GLES_LIBRARY NAMES GLESv3 REQUIRED)
@@ -59,20 +45,6 @@ function(mln_ffi_configure_opengl_dependencies target)
         ${target}
         SYSTEM
         INTERFACE "${OPENGL_EGL_INCLUDE_DIR}" "${OPENGL_GLES3_INCLUDE_DIR}")
-      get_filename_component(
-        MLN_FFI_EGL_LIBRARY_DIR "${OPENGL_egl_LIBRARY}"
-        DIRECTORY)
-      set_target_properties(
-        ${target}
-        PROPERTIES
-          MLN_FFI_INCLUDE_DIRS
-          "${OPENGL_EGL_INCLUDE_DIR};${OPENGL_GLES3_INCLUDE_DIR}"
-          MLN_FFI_RUNTIME_DIRS "${MLN_FFI_EGL_LIBRARY_DIR}")
-      if(BUILD_TESTING)
-        set_property(
-          TARGET ${target}
-          PROPERTY MLN_FFI_TEST_LINK_LIBRARIES OpenGL::EGL OpenGL::GLES3)
-      endif()
     endif()
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     find_package(OpenGL REQUIRED)

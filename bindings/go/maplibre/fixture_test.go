@@ -16,8 +16,8 @@ import (
 
 // The suite's shared fixture: one runtime and one map per test, a resource
 // provider that denies every request, and waits that receive copied events.
-// Native semantics are tested once, in tests/native; these tests
-// cover what the binding adds on top.
+// Native semantics are tested in mln-rs; these tests cover what the binding
+// adds on top.
 //
 // Most tests reach no server at all. The resource transform tests, which only
 // the built-in HTTP stack calls, use serveLoopback: an httptest server on the
@@ -26,7 +26,7 @@ import (
 const emptyStyle = `{"version":8,"sources":{},"layers":[]}`
 
 // testTimeout bounds each wait. MLN_TEST_TIMEOUT_SCALE stretches it on
-// emulators and software renderers, as it does for the C suite.
+// emulators and software renderers, as it does for the other suites.
 func testTimeout() time.Duration {
 	scale, err := strconv.Atoi(os.Getenv("MLN_TEST_TIMEOUT_SCALE"))
 	if err != nil || scale < 1 {

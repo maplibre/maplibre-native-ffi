@@ -63,16 +63,6 @@ function(mln_ffi_configure_platform_dependencies target)
     ${target}
     PROPERTIES MLN_FFI_SHARED_SUPPORTED TRUE MLN_FFI_ARCHIVE_FORMAT apple)
 
-  # The host runs the suite for macOS, Mac Catalyst, and simulators, but not
-  # for devices.
-  mln_ffi_apple_is_embedded(MLN_FFI_APPLE_EMBEDDED)
-  mln_ffi_apple_is_simulator(MLN_FFI_APPLE_SIMULATOR)
-  if(MLN_FFI_APPLE_EMBEDDED AND NOT MLN_FFI_APPLE_SIMULATOR)
-    set_target_properties(${target} PROPERTIES MLN_FFI_TEST_SUPPORTED FALSE)
-  else()
-    set_target_properties(${target} PROPERTIES MLN_FFI_TEST_SUPPORTED TRUE)
-  endif()
-
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     mln_ffi_apple_sdk_path(MLN_FFI_ZIG_LIBC_SYSROOT)
     set_target_properties(

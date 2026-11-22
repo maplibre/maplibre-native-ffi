@@ -5,17 +5,11 @@
 
 import type { CameraDelta, CameraOptions } from "@maplibre/native-ffi";
 
-/** The camera and its limits, as the map last reported them. */
+/** The camera, as the map last reported it. */
 export interface View {
   readonly camera: Required<
-    Pick<CameraOptions, "center" | "zoom" | "bearing" | "pitch" | "roll">
+    Pick<CameraOptions, "center" | "zoom" | "bearing" | "pitch">
   >;
-  readonly bounds: {
-    readonly minZoom: number;
-    readonly maxZoom: number;
-    readonly minPitch: number;
-    readonly maxPitch: number;
-  };
 }
 
 export interface LogicalSize {
@@ -37,8 +31,6 @@ export type ToWorker =
     }
   | { readonly type: "resize"; readonly size: LogicalSize }
   | { readonly type: "cameraDelta"; readonly delta: CameraDelta }
-  | { readonly type: "jumpTo"; readonly camera: CameraOptions }
-  | { readonly type: "cancelCameraTransitions" }
   | { readonly type: "setStyle"; readonly styleId: string };
 
 export type FromWorker =

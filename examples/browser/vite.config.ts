@@ -14,16 +14,11 @@ const here = (path: string) =>
 
 export default defineConfig({
   base: "/maplibre-native-ffi/demo/",
-  // The comparison imports GL JS on demand. Bundling it up front saves the dev
-  // server a reload when the comparison first opens.
-  optimizeDeps: { include: ["maplibre-gl"] },
   worker: { format: "es" },
   build: {
     outDir: here("../../docs/public/demo"),
     emptyOutDir: true,
     target: "es2024",
-    // GL JS alone is about 1 MB, in a chunk that loads only for the comparison.
-    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       input: {
         index: here("index.html"),

@@ -34,14 +34,8 @@ platform=$(printf '%s' "${MLN_FFI_SIMULATOR_RUNTIME:-iOS}" | tr '[:upper:]' '[:l
 device=$(devices-cli get "$platform")
 
 # simctl hands the spawned process the variables named SIMCTL_CHILD_<NAME>, with
-# the prefix removed, so the fixture directory travels under that spelling. The
-# binding suites share this runner and read no fixtures, so the variable travels
-# when the caller set one and the native suite reports its own absence.
-if [[ -n "${MLN_FFI_TEST_FIXTURE_DIR:-}" ]]; then
-  export SIMCTL_CHILD_MLN_FFI_TEST_FIXTURE_DIR="$MLN_FFI_TEST_FIXTURE_DIR"
-fi
-# The simulator is slower than the host, so waits and the native hang watchdog
-# stretch by the timeout scale.
+# the prefix removed. The simulator is slower than the host, so waits stretch by
+# the timeout scale.
 export SIMCTL_CHILD_MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-3}"
 if [[ -n "${MLN_FFI_TEST_BACKEND:-}" ]]; then
   export SIMCTL_CHILD_MLN_FFI_TEST_BACKEND="$MLN_FFI_TEST_BACKEND"

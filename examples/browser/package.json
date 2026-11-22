@@ -4,7 +4,6 @@
   "type": "module",
   "dependencies": {
     "@fontsource-variable/overpass": "5.2.8",
-    "@maplibre/native-ffi": "workspace:*",
-    "maplibre-gl": "6.16.0"
+    "@maplibre/native-ffi": "workspace:*"
   }
 }

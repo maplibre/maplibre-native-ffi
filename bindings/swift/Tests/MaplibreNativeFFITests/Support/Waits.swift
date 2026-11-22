@@ -4,7 +4,7 @@ import Testing
 
 /// Every wait gives up at a deadline: 10 seconds times
 /// `MLN_TEST_TIMEOUT_SCALE`, which the runners set above 1 on simulators and
-/// software renderers, as they do for the C suite.
+/// software renderers, as they do for the other suites.
 enum TestTimeout {
   static let scale: Double = {
     guard let text = ProcessInfo.processInfo

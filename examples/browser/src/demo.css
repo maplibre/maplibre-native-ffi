@@ -350,35 +350,6 @@ label.field {
   color: var(--signal);
 }
 
-/* The comparison switch. */
-
-.switch {
-  flex: none;
-  width: 34px;
-  height: 20px;
-  margin: 0;
-  border-radius: 10px;
-  appearance: none;
-  background:
-    radial-gradient(circle, #fff 6.5px, transparent 7px) 0 0 / 20px 20px
-      no-repeat,
-    light-dark(rgb(24 32 46 / 0.22), rgb(230 234 240 / 0.22));
-  cursor: pointer;
-  transition: background-position 160ms ease;
-}
-
-.switch:checked {
-  background:
-    radial-gradient(circle, var(--on-signal) 6.5px, transparent 7px) 14px 0 /
-      20px 20px no-repeat,
-    var(--signal);
-}
-
-.switch:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
 /* The status line, while the map loads or after it fails. */
 
 .status {
@@ -467,82 +438,4 @@ label.field {
 .attribution a:hover {
   color: var(--ink);
   text-decoration-color: currentColor;
-}
-
-/*
- * The comparison. The GL JS map covers the page, clipped to the right of the
- * divider, so input left of it falls through to the native map.
- */
-
-#gl-map {
-  position: fixed;
-  inset: 0;
-  clip-path: inset(0 0 0 var(--split));
-  /* GL JS clears to transparent; without this the native map shows through. */
-  background: var(--raised);
-}
-
-.divider {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: var(--split);
-  width: 24px;
-  margin-left: -12px;
-  cursor: ew-resize;
-  touch-action: none;
-  outline: none;
-}
-
-.divider::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 11px;
-  width: 2px;
-  background: #fff;
-  box-shadow: 0 0 4px rgb(0 0 0 / 0.4);
-}
-
-.divider::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 20px;
-  height: 20px;
-  margin-top: -12px;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background: var(--signal);
-  box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
-}
-
-.divider:focus-visible::after {
-  outline: 2px solid var(--signal);
-  outline-offset: 2px;
-}
-
-.compare-label {
-  position: fixed;
-  bottom: 36px;
-  padding: 3px 9px 2px;
-  border: 1px solid var(--rule);
-  border-radius: 7px;
-  background: var(--paper);
-  backdrop-filter: blur(14px);
-  box-shadow: var(--shadow);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.compare-label.native {
-  right: calc(100% - var(--split) + 16px);
-}
-
-.compare-label.gl {
-  left: calc(var(--split) + 16px);
 }

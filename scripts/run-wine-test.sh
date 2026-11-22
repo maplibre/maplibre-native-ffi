@@ -39,7 +39,6 @@ fi
 export WINEDEBUG="${WINEDEBUG:--all}"
 export DXVK_LOG_LEVEL="${DXVK_LOG_LEVEL:-none}"
 export VKD3D_DEBUG="${VKD3D_DEBUG:-none}"
-export MLN_FFI_TEST_FIXTURE_DIR="$MISE_MONOREPO_ROOT/tests/native/fixtures"
 timeout_seconds="${MLN_FFI_DEVICE_TIMEOUT:-300}"
 
 if [[ ! -f "$proton" ]]; then

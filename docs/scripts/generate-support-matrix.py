@@ -44,9 +44,10 @@ def support_matrix() -> dict[str, Any]:
     for preset in plan.targets(presets):
         if all(gap("c", target, "build") for target in gaps.cells(preset)):
             continue
+        # mln-rs tests the C library itself. Here it is tested where a binding's
+        # suite runs against it, and otherwise only built.
         for target in gaps.cells(preset):
-            native_tested = not gap("c", target, "test")
-            record("c", target, "tested" if native_tested else "build-only")
+            record("c", target, "build-only")
         for suite in target_suites(preset):
             command = " ".join(suite.command)
             for binding, status in command_support(command):
@@ -55,6 +56,7 @@ def support_matrix() -> dict[str, Any]:
                         record(binding, target, "build-only")
                     else:
                         record(binding, target, status)
+                        record("c", target, status)
             if LINUX_ARM64_KLIB in command.split():
                 for other in plan.targets(presets):
                     if other.platform == "linux-gnu" and other.architecture == "arm64":

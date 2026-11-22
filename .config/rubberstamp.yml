@@ -170,7 +170,7 @@ ci:
   context: >-
     Each unit installs the mise toolchain, builds the native library for its
     targets with CMake, and runs those targets' binding tests and example
-    builds. Linux x64 runs the C tests and every binding's suite, so it covers
+    builds. Linux x64 runs every binding's suite, so it covers
     platform-independent changes however large. Another unit matters only when a
     change reaches what it alone builds or runs: platform source directories and
     source sets such as `androidMain`, Objective-C++, platform conditionals,
@@ -186,9 +186,9 @@ ci:
     tool configured for only some operating systems puts those at risk. A public
     header change that adds a macro, an inline function, or a construct new to
     the headers puts MSVC (Windows x64) and Apple Clang and the Swift importer
-    (macOS) at risk, since the C tests and several bindings compile the headers
-    there. A header change that only edits declarations or docs does not.
-    Release workflows don't run on pull requests. Hygiene always runs
+    (macOS) at risk, since the C doc snippets and several bindings compile the
+    headers there. A header change that only edits declarations or docs does
+    not. Release workflows don't run on pull requests. Hygiene always runs
     formatting, lint, generated-code checks, and the tests for `ci/`. Main runs
     every unit after merge, so a pull request needs only the coverage a reviewer
     would expect.
@@ -212,7 +212,7 @@ ci:
         # region.
         - if:
             files:
-              - tests/native/docsnippets/**
+              - tests/docsnippets/**
               - bindings/**/docsnippets/**
               - bindings/**/DocSnippets/**
           then: apply
@@ -228,10 +228,9 @@ ci:
           then: apply
     linux-x64:
       covers: >-
-        Linux x64 glibc with OpenGL (EGL) and Vulkan. Runs the C tests, every
-        binding's suite, and the Dart build: the general check for shared native
-        code, bindings, and build logic. Also compiles the Kotlin/Native Linux
-        ARM64 KLIB.
+        Linux x64 glibc with OpenGL (EGL) and Vulkan. Runs every binding's suite
+        and the Dart build: the general check for shared native code, bindings,
+        and build logic. Also compiles the Kotlin/Native Linux ARM64 KLIB.
       rules:
         - if:
             files:
@@ -285,11 +284,11 @@ ci:
       covers: >-
         Linux RISC-V 64-bit on glibc and musl, with OpenGL (EGL) and Vulkan.
         Cross-compiles the native library on an x64 runner, checks its libc ABI,
-        and runs the C tests and the Zig suite under QEMU's user-mode emulator.
-        Catches architecture conditionals in the engine and its vendored code,
-        and problems in the Zig toolchain's cross builds, the Cargo build of
-        mln-rs, or the emulated test roots on RISC-V. Code that Linux x64 and
-        ARM64 build alike doesn't need it.
+        and runs the Zig suite under QEMU's user-mode emulator. Catches
+        architecture conditionals in the engine and its vendored code, and
+        problems in the Zig toolchain's cross builds, the Cargo build of mln-rs,
+        or the emulated test roots on RISC-V. Code that Linux x64 and ARM64
+        build alike doesn't need it.
       rules:
         - if:
             files:
@@ -303,11 +302,11 @@ ci:
       covers: >-
         Linux LoongArch 64-bit on glibc and musl, with OpenGL (EGL) and Vulkan.
         Cross-compiles the native library on an x64 runner, checks its libc ABI,
-        and runs the C tests and the Zig suite under QEMU's user-mode emulator.
-        Catches architecture conditionals in the engine and its vendored code,
-        and problems in the Zig toolchain's cross builds, the Cargo build of
-        mln-rs, or the emulated test roots on LoongArch. Code that Linux x64 and
-        ARM64 build alike doesn't need it.
+        and runs the Zig suite under QEMU's user-mode emulator. Catches
+        architecture conditionals in the engine and its vendored code, and
+        problems in the Zig toolchain's cross builds, the Cargo build of mln-rs,
+        or the emulated test roots on LoongArch. Code that Linux x64 and ARM64
+        build alike doesn't need it.
       rules:
         - if:
             files:
@@ -335,10 +334,10 @@ ci:
           then: apply
     macos:
       covers: >-
-        macOS ARM64 with Metal. Runs the C tests and the desktop binding suites,
-        including Swift. Catches Apple Clang, Apple SDK, Metal, and macOS
-        packaging problems. Platform-independent code that Linux x64 tests
-        doesn't need it.
+        macOS ARM64 with Metal. Runs the desktop binding suites, including
+        Swift. Catches Apple Clang, Apple SDK, Metal, and macOS packaging
+        problems. Platform-independent code that Linux x64 tests doesn't need
+        it.
       rules:
         - if:
             files:
@@ -555,7 +554,6 @@ ci:
             files:
               - cmake/platform/ohos.cmake
               - .config/mise.ohos.*
-              - tests/native/abi/platform/transport.c
               - bindings/typescript/scripts/build-hap.sh
               - bindings/typescript/scripts/test-arkts.sh
               - bindings/typescript/scripts/verify-ohpm.sh
@@ -583,10 +581,10 @@ ci:
           then: apply
     web:
       covers: >-
-        The browser package, built from mln-rs for WebGL and WebGPU. Runs
-        mln-rs's browser check against it and the Kotlin/Wasm tests in a
-        browser. Catches wasm32 and browser rendering problems.
-        Platform-independent code that Linux x64 tests doesn't need it.
+        The browser package, built from mln-rs for WebGL and WebGPU. Runs the
+        bindings' browser tests against it. Catches wasm32 and browser rendering
+        problems. Platform-independent code that Linux x64 tests doesn't need
+        it.
       rules:
         - if:
             files:

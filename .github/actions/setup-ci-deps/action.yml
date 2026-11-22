@@ -193,35 +193,21 @@ runs:
       if: ${{ runner.os == 'Linux' && inputs.software-gpu != '' }}
       shell: bash
       run: |
-        # The native suites' Wayland cases run a compositor of their own on
-        # libwayland-server, and EGL presents to it through libwayland-egl.
         sudo apt-get update
         sudo apt-get install --no-install-recommends --yes \
           libegl-mesa0 \
           libgl1-mesa-dri \
           libvulkan1 \
-          libwayland-client0 \
-          libwayland-egl1 \
-          libwayland-server0 \
           mesa-utils \
           mesa-utils-extra \
           mesa-vulkan-drivers
-        # Software rendering is slower than hardware, so the native suites
-        # stretch their waits and hang watchdog to match.
+        # Software rendering is slower than hardware, so the test suites
+        # stretch their waits to match.
         {
           echo "EGL_PLATFORM=surfaceless"
           echo "LIBGL_ALWAYS_SOFTWARE=true"
           echo "MLN_TEST_TIMEOUT_SCALE=3"
         } >> "$GITHUB_ENV"
-
-    # mln-rs's browser check, which the web presets' tests run, draws a CJK
-    # label in the browser's sans-serif font, so the system needs a CJK font.
-    - name: Install a CJK font for the browser check
-      if: ${{ runner.os == 'Linux' && inputs.mise-env == 'web' }}
-      shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install --no-install-recommends --yes fonts-wqy-microhei
 
     # devices-cli runs one emulator per 8 GiB of RAM by default, which leaves a
     # 16 GiB runner, whose kernel keeps some, room for one. The x64 job's

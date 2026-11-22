@@ -17,29 +17,19 @@ import time
 from tools.ci.plan import ROOT, targets
 from tools.ci.suites import BOOT, BUILD, Suite, target_suites
 
-SECONDS_PER_MINUTE = 60
-
 
 def record(suite: Suite) -> dict[str, object]:
     return {
         "id": suite.id,
         "command": list(suite.command),
         "env": suite.env,
-        "wrapper": suite.wrapper,
-        "shell": suite.shell,
-        "timeout-minutes": suite.timeout_minutes,
         "prerequisites": list(suite.prerequisites),
         "backend": suite.backend,
     }
 
 
 def argv(suite: Suite) -> list[str]:
-    command = list(suite.command)
-    if suite.wrapper == "windows-console":
-        quoted = ", ".join(f"'{argument}'" for argument in command)
-        script = f"./ci/with-windows-console.ps1 -Command @({quoted})"
-        return ["pwsh", "-Command", f"{script}; exit $LASTEXITCODE"]
-    return command
+    return list(suite.command)
 
 
 def environment(suite: Suite) -> dict[str, str]:
@@ -65,16 +55,9 @@ def cancel(signum, frame):
 
 def execute(suite: Suite) -> tuple[str, str]:
     """Run one suite and return its result and a note for the summary."""
-    timeout = (
-        suite.timeout_minutes * SECONDS_PER_MINUTE if suite.timeout_minutes else None
-    )
     process = subprocess.Popen(argv(suite), cwd=ROOT, env=environment(suite))
     try:
-        code = process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
-        return "failure", f"timed out after {suite.timeout_minutes} minutes"
+        code = process.wait()
     except BaseException:
         process.terminate()
         process.wait()

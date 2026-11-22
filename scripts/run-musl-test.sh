@@ -5,12 +5,15 @@
 # the executable gets MLN_FFI_DEVICE_TIMEOUT seconds, or 300.
 set -euo pipefail
 
-preset=${1:?usage: run-musl-test.sh <preset> [executable [arguments...]]}
+# The preset comes first, as for the other device runners, though the container
+# needs only the executable.
+: "${1:?usage: run-musl-test.sh <preset> <executable> [arguments...]}"
 container_image=${MLN_FFI_MUSL_TEST_IMAGE:-alpine:3.22}
 backend=${MLN_FFI_TEST_BACKEND:?MLN_FFI_TEST_BACKEND must name the backend under test}
 shift
 if [[ $# -eq 0 ]]; then
-  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_native_abi_tests_$backend"
+  echo "usage: run-musl-test.sh <preset> <executable> [arguments...]" >&2
+  exit 2
 fi
 
 if [[ "$1" == */* && ! -x "$1" ]]; then
@@ -50,13 +53,9 @@ esac
       opengl) apk add --no-cache mesa-dri-gallium mesa-egl mesa-gles ;;
       vulkan) apk add --no-cache mesa-vulkan-swrast vulkan-loader ;;
     esac
-    # The Wayland cases run a compositor of their own on libwayland-server.
-    apk add --no-cache wayland-libs-client wayland-libs-egl wayland-libs-server
     export LIBGL_ALWAYS_SOFTWARE=true
-    # Software rendering is slow, so waits and the native hang watchdog stretch
-    # by the timeout scale.
+    # Software rendering is slow, so waits stretch by the timeout scale.
     export MLN_TEST_TIMEOUT_SCALE="$3"
-    export MLN_FFI_TEST_FIXTURE_DIR="$2/tests/native/fixtures"
     export MLN_FFI_TEST_BACKEND="$1"
     timeout_seconds=$4
     shift 4
