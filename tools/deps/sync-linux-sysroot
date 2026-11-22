@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Lays out the target-architecture EGL, OpenGL ES, and Vulkan loaders that the
-# Linux test harness links, for an architecture that the build host's multiarch
-# directories lack. cmake/toolchains/zig.cmake runs this for a preset that sets
-# MLN_FFI_ZIG_SYSROOT, and finds the loaders there.
+# Lays out the target-architecture EGL, OpenGL ES, and Vulkan loaders that
+# CMake's OpenGL lookup finds, for an architecture that the build host's
+# multiarch directories lack. cmake/toolchains/zig.cmake runs this for a preset
+# that sets MLN_FFI_ZIG_SYSROOT, and finds the loaders there.
 #
 #   tools/deps/sync-linux-sysroot <riscv64|loongarch64> <directory>
 #
-# The library itself resolves its loaders at run time, so only the harness
-# links these, and the tests load the loaders of the system they run on. Both
-# libcs link against Debian's, since the linker reads only their sonames and
-# symbols. A container of the host's own architecture downloads the packages,
+# The library itself resolves its loaders at run time, so nothing links these,
+# and the tests load the loaders of the system they run on. Both libcs take
+# Debian's. A container of the host's own architecture downloads the packages,
 # so no emulation is needed.
 set -euo pipefail
 

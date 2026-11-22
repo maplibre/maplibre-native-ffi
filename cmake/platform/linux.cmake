@@ -6,16 +6,5 @@ function(mln_ffi_configure_platform_dependencies target)
   find_package(Threads REQUIRED)
   set_target_properties(
     ${target}
-    PROPERTIES
-      MLN_FFI_SHARED_SUPPORTED
-      TRUE
-      MLN_FFI_ARCHIVE_FORMAT
-      elf
-      MLN_FFI_TEST_SUPPORTED
-      TRUE
-      # The graphics loaders the test harness links come from the build host.
-      # The glibc test runs there, and the musl and FreeBSD tests resolve
-      # matching loaders inside their Alpine container and virtual machine.
-      MLN_FFI_TEST_LINK_OPTIONS
-      "LINKER:--allow-shlib-undefined")
+    PROPERTIES MLN_FFI_SHARED_SUPPORTED TRUE MLN_FFI_ARCHIVE_FORMAT elf)
 endfunction()

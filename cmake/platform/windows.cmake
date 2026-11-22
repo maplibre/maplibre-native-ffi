@@ -92,15 +92,5 @@ function(mln_ffi_configure_platform_dependencies target)
   endif()
   set_target_properties(
     ${target}
-    PROPERTIES
-      MLN_FFI_SHARED_SUPPORTED
-      TRUE
-      MLN_FFI_ARCHIVE_FORMAT
-      coff
-      MLN_FFI_TEST_SUPPORTED
-      TRUE
-      MLN_FFI_TEST_LIBRARY_PATH_VARIABLE
-      PATH
-      MLN_FFI_TEST_RUNTIME_DIRS
-      "${CMAKE_INSTALL_PREFIX}/bin")
+    PROPERTIES MLN_FFI_SHARED_SUPPORTED TRUE MLN_FFI_ARCHIVE_FORMAT coff)
 endfunction()

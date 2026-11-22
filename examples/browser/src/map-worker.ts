@@ -73,15 +73,6 @@ function handle(message: ToWorker): void {
     case "cameraDelta":
       map?.discarding.applyCameraDelta(message.delta);
       break;
-    case "jumpTo":
-      map?.discarding.updateCamera({
-        mode: CameraUpdateMode.jump,
-        camera: message.camera,
-      });
-      break;
-    case "cancelCameraTransitions":
-      map?.discarding.cancelCameraTransitions();
-      break;
     case "setStyle":
       setStyle(message.styleId);
       break;
@@ -89,17 +80,8 @@ function handle(message: ToWorker): void {
 }
 
 function view(): View {
-  const { view, bounds } = map!.getSnapshot();
-  const { center, zoom, bearing, pitch, roll } = view.camera;
-  return {
-    camera: { center, zoom, bearing, pitch, roll },
-    bounds: {
-      minZoom: bounds.minZoom,
-      maxZoom: bounds.maxZoom,
-      minPitch: bounds.minPitch,
-      maxPitch: bounds.maxPitch,
-    },
-  };
+  const { center, zoom, bearing, pitch } = map!.getSnapshot().view.camera;
+  return { camera: { center, zoom, bearing, pitch } };
 }
 
 function setStyle(id: string): void {

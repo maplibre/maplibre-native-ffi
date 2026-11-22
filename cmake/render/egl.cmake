@@ -19,9 +19,6 @@ function(mln_ffi_import_egl)
     NAMES GLESv2
     HINTS "${MLN_FFI_EGL_ROOT}" PATH_SUFFIXES . lib
     REQUIRED NO_DEFAULT_PATH)
-  get_filename_component(
-    MLN_FFI_EGL_LIBRARY_DIR "${MLN_FFI_EGL_LIBRARY}"
-    DIRECTORY)
 
   add_library(MLN_FFI::EGL SHARED IMPORTED GLOBAL)
   set_target_properties(

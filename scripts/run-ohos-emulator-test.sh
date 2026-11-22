@@ -37,7 +37,6 @@ test_executables=("$@")
 # Other suites may be running tests on the same emulator, so each run has a
 # directory of its own and removes it when it ends.
 remote_dir=/data/local/tmp/maplibre-native-ffi-$$
-fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 
 for local_file in "$native_library" "$cxx_library" ${extra_libraries[@]+"${extra_libraries[@]}"} "${test_executables[@]}"; do
   if [[ ! -f "$local_file" ]]; then
@@ -47,10 +46,6 @@ for local_file in "$native_library" "$cxx_library" ${extra_libraries[@]+"${extra
 done
 if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   echo "Invalid timeout: $timeout_seconds" >&2
-  exit 2
-fi
-if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
-  echo "OpenHarmony emulator fixture directory does not exist: $fixture_dir" >&2
   exit 2
 fi
 
@@ -69,21 +64,10 @@ for library in ${extra_libraries[@]+"${extra_libraries[@]}"}; do
   hdc -t "$connect_key" file send "$library" "$remote_dir/$(basename "$library")"
 done
 
-fixture_environment=
-if [[ -n "$fixture_dir" ]]; then
-  while IFS= read -r -d '' fixture; do
-    relative_path=${fixture#"$fixture_dir"/}
-    remote_fixture="$remote_dir/fixtures/$relative_path"
-    hdc -t "$connect_key" shell "mkdir -p '$(dirname "$remote_fixture")'"
-    hdc -t "$connect_key" file send "$fixture" "$remote_fixture"
-  done < <(find "$fixture_dir" -type f -print0)
-  fixture_environment="MLN_FFI_TEST_FIXTURE_DIR='$remote_dir/fixtures' "
-fi
 # The Oniro guest's virtio GPU does not expose a reliable accelerated EGL
 # screen under QEMU. Mesa's surfaceless llvmpipe path provides deterministic
 # offscreen rendering for the test executables.
-# Software rendering under QEMU is slow, so waits and the native hang watchdog
-# stretch by the timeout scale.
+# Software rendering under QEMU is slow, so waits stretch by the timeout scale.
 graphics_environment="EGL_PLATFORM=surfaceless LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe LIBGL_DRIVERS_PATH=/vendor/lib64/chipsetsdk MLN_TEST_TIMEOUT_SCALE='${MLN_TEST_TIMEOUT_SCALE:-3}' "
 # The backend under test, which a binding's suite reads.
 if [[ -n "${MLN_FFI_TEST_BACKEND:-}" ]]; then
@@ -96,7 +80,7 @@ for test_executable in "${test_executables[@]}"; do
 
   # A test that asks for a temporary directory gets one under the test
   # directory, as on Android, rather than relying on the guest's /tmp.
-  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}${graphics_environment}TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
+  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${graphics_environment}TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
   for argument in ${test_arguments[@]+"${test_arguments[@]}"}; do
     printf -v quoted_argument '%q' "$argument"
     remote_command+=" $quoted_argument"

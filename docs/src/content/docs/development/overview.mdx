@@ -29,12 +29,12 @@ winget install --exact --id Microsoft.VisualStudio.2022.BuildTools --override "-
 
 ## Everyday commands
 
-`mise run test` builds the native library for this machine and runs its C tests
-for each render backend that it carries. `mise run //bindings/<lang>:test` tests
-one binding against that build, with the platform's default backend. Pass a
-preset name to build for another target, such as `linux-gnu-x64` or
-`macos-arm64`, and a backend after it to test that one, such as
-`mise run test linux-gnu-x64 opengl`. `CMakePresets.json` lists the presets.
+`mise run build` builds the native library for this machine.
+`mise run //bindings/<lang>:test` builds it and tests one binding against it,
+with the platform's default backend. Pass a preset name to build for another
+target, such as `linux-gnu-x64` or `macos-arm64`, and a backend after it to test
+that one, such as `mise run //bindings/go:test linux-gnu-x64 opengl`.
+`CMakePresets.json` lists the presets. mln-rs tests the library itself.
 
 The library is [mln-rs](https://github.com/louwers/mln-rs), the Rust port of
 MapLibre Native, which the `third_party/mln-rs` submodule vendors. A preset's
@@ -70,12 +70,11 @@ browser package with one backend, so that a page downloads only the one it draws
 with: a wasm-bindgen module for `wasm32-unknown-unknown`, built with mln-rs's
 own `just c-web` recipe. Their tools come with `-E web`:
 `mise -E web run build web-wasm32-webgpu` installs the package under
-`share/maplibre-native-c/web`. The package has no C to link, so the C suites
-don't run for it: `mise -E web run test <preset>` runs mln-rs's browser check
-against it in headless Chromium, and
+`share/maplibre-native-c/web`, and
 `mise -E web run //bindings/kotlin:test:wasm <preset>` runs the Kotlin/Wasm
-suite. The module runs on the thread that loads it, with no threads of its own
-and no cross-origin isolation, and starts Web Workers for its tile work.
+suite against it. The module runs on the thread that loads it, with no threads
+of its own and no cross-origin isolation, and starts Web Workers for its tile
+work.
 
 The TypeScript binding compiles its Node-API C with the library into a browser
 module of its own (`bindings/typescript/web`), over a Node-API that it
@@ -86,11 +85,11 @@ the site serves as its live demo, loads those modules.
 ### Emulators and simulators
 
 Tests that need a device get one from
-[devices-cli](https://github.com/sargunv/devices-cli), which mise installs.
-`mise run test` boots an emulator or simulator for Android, OpenHarmony, iOS,
-tvOS, and visionOS, or a virtual machine for FreeBSD, and leaves it running.
-`devices-cli release` stops this worktree's devices. Android emulators need KVM.
-To test on your own Android device, set `ANDROID_SERIAL`.
+[devices-cli](https://github.com/sargunv/devices-cli), which mise installs. A
+binding's test task boots an emulator or simulator for Android, OpenHarmony,
+iOS, tvOS, and visionOS, or a virtual machine for FreeBSD, and leaves it
+running. `devices-cli release` stops this worktree's devices. Android emulators
+need KVM. To test on your own Android device, set `ANDROID_SERIAL`.
 
 ### Windows from Linux
 
@@ -98,9 +97,10 @@ The Windows presets build on Linux. `mise -E msvc install` downloads the MSVC
 runtime and the Windows SDK, and accepts
 [Microsoft's license](https://go.microsoft.com/fwlink/?LinkId=2086102) for them.
 Install Proton Experimental from Steam, then run tests with
-`mise -E msvc run test windows-x64`. Proton's launcher gives the prefix the
-fonts, ICU, and DXVK that .NET and WPF need. To use another Wine, set `WINE` to
-its executable. Wine isn't Windows: when results differ, Windows CI is right.
+`mise -E msvc run //bindings/<lang>:test windows-x64`. Proton's launcher gives
+the prefix the fonts, ICU, and DXVK that .NET and WPF need. To use another Wine,
+set `WINE` to its executable. Wine isn't Windows: when results differ, Windows
+CI is right.
 
 ### MinGW
 
@@ -112,7 +112,7 @@ pacman -S --needed mingw-w64-x86_64-clang mingw-w64-x86_64-llvm mingw-w64-x86_64
 ```
 
 Then run tasks from PowerShell with `-E msys2`, such as
-`mise -E msys2 run test mingw-x64`. Set `MLN_FFI_MSYS2_ROOT` if the MINGW64
+`mise -E msys2 run build mingw-x64`. Set `MLN_FFI_MSYS2_ROOT` if the MINGW64
 prefix isn't `C:/msys64/mingw64`.
 
 ### FreeBSD
@@ -125,25 +125,6 @@ Install QEMU and OVMF, and make sure you can access `/dev/kvm`.
 These presets build on any Linux host, and their tests run under QEMU. Install
 Docker, then run `bash scripts/setup-qemu.sh` to install and register the
 emulators. Run it again after a reboot.
-
-## Benchmarks
-
-`mise run bench` measures what the C API costs its callers: CPU time,
-allocations, memory, latency, and frame pacing. It runs the cases in
-`benchmarks/`, whose comments say what each one times. The first run downloads
-pinned map data into `build/bench/fixtures`, and no case uses the network.
-
-`mise run bench:compare <ref>` compares the working tree with a Git ref, or
-another build of this repository, such as one with other CMake options. A change
-gets a verdict only when it's over 5% and unlikely to be noise. The comparison
-also reports how much the last frames of the two sides differ, so a side that's
-faster because it draws less shows up. `mise run bench -- --help` and
-`mise run bench:compare -- --help` list the options.
-
-Compare on an idle machine. To see how much your machine's numbers vary, compare
-a commit with itself, which should give no verdicts. Pass a preset and the same
-`-E` as for the tests to run on another target. Emulators and software
-rasterizers don't show what a device costs.
 
 ## Change mln-rs
 
@@ -181,9 +162,8 @@ Test a patch with mln-rs's own tests, which `cargo test` runs from
 the pull request.
 
 To update mln-rs, check out the commit in the submodule, run `mise deps` to
-reapply the patches, and run the C tests. mln-rs runs a copy of the ABI suite in
-`tools/c-abi-test`, which it passes completely, so the lists here hold only the
-exit programs and the platforms that its copy doesn't run.
+reapply the patches, and run the binding suites. mln-rs tests the C API with its
+ABI suite in `tools/c-abi-test`.
 
 ## CI
 
@@ -204,7 +184,7 @@ repository root, since the testbox copies the current directory.
 ```bash
 blacksmith auth login
 blacksmith testbox warmup .github/workflows/blacksmith-testbox-linux-x64.yml --job linux-x64 --ref <branch>
-blacksmith testbox run --id <id> "mise run test linux-gnu-x64 opengl"
+blacksmith testbox run --id <id> "mise run //bindings/go:test linux-gnu-x64 opengl"
 ```
 
 Builds fail on the testbox unless you prefix them with

@@ -56,7 +56,7 @@ runs:
         # The x64 driver also carries d3d12, which Mesa prefers when it is
         # present. Every process draws with llvmpipe.
         "GALLIUM_DRIVER=llvmpipe" >> $env:GITHUB_ENV
-        # Software rendering is slower than hardware, so the native suites
-        # stretch their waits and hang watchdog to match.
+        # Software rendering is slower than hardware, so the test suites
+        # stretch their waits to match.
         "MLN_TEST_TIMEOUT_SCALE=3" >> $env:GITHUB_ENV
         "Path=$($mesaWglDriver.Directory.FullName);$env:Path" >> $env:GITHUB_ENV

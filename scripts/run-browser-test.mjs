@@ -2,17 +2,11 @@
 //
 // Usage: node scripts/run-browser-test.mjs <page.html>
 //        [--timeout-seconds N] [--render-backend NAME] [--browser-arg FLAG]...
-//        [--module-arg ARG]... [--print-output] [--hardware-gpu]
 //
-// Backend-specific browser flags live here for every suite. Module arguments
-// reach the page through its query string.
+// Backend-specific browser flags live here for every suite.
 //
 // The browser is slower than a native run, so the page gets the timeout scale
-// the native suite stretches its waits by: MLN_TEST_TIMEOUT_SCALE, or 3.
-//
-// --print-output prints the page's output when it passes too, and
-// --hardware-gpu renders on the host's GPU instead of in software, for the
-// benchmarks.
+// that the test suites stretch their waits by: MLN_TEST_TIMEOUT_SCALE, or 3.
 
 import { spawn } from "node:child_process";
 import { createReadStream, existsSync, statSync } from "node:fs";
@@ -31,12 +25,6 @@ const CONTENT_TYPES = {
   ".wasm": "application/wasm",
   ".data": "application/octet-stream",
   ".map": "application/json",
-};
-
-// The style document that the ABI suite's browser HTTP case loads from this
-// origin, keyed by path to the ID of its one layer.
-const FIXTURE_STYLE_LAYER_IDS = {
-  "/__fixture/http-style.json": "http-fixture",
 };
 
 // Headless Chromium can use Metal on macOS. Forcing its Linux SwiftShader
@@ -58,23 +46,6 @@ const BACKEND_BROWSER_ARGS = {
   opengl: ["--enable-unsafe-swiftshader"],
 };
 
-// With --hardware-gpu: the host's GPU, through Vulkan on Linux, whatever the
-// GPU blocklist says, and SwiftShader only where the host has no GPU. These
-// replace the flags above, which a later --browser-arg can't override.
-const HARDWARE_BROWSER_ARGS = {
-  webgpu:
-    process.platform === "darwin"
-      ? ["--enable-unsafe-webgpu"]
-      : [
-          "--enable-unsafe-webgpu",
-          "--enable-features=Vulkan",
-          "--use-angle=vulkan",
-          "--ignore-gpu-blocklist",
-          "--enable-unsafe-swiftshader",
-        ],
-  opengl: ["--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"],
-};
-
 function fail(message) {
   console.error(`error: ${message}`);
   process.exit(2);
@@ -87,20 +58,14 @@ if (!existsSync(targetPath)) fail(`test target does not exist: ${targetPath}`);
 
 let timeoutSeconds = 600;
 const extraBrowserArgs = [];
-const moduleArgs = [];
-const printOutput = rest.includes("--print-output");
-const hardwareGpu = rest.includes("--hardware-gpu");
 for (let i = 0; i < rest.length; i += 1) {
   if (rest[i] === "--timeout-seconds") timeoutSeconds = Number(rest[i + 1]);
   if (rest[i] === "--browser-arg") extraBrowserArgs.push(rest[i + 1]);
-  if (rest[i] === "--module-arg") moduleArgs.push(rest[i + 1]);
   if (rest[i] === "--render-backend") {
     const backend = rest[i + 1];
     if (!(backend in BACKEND_BROWSER_ARGS))
       fail(`no browser flags are known for the ${backend} backend`);
-    extraBrowserArgs.push(
-      ...(hardwareGpu ? HARDWARE_BROWSER_ARGS : BACKEND_BROWSER_ARGS)[backend],
-    );
+    extraBrowserArgs.push(...BACKEND_BROWSER_ARGS[backend]);
   }
 }
 
@@ -195,18 +160,6 @@ const server = createServer((request, response) => {
     return;
   }
 
-  const layerId = FIXTURE_STYLE_LAYER_IDS[url.pathname];
-  if (layerId !== undefined) {
-    response.writeHead(200, { "Content-Type": "application/json" }).end(
-      JSON.stringify({
-        version: 8,
-        sources: {},
-        layers: [{ id: layerId, type: "background" }],
-      }),
-    );
-    return;
-  }
-
   // Serving one directory, so a path that escapes it is a bug or an attack.
   const requested = path.join(root, path.normalize(url.pathname));
   if (
@@ -235,7 +188,6 @@ const profile = await mkdtemp(path.join(tmpdir(), "mln-browser-test-"));
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const { port } = server.address();
 const pageQuery = new URLSearchParams({ scale: timeoutScale });
-for (const argument of moduleArgs) pageQuery.append("arg", argument);
 const pageUrl = `http://127.0.0.1:${port}/${pageName}?${pageQuery}`;
 console.log(`running ${pageUrl} in ${browser}`);
 
@@ -294,10 +246,10 @@ if (!browserExited) {
 await rm(profile, { recursive: true, force: true, maxRetries: 5 });
 
 // Chromium's logging already carried the console through as the suite ran, so
-// the collected output only gets reprinted when it is the failure report, or
-// when the caller asked for it. process.exit drops what Node hasn't yet written
-// to a full pipe, so the exit waits for the write.
-if ((result.status !== 0 || printOutput) && result.output)
+// the collected output only gets reprinted when it is the failure report.
+// process.exit drops what Node hasn't yet written to a full pipe, so the exit
+// waits for the write.
+if (result.status !== 0 && result.output)
   await new Promise((resolve) =>
     process.stdout.write(`${result.output}\n`, resolve),
   );

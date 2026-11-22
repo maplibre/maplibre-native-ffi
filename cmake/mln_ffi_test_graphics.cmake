@@ -1,23 +1,17 @@
-# Builds tests/graphics, the GPU fixtures that the C suite and the binding
-# suites share. tests/graphics/include/mln_test_graphics.h states its interface.
-# A binding that compiles graphics.c itself, as Swift does, adds
-# third_party/Vulkan-Headers/include to its include path, and links dl on
-# Linux, or user32 and gdi32 on Windows.
-#
-# Two targets come from the one source file:
-#
-#   * mln_test_graphics_objects, which the C suite links into its executable,
-#     so emulator and simulator runners push nothing extra.
-#   * mln_test_graphics, a shared library that binding suites load over their
-#     FFI. The build task installs it through the test-graphics component, which
-#     a full installation and the package leave out.
+# Builds tests/graphics, the GPU fixtures that the binding suites share, as
+# mln_test_graphics, a shared library that they load over their FFI.
+# tests/graphics/include/mln_test_graphics.h states its interface. The build
+# task installs it through the test-graphics component, which a full
+# installation and the package leave out. A binding that compiles graphics.c
+# itself, as Swift does, adds third_party/Vulkan-Headers/include to its include
+# path, and links dl on Linux, or user32 and gdi32 on Windows.
 
 set(MLN_FFI_TEST_GRAPHICS_DIR "${PROJECT_SOURCE_DIR}/tests/graphics")
 
-# The loaders this build found for its own harness, which the library tries
-# before the platform's default search. They are build-host paths, which is
-# why only this test library carries them, and why a cross build, whose tests
-# run elsewhere, carries none.
+# The loaders this build found (cmake/render), which the library tries before
+# the platform's default search. They are build-host paths, which is why only
+# this test library carries them, and why a cross build, whose tests run
+# elsewhere, carries none.
 function(mln_ffi_test_graphics_loader_definitions out_var)
   set(definitions)
   set(${out_var} "" PARENT_SCOPE)
@@ -54,10 +48,13 @@ function(mln_ffi_add_test_graphics)
   mln_ffi_test_graphics_loader_definitions(loader_definitions)
 
   add_library(
-    mln_test_graphics_objects
-    OBJECT "${MLN_FFI_TEST_GRAPHICS_DIR}/graphics.c")
+    mln_test_graphics
+    SHARED "${MLN_FFI_TEST_GRAPHICS_DIR}/graphics.c")
+  if(MINGW)
+    set_target_properties(mln_test_graphics PROPERTIES PREFIX "")
+  endif()
   set_target_properties(
-    mln_test_graphics_objects
+    mln_test_graphics
     PROPERTIES
       C_STANDARD
       11
@@ -66,38 +63,22 @@ function(mln_ffi_add_test_graphics)
       C_EXTENSIONS
       OFF
       C_VISIBILITY_PRESET
-      hidden
-      POSITION_INDEPENDENT_CODE
-      ON)
+      hidden)
   target_include_directories(
-    mln_test_graphics_objects
+    mln_test_graphics
     PUBLIC "${MLN_FFI_TEST_GRAPHICS_DIR}/include")
   target_include_directories(
-    mln_test_graphics_objects
+    mln_test_graphics
     SYSTEM
     PRIVATE "${PROJECT_SOURCE_DIR}/third_party/Vulkan-Headers/include")
   target_compile_definitions(
-    mln_test_graphics_objects
+    mln_test_graphics
     PRIVATE MLN_TEST_GRAPHICS_EXPORTS ${loader_definitions})
   if(WIN32)
-    target_link_libraries(mln_test_graphics_objects PUBLIC user32 gdi32)
+    target_link_libraries(mln_test_graphics PRIVATE user32 gdi32)
   else()
-    target_link_libraries(mln_test_graphics_objects PUBLIC ${CMAKE_DL_LIBS})
+    target_link_libraries(mln_test_graphics PRIVATE ${CMAKE_DL_LIBS})
   endif()
-
-  get_target_property(shared_supported mln_ffi_platform_dependencies
-                      MLN_FFI_SHARED_SUPPORTED)
-  if(NOT shared_supported)
-    return()
-  endif()
-  add_library(mln_test_graphics SHARED)
-  if(MINGW)
-    set_target_properties(mln_test_graphics PROPERTIES PREFIX "")
-  endif()
-  target_link_libraries(mln_test_graphics PRIVATE mln_test_graphics_objects)
-  target_include_directories(
-    mln_test_graphics
-    INTERFACE "${MLN_FFI_TEST_GRAPHICS_DIR}/include")
 
   set(component test-graphics)
   install(
@@ -133,7 +114,7 @@ libdir=\${prefix}/${CMAKE_INSTALL_LIBDIR}
 includedir=\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}
 
 Name: mln-test-graphics
-Description: GPU fixtures for MapLibre Native C API tests
+Description: GPU fixtures for MapLibre Native FFI binding tests
 Version: ${PROJECT_VERSION}
 Cflags: -I\${includedir}
 Libs: -L\${libdir}${rpath_flags} -lmln_test_graphics

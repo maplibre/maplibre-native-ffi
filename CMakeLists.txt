@@ -3,9 +3,10 @@ cmake_minimum_required(VERSION 3.28)
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/platform/apple.cmake")
 mln_ffi_configure_apple_toolchain_defaults()
 
-# Cargo builds the library from mln-rs (cmake/mln_ffi_mln_rs.cmake). C and C++
-# are the languages of the test suites and the test graphics fixtures. A web
-# preset builds the browser package (cmake/mln_ffi_web.cmake), which has
+# Cargo builds the library from mln-rs (cmake/mln_ffi_mln_rs.cmake), with the
+# C and C++ compilers that CMake finds for mln-rs's C and C++ dependencies. C is
+# also the language of the test graphics fixtures and the docs' C snippets. A
+# web preset builds the browser package (cmake/mln_ffi_web.cmake), which needs
 # neither.
 if(MLN_FFI_TARGET_PLATFORM MATCHES "^web-")
   set(MLN_FFI_WEB TRUE)
@@ -26,8 +27,6 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-# The test suites use C++ only for their own support files, not C++20 modules.
-set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 if(MSVC)
   # sccache cannot reliably cache MSVC compilations that emit shared compiler
@@ -56,9 +55,10 @@ else()
 
   mln_ffi_validate_platform()
   mln_ffi_select_platform()
-  # Before the render backend, which only looks for a graphics loader when the
-  # test harness that links it is being built.
-  include(CTest)
+  # Before the render backend, which looks for the graphics loaders that the
+  # test graphics fixtures try first only when they are built.
+  option(BUILD_TESTING
+         "Build the test graphics fixtures and compile the docs' C snippets" ON)
 
   mln_ffi_select_render_backend()
   mln_ffi_add_c_api_library(maplibre_native_c)
@@ -71,8 +71,18 @@ else()
   add_library(maplibre_native_ffi::c ALIAS maplibre_native_c)
 
   if(BUILD_TESTING AND MLN_FFI_ARTIFACT_NAME)
-    include(cmake/mln_ffi_tests.cmake)
-    mln_ffi_add_native_tests()
+    include(mln_ffi_test_graphics)
+    mln_ffi_add_test_graphics()
+
+    # Compiles the C snippets that the docs site shows, so they keep up with
+    # the headers. Nothing runs them.
+    file(GLOB doc_snippets CONFIGURE_DEPENDS
+         "${PROJECT_SOURCE_DIR}/tests/docsnippets/*.c")
+    add_library(mln_ffi_doc_snippets OBJECT ${doc_snippets})
+    set_target_properties(
+      mln_ffi_doc_snippets
+      PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED YES C_EXTENSIONS OFF)
+    target_link_libraries(mln_ffi_doc_snippets PRIVATE maplibre_native_c)
   endif()
 endif()
 

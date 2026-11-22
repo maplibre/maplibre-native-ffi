@@ -220,29 +220,6 @@ class SuitesTest(unittest.TestCase):
         ):
             suites.target_suites(target)
 
-    def test_a_target_runs_each_backends_native_suites_once(self):
-        for name, backends in (
-            ("linux-gnu-x64", ("vulkan", "opengl")),
-            ("windows-x64", ("vulkan", "opengl")),
-            ("macos-arm64", ("metal",)),
-            # The x86 emulator can't run Vulkan, as support-gaps.toml records.
-            ("android-x86", ("opengl",)),
-            # No ARM Android device is configured.
-            ("android-arm64", ()),
-        ):
-            with self.subTest(preset=name):
-                self.assertEqual(
-                    [
-                        (suite.command, suite.backend)
-                        for suite in suites.target_suites(self.targets[name])
-                        if suite.task == "test"
-                    ],
-                    [
-                        (("mise", "run", "test", name, backend), backend)
-                        for backend in backends
-                    ],
-                )
-
     def test_a_binding_tests_each_backend_or_builds_once(self):
         go = {
             name: [
@@ -264,15 +241,6 @@ class SuitesTest(unittest.TestCase):
                 "android-arm64": [("//bindings/go:build", "android-arm64")],
             },
         )
-
-    def test_only_the_windows_vulkan_native_suites_need_the_desktop(self):
-        wrapped = {
-            (target.preset, suite.backend)
-            for target in self.targets.values()
-            for suite in suites.target_suites(target)
-            if suite.wrapper == "windows-console"
-        }
-        self.assertEqual(wrapped, {("windows-x64", "vulkan"), ("mingw-x64", "vulkan")})
 
     def test_consumer_suites_use_the_packaged_install(self):
         for target in self.targets.values():

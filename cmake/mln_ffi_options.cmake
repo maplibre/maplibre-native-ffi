@@ -12,11 +12,6 @@ function(mln_ffi_configure_options)
   set_property(
     CACHE MLN_FFI_DEFAULT_RENDER_BACKEND
     PROPERTY STRINGS metal opengl vulkan webgpu)
-  set(MLN_FFI_TEST_BACKENDS ""
-      CACHE
-        STRING
-        "Render backends whose native suites the build compiles, as a list; empty means every backend the library carries"
-  )
   set(MLN_FFI_RUST_TARGET "" CACHE STRING "Rust target triple for this build")
   set(MLN_FFI_TARGET_PLATFORM ""
       CACHE STRING "Platform name that bindings match this artifact by")
@@ -36,7 +31,6 @@ function(mln_ffi_configure_options)
   string(TOLOWER "${MLN_FFI_RENDER_BACKENDS}" backends)
   string(TOLOWER "${MLN_FFI_OPENGL_CONTEXT_PROVIDER}" provider)
   string(TOLOWER "${MLN_FFI_DEFAULT_RENDER_BACKEND}" default_backend)
-  string(TOLOWER "${MLN_FFI_TEST_BACKENDS}" test_backends)
   list(REMOVE_DUPLICATES backends)
   foreach(backend IN LISTS backends)
     if(NOT backend MATCHES "^(metal|opengl|vulkan|webgpu)$")
@@ -90,18 +84,6 @@ function(mln_ffi_configure_options)
         "The default render backend ${default_backend} is not one of the build's: ${backends}"
     )
   endif()
-  if(NOT test_backends)
-    set(test_backends ${backends})
-  endif()
-  foreach(backend IN LISTS test_backends)
-    if(NOT backend IN_LIST backends)
-      message(
-        FATAL_ERROR
-          "MLN_FFI_TEST_BACKENDS names ${backend}, which the build does not carry: ${backends}"
-      )
-    endif()
-  endforeach()
-
   list(JOIN backends ", " described)
   if(provider)
     string(APPEND described " (OpenGL through ${provider})")
@@ -114,6 +96,5 @@ function(mln_ffi_configure_options)
   set(MLN_FFI_RENDER_BACKENDS "${backends}" PARENT_SCOPE)
   set(MLN_FFI_OPENGL_CONTEXT_PROVIDER "${provider}" PARENT_SCOPE)
   set(MLN_FFI_DEFAULT_RENDER_BACKEND "${default_backend}" PARENT_SCOPE)
-  set(MLN_FFI_TEST_BACKENDS "${test_backends}" PARENT_SCOPE)
   set(MLN_FFI_EGL_ROOT "${MLN_FFI_EGL_ROOT}" PARENT_SCOPE)
 endfunction()

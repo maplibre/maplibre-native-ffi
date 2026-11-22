@@ -11,7 +11,6 @@ import {
   type ScreenPoint,
 } from "@maplibre/native-ffi";
 
-import type { Comparison } from "./compare.ts";
 import { addCollapse, addStylePicker, showAttributions } from "./panel.ts";
 import type { FromWorker, ToWorker, View } from "./protocol.ts";
 import { defaultStyle, type Style, styles } from "./styles.ts";
@@ -26,9 +25,9 @@ export interface Backend {
 }
 
 /** The map in the Web Worker, as the page reaches it. */
-export class RemoteMap {
+class RemoteMap {
   readonly #worker: Worker;
-  /** The camera and its limits, as the map last reported them. */
+  /** The camera, as the map last reported it. */
   view: View | undefined;
 
   constructor(worker: Worker) {
@@ -49,14 +48,6 @@ export class RemoteMap {
 
   applyCameraDelta(delta: CameraDelta): void {
     this.#post({ type: "cameraDelta", delta });
-  }
-
-  jumpTo(camera: CameraOptions): void {
-    this.#post({ type: "jumpTo", camera });
-  }
-
-  cancelCameraTransitions(): void {
-    this.#post({ type: "cancelCameraTransitions" });
   }
 
   setStyle(style: Style): void {
@@ -153,11 +144,9 @@ async function start(backend: Backend): Promise<void> {
         map.view = data.view;
         styledMap = map;
         addGestures(map);
-        addCompareToggle(map);
         break;
       case "camera":
         map.view = data.view;
-        comparison?.nativeCameraChanged();
         if (data.settled) scheduleHashUpdate(map);
         break;
     }
@@ -199,36 +188,6 @@ function pickStyle(picked: Style): void {
   // This replaces the last style's error, if it had one.
   showStatus(`Loading ${style.name}…`);
   styledMap.setStyle(style);
-  comparison?.setStyle(style);
-}
-
-// The comparison with MapLibre GL JS, while the page shows it. The page loads
-// GL JS only for the comparison, and keeps it in the URL as ?compare.
-
-let comparison: Comparison | undefined;
-
-function addCompareToggle(map: RemoteMap): void {
-  const toggle = document.querySelector<HTMLInputElement>("#compare")!;
-  const update = async () => {
-    setSearchParam("compare", toggle.checked ? "" : null);
-    comparison?.remove();
-    comparison = undefined;
-    if (!toggle.checked) return;
-    const { compare } = await import("./compare.ts");
-    // The toggle may have changed while GL JS loaded.
-    if (toggle.checked && comparison === undefined) {
-      comparison = compare(map, canvas, style);
-    }
-  };
-  const change = () =>
-    update().catch((error: unknown) => {
-      console.error(error);
-      showError(error instanceof Error ? error.message : String(error));
-    });
-  toggle.checked = new URLSearchParams(location.search).has("compare");
-  toggle.disabled = false;
-  toggle.addEventListener("change", change);
-  if (toggle.checked) void change();
 }
 
 /** Points the backend links at this page's view, so a switch keeps it. */

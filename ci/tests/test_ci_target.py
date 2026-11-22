@@ -21,9 +21,6 @@ def suite(step_id: str, *prerequisites: str) -> Suite:
         id=step_id,
         command=command,
         env={},
-        wrapper=None,
-        shell=None,
-        timeout_minutes=None,
         prerequisites=prerequisites or ("build",),
     )
 
@@ -103,54 +100,10 @@ class RunTest(unittest.TestCase):
 
 
 class CommandTest(unittest.TestCase):
-    def test_wrapper_preserves_the_desktop_session_path(self):
-        console = Suite(
-            "test",
-            ("mise", "run", "test", "windows-x64", "vulkan"),
-            {},
-            "windows-console",
-            "pwsh",
-            15,
-            (),
-        )
-        self.assertEqual(
-            target.argv(console),
-            [
-                "pwsh",
-                "-Command",
-                (
-                    "./ci/with-windows-console.ps1 -Command "
-                    "@('mise', 'run', 'test', 'windows-x64', 'vulkan'); exit $LASTEXITCODE"
-                ),
-            ],
-        )
-
-    def test_a_suite_that_outlives_its_timeout_fails(self):
-        slow = Suite("slow", ("mise", "run", "//x:slow"), {}, None, None, 1, ())
-        # A minute is the smallest timeout a suite declares, so shorten it.
-        with (
-            mock.patch.object(
-                target,
-                "argv",
-                # The child waits for an event that never fires.
-                lambda _: [
-                    sys.executable,
-                    "-c",
-                    "import threading; threading.Event().wait()",
-                ],
-            ),
-            mock.patch.object(target, "SECONDS_PER_MINUTE", 0.2),
-        ):
-            self.assertEqual(
-                target.execute(slow), ("failure", "timed out after 1 minutes")
-            )
-
     def test_the_arguments_of_ci_target_do_not_reach_its_suites(self):
         # Windows reports the names in upper case.
         with mock.patch.dict(os.environ, {"usage_preset": "p", "USAGE_LIST": "false"}):
-            env = target.environment(
-                Suite("a", ("mise",), {"X": "1"}, None, None, None, ())
-            )
+            env = target.environment(Suite("a", ("mise",), {"X": "1"}, ()))
         self.assertNotIn("usage_preset", env)
         self.assertNotIn("USAGE_LIST", env)
         self.assertEqual(env["X"], "1")

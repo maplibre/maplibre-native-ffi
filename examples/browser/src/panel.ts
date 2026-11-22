@@ -1,5 +1,4 @@
-// The control panel: the style picker, the backend links, the comparison
-// toggle, and the status line.
+// The control panel: the style picker, the backend links, and the status line.
 
 import { styles, type Style } from "./styles.ts";
 

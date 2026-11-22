@@ -22,7 +22,6 @@ module's export section on the web.
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import os
 import pathlib
 import re
@@ -41,15 +40,39 @@ PE_EXPORT = re.compile(r"^\s*Name: (?P<name>\S+)$")
 DUMPBIN_EXPORT = re.compile(r"^\s+\d+\s+[0-9A-Fa-f]+\s+[0-9A-Fa-f]+\s+(?P<name>\S+)")
 
 
+BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+LINE_COMMENT = re.compile(r"//[^\n]*")
+# The function name is the last identifier before the parameter list. The
+# return type may span lines, and nothing between MLN_API and the name holds a
+# parenthesis, brace, or semicolon.
+DECLARATION = re.compile(r"\bMLN_API\b[^;{}()]*?\b(mln_\w+)\s*\(")
+API_MARKER = re.compile(r"\bMLN_API\b")
+
+
 def declared_functions() -> set[str]:
-    """The MLN_API functions, parsed the way check-export-calls parses them."""
-    spec = importlib.util.spec_from_file_location(
-        "check_export_calls", ROOT / "tools" / "lint" / "check-export-calls.py"
-    )
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return set(module.exported_functions(include_web_only=True))
+    """The functions that a public header declares with MLN_API."""
+    functions: set[str] = set()
+    for header in sorted((ROOT / "include").rglob("*.h")):
+        text = BLOCK_COMMENT.sub(" ", header.read_text(encoding="utf-8"))
+        # The MLN_API definitions themselves are preprocessor lines.
+        text = "\n".join(
+            line
+            for line in LINE_COMMENT.sub("", text).splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        names = DECLARATION.findall(text)
+        # A declaration that the pattern misses would pass the check unseen, so
+        # every MLN_API marker has to belong to a declaration it found.
+        markers = len(API_MARKER.findall(text))
+        if markers != len(names):
+            raise SystemExit(
+                f"error: {header.relative_to(ROOT).as_posix()} has {markers} "
+                f"MLN_API markers but {len(names)} parsed declarations"
+            )
+        functions.update(names)
+    if not functions:
+        raise SystemExit("error: found no MLN_API declarations under include/")
+    return functions
 
 
 def run(command: list[str]) -> str:

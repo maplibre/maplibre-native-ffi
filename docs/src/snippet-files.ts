@@ -7,7 +7,7 @@
 type Files = Record<string, string>;
 
 const files: Record<string, Files> = {
-  c: import.meta.glob("../../tests/native/docsnippets/*.c", {
+  c: import.meta.glob("../../tests/docsnippets/*.c", {
     query: "?raw",
     import: "default",
     eager: true,

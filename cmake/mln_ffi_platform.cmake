@@ -47,7 +47,6 @@ endfunction()
 #   MLN_FFI_SHARED_SUPPORTED   whether the platform builds a shared library
 #   MLN_FFI_ARCHIVE_FORMAT     elf, whose archive keeps only the C API global,
 #                              or another format, copied as Cargo writes it
-#   MLN_FFI_TEST_SUPPORTED     whether the native suites build and run
 #   MLN_FFI_STATIC_LINK_LIBRARIES
 #                              what an in-tree target that links the static
 #                              archive links besides, where nothing else does

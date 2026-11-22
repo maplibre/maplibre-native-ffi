@@ -6,10 +6,11 @@
 # MLN_FFI_DEVICE_TIMEOUT seconds, or 300.
 set -euo pipefail
 
-preset=${1:?usage: run-qemu-test.sh <preset> [executable [arguments...]]}
+preset=${1:?usage: run-qemu-test.sh <preset> <executable> [arguments...]}
 shift
 if [[ $# -eq 0 ]]; then
-  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_native_abi_tests_${MLN_FFI_TEST_BACKEND:?MLN_FFI_TEST_BACKEND must name the backend under test}"
+  echo "usage: run-qemu-test.sh <preset> <executable> [arguments...]" >&2
+  exit 2
 fi
 
 case "$preset" in
@@ -55,8 +56,7 @@ if [[ -f "$root/usr/share/glvnd/egl_vendor.d/50_mesa.json" ]]; then
   export __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/50_mesa.json
 fi
 export LIBGL_ALWAYS_SOFTWARE=true
-# Emulated software rendering is slow, so waits and the native hang watchdog
-# stretch by the timeout scale.
+# Emulated software rendering is slow, so waits stretch by the timeout scale.
 export MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-5}"
 
 export QEMU_LD_PREFIX="$root"

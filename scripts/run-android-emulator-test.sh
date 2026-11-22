@@ -49,7 +49,6 @@ timeout_scale=${MLN_TEST_TIMEOUT_SCALE:-3}
 # Other sessions may be running tests on the same device, so each run has a
 # directory of its own and removes it when it ends.
 remote_dir=/data/local/tmp/maplibre-native-ffi-$$
-fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 # The AVD of the emulator the tests run on, once the device is known; a device
 # that is no emulator has none.
 avd_name=
@@ -73,10 +72,6 @@ for local_file in "$native_library" ${extra_libraries[@]+"${extra_libraries[@]}"
 done
 if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
   echo "Invalid timeout: $timeout_seconds" >&2
-  exit 2
-fi
-if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
-  echo "Android fixture directory does not exist: $fixture_dir" >&2
   exit 2
 fi
 
@@ -148,15 +143,10 @@ for library in ${extra_libraries[@]+"${extra_libraries[@]}"}; do
   run_adb "the push of $(basename "$library")" push "$library" "$remote_dir/$(basename "$library")" >/dev/null
 done
 
-fixture_environment=
 # The backend under test, which a binding's suite reads.
 backend_environment=
 if [[ -n "${MLN_FFI_TEST_BACKEND:-}" ]]; then
   backend_environment="MLN_FFI_TEST_BACKEND='$MLN_FFI_TEST_BACKEND' "
-fi
-if [[ -n "$fixture_dir" ]]; then
-  run_adb "the push of the fixtures" push "$fixture_dir" "$remote_dir/fixtures" >/dev/null
-  fixture_environment="MLN_FFI_TEST_FIXTURE_DIR='$remote_dir/fixtures' "
 fi
 
 for test_executable in "${test_executables[@]}"; do
@@ -166,9 +156,8 @@ for test_executable in "${test_executables[@]}"; do
 
   # Android has no /tmp, which is where a runtime library falls back to when
   # TMPDIR is unset, so a test that asks for a temporary directory gets one here.
-  # The emulator renders in software, so waits and the native hang watchdog
-  # stretch by the timeout scale.
-  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}${backend_environment}MLN_TEST_TIMEOUT_SCALE='$timeout_scale' TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
+  # The emulator renders in software, so waits stretch by the timeout scale.
+  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${backend_environment}MLN_TEST_TIMEOUT_SCALE='$timeout_scale' TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
   for argument in ${test_arguments[@]+"${test_arguments[@]}"}; do
     printf -v quoted_argument '%q' "$argument"
     remote_command+=" $quoted_argument"

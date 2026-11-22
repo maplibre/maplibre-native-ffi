@@ -122,8 +122,7 @@ REMEDIES = {
     ),
     LINKED_LOADER: (
         "A host that loads its own graphics loader would run two. Resolve the "
-        "entry points at run time, as src/render/opengl/egl_dispatch.cpp does, "
-        "and link the loader into the test harness only."
+        "entry points at run time."
     ),
     VENDORED_LOADER: (
         "The host supplies the graphics loader. Leave it out of the package."

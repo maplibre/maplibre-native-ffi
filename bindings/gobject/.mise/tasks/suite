@@ -21,7 +21,7 @@ export PKG_CONFIG_PATH="$install_dir/share/pkgconfig"
 package=maplibre-native-ffi-gobject-0
 
 # The suite renders with the backend that MLN_FFI_TEST_BACKEND names, and with
-# the graphics objects of the C suite's fixtures.
+# the graphics objects of the shared test graphics fixtures.
 # shellcheck disable=SC2046 # pkg-config prints one flag per word.
 cc -std=c11 -Wall -Wextra -Werror "$sources/suite/main.c" \
   $(pkg-config --cflags --libs "$package" mln-test-graphics) -o "$scratch/suite"

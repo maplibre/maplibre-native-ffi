@@ -1,9 +1,9 @@
 """The suites that each native target's CI job runs after its build.
 
-A job builds its platform once. The native suites and each binding's tests run
-once for every backend of the platform that support-gaps.toml lets them test
-on the runner, and name that backend as their last argument. A binding that
-can test on no backend builds instead, once.
+A job builds its platform once. Each binding's tests run once for every backend
+of the platform that support-gaps.toml lets them test on the runner, and name
+that backend as their last argument. A binding that can test on no backend
+builds instead, once.
 """
 
 from __future__ import annotations
@@ -36,10 +36,6 @@ class Suite:
     id: str
     command: tuple[str, ...]
     env: dict[str, str]
-    # `windows-console` runs the command in the Windows desktop session.
-    wrapper: str | None
-    shell: str | None
-    timeout_minutes: int | None
     # The steps that must have succeeded for this one to run.
     prerequisites: tuple[str, ...]
     # The render backend whose suites it runs, if any.
@@ -189,20 +185,13 @@ def command_support(command: str) -> list[tuple[str, str]]:
     return [(binding, status)]
 
 
-def native_checks(target: Target) -> list[tuple[list[str], str | None]]:
-    """The checks against the target's own build tree: the native suites of
-    each backend that the runner can test, and the platform's ABI checks."""
-    preset = target.preset
-    target_platform = target.platform
-    commands: list[tuple[list[str], str | None]] = [
-        (["mise", "run", "test", preset, backend], backend)
-        for backend in gaps.tested_backends("c", target)
-    ]
-    if target_platform == "linux-gnu":
-        commands.append((["mise", "run", "check-glibc-floor", preset], None))
-    elif target_platform == "linux-musl":
-        commands.append((["mise", "run", "check-musl-abi", preset], None))
-    return commands
+def native_checks(target: Target) -> list[list[str]]:
+    """The platform's ABI checks against the target's own build tree."""
+    if target.platform == "linux-gnu":
+        return [["mise", "run", "check-glibc-floor", target.preset]]
+    if target.platform == "linux-musl":
+        return [["mise", "run", "check-musl-abi", target.preset]]
+    return []
 
 
 def target_suites(target: Target) -> list[Suite]:
@@ -221,22 +210,10 @@ def target_suites(target: Target) -> list[Suite]:
         backend: str | None = None,
         step_id: str | None = None,
     ) -> None:
-        wrapper, shell, timeout = None, None, None
-        # Lavapipe presents Win32 surfaces through GDI, which needs the VM's
-        # interactive desktop. WGL and the binding suites run in service session 0.
-        if preset in {"windows-x64", "mingw-x64"} and command[2:] == [
-            "test",
-            preset,
-            "vulkan",
-        ]:
-            wrapper, shell, timeout = "windows-console", "pwsh", 15
         suite = Suite(
             id=step_id or suite_id(command[2] + (f"-{backend}" if backend else "")),
             command=tuple(command),
             env=env,
-            wrapper=wrapper,
-            shell=shell,
-            timeout_minutes=timeout,
             prerequisites=prerequisites,
             backend=backend,
         )
@@ -246,8 +223,8 @@ def target_suites(target: Target) -> list[Suite]:
             raise SystemExit(f"error: {preset} runs two suites with id {suite.id!r}")
         suites.append(suite)
 
-    for command, backend in native_checks(target):
-        add(command, native, {}, backend)
+    for command in native_checks(target):
+        add(command, native, {})
     add(["mise", "run", "archive-native", preset], native, {}, step_id="archive")
     add(
         [

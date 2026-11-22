@@ -298,79 +298,10 @@ run = [
   ] },
 ]
 
-[tasks.test]
-description = "Build and run the native C tests for a CMake preset, for one render backend or all of them."
-usage = '''
-arg "[preset]" default="{{vars.host_native_preset}}"
-arg "[backend]" default="" help="Render backend whose suites run, such as vulkan or opengl; empty runs every backend the build compiled suites for"
-'''
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-# ctest runs the suites: on the host, one entry per test file and one per
-# program in tests/native/exit; off the host, one entry per suite and exit
-# program through tools/devices/run. Each backend's entries carry its name as
-# a label. A web preset builds no C, so mln-rs's browser check drives the
-# package's raw C ABI from a Web Worker in headless Chromium instead;
-# scripts/find-chromium.mjs says how a browser is located. The check draws a
-# CJK label in the browser's sans-serif font, so it needs a CJK font installed.
-run = '''
-build_dir="$MISE_MONOREPO_ROOT/build/$usage_preset"
-share="$build_dir/install/share/maplibre-native-c"
-if [[ -n "$usage_backend" ]] && ! jq -e --arg backend "$usage_backend" '.backends | index($backend)' "$share/artifact.json" >/dev/null; then
-  echo "error: $usage_preset carries no $usage_backend backend; it carries $(jq -r '.backends | join(", ")' "$share/artifact.json")" >&2
-  exit 2
-fi
-case "$usage_preset" in
-web-*)
-  feature="$(jq -r '{webgpu: "webgpu", opengl: "gl"}[.backends[0]]' "$share/artifact.json")"
-  exec node "$MISE_MONOREPO_ROOT/third_party/mln-rs/crates/mln_c/web-check/check.mjs" \
-    "$share/web" "$feature" --chromium "$(node "$MISE_MONOREPO_ROOT/scripts/find-chromium.mjs")"
-  ;;
-esac
-# CTest labels each test with its backend.
-backends=$usage_backend
-if [[ -z "$backends" ]]; then
-  backends=$(ctest --test-dir "$build_dir" --print-labels | sed -n 's/^  *//p')
-  if [[ -z "$backends" ]]; then
-    echo "error: $usage_preset registers no native tests to run" >&2
-    exit 2
-  fi
-fi
-for backend in $backends; do
-  # A device build that no emulator or simulator runs registers no tests, so it
-  # fails before a device boots for nothing.
-  if ctest --test-dir "$build_dir" -C Release -L "^$backend\$" --show-only | grep -q '^Total Tests: 0[[:space:]]*$'; then
-    echo "error: $usage_preset registers no native $backend tests to run" >&2
-    exit 2
-  fi
-  export MLN_FFI_TEST_BACKEND="$backend"
-  # The device boots here rather than inside the first test's timeout.
-  MLN_FFI_DEVICE_INSTALL="$build_dir/install" "$MISE_MONOREPO_ROOT/tools/devices/run" --boot
-  ctest --test-dir "$build_dir" -C Release -L "^$backend\$" --output-on-failure --no-tests=error --timeout 300 --parallel
-done
-'''
-
-# The C API benchmarks, in benchmarks/. `mise run bench -- --help` and
-# `mise run bench:compare -- --help` list the options.
-[tasks.bench]
-description = "Build and run the C API benchmarks for a preset, writing a report under build/bench/runs."
-run = 'MLN_BENCH_HOST_PRESET="{{vars.host_native_preset}}" python3 benchmarks/bench.py run "$@"'
-
-[tasks."bench:compare"]
-description = "Compare the C API benchmarks of two sides, such as a base ref and the working tree, run interleaved."
-run = 'MLN_BENCH_HOST_PRESET="{{vars.host_native_preset}}" python3 benchmarks/bench.py compare "$@"'
-
-[tasks."bench:fixtures"]
-description = "Download the benchmarks' pinned fixtures into build/bench/fixtures."
-run = "python3 benchmarks/bench.py fixtures"
-
 [tasks.check-exports]
 description = "Check that an installed native library exports exactly the public C API."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = 'python3 tools/lint/check-exports.py "$usage_preset"'
-
-[tasks.check-export-calls]
-description = "Check that the C tests call every exported function by name."
-run = 'python3 tools/lint/check-export-calls.py "$@"'
 
 [tasks."android-sdk-packages"]
 description = "Install the pinned packages into the selected Android SDK."

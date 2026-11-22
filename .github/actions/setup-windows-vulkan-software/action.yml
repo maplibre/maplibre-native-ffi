@@ -57,6 +57,6 @@ runs:
 
         Register-VulkanDriver $driverManifest.FullName
         "Path=$($driver.Directory.FullName);$env:Path" >> $env:GITHUB_ENV
-        # Software rendering is slower than hardware, so the native suites
-        # stretch their waits and hang watchdog to match.
+        # Software rendering is slower than hardware, so the test suites
+        # stretch their waits to match.
         "MLN_TEST_TIMEOUT_SCALE=3" >> $env:GITHUB_ENV

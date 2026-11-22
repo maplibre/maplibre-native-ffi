@@ -6,11 +6,14 @@
 # MLN_FFI_DEVICE_TIMEOUT seconds, or 300.
 set -euo pipefail
 
-preset=${1:?usage: run-freebsd-test.sh <preset> [executable [arguments...]]}
+# The preset comes first, as for the other device runners, though the machine
+# needs only the executable.
+: "${1:?usage: run-freebsd-test.sh <preset> <executable> [arguments...]}"
 backend=${MLN_FFI_TEST_BACKEND:?MLN_FFI_TEST_BACKEND must name the backend under test}
 shift
 if [[ $# -eq 0 ]]; then
-  set -- "$MISE_MONOREPO_ROOT/build/$preset/mln_native_abi_tests_$backend"
+  echo "usage: run-freebsd-test.sh <preset> <executable> [arguments...]" >&2
+  exit 2
 fi
 
 if [[ "$1" == */* && ! -x "$1" ]]; then
@@ -41,12 +44,10 @@ host=$("$MISE_MONOREPO_ROOT/tools/devices/freebsd-host")
 # one is quoted for that shell.
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 command="cd $(quote "$MISE_MONOREPO_ROOT") && exec env"
-# Software rendering is slow, so waits and the native hang watchdog stretch by
-# the timeout scale.
+# Software rendering is slow, so waits stretch by the timeout scale.
 for argument in \
   LIBGL_ALWAYS_SOFTWARE=true \
   "MLN_TEST_TIMEOUT_SCALE=${MLN_TEST_TIMEOUT_SCALE:-3}" \
-  "MLN_FFI_TEST_FIXTURE_DIR=$MISE_MONOREPO_ROOT/tests/native/fixtures" \
   "MLN_FFI_TEST_BACKEND=$backend" \
   ${drivers[@]+"${drivers[@]}"} \
   timeout "${MLN_FFI_DEVICE_TIMEOUT:-300}" \

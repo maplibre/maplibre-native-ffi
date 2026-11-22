@@ -281,11 +281,6 @@ class PlatformGapsTest(unittest.TestCase):
             for name in names:
                 target = self.targets[name]
                 with self.subTest(preset=name):
-                    for backend in target.backends:
-                        self.assertIn(
-                            (["mise", "run", "test", name, backend], backend),
-                            suites.native_checks(target),
-                        )
                     commands = suites.consumer_commands(target)
                     for backend in target.backends:
                         bindings = {
@@ -350,7 +345,7 @@ class PlatformGapsTest(unittest.TestCase):
             self.assertEqual(suites.consumer_commands(target), [])
             result = plan.plan(self.presets, False, ["linux-x64"])
             self.assertNotIn(target.preset, {row["preset"] for row in result["matrix"]})
-        # A native test gap on one backend leaves the other's suites.
+        # A native test gap on one backend leaves the bindings' other suites.
         entry = dataclasses.replace(
             entry,
             selectors={
@@ -360,10 +355,6 @@ class PlatformGapsTest(unittest.TestCase):
             },
         )
         with mock.patch.object(gaps, "load_gaps", return_value=(936, [entry])):
-            self.assertEqual(
-                suites.native_checks(target)[0],
-                (["mise", "run", "test", target.preset, "opengl"], "opengl"),
-            )
             self.assertNotIn(
                 "vulkan",
                 {backend for _, backend in suites.consumer_commands(target)},

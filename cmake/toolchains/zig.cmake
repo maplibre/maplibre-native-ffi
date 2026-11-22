@@ -36,7 +36,7 @@ set(MLN_FFI_ZIG_FREEBSD "14.0"
     CACHE STRING "Oldest FreeBSD release the FreeBSD artifacts may require")
 
 set(MLN_FFI_ZIG_SYSROOT ""
-    CACHE PATH "Target-architecture graphics loaders for the test harness")
+    CACHE PATH "Target-architecture graphics loaders for CMake to find")
 
 list(
   APPEND
@@ -164,8 +164,8 @@ if(MLN_FFI_ZIG_SYSROOT)
     COMMAND_ERROR_IS_FATAL ANY)
   set(CMAKE_FIND_ROOT_PATH "${MLN_FFI_ZIG_SYSROOT}")
   set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-  # The loaders stand in for the target's system libraries, so the test
-  # executables find the target's own at run time rather than these.
+  # The loaders stand in for the target's system libraries, which the tests
+  # find at run time rather than these.
   list(APPEND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES
        "${MLN_FFI_ZIG_SYSROOT}/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
 endif()
