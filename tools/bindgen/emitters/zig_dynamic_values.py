@@ -24,6 +24,12 @@ def slice_of(values, value):
     return values.bound.slices.get(value.native) if value.kind == "record" else None
 
 
+def fixed(value):
+    """Whether an array fills the fixed extent that its record holds in place,
+    which Zig presents as an array of that length. A counted one is a slice."""
+    return value.extent is not None and not value.counted_inline
+
+
 def public(values, value):
     if array := slice_of(values, value):
         return values.public(array.value)
@@ -32,7 +38,7 @@ def public(values, value):
     elif value.kind == "array":
         typ = (
             f"[{value.length}]{values.public(value.element)}"
-            if value.ctype.kind == "array"
+            if fixed(value)
             else f"[]const {values.public(value.element)}"
         )
     elif value.kind == "reference":
@@ -63,16 +69,21 @@ def encode(values, value, source, depth=0):
     if value.kind == "reference":
         return f"try marshal.store(allocator, {encode(values, value.element, source)})"
     if value.kind == "array":
-        if value.element.kind == "scalar" and value.ctype.kind != "array":
+        if value.element.kind == "scalar" and value.extent is None:
             return f"{source}.ptr"
         native = values.native_type(value.element)
-        fixed = value.ctype.kind == "array"
-        storage = (
-            f"var items: [{value.length}]{native} = undefined;"
-            if fixed
-            else f"const items = try allocator.alloc({native}, {source}.len);"
-        )
-        return f"blk: {{ {storage} for ({source}, 0..) |{item}, index| items[index] = {encode(values, value.element, item, depth + 1)}; break :blk items{'' if fixed else '.ptr'}; }}"
+        inline = value.extent is not None
+        if value.counted_inline:
+            # The elements in use, then zeroed storage up to the extent.
+            storage = (
+                f"if ({source}.len > {value.extent}) return error.InvalidArgument; "
+                f"var items = std.mem.zeroes([{value.extent}]{native});"
+            )
+        elif inline:
+            storage = f"var items: [{value.length}]{native} = undefined;"
+        else:
+            storage = f"const items = try allocator.alloc({native}, {source}.len);"
+        return f"blk: {{ {storage} for ({source}, 0..) |{item}, index| items[index] = {encode(values, value.element, item, depth + 1)}; break :blk items{'' if inline else '.ptr'}; }}"
     if value.kind in {"scalar", "native_pointer"}:
         return source
     return to_native(value, source)
@@ -89,7 +100,7 @@ def encoding(value) -> tuple[bool, bool]:
         return True, encoding(value.element)[1]
     if value.kind == "array":
         allocates, roots = encoding(value.element)
-        if value.ctype.kind == "array":
+        if value.extent is not None:
             return allocates, roots
         return value.element.kind != "scalar" or allocates, roots
     if value.kind in {"record", "union"}:
@@ -133,7 +144,7 @@ def borrows(values, value):
     if slice_of(values, value):
         return False
     if value.kind == "array":
-        return value.ctype.kind == "array" and borrows(values, value.element)
+        return fixed(value) and borrows(values, value.element)
     if value.kind == "reference":
         return borrows(values, value.element)
     if value.kind in {"record", "union"}:
@@ -204,23 +215,27 @@ def decode(values, value, source, context="raw", borrowed=False):
             borrowed,
         )
     if value.kind == "array":
-        fixed = value.ctype.kind == "array"
         count = (
             value.length
             if value.length.isdigit()
             else context + "." + identifier(value.length)
         )
-        items = (
-            source
-            if fixed
-            else f"try marshal.nativeSlice({values.native_type(value.element)}, {source}, {count})"
-        )
+        if fixed(value):
+            items = source
+        elif value.counted_inline:
+            # The count selects the elements in use, never past the extent.
+            items = f"(if ({count} <= {value.extent}) {source}[0..{count}] else return error.NativeError)"
+        else:
+            items = f"try marshal.nativeSlice({values.native_type(value.element)}, {source}, {count})"
         storage = (
             f"var copied: [{value.length}]{values.public(value.element)} = undefined;"
-            if fixed
+            if fixed(value)
             else f"const copied = try allocator.alloc({values.public(value.element)}, {count});"
         )
         copied = decode(values, value.element, "item", context, borrowed)
+        if value.counted_inline:
+            # Checks the count before it allocates for it.
+            return f"blk: {{ const in_use = {items}; const copied = try allocator.alloc({values.public(value.element)}, in_use.len); for (in_use, 0..) |item, index| copied[index] = {copied}; break :blk copied; }}"
         if value.stride:
             return f"blk: {{ {storage} for (0..{count}) |index| {{ const item = try marshal.stridedAt({values.native_type(value.element)}, {source}, {count}, {context}.{identifier(value.stride)}, index); copied[index] = {copied}; }} break :blk copied; }}"
         return f"blk: {{ {storage} for ({items}, 0..) |item, index| copied[index] = {copied}; break :blk copied; }}"

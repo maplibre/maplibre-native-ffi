@@ -21,12 +21,12 @@ public extension GpuDeviceHandle {
   /// - `Status.unsupported` when this build or platform lacks `backend`, when
   ///   the device can't render with `open_gl_client_api`, when options name a
   ///   GPU that the backend can't select (an OpenGL device takes no
-  ///   `adapter_index`, `adapter_uuid`, or `adapter_luid`, and only a Vulkan
-  ///   device takes `adapter_uuid` or `adapter_luid`), when a device that
-  ///   doesn't render with Vulkan gets a `queue_lock`, or in a browser for
-  ///   every backend: WebGPU makes devices asynchronously, and a WebGL2 context
-  ///   needs a canvas. Attach without a device, which the session makes itself,
-  ///   or wrap your WebGL2 context.
+  ///   `adapter_index`, `adapter_uuid`, or `adapter_luid`, only a Vulkan device
+  ///   takes `adapter_uuid`, and only a Vulkan or D3D12 device `adapter_luid`),
+  ///   when a device that doesn't render with Vulkan gets a `queue_lock`, or in
+  ///   a browser for every backend: WebGPU makes devices asynchronously, and a
+  ///   WebGL2 context needs a canvas. Attach without a device, which the
+  ///   session makes itself, or wrap your WebGL2 context.
   /// - `Status.notFound` when no GPU matches `adapter_index`, `adapter_uuid`,
   ///   or `adapter_luid`.
   /// - `Status.nativeError` when the platform can't create the device.
@@ -60,6 +60,33 @@ public extension GpuDeviceHandle {
       )
     } result: { GpuDeviceCapabilities(raw: value0) }
   }
+
+  #if os(Windows)
+    /// Gets the D3D12 device and direct command queue of a D3D12 device.
+    ///
+    /// Use them to make the textures of a borrowed ring that sessions on the
+    /// device render into, and to submit your reads of them, which the queue
+    /// orders after the frames submitted before them.
+    ///
+    /// See `mln_gpu_device_get_d3d12_context` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `Status.unsupported` when the device doesn't render with D3D12.
+    func getD3d12Context() throws -> GpuDeviceD3d12ContextResult {
+      var value0 = mln_gpu_device_d3d12_context_result()
+      value0
+        .size = UInt32(MemoryLayout<mln_gpu_device_d3d12_context_result>.size)
+      return try nativeInvoke { raw, _, diagnostic in
+        mln_gpu_device_get_d3d12_context(
+          raw,
+          &value0,
+          diagnostic
+        )
+      } result: { GpuDeviceD3d12ContextResult(raw: value0) }
+    }
+  #endif
 
   #if os(Android) || os(Linux) || os(macOS) || os(Windows)
     /// Gets the Vulkan instance, device, and graphics queue of a Vulkan device.
@@ -99,6 +126,38 @@ public extension GpuDeviceHandle {
   func release() {
     nativeClose { raw in mln_gpu_device_release(raw) }
   }
+
+  #if os(Windows)
+    /// Wraps your D3D12 device and direct command queue, so that sessions
+    /// render
+    /// on them.
+    ///
+    /// Sessions on the device render into your textures and submit to your
+    /// queue.
+    ///
+    /// See `mln_gpu_device_wrap_d3d12` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+    ///   `RenderBackendFlag.d3d12`, when the device runs no shader model 6.0,
+    ///   when `command_queue` isn't a direct queue of `device`, or when the
+    ///   library can't load DXC (`dxcompiler.dll`) to compile its shaders.
+    /// - `Status.invalidArgument` when `device` or `command_queue` isn't of its
+    ///   interface.
+    static func wrapD3d12(descriptor bindingArg0: D3d12DeviceDescriptor) throws
+      -> GpuDeviceHandle
+    {
+      var value0: mln_gpu_device = 0
+      return try MaplibreNativeFFI
+        .nativeInvoke { _, arena, diagnostic in mln_gpu_device_wrap_d3d12(
+          arena.store(bindingArg0.nativeValue()),
+          &value0,
+          diagnostic
+        ) } result: { try GpuDeviceHandle(adopting: value0) }
+    }
+  #endif
 
   #if os(iOS) || os(macOS) || os(tvOS) || os(visionOS)
     /// Wraps your Metal device and command queue, so that sessions render on

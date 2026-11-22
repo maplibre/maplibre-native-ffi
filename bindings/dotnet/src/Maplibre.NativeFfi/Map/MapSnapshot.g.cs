@@ -15,6 +15,10 @@ namespace Maplibre.NativeFfi;
 /// <param name="FullyLoaded">
 /// Whether the style and every resource that the view needs have loaded.
 /// </param>
+/// <param name="GestureInProgress">
+/// Whether a gesture recognizer's gesture, or the glide and snap after it,
+/// moves the camera.
+/// </param>
 /// <param name="LatestRenderUpdateGeneration">
 /// Counts the render updates that the map has made for its render session.
 /// </param>

@@ -12,18 +12,29 @@ private final class HeldCompletion: @unchecked Sendable {
     descriptor = completion.pointee
   }
 
-  func deliver(status: mln_status = MLN_STATUS_OK, value: Int32 = 0) {
+  func deliver(
+    status: mln_status = MLN_STATUS_OK,
+    value: Int32 = 0,
+    diagnostic: String = "",
+    generation: UInt64 = 0
+  ) {
     guard let descriptor else {
       Issue.record("the fake call kept no completion")
       return
     }
-    withUnsafePointer(to: value) { value in
-      var result = mln_completion_result()
-      result.size = UInt32(MemoryLayout<mln_completion_result>.size)
-      result.status = mln_status(rawValue: status.rawValue)
-      result.value = UnsafeRawPointer(value)
-      result.value_count = 1
-      descriptor.callback?(descriptor.user_data, &result)
+    var diagnostic = Array(diagnostic.utf8)
+    diagnostic.withUnsafeMutableBufferPointer { diagnostic in
+      withUnsafePointer(to: value) { value in
+        var result = mln_completion_result()
+        result.size = UInt32(MemoryLayout<mln_completion_result>.size)
+        result.status = mln_status(rawValue: status.rawValue)
+        result.generation = generation
+        result.diagnostic.data = UnsafeRawPointer(diagnostic.baseAddress)
+        result.diagnostic.size = diagnostic.count
+        result.value = UnsafeRawPointer(value)
+        result.value_count = 1
+        descriptor.callback?(descriptor.user_data, &result)
+      }
     }
   }
 
@@ -108,16 +119,26 @@ private struct ConversionFailure: Error {}
 }
 
 /// A command that native accepts and then fails throws its status, its
-/// diagnostic, and the generation it published.
+/// diagnostic, and the generation it reports.
 @Test func aFailedCommandThrowsItsStatusAndGeneration() async throws {
-  try await withMapFixture { fixture in
-    let committed = try await fixture.map.setStyleJson(emptyStyle)
-    let error = await expectMaplibreError(.notFound) {
-      try await fixture.map.removeStyleSource("missing")
-    }
-    #expect(error?.diagnostic.isEmpty == false)
-    #expect(error.map { $0.generation > committed.generation } == true)
+  let held = HeldCompletion()
+  let failing = try NativeCompletion.start({ completion, _ in
+    held.keep(completion)
+    return MLN_STATUS_OK
+  }) { result in
+    try NativeCompletion.value(result, as: Int32.self)
   }
+  held.deliver(
+    status: MLN_STATUS_NOT_FOUND,
+    diagnostic: "no source named missing",
+    generation: 7
+  )
+  held.release()
+  let error = await expectMaplibreError(.notFound) {
+    try await failing.value()
+  }
+  #expect(error?.diagnostic == "no source named missing")
+  #expect(error?.generation == 7)
 }
 
 /// Cancelling the task that awaits a completion ends the wait with

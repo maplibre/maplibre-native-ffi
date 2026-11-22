@@ -7,6 +7,34 @@ import org.maplibre.nativeffi.internal.lifecycle.*
 import org.maplibre.nativeffi.internal.memory.*
 
 /**
+ * Gets the D3D12 texture of an acquired frame.
+ *
+ * It gets a borrowed ring's texture, or an exported ring's on a D3D12 device: the resource whose
+ * memory the ring shares, and the frame's depth resource with
+ * `RenderSessionAttachOptions.keepDepth`. Wait for `AcquiredFrameHandle.withProducerSync()` before
+ * you use them.
+ *
+ * See `mln_acquired_frame_get_d3d12_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when the frame isn't of a D3D12 device.
+ * - `Status.TARGET_LOST` when the session failed, or you detached, abandoned, or disposed it.
+ */
+public fun <T> AcquiredFrameHandle.withD3d12Texture(block: (D3d12TextureFrame) -> T): T =
+  nativeCall(this, binding) {
+    borrowView(
+      { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
+      { C.mln_acquired_frame_view_end(it) },
+    ) { scope ->
+      val out = sized(w(56, 72, 52), w(8, 8, 4))
+      check(C.mln_acquired_frame_get_d3d12_texture(handle, out, diagnostic))
+      block(readD3d12TextureFrame(out, scope))
+    }
+  }
+
+/**
  * Gets the DXGI shared texture of an exported ring's acquired frame.
  *
  * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the texture. Once you release
@@ -65,6 +93,28 @@ public fun <T> AcquiredFrameHandle.withVulkanTexture(block: (VulkanTextureFrame)
   }
 
 /**
+ * Wraps your D3D12 device and direct command queue, so that sessions render on them.
+ *
+ * Sessions on the device render into your textures and submit to your queue.
+ *
+ * See `mln_gpu_device_wrap_d3d12` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when `supportedRenderBackendMask()` lacks `RenderBackendFlag.D3D12`, when
+ *   the device runs no shader model 6.0, when `command_queue` isn't a direct queue of `device`, or
+ *   when the library can't load DXC (`dxcompiler.dll`) to compile its shaders.
+ * - `Status.INVALID_ARGUMENT` when `device` or `command_queue` isn't of its interface.
+ */
+public fun GpuDeviceHandle.Companion.wrapD3d12(descriptor: D3d12DeviceDescriptor): GpuDeviceHandle =
+  nativeCall(null, null) {
+    val out = allocate(8, w(8, 8, 4))
+    check(C.mln_gpu_device_wrap_d3d12(writeD3d12DeviceDescriptor(descriptor), out, diagnostic))
+    adopt(out, GeneratedOwnerDisposal::gpuDevice) { GpuDeviceHandle.wrap(it) }
+  }
+
+/**
  * Wraps your Vulkan device and queue, so that sessions render on them.
  *
  * Sessions on the device render into your images, present to your surfaces, and submit to your
@@ -92,6 +142,26 @@ public fun GpuDeviceHandle.Companion.wrapVulkan(
       { it.bindingCallbacks },
       { it.release() },
     )
+  }
+
+/**
+ * Gets the D3D12 device and direct command queue of a D3D12 device.
+ *
+ * Use them to make the textures of a borrowed ring that sessions on the device render into, and to
+ * submit your reads of them, which the queue orders after the frames submitted before them.
+ *
+ * See `mln_gpu_device_get_d3d12_context` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ *
+ * Errors:
+ *
+ * - `Status.UNSUPPORTED` when the device doesn't render with D3D12.
+ */
+public fun GpuDeviceHandle.getD3d12Context(): GpuDeviceD3d12ContextResult =
+  nativeCall(this, binding) {
+    val out = sized(w(12, 24), w(4, 8))
+    check(C.mln_gpu_device_get_d3d12_context(handle, out, diagnostic))
+    readGpuDeviceD3d12ContextResult(out)
   }
 
 /**

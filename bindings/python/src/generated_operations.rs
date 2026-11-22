@@ -138,10 +138,6 @@ fn generated_copy_mln_camera_transition_end(
     let dict = PyDict::new(py);
     dict.set_item("outcome", generated_value(py, value.outcome)?)?;
     dict.set_item("generation", generated_value(py, value.generation)?)?;
-    dict.set_item(
-        "velocity",
-        generated_copy_mln_camera_velocity(py, &value.velocity)?,
-    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -168,18 +164,6 @@ unsafe extern "C" fn generated_callback_mln_camera_transition_handler_callback(
         },
     );
     outcome
-}
-
-fn generated_copy_mln_camera_velocity(
-    py: Python<'_>,
-    value: &sys::mln_camera_velocity,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("pan", generated_copy_mln_screen_point(py, &value.pan)?)?;
-    dict.set_item("zoom", generated_value(py, value.zoom)?)?;
-    dict.set_item("bearing", generated_value(py, value.bearing)?)?;
-    dict.set_item("pitch", generated_value(py, value.pitch)?)?;
-    Ok(dict.into_any().unbind())
 }
 
 fn generated_copy_mln_canonical_tile_id(
@@ -283,6 +267,28 @@ unsafe extern "C" fn generated_callback_mln_custom_vector_source_options_cancel_
         },
     );
     outcome
+}
+
+fn generated_copy_mln_d3d12_texture_frame(
+    py: Python<'_>,
+    value: &sys::mln_d3d12_texture_frame,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("width", generated_value(py, value.width)?)?;
+    dict.set_item("height", generated_value(py, value.height)?)?;
+    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
+    dict.set_item("slot", generated_value(py, value.slot)?)?;
+    dict.set_item("resource", generated_value(py, value.resource as usize)?)?;
+    dict.set_item("device", generated_value(py, value.device as usize)?)?;
+    dict.set_item("format", generated_value(py, value.format)?)?;
+    dict.set_item("state", generated_value(py, value.state)?)?;
+    dict.set_item(
+        "depth_resource",
+        generated_value(py, value.depth_resource as usize)?,
+    )?;
+    dict.set_item("depth_format", generated_value(py, value.depth_format)?)?;
+    dict.set_item("depth_state", generated_value(py, value.depth_state)?)?;
+    Ok(dict.into_any().unbind())
 }
 
 fn generated_copy_mln_dma_buf_frame(
@@ -458,6 +464,94 @@ fn generated_copy_mln_geo_json_source_options(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_gesture_event(
+    py: Python<'_>,
+    value: &sys::mln_gesture_event,
+) -> PyResult<Py<PyAny>> {
+    Ok(match value.type_ {
+        sys::MLN_GESTURE_EVENT_TAP => generated_variant(
+            py,
+            "tap",
+            generated_copy_mln_gesture_tap(py, &(unsafe { value.data.tap }))?,
+        )?,
+        sys::MLN_GESTURE_EVENT_DOUBLE_TAP => generated_variant(
+            py,
+            "double_tap",
+            generated_copy_mln_gesture_tap(py, &(unsafe { value.data.double_tap }))?,
+        )?,
+        sys::MLN_GESTURE_EVENT_TWO_FINGER_TAP => generated_variant(
+            py,
+            "two_finger_tap",
+            generated_copy_mln_gesture_tap(py, &(unsafe { value.data.two_finger_tap }))?,
+        )?,
+        sys::MLN_GESTURE_EVENT_NOTCH => generated_variant(
+            py,
+            "notch",
+            generated_copy_mln_gesture_notch_event(py, &(unsafe { value.data.notch }))?,
+        )?,
+        sys::MLN_GESTURE_EVENT_LONG_PRESS => generated_variant(
+            py,
+            "long_press",
+            generated_copy_mln_gesture_tap(py, &(unsafe { value.data.long_press }))?,
+        )?,
+        tag => generated_unknown_variant(py, tag)?,
+    })
+}
+
+fn generated_copy_mln_gesture_notch_event(
+    py: Python<'_>,
+    value: &sys::mln_gesture_notch_event,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("axis", generated_value(py, value.axis)?)?;
+    dict.set_item("kind", generated_value(py, value.kind)?)?;
+    dict.set_item("value", generated_value(py, value.value)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_gesture_result(
+    py: Python<'_>,
+    value: &sys::mln_gesture_result,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("handled", generated_value(py, value.handled)?)?;
+    dict.set_item("next_tick", generated_value(py, value.next_tick)?)?;
+    dict.set_item("next_tick_ms", generated_value(py, value.next_tick_ms)?)?;
+    dict.set_item(
+        "box_zoom_active",
+        generated_value(py, value.box_zoom_active)?,
+    )?;
+    dict.set_item(
+        "box_zoom",
+        generated_copy_mln_screen_box(py, &value.box_zoom)?,
+    )?;
+    dict.set_item(
+        "events",
+        generated_list(
+            py,
+            value
+                .events
+                .get(..generated_count(value.event_count)?)
+                .ok_or_else(|| native_error("native count exceeds its array"))?,
+            |element| generated_copy_mln_gesture_event(py, element),
+        )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_gesture_tap(
+    py: Python<'_>,
+    value: &sys::mln_gesture_tap,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("id", generated_value(py, value.id)?)?;
+    dict.set_item(
+        "position",
+        generated_copy_mln_screen_point(py, &value.position)?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_gpu_device_capabilities(
     py: Python<'_>,
     value: &sys::mln_gpu_device_capabilities,
@@ -474,6 +568,19 @@ fn generated_copy_mln_gpu_device_capabilities(
     dict.set_item(
         "depth_export_kinds",
         generated_value(py, value.depth_export_kinds)?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_gpu_device_d3d12_context_result(
+    py: Python<'_>,
+    value: &sys::mln_gpu_device_d3d12_context_result,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("device", generated_value(py, value.device as usize)?)?;
+    dict.set_item(
+        "command_queue",
+        generated_value(py, value.command_queue as usize)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -782,6 +889,38 @@ fn generated_copy_mln_offline_region_definition(
         )?,
         tag => generated_unknown_variant(py, tag)?,
     })
+}
+
+fn generated_copy_mln_offline_region_expiry(
+    py: Python<'_>,
+    value: &sys::mln_offline_region_expiry,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "stale_after_unix_ms",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER != 0,
+            || generated_value(py, value.stale_after_unix_ms),
+        )?,
+    )?;
+    dict.set_item(
+        "usable_offline_until_unix_ms",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL != 0,
+            || generated_value(py, value.usable_offline_until_unix_ms),
+        )?,
+    )?;
+    dict.set_item(
+        "stale_resource_count",
+        generated_value(py, value.stale_resource_count)?,
+    )?;
+    dict.set_item(
+        "unusable_resource_count",
+        generated_value(py, value.unusable_resource_count)?,
+    )?;
+    Ok(dict.into_any().unbind())
 }
 
 fn generated_copy_mln_offline_region_info(
@@ -1462,6 +1601,16 @@ fn generated_copy_mln_runtime_event_tile_action(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_screen_box(
+    py: Python<'_>,
+    value: &sys::mln_screen_box,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("min", generated_copy_mln_screen_point(py, &value.min)?)?;
+    dict.set_item("max", generated_copy_mln_screen_point(py, &value.max)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_screen_point(
     py: Python<'_>,
     value: &sys::mln_screen_point,
@@ -1802,28 +1951,6 @@ unsafe extern "C" fn generated_callback_mln_wake_callback(user_data: *mut std::f
     outcome
 }
 
-fn generated_input_mln_anchored_momentum<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_anchored_momentum> {
-    let mut raw: sys::mln_anchored_momentum = unsafe { std::mem::zeroed() };
-    raw.fields = 0;
-    if let Some(field) = generated_present(value, "velocity")? {
-        raw.velocity = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_ANCHORED_MOMENTUM_VELOCITY;
-    }
-    if let Some(field) = generated_present(value, "anchor")? {
-        raw.anchor = generated_input_mln_screen_point(&field, storage)?;
-        raw.fields |= sys::MLN_ANCHORED_MOMENTUM_ANCHOR;
-    }
-    raw.decay = generated_input_mln_momentum_decay(&value.getattr("decay")?, storage)?;
-    if let Some(field) = generated_present(value, "snap")? {
-        raw.snap = generated_input_mln_momentum_snap(&field, storage)?;
-        raw.fields |= sys::MLN_ANCHORED_MOMENTUM_SNAP;
-    }
-    Ok(raw)
-}
-
 fn generated_input_mln_android_window_target<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -1926,7 +2053,6 @@ fn generated_input_mln_camera_delta<'py>(
     let mut raw: sys::mln_camera_delta = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_camera_delta>() as _;
     raw.fields = 0;
-    raw.reserved = 0;
     if let Some(field) = generated_present(value, "offset")? {
         raw.offset = generated_input_mln_screen_point(&field, storage)?;
         raw.fields |= sys::MLN_CAMERA_DELTA_OFFSET;
@@ -1947,14 +2073,7 @@ fn generated_input_mln_camera_delta<'py>(
         raw.anchor = generated_input_mln_screen_point(&field, storage)?;
         raw.fields |= sys::MLN_CAMERA_DELTA_ANCHOR;
     }
-    if let Some(field) = generated_present(value, "momentum")? {
-        raw.momentum = generated_input_mln_gesture_momentum(&field, storage)?;
-        raw.fields |= sys::MLN_CAMERA_DELTA_MOMENTUM;
-    }
     raw.animation = generated_input_mln_animation_options(&value.getattr("animation")?, storage)?;
-    raw.gesture_phase = value
-        .getattr("gesture_phase")?
-        .extract::<sys::mln_gesture_phase>()?;
     Ok(raw)
 }
 
@@ -2066,15 +2185,11 @@ fn generated_input_mln_camera_update<'py>(
 ) -> PyResult<sys::mln_camera_update> {
     let mut raw: sys::mln_camera_update = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_camera_update>() as _;
-    raw.reserved = 0;
     raw.mode = value
         .getattr("mode")?
         .extract::<sys::mln_camera_update_mode>()?;
     raw.camera = generated_input_mln_camera_options(&value.getattr("camera")?, storage)?;
     raw.animation = generated_input_mln_animation_options(&value.getattr("animation")?, storage)?;
-    raw.gesture_phase = value
-        .getattr("gesture_phase")?
-        .extract::<sys::mln_gesture_phase>()?;
     Ok(raw)
 }
 
@@ -2204,6 +2319,68 @@ fn generated_input_mln_custom_vector_source_options<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_d3d12_borrowed_texture<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_d3d12_borrowed_texture> {
+    let _ = storage;
+    let mut raw: sys::mln_d3d12_borrowed_texture = unsafe { std::mem::zeroed() };
+    raw.resource = value.getattr("resource")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
+fn generated_input_mln_d3d12_borrowed_textures_target<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_d3d12_borrowed_textures_target> {
+    let mut raw: sys::mln_d3d12_borrowed_textures_target = unsafe { std::mem::zeroed() };
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
+    raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
+    raw.textures = {
+        let items = generated_items(&value.getattr("textures")?, |item| {
+            generated_input_mln_d3d12_borrowed_texture(&item, storage)
+        })?;
+        raw.texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
+    raw.state = value.getattr("state")?.extract::<u32>()?;
+    raw.depth_textures = {
+        let items = generated_items(&value.getattr("depth_textures")?, |item| {
+            generated_input_mln_d3d12_borrowed_texture(&item, storage)
+        })?;
+        raw.depth_texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
+    raw.depth_state = value.getattr("depth_state")?.extract::<u32>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_d3d12_composition_target<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_d3d12_composition_target> {
+    let mut raw: sys::mln_d3d12_composition_target = unsafe { std::mem::zeroed() };
+    raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
+    raw.kind = value
+        .getattr("kind")?
+        .extract::<sys::mln_d3d12_composition_kind>()?;
+    raw.object = value.getattr("object")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
+fn generated_input_mln_d3d12_device_descriptor<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_d3d12_device_descriptor> {
+    let _ = storage;
+    let mut raw: sys::mln_d3d12_device_descriptor = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_d3d12_device_descriptor>() as _;
+    raw.device = value.getattr("device")?.extract::<usize>()? as _;
+    raw.command_queue = value.getattr("command_queue")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
 fn generated_input_mln_dma_buf_format<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -2321,21 +2498,21 @@ fn generated_input_mln_frame_demand<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_frame_pacer_options<'py>(
+fn generated_input_mln_frame_pacing_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_frame_pacer_options> {
+) -> PyResult<sys::mln_frame_pacing_options> {
     let _ = storage;
-    let mut raw: sys::mln_frame_pacer_options = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_frame_pacer_options>() as _;
+    let mut raw: sys::mln_frame_pacing_options = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_frame_pacing_options>() as _;
     raw.fields = 0;
     if let Some(field) = generated_present(value, "maximum_frames_per_second")? {
         raw.maximum_frames_per_second = field.extract::<u32>()?;
-        raw.fields |= sys::MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+        raw.fields |= sys::MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND;
     }
-    let field = value.getattr("unlimited_frames_per_second")?;
-    if field.extract::<bool>()? {
-        raw.fields |= sys::MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
+    if let Some(field) = generated_present(value, "view")? {
+        raw.view = field.extract::<usize>()? as _;
+        raw.fields |= sys::MLN_FRAME_PACING_OPTION_VIEW;
     }
     Ok(raw)
 }
@@ -2405,15 +2582,189 @@ fn generated_input_mln_geo_json_source_options<'py>(
     Ok(raw)
 }
 
-fn generated_input_mln_gesture_momentum<'py>(
+fn generated_input_mln_gesture_axis_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_gesture_momentum> {
-    let mut raw: sys::mln_gesture_momentum = unsafe { std::mem::zeroed() };
-    raw.pan = generated_input_mln_pan_momentum(&value.getattr("pan")?, storage)?;
-    raw.zoom = generated_input_mln_anchored_momentum(&value.getattr("zoom")?, storage)?;
-    raw.bearing = generated_input_mln_anchored_momentum(&value.getattr("bearing")?, storage)?;
-    raw.pitch = generated_input_mln_anchored_momentum(&value.getattr("pitch")?, storage)?;
+) -> PyResult<sys::mln_gesture_axis_options> {
+    let mut raw: sys::mln_gesture_axis_options = unsafe { std::mem::zeroed() };
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "enabled")? {
+        raw.enabled = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_GESTURE_AXIS_OPTION_ENABLED;
+    }
+    if let Some(field) = generated_present(value, "glides")? {
+        raw.glides = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_GESTURE_AXIS_OPTION_GLIDES;
+    }
+    if let Some(field) = generated_present(value, "momentum")? {
+        raw.momentum = generated_input_mln_momentum_decay(&field, storage)?;
+        raw.fields |= sys::MLN_GESTURE_AXIS_OPTION_MOMENTUM;
+    }
+    if let Some(field) = generated_present(value, "snaps")? {
+        raw.snaps = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_GESTURE_AXIS_OPTION_SNAPS;
+    }
+    if let Some(field) = generated_present(value, "snap")? {
+        raw.snap = generated_input_mln_momentum_snap(&field, storage)?;
+        raw.fields |= sys::MLN_GESTURE_AXIS_OPTION_SNAP;
+    }
+    if let Some(field) = generated_present(value, "notches")? {
+        raw.notches = {
+            let items = generated_items(&field, |item| {
+                generated_input_mln_gesture_notch(&item, storage)
+            })?;
+            raw.notch_count = generated_length(items.len())?;
+            storage.keep_array(items)
+        };
+        raw.fields |= sys::MLN_GESTURE_AXIS_OPTION_NOTCHES;
+    }
+    Ok(raw)
+}
+
+fn generated_input_mln_gesture_delta<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_gesture_delta> {
+    let mut raw: sys::mln_gesture_delta = unsafe { std::mem::zeroed() };
+    raw.position = generated_input_mln_screen_point(&value.getattr("position")?, storage)?;
+    raw.discrete = value.getattr("discrete")?.extract::<bool>()?;
+    raw.pan = generated_input_mln_screen_point(&value.getattr("pan")?, storage)?;
+    raw.zoom = value.getattr("zoom")?.extract::<f64>()?;
+    raw.bearing = value.getattr("bearing")?.extract::<f64>()?;
+    raw.pitch = value.getattr("pitch")?.extract::<f64>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_gesture_input<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_gesture_input> {
+    let mut raw: sys::mln_gesture_input = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_gesture_input>() as _;
+    let field = value;
+    let tag = field.getattr("_tag")?.extract::<u32>()?;
+    match tag {
+        sys::MLN_GESTURE_INPUT_POINTER_DOWN => {
+            raw.data.pointer_down =
+                generated_input_mln_gesture_pointer_down(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_GESTURE_INPUT_POINTER_MOVE => {
+            raw.data.pointer_move =
+                generated_input_mln_gesture_pointer(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_GESTURE_INPUT_POINTER_UP => {
+            raw.data.pointer_up =
+                generated_input_mln_gesture_pointer(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_GESTURE_INPUT_POINTER_CANCEL => {
+            raw.data.pointer_cancel =
+                generated_input_mln_gesture_pointer(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_GESTURE_INPUT_MODES => {
+            raw.data.modes = field
+                .getattr("value")?
+                .extract::<sys::mln_gesture_modes>()?;
+        }
+        sys::MLN_GESTURE_INPUT_DELTA => {
+            raw.data.delta = generated_input_mln_gesture_delta(&field.getattr("value")?, storage)?;
+        }
+        sys::MLN_GESTURE_INPUT_PINCH => {
+            raw.data.pinch = generated_input_mln_gesture_pinch(&field.getattr("value")?, storage)?;
+        }
+        _ => {}
+    }
+    raw.type_ = tag;
+    Ok(raw)
+}
+
+fn generated_input_mln_gesture_notch<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_gesture_notch> {
+    let _ = storage;
+    let mut raw: sys::mln_gesture_notch = unsafe { std::mem::zeroed() };
+    raw.spacing = value.getattr("spacing")?.extract::<f64>()?;
+    raw.offset = value.getattr("offset")?.extract::<f64>()?;
+    raw.kind = value.getattr("kind")?.extract::<u32>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_gesture_options<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_gesture_options> {
+    let mut raw: sys::mln_gesture_options = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_gesture_options>() as _;
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "double_tap_zoom")? {
+        raw.double_tap_zoom = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM;
+    }
+    if let Some(field) = generated_present(value, "two_finger_tap_zoom")? {
+        raw.two_finger_tap_zoom = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM;
+    }
+    raw.pan = generated_input_mln_gesture_pan_options(&value.getattr("pan")?, storage)?;
+    raw.zoom = generated_input_mln_gesture_axis_options(&value.getattr("zoom")?, storage)?;
+    raw.bearing = generated_input_mln_gesture_axis_options(&value.getattr("bearing")?, storage)?;
+    raw.pitch = generated_input_mln_gesture_axis_options(&value.getattr("pitch")?, storage)?;
+    Ok(raw)
+}
+
+fn generated_input_mln_gesture_pan_options<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_gesture_pan_options> {
+    let mut raw: sys::mln_gesture_pan_options = unsafe { std::mem::zeroed() };
+    raw.fields = 0;
+    if let Some(field) = generated_present(value, "enabled")? {
+        raw.enabled = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_GESTURE_PAN_OPTION_ENABLED;
+    }
+    if let Some(field) = generated_present(value, "glides")? {
+        raw.glides = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_GESTURE_PAN_OPTION_GLIDES;
+    }
+    if let Some(field) = generated_present(value, "momentum")? {
+        raw.momentum = generated_input_mln_momentum_decay(&field, storage)?;
+        raw.fields |= sys::MLN_GESTURE_PAN_OPTION_MOMENTUM;
+    }
+    Ok(raw)
+}
+
+fn generated_input_mln_gesture_pinch<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_gesture_pinch> {
+    let mut raw: sys::mln_gesture_pinch = unsafe { std::mem::zeroed() };
+    raw.center = generated_input_mln_screen_point(&value.getattr("center")?, storage)?;
+    raw.scale = value.getattr("scale")?.extract::<f64>()?;
+    raw.rotation = value.getattr("rotation")?.extract::<f64>()?;
+    raw.phase = value.getattr("phase")?.extract::<sys::mln_pinch_phase>()?;
+    Ok(raw)
+}
+
+fn generated_input_mln_gesture_pointer<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_gesture_pointer> {
+    let mut raw: sys::mln_gesture_pointer = unsafe { std::mem::zeroed() };
+    raw.id = value.getattr("id")?.extract::<u32>()?;
+    raw.position = generated_input_mln_screen_point(&value.getattr("position")?, storage)?;
+    Ok(raw)
+}
+
+fn generated_input_mln_gesture_pointer_down<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_gesture_pointer_down> {
+    let mut raw: sys::mln_gesture_pointer_down = unsafe { std::mem::zeroed() };
+    raw.id = value.getattr("id")?.extract::<u32>()?;
+    raw.kind = value.getattr("kind")?.extract::<sys::mln_pointer_kind>()?;
+    raw.position = generated_input_mln_screen_point(&value.getattr("position")?, storage)?;
+    raw.modes = value
+        .getattr("modes")?
+        .extract::<sys::mln_gesture_modes>()?;
     Ok(raw)
 }
 
@@ -2630,6 +2981,10 @@ fn generated_input_mln_map_options<'py>(
         raw.system_fonts_enabled = field.extract::<bool>()?;
         raw.fields |= sys::MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED;
     }
+    if let Some(field) = generated_present(value, "local_ideographs_enabled")? {
+        raw.local_ideographs_enabled = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED;
+    }
     Ok(raw)
 }
 
@@ -2804,13 +3159,17 @@ fn generated_input_mln_momentum_decay<'py>(
         raw.stop_speed = field.extract::<f64>()?;
         raw.fields |= sys::MLN_MOMENTUM_DECAY_STOP_SPEED;
     }
-    if let Some(field) = generated_present(value, "distance")? {
-        raw.distance = field.extract::<f64>()?;
-        raw.fields |= sys::MLN_MOMENTUM_DECAY_DISTANCE;
+    if let Some(field) = generated_present(value, "reference_speed")? {
+        raw.reference_speed = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_REFERENCE_SPEED;
     }
     if let Some(field) = generated_present(value, "duration_ms")? {
         raw.duration_ms = field.extract::<f64>()?;
         raw.fields |= sys::MLN_MOMENTUM_DECAY_DURATION_MS;
+    }
+    if let Some(field) = generated_present(value, "duration_exponent")? {
+        raw.duration_exponent = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_MOMENTUM_DECAY_DURATION_EXPONENT;
     }
     if let Some(field) = generated_present(value, "easing")? {
         raw.easing = generated_input_mln_unit_bezier(&field, storage)?;
@@ -3000,20 +3359,6 @@ fn generated_input_mln_open_gl_surface_target<'py>(
     let mut raw: sys::mln_open_gl_surface_target = unsafe { std::mem::zeroed() };
     raw.logical_size = generated_input_mln_logical_size(&value.getattr("logical_size")?, storage)?;
     raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
-    Ok(raw)
-}
-
-fn generated_input_mln_pan_momentum<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_pan_momentum> {
-    let mut raw: sys::mln_pan_momentum = unsafe { std::mem::zeroed() };
-    raw.fields = 0;
-    if let Some(field) = generated_present(value, "velocity")? {
-        raw.velocity = generated_input_mln_screen_point(&field, storage)?;
-        raw.fields |= sys::MLN_PAN_MOMENTUM_VELOCITY;
-    }
-    raw.decay = generated_input_mln_momentum_decay(&value.getattr("decay")?, storage)?;
     Ok(raw)
 }
 
@@ -3221,6 +3566,16 @@ fn generated_input_mln_render_target<'py>(
             raw.data.web_canvas =
                 generated_input_mln_web_canvas_target(&field.getattr("value")?, storage)?;
         }
+        sys::MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES => {
+            raw.data.d3d12_borrowed_textures = generated_input_mln_d3d12_borrowed_textures_target(
+                &field.getattr("value")?,
+                storage,
+            )?;
+        }
+        sys::MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION => {
+            raw.data.d3d12_composition =
+                generated_input_mln_d3d12_composition_target(&field.getattr("value")?, storage)?;
+        }
         _ => {}
     }
     raw.kind = tag;
@@ -3353,6 +3708,7 @@ fn generated_input_mln_resource_response<'py>(
         raw.retry_after_unix_ms = field.extract::<i64>()?;
         raw.fields |= sys::MLN_RESOURCE_RESPONSE_RETRY_AFTER;
     }
+    raw.no_store = value.getattr("no_store")?.extract::<bool>()?;
     Ok(raw)
 }
 
@@ -3928,10 +4284,10 @@ unsafe extern "C" fn generated_dispose_mln_acquired_frame(
     unsafe { sys::mln_acquired_frame_discard(handle, std::ptr::null_mut()) }
 }
 
-unsafe extern "C" fn generated_dispose_mln_frame_pacer(
-    handle: sys::mln_frame_pacer,
+unsafe extern "C" fn generated_dispose_mln_gesture_recognizer(
+    handle: sys::mln_gesture_recognizer,
 ) -> sys::mln_status {
-    unsafe { sys::mln_frame_pacer_release(handle) };
+    unsafe { sys::mln_gesture_recognizer_release(handle) };
     sys::MLN_STATUS_OK
 }
 
@@ -4020,6 +4376,19 @@ impl AcquiredFrameHandle {
             })
         }?;
         generated_copy_mln_android_hardware_buffer_frame(py, &out_frame)
+    }
+    #[pyo3(signature = ())]
+    fn d3d12_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let mut out_frame: sys::mln_d3d12_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_d3d12_texture_frame>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_acquired_frame_get_d3d12_texture(handle, &mut out_frame, diagnostic)
+            })
+        }?;
+        generated_copy_mln_d3d12_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
     fn dma_buf(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -4163,27 +4532,32 @@ impl AcquiredFrameHandle {
 }
 
 #[pymethods]
-impl FramePacerHandle {
-    #[staticmethod]
-    #[pyo3(signature = (options=None))]
-    fn create(py: Python<'_>, options: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+impl GestureRecognizerHandle {
+    #[pyo3(signature = (input, time_ms))]
+    fn handle(
+        &self,
+        py: Python<'_>,
+        input: &Bound<'_, PyAny>,
+        time_ms: f64,
+    ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options = options.unwrap_or_else(|| py.None().into_bound(py));
-        let options_value = generated_maybe(&options, |options| {
-            generated_input_mln_frame_pacer_options(&options, storage)
-        })?;
-        let mut out_pacer: sys::mln_frame_pacer = unsafe { std::mem::zeroed() };
+        let input_value = generated_input_mln_gesture_input(&input.clone(), storage)?;
+        let handle = self.input();
+        let mut out_result: sys::mln_gesture_result = unsafe { std::mem::zeroed() };
+        out_result.size = std::mem::size_of::<sys::mln_gesture_result>() as _;
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_frame_pacer_create(
-                    generated_pointer(&options_value),
-                    &mut out_pacer,
+                sys::mln_gesture_recognizer_handle(
+                    handle,
+                    &input_value,
+                    time_ms,
+                    &mut out_result,
                     diagnostic,
                 )
             })
         }?;
-        unsafe { FramePacerHandle::adopt(py, out_pacer, Vec::new()) }
+        generated_copy_mln_gesture_result(py, &out_result)
     }
     #[pyo3(signature = ())]
     fn _dispose(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -4192,7 +4566,7 @@ impl FramePacerHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_frame_pacer_release(handle)) };
+        unsafe { call.run(|| sys::mln_gesture_recognizer_release(handle)) };
         reservation.commit();
         Ok(py.None())
     }
@@ -4203,7 +4577,7 @@ impl FramePacerHandle {
             return Ok(py.None());
         };
         let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_frame_pacer_release(handle)) };
+        unsafe { call.run(|| sys::mln_gesture_recognizer_release(handle)) };
         reservation.commit();
         Ok(py.None())
     }
@@ -4211,14 +4585,27 @@ impl FramePacerHandle {
     fn set_options(&self, py: Python<'_>, options: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let storage = &mut call.storage;
-        let options_value = generated_input_mln_frame_pacer_options(&options.clone(), storage)?;
+        let options_value = generated_input_mln_gesture_options(&options.clone(), storage)?;
         let handle = self.input();
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_frame_pacer_set_options(handle, &options_value, diagnostic)
+                sys::mln_gesture_recognizer_set_options(handle, &options_value, diagnostic)
             })
         }?;
         Ok(py.None())
+    }
+    #[pyo3(signature = (time_ms))]
+    fn tick(&self, py: Python<'_>, time_ms: f64) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let mut out_result: sys::mln_gesture_result = unsafe { std::mem::zeroed() };
+        out_result.size = std::mem::size_of::<sys::mln_gesture_result>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_gesture_recognizer_tick(handle, time_ms, &mut out_result, diagnostic)
+            })
+        }?;
+        generated_copy_mln_gesture_result(py, &out_result)
     }
 }
 
@@ -4260,6 +4647,20 @@ impl GpuDeviceHandle {
         generated_copy_mln_gpu_device_capabilities(py, &out_capabilities)
     }
     #[pyo3(signature = ())]
+    fn get_d3d12_context(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let mut out_result: sys::mln_gpu_device_d3d12_context_result =
+            unsafe { std::mem::zeroed() };
+        out_result.size = std::mem::size_of::<sys::mln_gpu_device_d3d12_context_result>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_gpu_device_get_d3d12_context(handle, &mut out_result, diagnostic)
+            })
+        }?;
+        generated_copy_mln_gpu_device_d3d12_context_result(py, &out_result)
+    }
+    #[pyo3(signature = ())]
     fn get_vulkan_context(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
@@ -4294,6 +4695,21 @@ impl GpuDeviceHandle {
         unsafe { call.run(|| sys::mln_gpu_device_release(handle)) };
         reservation.commit();
         Ok(py.None())
+    }
+    #[staticmethod]
+    #[pyo3(signature = (descriptor))]
+    fn wrap_d3d12(py: Python<'_>, descriptor: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let descriptor_value =
+            generated_input_mln_d3d12_device_descriptor(&descriptor.clone(), storage)?;
+        let mut out_device: sys::mln_gpu_device = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_gpu_device_wrap_d3d12(&descriptor_value, &mut out_device, diagnostic)
+            })
+        }?;
+        unsafe { GpuDeviceHandle::adopt(py, out_device, Vec::new()) }
     }
     #[staticmethod]
     #[pyo3(signature = (descriptor))]
@@ -4345,6 +4761,32 @@ impl GpuDeviceHandle {
 
 #[pymethods]
 impl MapHandle {
+    #[pyo3(signature = (options=None))]
+    fn gesture_recognizer_create(
+        &self,
+        py: Python<'_>,
+        options: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_gesture_options(&options, storage)
+        })?;
+        let handle = self.input();
+        let mut out_recognizer: sys::mln_gesture_recognizer = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_gesture_recognizer_create(
+                    handle,
+                    generated_pointer(&options_value),
+                    &mut out_recognizer,
+                    diagnostic,
+                )
+            })
+        }?;
+        unsafe { GestureRecognizerHandle::adopt(py, out_recognizer, Vec::new()) }
+    }
     #[pyo3(signature = (source_id, options))]
     fn add_custom_geometry_source(
         &self,
@@ -8033,7 +8475,13 @@ impl RenderSessionHandle {
     fn release_target(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
         let handle = self.input();
-        let convert = py_none;
+        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
+            if result.value.is_null() {
+                return Ok(py.None());
+            }
+            let value = completion_value::<sys::mln_gpu_sync>(result)?;
+            generated_copy_mln_gpu_sync(py, &value)
+        };
         unsafe {
             call.complete(
                 |completion, diagnostic| {
@@ -8078,18 +8526,26 @@ impl RenderSessionHandle {
         }?;
         Ok(py.None())
     }
-    #[pyo3(signature = (pacer=None))]
-    fn set_frame_pacer(
+    #[pyo3(signature = (options=None))]
+    fn set_frame_pacing(
         &self,
         py: Python<'_>,
-        pacer: Option<&FramePacerHandle>,
+        options: Option<Bound<'_, PyAny>>,
     ) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
-        let pacer_handle = pacer.map_or(sys::mln_frame_pacer(0), |handle| handle.input());
+        let storage = &mut call.storage;
+        let options = options.unwrap_or_else(|| py.None().into_bound(py));
+        let options_value = generated_maybe(&options, |options| {
+            generated_input_mln_frame_pacing_options(&options, storage)
+        })?;
         let handle = self.input();
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_render_session_set_frame_pacer(handle, pacer_handle, diagnostic)
+                sys::mln_render_session_set_frame_pacing(
+                    handle,
+                    generated_pointer(&options_value),
+                    diagnostic,
+                )
             })
         }?;
         Ok(py.None())
@@ -8100,7 +8556,13 @@ impl RenderSessionHandle {
         let storage = &mut call.storage;
         let target_value = generated_input_mln_render_target(&target.clone(), storage)?;
         let handle = self.input();
-        let convert = py_none;
+        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
+            if result.value.is_null() {
+                return Ok(py.None());
+            }
+            let value = completion_value::<sys::mln_gpu_sync>(result)?;
+            generated_copy_mln_gpu_sync(py, &value)
+        };
         unsafe {
             call.complete(
                 |completion, diagnostic| {
@@ -8486,6 +8948,25 @@ impl RuntimeHandle {
             call.complete(
                 |completion, diagnostic| {
                     sys::mln_runtime_get_offline_region(handle, region_id, completion, diagnostic)
+                },
+                convert,
+            )
+        }
+    }
+    #[pyo3(signature = (region_id))]
+    fn get_offline_region_expiry(&self, py: Python<'_>, region_id: i64) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let handle = self.input();
+        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
+            let value = completion_value::<sys::mln_offline_region_expiry>(result)?;
+            generated_copy_mln_offline_region_expiry(py, &value)
+        };
+        unsafe {
+            call.complete(
+                |completion, diagnostic| {
+                    sys::mln_runtime_get_offline_region_expiry(
+                        handle, region_id, completion, diagnostic,
+                    )
                 },
                 convert,
             )
@@ -9002,10 +9483,10 @@ generated_owner!(
     )
 );
 generated_owner!(
-    FramePacerHandle,
-    "_FramePacerHandle",
-    mln_frame_pacer,
-    Some(generated_dispose_mln_frame_pacer)
+    GestureRecognizerHandle,
+    "_GestureRecognizerHandle",
+    mln_gesture_recognizer,
+    Some(generated_dispose_mln_gesture_recognizer)
 );
 generated_owner!(
     GpuDeviceHandle,
@@ -9226,7 +9707,7 @@ fn supported_render_backend_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
 fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GeneratedReadScope>()?;
     module.add_class::<AcquiredFrameHandle>()?;
-    module.add_class::<FramePacerHandle>()?;
+    module.add_class::<GestureRecognizerHandle>()?;
     module.add_class::<GpuDeviceHandle>()?;
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;

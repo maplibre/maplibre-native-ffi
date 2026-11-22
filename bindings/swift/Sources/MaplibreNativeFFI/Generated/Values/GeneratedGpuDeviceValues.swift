@@ -3,6 +3,40 @@
 internal import MaplibreNativeC
 import Foundation
 
+/// Your D3D12 device and direct command queue, for
+/// `GpuDeviceHandle.wrapD3d12()`.
+///
+/// See `mln_d3d12_device_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+public struct D3d12DeviceDescriptor: Equatable, Hashable, Sendable {
+  /// Your `ID3D12Device`.
+  public var device: NativePointer
+  /// Your `ID3D12CommandQueue` of `D3D12_COMMAND_LIST_TYPE_DIRECT` on `device`,
+  /// which sessions on the device submit to. Submit your reads of a borrowed
+  /// ring's textures to it for `GpuSyncKind.queueOrder`.
+  public var commandQueue: NativePointer
+  public init(device: NativePointer, commandQueue: NativePointer) {
+    self.device = device
+    self.commandQueue = commandQueue
+  }
+
+  init(raw: mln_d3d12_device_descriptor) {
+    device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
+    commandQueue = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_queue,
+      to: UInt.self
+    ))
+  }
+
+  func nativeValue() -> mln_d3d12_device_descriptor {
+    var raw = mln_d3d12_device_descriptor()
+    raw.size = UInt32(MemoryLayout<mln_d3d12_device_descriptor>.size)
+    raw.device = device.unsafeMutableRawPointer
+    raw.command_queue = commandQueue.unsafeMutableRawPointer
+    return raw
+  }
+}
+
 /// What a GPU device can do.
 ///
 /// See `mln_gpu_device_capabilities` in the
@@ -52,6 +86,33 @@ public struct GpuDeviceCapabilities: Equatable, Hashable, Sendable {
   }
 }
 
+/// The D3D12 objects of a device, as `GpuDeviceHandle.getD3d12Context()`
+/// reports them.
+///
+/// See `mln_gpu_device_d3d12_context_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+public struct GpuDeviceD3d12ContextResult: Equatable, Hashable, Sendable {
+  /// The `ID3D12Device`.
+  public var device: NativePointer
+  /// The direct `ID3D12CommandQueue` that sessions on the device submit to.
+  public var commandQueue: NativePointer
+  public init(
+    device: NativePointer = .null,
+    commandQueue: NativePointer = .null
+  ) {
+    self.device = device
+    self.commandQueue = commandQueue
+  }
+
+  init(raw: mln_gpu_device_d3d12_context_result) {
+    device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
+    commandQueue = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_queue,
+      to: UInt.self
+    ))
+  }
+}
+
 /// Options for `GpuDeviceHandle.create()`.
 ///
 /// Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
@@ -62,9 +123,9 @@ public struct GpuDeviceCapabilities: Equatable, Hashable, Sendable {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
 public struct GpuDeviceOptions: Sendable {
   /// The backend that the device renders with. By default, the platform's own:
-  /// Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has
-  /// no Vulkan driver, and in a browser the build's one backend: WebGPU or
-  /// OpenGL (WebGL2).
+  /// Metal on Apple platforms, Vulkan elsewhere, then D3D12 on Windows, or
+  /// OpenGL where the system has neither, and in a browser the build's one
+  /// backend: WebGPU or OpenGL (WebGL2).
   public var backend: RenderBackend?
   /// The GPU to use, as an index into the backend's list of GPUs. OpenGL's list
   /// holds one GPU: the one that its display renders on.
@@ -73,8 +134,9 @@ public struct GpuDeviceOptions: Sendable {
   /// `VkPhysicalDeviceIDProperties.deviceUUID`. Only a Vulkan device takes one.
   public var adapterUuid: Data?
   /// The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
-  /// which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a
-  /// Vulkan device takes one.
+  /// which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID` and
+  /// D3D12 as `ID3D12Device::GetAdapterLuid`. Only a Vulkan or D3D12 device
+  /// takes one.
   public var adapterLuid: Data?
   /// The OpenGL API that an OpenGL device renders with. An EGL device defaults
   /// to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too on Linux and

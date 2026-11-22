@@ -14,6 +14,11 @@ namespace Texture {
 	void draw_map (uint64 image_view) {
 	}
 
+	// The host's wait for the session's GPU work, as for a frame's
+	// producer sync.
+	void wait_for_sync (GpuSync sync) {
+	}
+
 	void destroy_textures (uint64[] images, uint64[] views) {
 	}
 
@@ -103,9 +108,11 @@ namespace Texture {
 			{ image: new_images[1], image_view: new_views[1] },
 		});
 
-		yield session.set_target_async (
+		var sync = yield session.set_target_async (
 			new RenderTarget.vulkan_borrowed_textures (resized)
 		);
+		// Wait for its sync before you destroy the old textures.
+		wait_for_sync (sync);
 		// vkDestroyImageView and vkDestroyImage
 		destroy_textures (images, views);
 		// #endregion resize-borrowed

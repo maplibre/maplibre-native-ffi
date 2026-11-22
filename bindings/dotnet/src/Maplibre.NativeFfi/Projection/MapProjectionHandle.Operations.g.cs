@@ -35,7 +35,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     NativeHandleState<MlnMapProjection> INativeOwner<MlnMapProjection>.State => state;
-    internal MlnMapProjection Handle => state.Handle;
+    internal MlnMapProjection NativeHandle => state.Handle;
 
     /// <summary>
     /// The native handle value. It stays readable after release.
@@ -97,7 +97,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         {
             size = (uint)sizeof(mln_map_projection_camera_result),
         };
-        Check(NativeMethods.mln_map_projection_get_camera(Handle, &outResult, Diagnostic));
+        Check(NativeMethods.mln_map_projection_get_camera(NativeHandle, &outResult, Diagnostic));
         return CopyMapProjectionCameraResult(outResult);
     }
 
@@ -116,7 +116,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         bool outOccluded = default;
         Check(
             NativeMethods.mln_map_projection_is_location_occluded(
-                Handle,
+                NativeHandle,
                 NativeLatLng(coordinate),
                 &outOccluded,
                 Diagnostic
@@ -139,7 +139,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         var outCoordinate = default(mln_lat_lng);
         Check(
             NativeMethods.mln_map_projection_lat_lng_for_pixel(
-                Handle,
+                NativeHandle,
                 NativeScreenPoint(point),
                 &outCoordinate,
                 Diagnostic
@@ -164,7 +164,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         var outCoordinate = default(mln_lat_lng);
         Check(
             NativeMethods.mln_map_projection_lat_lng_for_pixel_unwrapped(
-                Handle,
+                NativeHandle,
                 NativeScreenPoint(point),
                 &outCoordinate,
                 Diagnostic
@@ -187,7 +187,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         var outCoordinates = scope.OutputArray<mln_lat_lng>(points.Length);
         Check(
             NativeMethods.mln_map_projection_lat_lngs_for_pixels(
-                Handle,
+                NativeHandle,
                 scope.Array<mln_screen_point, ScreenPoint>(
                     points,
                     static (item, scope) => NativeScreenPoint(item)
@@ -219,7 +219,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         var outCoordinates = scope.OutputArray<mln_lat_lng>(points.Length);
         Check(
             NativeMethods.mln_map_projection_lat_lngs_for_pixels_unwrapped(
-                Handle,
+                NativeHandle,
                 scope.Array<mln_screen_point, ScreenPoint>(
                     points,
                     static (item, scope) => NativeScreenPoint(item)
@@ -253,7 +253,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         double outMetersPerPixel = default;
         Check(
             NativeMethods.mln_map_projection_meters_per_pixel_at_latitude(
-                Handle,
+                NativeHandle,
                 latitude,
                 &outMetersPerPixel,
                 Diagnostic
@@ -279,7 +279,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         var outPoint = default(mln_screen_point);
         Check(
             NativeMethods.mln_map_projection_pixel_for_lat_lng(
-                Handle,
+                NativeHandle,
                 NativeLatLng(coordinate),
                 &outPoint,
                 Diagnostic
@@ -302,7 +302,7 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         var outPoints = scope.OutputArray<mln_screen_point>(coordinates.Length);
         Check(
             NativeMethods.mln_map_projection_pixels_for_lat_lngs(
-                Handle,
+                NativeHandle,
                 scope.Array<mln_lat_lng, LatLng>(
                     coordinates,
                     static (item, scope) => NativeLatLng(item)
@@ -346,6 +346,6 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     {
         using var call = Enter(this);
         var nativeCamera = NativeCameraOptions(camera);
-        Check(NativeMethods.mln_map_projection_set_camera(Handle, &nativeCamera, Diagnostic));
+        Check(NativeMethods.mln_map_projection_set_camera(NativeHandle, &nativeCamera, Diagnostic));
     }
 }

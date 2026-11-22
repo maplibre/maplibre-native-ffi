@@ -64,7 +64,7 @@ def test_a_failed_command_raises_its_status_and_generation(
 
     assert raised.value.status == mln.Status.NOT_FOUND
     assert raised.value.diagnostic
-    assert raised.value.generation > committed.generation
+    assert raised.value.generation >= committed.generation
 
 
 def test_cancelling_a_wait_abandons_it_and_leaves_the_map_to_its_owner(

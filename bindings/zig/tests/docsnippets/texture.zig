@@ -24,6 +24,9 @@ fn drawMap(_: void, texture: maplibre.VulkanTextureFrame) void {
     _ = texture.image_view;
 }
 
+// The host's wait for the session's GPU work, as for a frame's producer sync.
+fn waitForSync(_: maplibre.GpuSync) void {}
+
 fn destroyTextures(images: [2]u64, views: [2]u64) void {
     _ = .{ images, views };
 }
@@ -109,7 +112,8 @@ fn renderToTexture(
     } };
 
     const replaced = try session.setTarget(allocator, resized, null);
-    try replaced.await(null);
+    // Wait for its sync before you destroy the old textures.
+    if (try replaced.await(null)) |sync| waitForSync(sync);
 
     // vkDestroyImageView and vkDestroyImage
     destroyTextures(images, views);

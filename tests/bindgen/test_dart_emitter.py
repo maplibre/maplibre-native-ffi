@@ -150,7 +150,7 @@ class DartEmitterTests(unittest.TestCase):
             "const MapOptions({required this.initialExtent, this.mapMode = const "
             "MapMode.fromRawValue(0), this.fastPforEnabled = false, this.eventMask, "
             "this.tileCacheEnabled, this.fallbackFontFaces = '', "
-            "this.systemFontsEnabled});",
+            "this.systemFontsEnabled, this.localIdeographsEnabled});",
             values,
         )
         # A list member defaults to empty unless it is required.
@@ -162,6 +162,17 @@ class DartEmitterTests(unittest.TestCase):
             "int cVersion() {\n    final nativeResult = raw.mln_c_version();",
             operations,
         )
+
+    def test_a_default_without_a_const_constructor_is_built_in_an_initializer(
+        self,
+    ):
+        values = dart.lower(real_api()).files[dart.VALUES]
+        # Axis options copy their notches, so their constructor isn't const,
+        # and a parameter can't default to one.
+        self.assertIn("  GestureAxisOptions({", values)
+        self.assertIn("GestureAxisOptions? zoom", values)
+        self.assertIn("zoom = zoom ?? GestureAxisOptions()", values)
+        self.assertIn("this.pan = const GesturePanOptions()", values)
 
     def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
         self,
@@ -181,7 +192,9 @@ class DartEmitterTests(unittest.TestCase):
         values = dart.lower(real_api()).files[dart.VALUES]
         self.assertIn("`MapHandle.cancelCameraTransitions()`", values)
         self.assertIn("`MapHandle.cancelCameraTransitionsWithId()`", values)
-        self.assertIn("`GesturePhase.begin` or `GesturePhase.cancel`", values)
+        self.assertIn("For `MomentumDecayModel.friction`.", values)
+        # A tag that only its union uses names the variant it selects.
+        self.assertIn("`GestureEventNotch`", values)
         self.assertNotIn("`mln_map_cancel_camera_transitions()`", values)
 
     def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):

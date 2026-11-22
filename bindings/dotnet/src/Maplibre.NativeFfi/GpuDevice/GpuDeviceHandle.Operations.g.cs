@@ -31,7 +31,7 @@ public sealed unsafe partial class GpuDeviceHandle : IDisposable, INativeOwner<M
     }
 
     NativeHandleState<MlnGpuDevice> INativeOwner<MlnGpuDevice>.State => state;
-    internal MlnGpuDevice Handle => state.Handle;
+    internal MlnGpuDevice NativeHandle => state.Handle;
 
     /// <summary>
     /// The native handle value. It stays readable after release.
@@ -73,12 +73,13 @@ public sealed unsafe partial class GpuDeviceHandle : IDisposable, INativeOwner<M
     /// lacks <c>backend</c>, when the device can't render with
     /// <c>open_gl_client_api</c>, when options name a GPU that the backend
     /// can't select (an OpenGL device takes no <c>adapter_index</c>,
-    /// <c>adapter_uuid</c>, or <c>adapter_luid</c>, and only a Vulkan device
-    /// takes <c>adapter_uuid</c> or <c>adapter_luid</c>), when a device that
-    /// doesn't render with Vulkan gets a <c>queue_lock</c>, or in a browser for
-    /// every backend: WebGPU makes devices asynchronously, and a WebGL2 context
-    /// needs a canvas. Attach without a device, which the session makes itself,
-    /// or wrap your WebGL2 context.</description></item>
+    /// <c>adapter_uuid</c>, or <c>adapter_luid</c>, only a Vulkan device takes
+    /// <c>adapter_uuid</c>, and only a Vulkan or D3D12 device
+    /// <c>adapter_luid</c>), when a device that doesn't render with Vulkan gets
+    /// a <c>queue_lock</c>, or in a browser for every backend: WebGPU makes
+    /// devices asynchronously, and a WebGL2 context needs a canvas. Attach
+    /// without a device, which the session makes itself, or wrap your WebGL2
+    /// context.</description></item>
     /// <item><description><c>Status.NotFound</c> when no GPU matches
     /// <c>adapter_index</c>, <c>adapter_uuid</c>, or
     /// <c>adapter_luid</c>.</description></item>
@@ -121,8 +122,41 @@ public sealed unsafe partial class GpuDeviceHandle : IDisposable, INativeOwner<M
         {
             size = (uint)sizeof(mln_gpu_device_capabilities),
         };
-        Check(NativeMethods.mln_gpu_device_get_capabilities(Handle, &outCapabilities, Diagnostic));
+        Check(
+            NativeMethods.mln_gpu_device_get_capabilities(
+                NativeHandle,
+                &outCapabilities,
+                Diagnostic
+            )
+        );
         return CopyGpuDeviceCapabilities(outCapabilities);
+    }
+
+    /// <summary>
+    /// Gets the D3D12 device and direct command queue of a D3D12 device.
+    /// </summary>
+    /// <remarks>
+    /// <para>Use them to make the textures of a borrowed ring that sessions on
+    /// the device render into, and to submit your reads of them, which the
+    /// queue orders after the frames submitted before them.</para>
+    /// <para>See <c>mln_gpu_device_get_d3d12_context</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the device doesn't
+    /// render with D3D12.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public GpuDeviceD3d12ContextResult GetD3d12Context()
+    {
+        using var call = Enter(this);
+        var outResult = new mln_gpu_device_d3d12_context_result
+        {
+            size = (uint)sizeof(mln_gpu_device_d3d12_context_result),
+        };
+        Check(NativeMethods.mln_gpu_device_get_d3d12_context(NativeHandle, &outResult, Diagnostic));
+        return CopyGpuDeviceD3d12ContextResult(outResult);
     }
 
     /// <summary>
@@ -152,7 +186,9 @@ public sealed unsafe partial class GpuDeviceHandle : IDisposable, INativeOwner<M
         {
             size = (uint)sizeof(mln_gpu_device_vulkan_context_result),
         };
-        Check(NativeMethods.mln_gpu_device_get_vulkan_context(Handle, &outResult, Diagnostic));
+        Check(
+            NativeMethods.mln_gpu_device_get_vulkan_context(NativeHandle, &outResult, Diagnostic)
+        );
         return CopyGpuDeviceVulkanContextResult(outResult);
     }
 
@@ -168,6 +204,37 @@ public sealed unsafe partial class GpuDeviceHandle : IDisposable, INativeOwner<M
     public void Release()
     {
         state.Close();
+    }
+
+    /// <summary>
+    /// Wraps your D3D12 device and direct command queue, so that sessions
+    /// render on them.
+    /// </summary>
+    /// <remarks>
+    /// <para>Sessions on the device render into your textures and submit to
+    /// your queue.</para>
+    /// <para>See <c>mln_gpu_device_wrap_d3d12</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when
+    /// <c>MaplibreNative.SupportedRenderBackendMask()</c> lacks
+    /// <c>RenderBackendFlag.D3d12</c>, when the device runs no shader model
+    /// 6.0, when <c>command_queue</c> isn't a direct queue of <c>device</c>, or
+    /// when the library can't load DXC (<c>dxcompiler.dll</c>) to compile its
+    /// shaders.</description></item>
+    /// <item><description><c>Status.InvalidArgument</c> when <c>device</c> or
+    /// <c>command_queue</c> isn't of its interface.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public static GpuDeviceHandle WrapD3d12(D3d12DeviceDescriptor descriptor)
+    {
+        using var call = Enter(null);
+        var nativeDescriptor = NativeD3d12DeviceDescriptor(descriptor);
+        MlnGpuDevice outDevice = default;
+        Check(NativeMethods.mln_gpu_device_wrap_d3d12(&nativeDescriptor, &outDevice, Diagnostic));
+        return GpuDeviceHandle.Adopt(outDevice);
     }
 
     /// <summary>

@@ -14,10 +14,9 @@ namespace Maplibre.NativeFfi;
 public readonly partial record struct CameraUpdate(
     CameraUpdateMode Mode,
     CameraOptions Camera,
-    AnimationOptions Animation,
-    GesturePhase GesturePhase
+    AnimationOptions Animation
 )
 {
     public CameraUpdate()
-        : this(default, new(), new(), default) { }
+        : this(default, new(), new()) { }
 }

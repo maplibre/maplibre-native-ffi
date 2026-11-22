@@ -194,6 +194,25 @@ private constructor(
     }
 
   /**
+   * Reads how long the resources of the offline region `regionId` stay usable.
+   *
+   * See `mln_runtime_get_offline_region_expiry` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.NOT_FOUND` when the cache file has no region `regionId`.
+   */
+  public fun getOfflineRegionExpiry(regionId: Long): Completion<OfflineRegionExpiry> =
+    nativeSubmit(
+      this,
+      binding,
+      { result -> readOfflineRegionExpiry(CompletionBridge.value(result)) },
+    ) {
+      check(C.mln_runtime_get_offline_region_expiry(handle, regionId, completion, diagnostic))
+    }
+
+  /**
    * Reads the download progress of the offline region `regionId`.
    *
    * While the download is active, the counts cover what it has visited. Once it's inactive, they
@@ -217,11 +236,12 @@ private constructor(
     }
 
   /**
-   * Makes maps check each resource of the offline region `regionId` with the server before they use
-   * it.
+   * Makes each resource of the offline region `regionId` stale, so maps check it with the server
+   * when they next use it.
    *
-   * The region keeps its resources. Starting its download again fetches the invalidated resources
-   * for offline use. If the style or a TileJSON document is then missing or invalid, the download
+   * The region keeps its resources, and maps show them while they check them, except those that the
+   * server requires checking first. Starting the region's download again checks every resource with
+   * the server. If the style or a TileJSON document is then missing or invalid, the download
    * reports an offline region response error and goes on from the stored copy. Resources that the
    * current style no longer lists stay in the region until it's deleted.
    *
@@ -363,8 +383,9 @@ private constructor(
   /**
    * Starts or pauses the download of the offline region `regionId`.
    *
-   * Setting the state that the download already has does nothing. A download stops when the runtime
-   * closes.
+   * A download fetches the resources that the region lacks, and checks those that are stale with
+   * the server, keeping each stored copy until its refresh arrives. Setting the state that the
+   * download already has does nothing. A download stops when the runtime closes.
    *
    * See `mln_runtime_set_offline_region_download_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

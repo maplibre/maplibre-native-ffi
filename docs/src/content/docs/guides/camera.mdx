@@ -63,22 +63,18 @@ pitch to ranges.
 
 ## Apply gestures
 
-The library doesn't handle input, so your app recognizes gestures from its own
-input events and applies them to the camera as deltas. Screen points are in
-logical pixels from the map's top-left corner.
+A [](api:mln_gesture_recognizer) turns your app's input into camera movement.
+Create one for the map with [](api:mln_gesture_recognizer_create), and pass it
+each input event with [](api:mln_gesture_recognizer_handle): pointers going
+down, moving, and up, wheel and key movement as deltas, and pinches that the
+platform recognizes. Screen points are in logical pixels from the map's top-left
+corner, and every input and tick takes a time from the same clock.
 
-When a gesture starts, send a delta with [](api:mln_map_apply_camera_delta) in
-the begin phase, which stops running camera animations. For each movement, send
-a delta in the update phase with the change since the last one: the movement as
-the offset for a drag, or the scale and the pinch's center as the anchor for a
-pinch. When the gesture ends, send the end phase, or the cancel phase if the
-platform cancels it.
-
-To keep the camera moving after the user flicks the map, give the end-phase
-delta a [](api:mln_gesture_momentum) with the gesture's release velocities. The
-map slows each part of the motion on its own and keeps the gesture in progress
-until it stops. A begin-phase delta stops it early. Its options set how quickly
-it slows, so it can match how your platform scrolls.
+The recognizer drags, pinches, twists, and tilts the map, and keeps it gliding
+after a flick. Each result says when it next needs
+[](api:mln_gesture_recognizer_tick), and reports taps, long presses, and notches
+for your app to act on. Its options set how each part of the camera glides and
+snaps, so it can match how your platform scrolls.
 
 <Snippet page="camera" region="gesture" />
 

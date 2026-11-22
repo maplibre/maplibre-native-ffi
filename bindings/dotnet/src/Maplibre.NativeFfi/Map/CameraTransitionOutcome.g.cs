@@ -21,8 +21,8 @@ public enum CameraTransitionOutcome : uint
 
     /// <summary>
     /// <c>MapHandle.CancelCameraTransitionsAsync()</c>,
-    /// <c>MapHandle.CancelCameraTransitionsWithIdAsync()</c>, a gesture's
-    /// <c>GesturePhase.Begin</c> or <c>GesturePhase.Cancel</c>,
+    /// <c>MapHandle.CancelCameraTransitionsWithIdAsync()</c>, a gesture that a
+    /// gesture recognizer begins or cancels,
     /// <c>MapHandle.SetFreeCameraOptionsAsync()</c>, or a resize that moved the
     /// camera back inside its bounds stopped the change. A command that fails
     /// before it moves the camera also reports this.

@@ -48,6 +48,28 @@ static void destroy_textures(
   (void)views;
 }
 
+// The host's wait for the session's GPU work, as for a frame's
+// producer sync.
+static void wait_for_sync(const mln_gpu_sync* sync) { (void)sync; }
+
+// #region resize-borrowed
+// A borrowed ring's replacement completes with the sync that the old
+// textures' last use signals.
+static mln_gpu_sync replaced_sync;
+static bool replaced_has_sync;
+
+static void on_replaced(
+  void* user_data, const mln_completion_result* result
+) {
+  replaced_has_sync =
+    result->status == MLN_STATUS_OK && result->value != NULL;
+  if (replaced_has_sync) {
+    replaced_sync = *(const mln_gpu_sync*)result->value;
+  }
+  on_done(user_data, result);
+}
+// #endregion resize-borrowed
+
 static void draw_frame(void) {
   // #region acquire
   mln_acquired_frame frame = MLN_HANDLE_NULL;
@@ -165,11 +187,18 @@ void mln_doc_texture(
     },
   };
 
-  mln_render_session_set_target(session, &resized, &done, NULL);
+  const mln_completion replaced = {
+    .size = sizeof(mln_completion), .callback = on_replaced
+  };
+  mln_render_session_set_target(session, &resized, &replaced, NULL);
   // #endregion resize-borrowed
   wait_for_done();
 
   // #region resize-borrowed
+  // Wait for its sync before you destroy the old textures.
+  if (replaced_has_sync) {
+    wait_for_sync(&replaced_sync);
+  }
   // vkDestroyImageView and vkDestroyImage
   destroy_textures(images, views);
   // #endregion resize-borrowed

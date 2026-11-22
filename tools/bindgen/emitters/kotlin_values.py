@@ -841,6 +841,8 @@ class Values:
 
     def field_write(self, record, field, expression):
         value = field.value
+        if value.extent is not None:
+            raise Unsupported(f"{record.native}.{field.name}: inline array input")
         lines = [self.place(value, self.at("target", record, field.name), expression)]
         if value.kind == "array" or (
             value.kind == "buffer" and value.length not in {None, "nul", "1"}
@@ -1021,7 +1023,16 @@ class Values:
             value.kind == "buffer" and value.length not in {None, "nul", "1"}
         ):
             count = self.read_count(record, value.length)
-            pointer = f"readAddress({address})"
+            if value.counted_inline:
+                # The count selects the elements in use, never past the extent. It
+                # compares as a signed Long, since unsigned comparison on Android
+                # needs API 26, and a count past Long.MAX_VALUE turns negative.
+                count = (
+                    f"{count}.also {{ check(it.toLong() in 0L..{value.extent}L) "
+                    '{ "native count exceeds its array" } }'
+                )
+            # An inline array's elements start at the field itself.
+            pointer = address if value.extent is not None else f"readAddress({address})"
             if value.kind == "buffer":
                 result = f"readBytes({pointer}, {count})"
                 if is_text(value):

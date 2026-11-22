@@ -40,6 +40,7 @@ GROUPS = (
     "map_close",
     "tagged_union",
     "completion_results",
+    "counted_inline_array",
 )
 DEFINES = ("MLN_PROTOCOL_COMPLETION_RUNTIME", "MLN_PROTOCOL_ABI_VERSION")
 
@@ -366,7 +367,9 @@ class TypeScriptEmitterTests(unittest.TestCase):
         ]
         self.assertIn("`MapHandle.cancelCameraTransitions()`", values)
         self.assertIn("`MapHandle.cancelCameraTransitionsWithId()`", values)
-        self.assertIn("`GesturePhase.begin` or `GesturePhase.cancel`", values)
+        self.assertIn("For `MomentumDecayModel.friction`.", values)
+        # A tag that only its union uses names the variant it selects.
+        self.assertIn('`GestureEvent & { kind: "notch" }`', values)
         self.assertNotIn("`mln_map_cancel_camera_transitions()`", values)
 
     def test_only_synchronous_categories_return_without_a_promise(self):

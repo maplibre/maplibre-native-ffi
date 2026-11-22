@@ -37,7 +37,9 @@ session outlive the activity when a rotation recreates it. It attaches the
 session to the first surface, gives the session each later one, and releases the
 surface when the platform destroys it, as the React Native example in
 `examples/react-native` does. The session renders on a library thread with a
-device that the library makes for the window, and a frame pacer on the main
-thread's choreographer demands its frames. `MapGestures.kt` turns touches into
-camera changes, and measures each gesture's speed with Compose's velocity
-trackers so the map keeps moving after release.
+device that the library makes for the window, and paces its frames to the
+display through the main thread's choreographer. `MapGestures.kt` passes each
+touch, pen, mouse, and wheel event to the map's gesture recognizer, which moves
+the camera, keeps it gliding after a flick, and zooms on double taps. The
+example ticks the recognizer when it asks, and plays a haptic tick at the
+bearing's notch at north.

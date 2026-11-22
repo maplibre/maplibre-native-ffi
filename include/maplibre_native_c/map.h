@@ -204,6 +204,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_map_option_field : uint32_t {
   MLN_MAP_OPTION_EVENT_MASK = 1U << 0U,
   MLN_MAP_OPTION_TILE_CACHE_ENABLED = 1U << 1U,
   MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED = 1U << 2U,
+  MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED = 1U << 3U,
 } mln_map_option_field;
 
 /** A set of mln_map_option_field bits. */
@@ -235,24 +236,35 @@ typedef struct mln_map_options {
   bool tile_cache_enabled
     MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_TILE_CACHE_ENABLED");
   /**
-   * Fonts for the text that a style's own fonts don't draw, such as scripts
-   * that need complex shaping, like Myanmar or Devanagari. A JSON array of font
-   * files, each an object with a `url` and an optional `unicode-range`, as in
-   * a font face of a style's `font-faces`, which every font stack uses after
-   * the style's own font faces. Empty for the system's fonts, unless
-   * `system_fonts_enabled` is false.
+   * Fonts for the text that a style's own fonts don't draw. A JSON array of
+   * font files, each an object with a `url` and an optional `unicode-range`,
+   * as in a font face of a style's `font-faces`. They shape, in order, the
+   * text that glyph PBFs can't shape, such as Myanmar or Devanagari, or all
+   * the text of a style without glyph PBFs, and draw the glyphs that come
+   * from local fonts: those a style's PBFs lack, and CJK with
+   * `local_ideographs_enabled`. Empty for the system's fonts alone.
    */
   mln_buffer_view fallback_font_faces;
   /**
-   * Whether the map falls back to the system's fonts for CJK and the scripts
-   * that need complex shaping when `fallback_font_faces` is empty: fonts that
-   * the platform's font matcher picks for the user's preferred languages.
-   * Without it, the map does. The first map that uses them waits for them
-   * to be found. In the browser, the browser draws CJK glyphs in its
-   * sans-serif font instead, where `fallback_font_faces` doesn't cover them.
+   * Whether the map draws from the system's fonts what the style's fonts and
+   * `fallback_font_faces` don't: fonts that the platform's font matcher picks
+   * for the font stack's names, or for the character and the user's preferred
+   * languages. It shapes with them the text that glyph PBFs can't shape, and
+   * all the text of a style without glyph PBFs. Without it, the map does. The
+   * first map that uses them waits for the matcher to load. In the browser,
+   * the browser draws those glyphs in the font stack's families, then its
+   * sans-serif font, one at a time.
    */
   bool system_fonts_enabled
     MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED");
+  /**
+   * Whether CJK ideographs, kana and hangul come from local fonts
+   * (`fallback_font_faces`, then the system's) before glyph PBFs, rather than
+   * from a glyph PBF downloaded for every few characters. Without it, they
+   * do.
+   */
+  bool local_ideographs_enabled
+    MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED");
 } mln_map_options;
 
 /** A point on the screen, in logical pixels from the map's top-left corner. */
@@ -378,11 +390,10 @@ typedef enum mln_camera_transition_outcome : uint32_t {
   MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED = 0,
   /**
    * mln_map_cancel_camera_transitions(),
-   * mln_map_cancel_camera_transitions_with_id(), a gesture's
-   * MLN_GESTURE_PHASE_BEGIN or MLN_GESTURE_PHASE_CANCEL,
-   * mln_map_set_free_camera_options(), or a resize that moved the camera back
-   * inside its bounds stopped the change. A command that fails before it moves
-   * the camera also reports this.
+   * mln_map_cancel_camera_transitions_with_id(), a gesture that a gesture
+   * recognizer begins or cancels, mln_map_set_free_camera_options(), or a
+   * resize that moved the camera back inside its bounds stopped the change. A
+   * command that fails before it moves the camera also reports this.
    */
   MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED = 1,
   /** The map closed before the change ended. */
@@ -399,21 +410,6 @@ typedef enum mln_camera_transition_outcome : uint32_t {
   MLN_CAMERA_TRANSITION_OUTCOME_REPLACED = 3,
 } mln_camera_transition_outcome;
 
-/** How fast each part of a camera change moves. */
-typedef struct mln_camera_velocity {
-  /**
-   * How fast the map's content moves on the screen, in logical pixels per
-   * second.
-   */
-  mln_screen_point pan;
-  /** In zoom levels per second. */
-  double zoom;
-  /** In degrees per second. */
-  double bearing;
-  /** In degrees per second. */
-  double pitch;
-} mln_camera_velocity;
-
 /** The end of a camera change. */
 typedef struct mln_camera_transition_end {
   uint32_t size;
@@ -423,12 +419,6 @@ typedef struct mln_camera_transition_end {
    * the camera, or 0 when the map closed first.
    */
   uint64_t generation;
-  /**
-   * How fast a gesture's momentum still moved when it was cancelled, which the
-   * next gesture can add to its own release velocities. Zero for every other
-   * end.
-   */
-  mln_camera_velocity velocity;
 } mln_camera_transition_end;
 
 /**
@@ -497,228 +487,6 @@ typedef enum mln_camera_update_mode : uint32_t {
   MLN_CAMERA_UPDATE_MODE_FLY = 2,
 } mln_camera_update_mode;
 
-/**
- * Where a camera change falls in a gesture that the user makes.
- *
- * MLN_GESTURE_PHASE_BEGIN and MLN_GESTURE_PHASE_UPDATE mark a gesture in
- * progress, and MLN_GESTURE_PHASE_END and MLN_GESTURE_PHASE_CANCEL end it.
- */
-typedef enum mln_gesture_phase : uint32_t {
-  /** The change isn't part of a gesture. */
-  MLN_GESTURE_PHASE_NONE = 0,
-  /**
-   * The gesture starts. This cancels every running camera animation before
-   * the change applies.
-   */
-  MLN_GESTURE_PHASE_BEGIN = 1,
-  /**
-   * The gesture continues. To start a gesture that keeps the running camera
-   * animations, start it with this phase instead of MLN_GESTURE_PHASE_BEGIN.
-   */
-  MLN_GESTURE_PHASE_UPDATE = 2,
-  MLN_GESTURE_PHASE_END = 3,
-  /**
-   * The platform cancelled the gesture. This also cancels every running camera
-   * animation after the change applies.
-   */
-  MLN_GESTURE_PHASE_CANCEL = 4,
-} mln_gesture_phase;
-
-/** How a part of a gesture's momentum slows from its release speed. */
-typedef enum mln_momentum_decay_model : uint32_t {
-  /**
-   * The speed halves every `half_life_ms`, until it drops to `stop_speed`.
-   * UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
-   * deceleration 69 ms.
-   */
-  MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0,
-  /**
-   * The part eases `distance` over `duration_ms`, along `easing`, as a camera
-   * animation does. The caller plans the glide, for example from the
-   * platform's own fling physics, such as Android's OverScroller.
-   */
-  MLN_MOMENTUM_DECAY_MODEL_EASE = 1,
-} mln_momentum_decay_model;
-
-/** The fields that mln_momentum_decay sets. */
-typedef enum MLN_BINDING("kind=bitmask") mln_momentum_decay_field : uint32_t {
-  MLN_MOMENTUM_DECAY_MODEL = 1U << 0U,
-  MLN_MOMENTUM_DECAY_HALF_LIFE_MS = 1U << 1U,
-  MLN_MOMENTUM_DECAY_STOP_SPEED = 1U << 2U,
-  MLN_MOMENTUM_DECAY_DISTANCE = 1U << 3U,
-  MLN_MOMENTUM_DECAY_DURATION_MS = 1U << 4U,
-  MLN_MOMENTUM_DECAY_EASING = 1U << 5U,
-  MLN_MOMENTUM_DECAY_MIN_SPEED = 1U << 6U,
-  MLN_MOMENTUM_DECAY_MAX_SPEED = 1U << 7U,
-  MLN_MOMENTUM_DECAY_MAX_DISTANCE = 1U << 8U,
-} mln_momentum_decay_field;
-
-/** A set of mln_momentum_decay_field bits. */
-typedef uint32_t mln_momentum_decay_fields;
-
-/**
- * How one part of a gesture's momentum slows from its release speed.
- *
- * Speeds and distances are in the part's unit: logical pixels for pan, zoom
- * levels for zoom, and degrees for bearing and pitch. A setting whose bit
- * isn't set takes the part's default, which mln_gesture_momentum lists.
- * `min_speed` is finite and not negative, and every other number is finite
- * and positive. A friction decay can serve every release, as a preset that
- * matches a platform's scrolling. An eased glide takes its direction from the
- * part's velocity, and its distance and duration from the caller's plan.
- */
-typedef struct mln_momentum_decay {
-  mln_momentum_decay_fields fields;
-  mln_momentum_decay_model model
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_MODEL");
-  /** For MLN_MOMENTUM_DECAY_MODEL_FRICTION, how long the speed takes to halve.
-   */
-  double half_life_ms
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_HALF_LIFE_MS");
-  /** For MLN_MOMENTUM_DECAY_MODEL_FRICTION, the speed at which it ends. */
-  double stop_speed
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_STOP_SPEED");
-  /** Required for MLN_MOMENTUM_DECAY_MODEL_EASE. */
-  double distance MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_DISTANCE");
-  /** Required for MLN_MOMENTUM_DECAY_MODEL_EASE. */
-  double duration_ms
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_DURATION_MS");
-  /**
-   * For MLN_MOMENTUM_DECAY_MODEL_EASE, the share of `distance` covered over
-   * the share of `duration_ms`. Its control points are between 0 and 1, so the
-   * glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
-   * that camera animations ease along by default. Android's scroll fling
-   * follows (0.175, 0.5, 0.35, 1).
-   */
-  mln_unit_bezier easing
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_EASING");
-  /** A slower release starts no momentum. */
-  double min_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_MIN_SPEED");
-  /** For MLN_MOMENTUM_DECAY_MODEL_FRICTION, a faster release counts as this. */
-  double max_speed MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_MAX_SPEED");
-  /**
-   * The farthest the part moves. A friction release that would move farther
-   * starts slower, so it ends sooner, and a planned glide moves at most this
-   * far over its duration.
-   */
-  double max_distance
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_DECAY_MAX_DISTANCE");
-} mln_momentum_decay;
-
-/** The fields that mln_pan_momentum sets. */
-typedef enum MLN_BINDING("kind=bitmask") mln_pan_momentum_field : uint32_t {
-  MLN_PAN_MOMENTUM_VELOCITY = 1U << 0U,
-} mln_pan_momentum_field;
-
-/** A set of mln_pan_momentum_field bits. */
-typedef uint32_t mln_pan_momentum_fields;
-
-/** How a gesture's pan keeps moving the map's content after release. */
-typedef struct mln_pan_momentum {
-  mln_pan_momentum_fields fields;
-  /**
-   * How fast the map's content moved on the screen at release, in logical
-   * pixels per second. The pan moves only when this is set.
-   */
-  mln_screen_point velocity
-    MLN_BINDING("mask=fields;bit=MLN_PAN_MOMENTUM_VELOCITY");
-  mln_momentum_decay decay;
-} mln_pan_momentum;
-
-/** The fields that mln_momentum_snap sets. */
-typedef enum MLN_BINDING("kind=bitmask") mln_momentum_snap_field : uint32_t {
-  MLN_MOMENTUM_SNAP_SPACING = 1U << 0U,
-  MLN_MOMENTUM_SNAP_OFFSET = 1U << 1U,
-  MLN_MOMENTUM_SNAP_TOLERANCE = 1U << 2U,
-  MLN_MOMENTUM_SNAP_DURATION_MS = 1U << 3U,
-} mln_momentum_snap_field;
-
-/** A set of mln_momentum_snap_field bits. */
-typedef uint32_t mln_momentum_snap_fields;
-
-/**
- * Where a part settles after a gesture that changed it.
- *
- * The targets are every `spacing` from `offset`, in the part's unit. Bearing
- * targets wrap around the circle. Once the part's glide ends, or right away
- * when it doesn't move, the part eases to the nearest target if it is within
- * `tolerance` of it, and otherwise stays where it is. A setting whose bit
- * isn't set takes the part's default, which mln_gesture_momentum lists.
- */
-typedef struct mln_momentum_snap {
-  mln_momentum_snap_fields fields;
-  /** Positive. */
-  double spacing MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_SNAP_SPACING");
-  /** Defaults to 0. */
-  double offset MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_SNAP_OFFSET");
-  /** Not negative. */
-  double tolerance MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_SNAP_TOLERANCE");
-  /** Zero settles without easing. Defaults to 300. */
-  double duration_ms
-    MLN_BINDING("mask=fields;bit=MLN_MOMENTUM_SNAP_DURATION_MS");
-} mln_momentum_snap;
-
-/** The fields that mln_anchored_momentum sets. */
-typedef enum MLN_BINDING(
-  "kind=bitmask"
-) mln_anchored_momentum_field : uint32_t {
-  MLN_ANCHORED_MOMENTUM_VELOCITY = 1U << 0U,
-  MLN_ANCHORED_MOMENTUM_ANCHOR = 1U << 1U,
-  MLN_ANCHORED_MOMENTUM_SNAP = 1U << 2U,
-} mln_anchored_momentum_field;
-
-/** A set of mln_anchored_momentum_field bits. */
-typedef uint32_t mln_anchored_momentum_fields;
-
-/**
- * How a gesture's zoom, bearing, or pitch keeps changing after release.
- */
-typedef struct mln_anchored_momentum {
-  mln_anchored_momentum_fields fields;
-  /**
-   * How fast the value changed at release: zoom levels per second for zoom,
-   * and degrees per second for bearing and pitch. The part moves only when
-   * this is set.
-   */
-  double velocity MLN_BINDING("mask=fields;bit=MLN_ANCHORED_MOMENTUM_VELOCITY");
-  /**
-   * The screen point that the change keeps in place. Without one, the change
-   * keeps the center of the view in place.
-   */
-  mln_screen_point anchor
-    MLN_BINDING("mask=fields;bit=MLN_ANCHORED_MOMENTUM_ANCHOR");
-  mln_momentum_decay decay;
-  /**
-   * Where the part settles. Without this, it stays where the gesture and its
-   * glide leave it.
-   */
-  mln_momentum_snap snap
-    MLN_BINDING("mask=fields;bit=MLN_ANCHORED_MOMENTUM_SNAP");
-} mln_anchored_momentum;
-
-/**
- * How a gesture keeps moving the camera after the user lets go.
- *
- * A part moves only when its velocity is set, and each part slows on its own.
- * Every part defaults to MLN_MOMENTUM_DECAY_MODEL_FRICTION with a half-life of
- * 140 ms, and these other defaults:
- *
- * - Pan stops at 10 logical pixels per second, needs a release of at least
- *   200, and counts a release faster than 10000 as 10000.
- * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
- *   snap settles on the nearest whole level.
- * - Bearing stops at 1 degree per second and needs a release of at least 60.
- *   Its snap settles on north within 7 degrees.
- * - Pitch stops at 1 degree per second and needs a release of at least 5. Its
- *   snap settles flat within 7 degrees.
- */
-typedef struct mln_gesture_momentum {
-  mln_pan_momentum pan;
-  mln_anchored_momentum zoom;
-  mln_anchored_momentum bearing;
-  mln_anchored_momentum pitch;
-} mln_gesture_momentum;
-
 /** The fields that mln_camera_delta sets. */
 typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
   MLN_CAMERA_DELTA_OFFSET = 1U << 0U,
@@ -726,13 +494,12 @@ typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
   MLN_CAMERA_DELTA_BEARING = 1U << 2U,
   MLN_CAMERA_DELTA_PITCH = 1U << 3U,
   MLN_CAMERA_DELTA_ANCHOR = 1U << 4U,
-  MLN_CAMERA_DELTA_MOMENTUM = 1U << 5U,
 } mln_camera_delta_field;
 
 /** A set of mln_camera_delta_field bits. */
 typedef uint32_t mln_camera_delta_fields;
 
-/** A change to the camera from where it is now, for gestures. */
+/** A change to the camera from where it is now. */
 typedef struct mln_camera_delta {
   uint32_t size;
   mln_camera_delta_fields fields;
@@ -752,15 +519,7 @@ typedef struct mln_camera_delta {
    */
   mln_screen_point anchor
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_ANCHOR");
-  /**
-   * How the gesture keeps moving after this delta. Only a delta in the
-   * MLN_GESTURE_PHASE_END phase carries it.
-   */
-  mln_gesture_momentum momentum
-    MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_MOMENTUM");
   mln_animation_options animation;
-  mln_gesture_phase gesture_phase;
-  uint32_t reserved MLN_BINDING("kind=reserved");
 } mln_camera_delta;
 
 /**
@@ -774,8 +533,6 @@ typedef struct mln_camera_update {
   mln_camera_update_mode mode;
   mln_camera_options camera;
   mln_animation_options animation;
-  mln_gesture_phase gesture_phase;
-  uint32_t reserved MLN_BINDING("kind=reserved");
 } mln_camera_update;
 
 /** Options for finding the camera that fits an area. */
@@ -1010,6 +767,43 @@ typedef struct mln_offline_region_info {
   size_t metadata_size;
 } mln_offline_region_info;
 
+/** The fields that mln_offline_region_expiry sets. */
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_offline_region_expiry_field : uint32_t {
+  MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER = 1U << 0U,
+  MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL = 1U << 1U,
+} mln_offline_region_expiry_field;
+
+/** A set of mln_offline_region_expiry_field bits. */
+typedef uint32_t mln_offline_region_expiry_fields;
+
+/** How long the resources that an offline region holds stay usable. */
+typedef struct mln_offline_region_expiry {
+  mln_offline_region_expiry_fields fields;
+  /**
+   * When the first of the region's resources goes stale, which may have
+   * passed. Maps show a stale resource while they check it with the server,
+   * unless it must be checked first, and the region's download refreshes it.
+   * Without it, no resource ever goes stale.
+   */
+  int64_t stale_after_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER");
+  /**
+   * When the first of the region's resources that the server requires
+   * checking once stale stops being usable without the server, which may have
+   * passed. Refresh the region before then to keep all of it usable offline.
+   * Without it, every resource stays usable offline.
+   */
+  int64_t usable_offline_until_unix_ms MLN_BINDING(
+    "mask=fields;bit=MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL"
+  );
+  /** The resources that are stale now, tiles included. */
+  uint64_t stale_resource_count;
+  /** The stale resources that maps can't use now without the server. */
+  uint64_t unusable_resource_count;
+} mln_offline_region_expiry;
+
 /**
  * Creates an offline region in the runtime's cache file.
  *
@@ -1093,6 +887,18 @@ MLN_API mln_status mln_runtime_get_offline_region_status(
 ) MLN_NOEXCEPT;
 
 /**
+ * Reads how long the resources of the offline region `region_id` stay usable.
+ *
+ * Completes with:
+ * - MLN_STATUS_NOT_FOUND when the cache file has no region `region_id`.
+ */
+MLN_BINDING("execution=query;result=mln_offline_region_expiry")
+MLN_API mln_status mln_runtime_get_offline_region_expiry(
+  mln_runtime runtime, mln_offline_region_id region_id,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
  * Selects the events that the runtime reports about the download of the
  * offline region `region_id`.
  *
@@ -1113,8 +919,10 @@ MLN_API mln_status mln_runtime_set_offline_region_observed(
 /**
  * Starts or pauses the download of the offline region `region_id`.
  *
- * Setting the state that the download already has does nothing. A download
- * stops when the runtime closes.
+ * A download fetches the resources that the region lacks, and checks those
+ * that are stale with the server, keeping each stored copy until its refresh
+ * arrives. Setting the state that the download already has does nothing. A
+ * download stops when the runtime closes.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the cache file has no region `region_id`.
@@ -1127,14 +935,16 @@ MLN_API mln_status mln_runtime_set_offline_region_download_state(
 ) MLN_NOEXCEPT;
 
 /**
- * Makes maps check each resource of the offline region `region_id` with the
- * server before they use it.
+ * Makes each resource of the offline region `region_id` stale, so maps check
+ * it with the server when they next use it.
  *
- * The region keeps its resources. Starting its download again fetches the
- * invalidated resources for offline use. If the style or a TileJSON document
- * is then missing or invalid, the download reports an offline region response
- * error and goes on from the stored copy. Resources that the current style no
- * longer lists stay in the region until it's deleted.
+ * The region keeps its resources, and maps show them while they check them,
+ * except those that the server requires checking first. Starting the region's
+ * download again checks every resource with the server. If the style or a
+ * TileJSON document is then missing or invalid, the download reports an
+ * offline region response error and goes on from the stored copy. Resources
+ * that the current style no longer lists stay in the region until it's
+ * deleted.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the cache file has no region `region_id`.
@@ -1400,6 +1210,10 @@ typedef struct mln_map_snapshot {
   /** Whether the style and every resource that the view needs have loaded. */
   bool fully_loaded;
   bool rendering_stats_view_enabled;
+  /**
+   * Whether a gesture recognizer's gesture, or the glide and snap after it,
+   * moves the camera.
+   */
   bool gesture_in_progress;
   bool transition_in_progress;
   mln_runtime_event_flags event_mask;

@@ -514,7 +514,11 @@ class DotnetDocTests(unittest.TestCase):
         outcome = emitted(dotnet, real_api())["Map/CameraTransitionOutcome.g.cs"]
         self.assertIn("<c>MapHandle.CancelCameraTransitionsAsync()</c>", outcome)
         self.assertIn("<c>MapHandle.CancelCameraTransitionsWithIdAsync()</c>", outcome)
-        self.assertIn(
-            "<c>GesturePhase.Begin</c> or <c>GesturePhase.Cancel</c>", outcome
-        )
         self.assertNotIn("mln_map_cancel_camera_transitions()", outcome)
+        files = emitted(dotnet, real_api())
+        self.assertIn(
+            "For <c>MomentumDecayModel.Friction</c>.",
+            files["Gesture/MomentumDecay.g.cs"],
+        )
+        # A tag that only its union uses names the variant it selects.
+        self.assertIn("<c>GestureEvent.Notch</c>", files["Gesture/GestureNotch.g.cs"])

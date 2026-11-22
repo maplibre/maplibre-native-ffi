@@ -24,6 +24,8 @@ public readonly partial record struct CustomLayerPrerenderParameters(
 
         public sealed record WebGpu(WebGpuCustomLayerEncoder Value) : EncoderValue;
 
+        public sealed record D3d12(D3d12CustomLayerEncoder Value) : EncoderValue;
+
         public sealed record None : EncoderValue;
 
         public sealed record Unknown : EncoderValue

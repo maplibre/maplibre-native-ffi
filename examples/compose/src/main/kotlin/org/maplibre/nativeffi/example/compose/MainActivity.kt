@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,7 +38,13 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MapScreen(controller: MapController = viewModel()) {
   Box(Modifier.fillMaxSize().background(Color(0xfff2efe9))) {
-    AndroidExternalSurface(Modifier.fillMaxSize().mapGestures { controller.map }) {
+    val haptics = LocalHapticFeedback.current
+    AndroidExternalSurface(
+      Modifier.fillMaxSize().mapGestures({ controller.gestures }) {
+        // A notch, such as north on the bearing, ticks the phone.
+        haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+      },
+    ) {
       onSurface { surface, width, height ->
         controller.surfaceCreated(surface, width, height)
         surface.onChanged { newWidth, newHeight -> controller.surfaceChanged(newWidth, newHeight) }

@@ -187,3 +187,35 @@ func TestFlagsPrintTheirNames(t *testing.T) {
 		}
 	}
 }
+
+// A gesture input crosses as its variant, and a result's inline event array
+// decodes only the events that its count covers.
+func TestGestureRecognizerReportsTapsAsEvents(t *testing.T) {
+	f := newFixture(t)
+	recognizer, err := f.m.GestureRecognizerCreate(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer recognizer.Release()
+	at := ScreenPoint{X: 30, Y: 16}
+	tapAt := func(timeMs float64) []GestureEvent {
+		t.Helper()
+		down := GestureInputPointerDownVariant{Value: GesturePointerDown{ID: 2, Kind: PointerKindMouse, Position: at}}
+		if _, err := recognizer.Handle(down, timeMs); err != nil {
+			t.Fatal(err)
+		}
+		result, err := recognizer.Handle(GestureInputPointerUpVariant{Value: GesturePointer{ID: 2, Position: at}}, timeMs+50)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result.Events
+	}
+	tap := GestureTap{ID: 2, Position: at}
+	if got, want := tapAt(0), []GestureEvent{GestureEventTapVariant{Value: tap}}; !slices.Equal(got, want) {
+		t.Fatalf("first tap events = %+v, want %+v", got, want)
+	}
+	want := []GestureEvent{GestureEventTapVariant{Value: tap}, GestureEventDoubleTapVariant{Value: tap}}
+	if got := tapAt(100); !slices.Equal(got, want) {
+		t.Fatalf("second tap events = %+v, want %+v", got, want)
+	}
+}

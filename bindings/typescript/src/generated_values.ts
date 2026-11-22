@@ -11,32 +11,6 @@ import {
 } from "./internal/native_registrations.ts";
 
 /**
- * How a gesture's zoom, bearing, or pitch keeps changing after release.
- *
- * See `mln_anchored_momentum` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export interface AnchoredMomentum {
-  /**
-   * How fast the value changed at release: zoom levels per second for zoom, and
-   * degrees per second for bearing and pitch. The part moves only when this is
-   * set.
-   */
-  velocity?: number;
-  /**
-   * The screen point that the change keeps in place. Without one, the change
-   * keeps the center of the view in place.
-   */
-  anchor?: ScreenPoint;
-  decay?: MomentumDecay;
-  /**
-   * Where the part settles. Without this, it stays where the gesture and its
-   * glide leave it.
-   */
-  snap?: MomentumSnap;
-}
-
-/**
  * The Android hardware buffer of an exported ring's acquired frame.
  *
  * See `mln_android_hardware_buffer_frame` in the
@@ -156,8 +130,9 @@ export const CacheDatabaseOperation = {
    */
   clear: 1,
   /**
-   * Keeps the ambient cache's resources, but makes maps check each one with the
-   * server before they use it again. Offline regions keep their resources as
+   * Keeps the ambient cache's resources, but makes them stale: maps check each
+   * one with the server when they next use it, and show it meanwhile unless the
+   * server requires checking it first. Offline regions keep their resources as
    * they are.
    */
   invalidate: 2,
@@ -286,11 +261,11 @@ export const CameraChangeSource = {
    */
   command: 0,
   /**
-   * A camera command with a gesture phase.
+   * A gesture that a gesture recognizer recognized.
    */
   gesture: 1,
   /**
-   * The momentum and bearing snap that a gesture's end started.
+   * The glide and snap after a gesture recognizer's gesture.
    */
   momentum: 2,
 } as const;
@@ -300,7 +275,7 @@ export type CameraChangeSource =
   | (number & {});
 
 /**
- * A change to the camera from where it is now, for gestures.
+ * A change to the camera from where it is now.
  *
  * See `mln_camera_delta` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -328,13 +303,7 @@ export interface CameraDelta {
    * duration.
    */
   anchor?: ScreenPoint;
-  /**
-   * How the gesture keeps moving after this delta. Only a delta in the
-   * `GesturePhase.end` phase carries it.
-   */
-  momentum?: GestureMomentum;
   animation?: AnimationOptions;
-  gesturePhase?: GesturePhase;
 }
 
 /**
@@ -439,12 +408,6 @@ export interface CameraTransitionEnd {
    * the camera, or 0 when the map closed first.
    */
   readonly generation: bigint;
-  /**
-   * How fast a gesture's momentum still moved when it was cancelled, which the
-   * next gesture can add to its own release velocities. Zero for every other
-   * end.
-   */
-  readonly velocity: CameraVelocity;
 }
 
 /**
@@ -477,11 +440,10 @@ export const CameraTransitionOutcome = {
   completed: 0,
   /**
    * `MapHandle.cancelCameraTransitions()`,
-   * `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
-   * `GesturePhase.begin` or `GesturePhase.cancel`,
-   * `MapHandle.setFreeCameraOptions()`, or a resize that moved the camera back
-   * inside its bounds stopped the change. A command that fails before it moves
-   * the camera also reports this.
+   * `MapHandle.cancelCameraTransitionsWithId()`, a gesture that a gesture
+   * recognizer begins or cancels, `MapHandle.setFreeCameraOptions()`, or a
+   * resize that moved the camera back inside its bounds stopped the change. A
+   * command that fails before it moves the camera also reports this.
    */
   cancelled: 1,
   /**
@@ -517,7 +479,6 @@ export interface CameraUpdate {
   mode?: CameraUpdateMode;
   camera?: CameraOptions;
   animation?: AnimationOptions;
-  gesturePhase?: GesturePhase;
 }
 
 /**
@@ -544,32 +505,6 @@ export const CameraUpdateMode = {
 export type CameraUpdateMode =
   | (typeof CameraUpdateMode)[keyof typeof CameraUpdateMode]
   | (number & {});
-
-/**
- * How fast each part of a camera change moves.
- *
- * See `mln_camera_velocity` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export interface CameraVelocity {
-  /**
-   * How fast the map's content moves on the screen, in logical pixels per
-   * second.
-   */
-  readonly pan: ScreenPoint;
-  /**
-   * In zoom levels per second.
-   */
-  readonly zoom: number;
-  /**
-   * In degrees per second.
-   */
-  readonly bearing: number;
-  /**
-   * In degrees per second.
-   */
-  readonly pitch: number;
-}
 
 /**
  * A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
@@ -751,6 +686,178 @@ export interface CustomVectorSourceOptions {
 }
 
 /**
+ * A D3D12 texture of a borrowed ring.
+ *
+ * See `mln_d3d12_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export interface D3d12BorrowedTexture {
+  /**
+   * Your `ID3D12Resource`.
+   */
+  resource: bigint;
+}
+
+/**
+ * A ring of your D3D12 textures to render into, on the D3D12 device that you
+ * attach on.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. Each texture
+ * must be a 2D resource of the device with that size, one mip level, one array
+ * slice, one sample, `D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET`, and one typed
+ * color format that the device renders into, such as DXGI_FORMAT_R8G8B8A8_UNORM
+ * or DXGI_FORMAT_B8G8R8A8_UNORM. The ring holds up to `TEXTURE_RING_MAX_DEPTH`
+ * distinct textures, and references each.
+ *
+ * Each texture is in `state` when the session has it, and each frame leaves it
+ * there.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as `FrameProjection` says: one for each of `textures`, at the same
+ * index, or none. Each frame clears the one at its slot, renders the map's
+ * depth and stencil into it, stores them, and leaves it in `depth_state`. They
+ * must have the size of `textures`, one format of
+ * `GpuDeviceCapabilities.depthStencilFormats` (DXGI_FORMAT_D24_UNORM_S8_UINT or
+ * DXGI_FORMAT_D32_FLOAT_S8X24_UINT), one sample, and
+ * `D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL`.
+ *
+ * See `mln_d3d12_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export interface D3d12BorrowedTexturesTarget {
+  logicalSize: LogicalSize;
+  physicalWidth: number;
+  physicalHeight: number;
+  textures: readonly D3d12BorrowedTexture[];
+  /**
+   * The textures' `D3D12_RESOURCE_STATES`.
+   */
+  state?: number;
+  depthTextures?: readonly D3d12BorrowedTexture[];
+  /**
+   * The depth textures' `D3D12_RESOURCE_STATES`.
+   */
+  depthState?: number;
+}
+
+/**
+ * What shows a D3D12 composition swap chain.
+ *
+ * See `mln_d3d12_composition_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export const D3d12CompositionKind = {
+  /**
+   * An `IDCompositionVisual`, whose content the session sets to its swap chain.
+   */
+  visual: 1,
+  /**
+   * A XAML `SwapChainPanel`'s `ISwapChainPanelNative`, of WinUI or UWP, whose
+   * swap chain the session sets.
+   */
+  swapChainPanel: 2,
+} as const;
+/** One of the D3d12CompositionKind values, or a value this binding does not know. */
+export type D3d12CompositionKind =
+  | (typeof D3d12CompositionKind)[keyof typeof D3d12CompositionKind]
+  | (number & {});
+
+/**
+ * A composition swap chain to present to, which your DirectComposition visual
+ * or XAML `SwapChainPanel` shows.
+ *
+ * The session renders on D3D12: on the D3D12 device that you attach on, or on
+ * one that it makes without a device. It makes a flip-model swap chain for
+ * composition of `logical_size` at the map's scale factor, with premultiplied
+ * alpha, and sets it as the visual's content or the panel's swap chain. Commit
+ * your DirectComposition device once the attach completes. A panel takes its
+ * swap chain only on its UI thread: attach it there with
+ * `RenderDriverKind.callerGraphicsThread`, and service the session there. Scale
+ * the visual or the panel to show the swap chain at the display's scale. The
+ * session references `object` until a replacement or release of the target
+ * completes, or the session ends.
+ *
+ * See `mln_d3d12_composition_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+export interface D3d12CompositionTarget {
+  logicalSize: LogicalSize;
+  kind: D3d12CompositionKind;
+  /**
+   * Your `IDCompositionVisual*` or `ISwapChainPanelNative*`.
+   */
+  object: bigint;
+}
+
+/**
+ * Your D3D12 device and direct command queue, for
+ * `GpuDeviceHandle.wrapD3d12()`.
+ *
+ * See `mln_d3d12_device_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+export interface D3d12DeviceDescriptor {
+  /**
+   * Your `ID3D12Device`.
+   */
+  device: bigint;
+  /**
+   * Your `ID3D12CommandQueue` of `D3D12_COMMAND_LIST_TYPE_DIRECT` on `device`,
+   * which sessions on the device submit to. Submit your reads of a borrowed
+   * ring's textures to it for `GpuSyncKind.queueOrder`.
+   */
+  commandQueue: bigint;
+}
+
+/**
+ * The D3D12 texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for
+ * `MetalTextureFrame`. Otherwise they are zero.
+ *
+ * See `mln_d3d12_texture_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+export interface D3d12TextureFrame {
+  readonly width: number;
+  readonly height: number;
+  readonly scaleFactor: number;
+  /**
+   * The texture's index in the descriptor's `textures`, or in the ring.
+   */
+  readonly slot: number;
+  /**
+   * The `ID3D12Resource`.
+   */
+  readonly resource: bigint;
+  /**
+   * The resource's `ID3D12Device`.
+   */
+  readonly device: bigint;
+  /**
+   * The resource's `DXGI_FORMAT`.
+   */
+  readonly format: number;
+  /**
+   * The `D3D12_RESOURCE_STATES` that the frame left the resource in.
+   */
+  readonly state: number;
+  /**
+   * The `ID3D12Resource` that holds the frame's depth and stencil.
+   */
+  readonly depthResource: bigint;
+  /**
+   * The depth resource's `DXGI_FORMAT`.
+   */
+  readonly depthFormat: number;
+  /**
+   * The `D3D12_RESOURCE_STATES` that the frame left the depth resource in.
+   */
+  readonly depthState: number;
+}
+
+/**
  * A format of depth and stencil textures, as a bit in a set.
  *
  * See `mln_depth_stencil_format_flag` in the
@@ -923,11 +1030,15 @@ export interface EglContextDescriptor {
  *   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
  *   `android_hardware_buffer_usage`. Get each frame's buffer with
  *   `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
- * - `GpuExportKind.dxgiSharedHandle`: D3D11 textures of the format
+ * - `GpuExportKind.dxgiSharedHandle`: textures of the format
  *   DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
- *   resources and render targets. Open them on a D3D11 or D3D12 device of the
- *   same adapter, which you pick with `GpuDeviceOptions.adapterLuid`. Get each
- *   frame's texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+ *   resources and render targets: D3D11 textures on a Vulkan device, and
+ *   committed D3D12 resources in a shared heap on a D3D12 device, which each
+ *   frame leaves in D3D12_RESOURCE_STATE_COMMON. Open them on a D3D11 or D3D12
+ *   device of the same adapter, which you pick with
+ *   `GpuDeviceOptions.adapterLuid`. Get each frame's texture with
+ *   `AcquiredFrameHandle.withDxgiSharedTexture()`, and on a D3D12 device its
+ *   resource with `AcquiredFrameHandle.withD3d12Texture()`.
  * - `GpuExportKind.dmaBuf`: dmabufs of a format and modifier from
  *   `dma_buf_formats`. Get each frame's buffer with
  *   `AcquiredFrameHandle.withDmaBuf()`.
@@ -944,13 +1055,14 @@ export interface EglContextDescriptor {
  *
  * Each frame hands over with `GpuSyncKind.cpuComplete` or with the sync kind
  * that crosses APIs on its platform: `GpuSyncKind.metalSharedEvent` for an
- * IOSurface, and `GpuSyncKind.syncFd` for the others, where the device has
- * them. For a reader that waits on neither, such as a Wayland compositor
- * without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
- * out of `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
- * finishes before you acquire it, and release each frame only once the reader
- * is done with its texture. Give the ring 3 textures, so the session can render
- * while you hold two frames.
+ * IOSurface, `GpuSyncKind.d3d12Fence` for a DXGI shared texture, and
+ * `GpuSyncKind.syncFd` for the others, where the device has them. For a reader
+ * that waits on neither, such as a Wayland compositor without explicit
+ * synchronization or Flutter's `copyPixelBuffer`, leave them out of
+ * `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes
+ * before you acquire it, and release each frame only once the reader is done
+ * with its texture. Give the ring 3 textures, so the session can render while
+ * you hold two frames.
  *
  * See `mln_exported_ring_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -1063,23 +1175,25 @@ export const FrameDemandFlag = {
 export type FrameDemandFlag = number;
 
 /**
- * Options for creating a frame pacer, or for `FramePacerHandle.setOptions()`.
+ * Options for `RenderSessionHandle.setFramePacing()`.
  *
- * See `mln_frame_pacer_options` in the
+ * See `mln_frame_pacing_options` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
-export interface FramePacerOptions {
+export interface FramePacingOptions {
   /**
-   * The most frames per second that the pacer demands, greater than zero. The
-   * pacer skips display refreshes to stay within it. By default, it can demand
-   * frames at every refresh.
+   * The most frames per second that the library demands, greater than zero. It
+   * skips display refreshes to stay within it. By default, it can demand a
+   * frame at every refresh.
    */
   maximumFramesPerSecond?: number;
   /**
-   * Removes the frame rate limit, so the pacer can demand frames at every
-   * display refresh, as it does by default.
+   * The `NSView*` on macOS, or the `UIView*` on iOS and tvOS, that shows the
+   * session's frames, to pace them to its window's display rather than the main
+   * one. On iOS and tvOS, set the pacing again when the scene moves to another
+   * screen, as `windowScene:didUpdateEffectiveGeometry:` reports.
    */
-  unlimitedFramesPerSecond?: boolean;
+  view?: bigint;
 }
 
 /**
@@ -1211,66 +1325,360 @@ export interface GeoJsonSourceOptions {
 }
 
 /**
- * How a gesture keeps moving the camera after the user lets go.
+ * The part of the camera that a notch is on.
  *
- * A part moves only when its velocity is set, and each part slows on its own.
- * Every part defaults to `MomentumDecayModel.friction` with a half-life of 140
- * ms, and these other defaults:
- *
- * - Pan stops at 10 logical pixels per second, needs a release of at least 200,
- *   and counts a release faster than 10000 as 10000.
- * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its snap
- *   settles on the nearest whole level.
- * - Bearing stops at 1 degree per second and needs a release of at least 60.
- *   Its snap settles on north within 7 degrees.
- * - Pitch stops at 1 degree per second and needs a release of at least 5. Its
- *   snap settles flat within 7 degrees.
- *
- * See `mln_gesture_momentum` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * See `mln_gesture_axis` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
-export interface GestureMomentum {
-  pan?: PanMomentum;
-  zoom?: AnchoredMomentum;
-  bearing?: AnchoredMomentum;
-  pitch?: AnchoredMomentum;
+export const GestureAxis = {
+  zoom: 0,
+  bearing: 1,
+  pitch: 2,
+} as const;
+/** One of the GestureAxis values, or a value this binding does not know. */
+export type GestureAxis =
+  | (typeof GestureAxis)[keyof typeof GestureAxis]
+  | (number & {});
+
+/**
+ * How gestures move the zoom, the bearing, or the pitch.
+ *
+ * See `mln_gesture_axis_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export interface GestureAxisOptions {
+  /**
+   * Whether gestures move the part.
+   */
+  enabled?: boolean;
+  /**
+   * Whether a release glides on.
+   */
+  glides?: boolean;
+  momentum?: MomentumDecay;
+  /**
+   * Whether the part settles once its glide ends.
+   */
+  snaps?: boolean;
+  snap?: MomentumSnap;
+  /**
+   * Where the part reports notches while gestures, their glides, and their
+   * snaps move it, replacing the ones it had. Several notches at one value
+   * report one event, with the kind of the first in the list.
+   */
+  notches?: readonly GestureNotch[];
 }
 
 /**
- * Where a camera change falls in a gesture that the user makes.
+ * Camera movement from anything but a pointer, such as a wheel, a trackpad
+ * scroll, a dial, a crown, keys, or buttons, which the host converts into
+ * camera units. Zooms and turns hold `position` in place.
  *
- * `GesturePhase.begin` and `GesturePhase.update` mark a gesture in progress,
- * and `GesturePhase.end` and `GesturePhase.cancel` end it.
+ * A continuous delta, such as a trackpad scroll, applies at once. A discrete
+ * one, such as a wheel detent or a key press, eases, and a quick run of them
+ * merges into one ease that speeds up. Deltas are one gesture until they idle.
+ * The recommended amounts are a third of a level per wheel detent, 1/300 of a
+ * level per pixel of trackpad scrolling, and, for keys, 100 logical pixels of
+ * pan, a level of zoom, 15 degrees of bearing, and 10 of pitch.
  *
- * See `mln_gesture_phase` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * See `mln_gesture_delta` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
-export const GesturePhase = {
+export interface GestureDelta {
+  position?: ScreenPoint;
+  discrete?: boolean;
   /**
-   * The change isn't part of a gesture.
+   * How far the map's content moves on the screen, in logical pixels.
+   */
+  pan?: ScreenPoint;
+  /**
+   * Zoom levels to add.
+   */
+  zoom?: number;
+  /**
+   * Degrees to turn clockwise.
+   */
+  bearing?: number;
+  /**
+   * Degrees to tilt.
+   */
+  pitch?: number;
+}
+
+/**
+ * What a gesture means beyond moving the camera. Double taps and two-finger
+ * taps also zoom, as the options say.
+ *
+ * See `mln_gesture_event` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export type GestureEvent =
+  | { readonly kind: "tap"; readonly value: GestureTap }
+  | { readonly kind: "doubleTap"; readonly value: GestureTap }
+  | { readonly kind: "twoFingerTap"; readonly value: GestureTap }
+  | { readonly kind: "notch"; readonly value: GestureNotchEvent }
+  | { readonly kind: "longPress"; readonly value: GestureTap }
+  | {
+      readonly kind: "unknown";
+      readonly tag: number;
+      readonly bytes: Uint8Array;
+    };
+
+/**
+ * One input, in logical pixels from the map's top-left corner.
+ *
+ * When the view loses focus, the host cancels the pointers it sent and sends
+ * empty modes.
+ *
+ * See `mln_gesture_input` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export type GestureInput =
+  | { readonly kind: "pointerDown"; readonly value: GesturePointerDown }
+  | { readonly kind: "pointerMove"; readonly value: GesturePointer }
+  | { readonly kind: "pointerUp"; readonly value: GesturePointer }
+  | { readonly kind: "pointerCancel"; readonly value: GesturePointer }
+  | { readonly kind: "modes"; readonly value: GestureMode }
+  | { readonly kind: "delta"; readonly value: GestureDelta }
+  | { readonly kind: "pinch"; readonly value: GesturePinch };
+
+/**
+ * What a one-pointer drag or a double tap does instead of its default, from the
+ * pointer's held buttons or from held keys. A drag reads its modes when it
+ * starts and keeps them until it ends, and a double tap when it lifts; rotating
+ * wins over a box zoom.
+ *
+ * See `mln_gesture_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export const GestureMode = {
+  /**
+   * Sideways turns the map and up and down tilts it.
+   */
+  rotate: 1,
+  /**
+   * Draws a box that the map zooms to when the pointer lifts.
+   */
+  boxZoom: 2,
+  /**
+   * A double tap zooms out instead of in.
+   */
+  zoomOut: 4,
+} as const;
+/** A bitwise OR of GestureMode flags. */
+export type GestureMode = number;
+
+/**
+ * When a gesture recognizer next needs `GestureRecognizerHandle.tick()`.
+ *
+ * See `mln_gesture_next_tick` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export const GestureNextTick = {
+  /**
+   * Not until the next input.
    */
   none: 0,
   /**
-   * The gesture starts. This cancels every running camera animation before the
-   * change applies.
+   * Every display frame, while a delta eases or a gesture, its glide, or its
+   * snap may reach a notch.
    */
-  begin: 1,
+  frame: 1,
   /**
-   * The gesture continues. To start a gesture that keeps the running camera
-   * animations, start it with this phase instead of `GesturePhase.begin`.
+   * At `next_tick_ms`, on the inputs' clock: when a press becomes a long press,
+   * or idle deltas end.
    */
-  update: 2,
-  end: 3,
-  /**
-   * The platform cancelled the gesture. This also cancels every running camera
-   * animation after the change applies.
-   */
-  cancel: 4,
+  at: 2,
 } as const;
-/** One of the GesturePhase values, or a value this binding does not know. */
-export type GesturePhase =
-  | (typeof GesturePhase)[keyof typeof GesturePhase]
+/** One of the GestureNextTick values, or a value this binding does not know. */
+export type GestureNextTick =
+  | (typeof GestureNextTick)[keyof typeof GestureNextTick]
   | (number & {});
+
+/**
+ * Values every `spacing` from `offset`, in the part's unit, that report an
+ * `GestureEvent & { kind: "notch" }` as a gesture moves the part to or across
+ * one, for the host to play as haptic feedback. Bearing notches lie within one
+ * turn from the offset.
+ *
+ * See `mln_gesture_notch` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export interface GestureNotch {
+  /**
+   * Positive.
+   */
+  spacing?: number;
+  /**
+   * Finite.
+   */
+  offset?: number;
+  /**
+   * The host's name for the feedback, which the notch's events carry.
+   */
+  kind?: number;
+}
+
+/**
+ * A notch that a part reached.
+ *
+ * See `mln_gesture_notch_event` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export interface GestureNotchEvent {
+  readonly axis: GestureAxis;
+  /**
+   * The notch's kind, from the options.
+   */
+  readonly kind: number;
+  /**
+   * In the part's unit; a bearing from 0 up to 360 degrees.
+   */
+  readonly value: number;
+}
+
+/**
+ * How a gesture recognizer moves each part of the camera.
+ *
+ * Settings whose bits aren't set keep their values. A new recognizer moves
+ * every part, and glides each by friction with a half-life of 140 ms, a minimum
+ * speed of 0, and no maximum speed or distance, with these exceptions:
+ *
+ * - Pan stops at 10 logical pixels per second, needs a release of at least 200,
+ *   and counts a release faster than 10000 as 10000.
+ * - Zoom stops at 0.01 levels per second and glides at most 2.5 levels. Its
+ *   snap, when on, settles on the nearest whole level within half a level.
+ * - Bearing stops at 1 degree per second and needs a release of at least 60. It
+ *   snaps to north within 7 degrees, and has a notch of kind 0 at north.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+ *   snap, when on, settles flat within 7 degrees.
+ *
+ * Snaps take 300 ms. A double tap zooms in a level and a two-finger tap out.
+ *
+ * See `mln_gesture_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export interface GestureOptions {
+  /**
+   * Zoom levels that a double tap zooms in, eased; with `GestureMode.zoomOut`
+   * it zooms out instead. 0 leaves double taps to the host. Finite.
+   */
+  doubleTapZoom?: number;
+  /**
+   * Zoom levels that a two-finger tap zooms, eased; negative zooms out. 0
+   * leaves two-finger taps to the host. Finite.
+   */
+  twoFingerTapZoom?: number;
+  pan?: GesturePanOptions;
+  zoom?: GestureAxisOptions;
+  bearing?: GestureAxisOptions;
+  pitch?: GestureAxisOptions;
+}
+
+/**
+ * How gestures move the map's content.
+ *
+ * See `mln_gesture_pan_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export interface GesturePanOptions {
+  /**
+   * Whether drags, two fingers moving together, and deltas pan.
+   */
+  enabled?: boolean;
+  /**
+   * Whether a release glides on.
+   */
+  glides?: boolean;
+  momentum?: MomentumDecay;
+}
+
+/**
+ * A pinch the platform recognized, such as a macOS trackpad's magnify and
+ * rotate or a browser's Ctrl+wheel. Each update zooms by `scale` (above 1 zooms
+ * in) and turns `rotation` degrees clockwise on the screen since the last,
+ * around `center`. It glides on when it ends, as a touch pinch does.
+ *
+ * See `mln_gesture_pinch` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export interface GesturePinch {
+  center?: ScreenPoint;
+  scale?: number;
+  rotation?: number;
+  phase?: PinchPhase;
+}
+
+/**
+ * A pointer moved, went up, or was taken away.
+ *
+ * See `mln_gesture_pointer` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export interface GesturePointer {
+  id?: number;
+  /**
+   * Unused for `GestureInput & { kind: "pointerCancel" }`.
+   */
+  position?: ScreenPoint;
+}
+
+/**
+ * A pointer went down. The host sends no pointer whose buttons mean nothing,
+ * such as a mouse's middle button.
+ *
+ * See `mln_gesture_pointer_down` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export interface GesturePointerDown {
+  id?: number;
+  kind?: PointerKind;
+  position?: ScreenPoint;
+  /**
+   * The modes of the pointer's held buttons.
+   */
+  modes?: GestureMode;
+}
+
+/**
+ * What an input or a tick did.
+ *
+ * See `mln_gesture_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export interface GestureResult {
+  /**
+   * Whether the recognizer used the input, so the host stops the platform's
+   * default for it. Ticks report false.
+   */
+  readonly handled: boolean;
+  readonly nextTick: GestureNextTick;
+  /**
+   * For `GestureNextTick.at`.
+   */
+  readonly nextTickMs: number;
+  /**
+   * Whether a box-zoom drag is drawing `box_zoom`, which the host shows, in
+   * logical pixels corner to corner.
+   */
+  readonly boxZoomActive: boolean;
+  readonly boxZoom: ScreenBox;
+  readonly events: readonly GestureEvent[];
+}
+
+/**
+ * A tap, at `position`, by the pointer `id`.
+ *
+ * See `mln_gesture_tap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export interface GestureTap {
+  /**
+   * Unused for `GestureEvent & { kind: "twoFingerTap" }`.
+   */
+  readonly id: number;
+  readonly position: ScreenPoint;
+}
 
 /**
  * What a GPU device can do.
@@ -1307,6 +1715,24 @@ export interface GpuDeviceCapabilities {
 }
 
 /**
+ * The D3D12 objects of a device, as `GpuDeviceHandle.getD3d12Context()` reports
+ * them.
+ *
+ * See `mln_gpu_device_d3d12_context_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+export interface GpuDeviceD3d12ContextResult {
+  /**
+   * The `ID3D12Device`.
+   */
+  readonly device: bigint;
+  /**
+   * The direct `ID3D12CommandQueue` that sessions on the device submit to.
+   */
+  readonly commandQueue: bigint;
+}
+
+/**
  * Options for `GpuDeviceHandle.create()`.
  *
  * Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
@@ -1319,9 +1745,9 @@ export interface GpuDeviceCapabilities {
 export interface GpuDeviceOptions {
   /**
    * The backend that the device renders with. By default, the platform's own:
-   * Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has
-   * no Vulkan driver, and in a browser the build's one backend: WebGPU or
-   * OpenGL (WebGL2).
+   * Metal on Apple platforms, Vulkan elsewhere, then D3D12 on Windows, or
+   * OpenGL where the system has neither, and in a browser the build's one
+   * backend: WebGPU or OpenGL (WebGL2).
    */
   backend?: RenderBackend;
   /**
@@ -1336,8 +1762,8 @@ export interface GpuDeviceOptions {
   adapterUuid?: Uint8Array;
   /**
    * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which
-   * Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a Vulkan
-   * device takes one.
+   * Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID` and D3D12 as
+   * `ID3D12Device::GetAdapterLuid`. Only a Vulkan or D3D12 device takes one.
    */
   adapterLuid?: Uint8Array;
   /**
@@ -1818,23 +2244,32 @@ export interface MapOptions {
    */
   tileCacheEnabled?: boolean;
   /**
-   * Fonts for the text that a style's own fonts don't draw, such as scripts
-   * that need complex shaping, like Myanmar or Devanagari. A JSON array of font
-   * files, each an object with a `url` and an optional `unicode-range`, as in a
-   * font face of a style's `font-faces`, which every font stack uses after the
-   * style's own font faces. Empty for the system's fonts, unless
-   * `system_fonts_enabled` is false.
+   * Fonts for the text that a style's own fonts don't draw. A JSON array of
+   * font files, each an object with a `url` and an optional `unicode-range`, as
+   * in a font face of a style's `font-faces`. They shape, in order, the text
+   * that glyph PBFs can't shape, such as Myanmar or Devanagari, or all the text
+   * of a style without glyph PBFs, and draw the glyphs that come from local
+   * fonts: those a style's PBFs lack, and CJK with `local_ideographs_enabled`.
+   * Empty for the system's fonts alone.
    */
   fallbackFontFaces?: string;
   /**
-   * Whether the map falls back to the system's fonts for CJK and the scripts
-   * that need complex shaping when `fallback_font_faces` is empty: fonts that
-   * the platform's font matcher picks for the user's preferred languages.
-   * Without it, the map does. The first map that uses them waits for them to be
-   * found. In the browser, the browser draws CJK glyphs in its sans-serif font
-   * instead, where `fallback_font_faces` doesn't cover them.
+   * Whether the map draws from the system's fonts what the style's fonts and
+   * `fallback_font_faces` don't: fonts that the platform's font matcher picks
+   * for the font stack's names, or for the character and the user's preferred
+   * languages. It shapes with them the text that glyph PBFs can't shape, and
+   * all the text of a style without glyph PBFs. Without it, the map does. The
+   * first map that uses them waits for the matcher to load. In the browser, the
+   * browser draws those glyphs in the font stack's families, then its
+   * sans-serif font, one at a time.
    */
   systemFontsEnabled?: boolean;
+  /**
+   * Whether CJK ideographs, kana and hangul come from local fonts
+   * (`fallback_font_faces`, then the system's) before glyph PBFs, rather than
+   * from a glyph PBF downloaded for every few characters. Without it, they do.
+   */
+  localIdeographsEnabled?: boolean;
 }
 
 /**
@@ -1864,6 +2299,10 @@ export interface MapSnapshot {
    */
   readonly fullyLoaded: boolean;
   readonly renderingStatsViewEnabled: boolean;
+  /**
+   * Whether a gesture recognizer's gesture, or the glide and snap after it,
+   * moves the camera.
+   */
   readonly gestureInProgress: boolean;
   readonly transitionInProgress: boolean;
   readonly eventMask: RuntimeEventFlag;
@@ -2120,23 +2559,24 @@ export interface MetalTextureFrame {
 }
 
 /**
- * How one part of a gesture's momentum slows from its release speed.
+ * How one part of a gesture glides after release.
  *
  * Speeds and distances are in the part's unit: logical pixels for pan, zoom
- * levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
- * set takes the part's default, which `GestureMomentum` lists. `min_speed` is
- * finite and not negative, and every other number is finite and positive. A
- * friction decay can serve every release, as a preset that matches a platform's
- * scrolling. An eased glide takes its direction from the part's velocity, and
- * its distance and duration from the caller's plan.
+ * levels for zoom, and degrees for bearing and pitch, with speeds per second. A
+ * setting whose bit isn't set keeps its current value. A new `model` starts
+ * from its defaults: friction from the part's, which
+ * `MapHandle.gestureRecognizerCreate()` lists, and a curve from Android's
+ * fling. Settings of the other model are an error. `min_speed` is finite and
+ * not negative, `duration_exponent` finite and above -1, and every other number
+ * positive; the maximums may be infinite.
  *
  * See `mln_momentum_decay` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
 export interface MomentumDecay {
   model?: MomentumDecayModel;
   /**
-   * For `MomentumDecayModel.friction`, how long the speed takes to halve.
+   * For `MomentumDecayModel.friction`.
    */
   halfLifeMs?: number;
   /**
@@ -2144,42 +2584,43 @@ export interface MomentumDecay {
    */
   stopSpeed?: number;
   /**
-   * Required for `MomentumDecayModel.ease`.
+   * For `MomentumDecayModel.curve`, the speed that lasts `duration_ms`.
    */
-  distance?: number;
+  referenceSpeed?: number;
   /**
-   * Required for `MomentumDecayModel.ease`.
+   * For `MomentumDecayModel.curve`.
    */
   durationMs?: number;
   /**
-   * For `MomentumDecayModel.ease`, the share of `distance` covered over the
-   * share of `duration_ms`. Its control points are between 0 and 1, so the
-   * glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
-   * that camera animations ease along by default. Android's scroll fling
-   * follows (0.175, 0.5, 0.35, 1).
+   * For `MomentumDecayModel.curve`, how the duration grows with the speed.
+   */
+  durationExponent?: number;
+  /**
+   * For `MomentumDecayModel.curve`, the share of the glide covered over the
+   * share of its duration. Its control points are between 0 and 1, and `x1` and
+   * `y1` above 0, so the glide starts moving and never passes its end.
    */
   easing?: UnitBezier;
   /**
-   * A slower release starts no momentum.
+   * A slower release doesn't glide.
    */
   minSpeed?: number;
   /**
-   * For `MomentumDecayModel.friction`, a faster release counts as this.
+   * A faster release counts as this.
    */
   maxSpeed?: number;
   /**
-   * The farthest the part moves. A friction release that would move farther
-   * starts slower, so it ends sooner, and a planned glide moves at most this
-   * far over its duration.
+   * The farthest the part glides. A release that would glide farther counts as
+   * the speed that glides this far.
    */
   maxDistance?: number;
 }
 
 /**
- * How a part of a gesture's momentum slows from its release speed.
+ * How a part's glide unfolds from its release speed.
  *
  * See `mln_momentum_decay_model` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
 export const MomentumDecayModel = {
   /**
@@ -2189,11 +2630,14 @@ export const MomentumDecayModel = {
    */
   friction: 0,
   /**
-   * The part eases `distance` over `duration_ms`, along `easing`, as a camera
-   * animation does. The caller plans the glide, for example from the platform's
-   * own fling physics, such as Android's OverScroller.
+   * The glide lasts `duration_ms` × (speed / `reference_speed`) to the power of
+   * `duration_exponent`, and follows `easing`, starting at the release speed.
+   * Its defaults are Android's OverScroller fling, in its density-independent
+   * pixels: a reference speed of 1000, 555.182 ms, an exponent of 0.7362676,
+   * the curve (0.175, 0.5, 0.35, 1), a minimum speed of 50 and a maximum of
+   * 8000.
    */
-  ease: 1,
+  curve: 1,
 } as const;
 /** One of the MomentumDecayModel values, or a value this binding does not know. */
 export type MomentumDecayModel =
@@ -2204,13 +2648,14 @@ export type MomentumDecayModel =
  * Where a part settles after a gesture that changed it.
  *
  * The targets are every `spacing` from `offset`, in the part's unit. Bearing
- * targets wrap around the circle. Once the part's glide ends, or right away
- * when it doesn't move, the part eases to the nearest target if it is within
- * `tolerance` of it, and otherwise stays where it is. A setting whose bit isn't
- * set takes the part's default, which `GestureMomentum` lists.
+ * targets lie within one turn from `offset`, and the bearing takes the shorter
+ * way around to the nearest. Once the part's glide ends, or right away when it
+ * has none, the part eases to the nearest target if it is within `tolerance` of
+ * it, and otherwise stays where it is. A setting whose bit isn't set keeps its
+ * current value.
  *
  * See `mln_momentum_snap` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
 export interface MomentumSnap {
   /**
@@ -2218,7 +2663,7 @@ export interface MomentumSnap {
    */
   spacing?: number;
   /**
-   * Defaults to 0.
+   * Finite.
    */
   offset?: number;
   /**
@@ -2226,7 +2671,7 @@ export interface MomentumSnap {
    */
   tolerance?: number;
   /**
-   * Zero settles without easing. Defaults to 300.
+   * Zero settles without easing.
    */
   durationMs?: number;
 }
@@ -2316,6 +2761,37 @@ export const OfflineRegionDownloadState = {
 export type OfflineRegionDownloadState =
   | (typeof OfflineRegionDownloadState)[keyof typeof OfflineRegionDownloadState]
   | (number & {});
+
+/**
+ * How long the resources that an offline region holds stay usable.
+ *
+ * See `mln_offline_region_expiry` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export interface OfflineRegionExpiry {
+  /**
+   * When the first of the region's resources goes stale, which may have passed.
+   * Maps show a stale resource while they check it with the server, unless it
+   * must be checked first, and the region's download refreshes it. Without it,
+   * no resource ever goes stale.
+   */
+  readonly staleAfterUnixMs?: bigint;
+  /**
+   * When the first of the region's resources that the server requires checking
+   * once stale stops being usable without the server, which may have passed.
+   * Refresh the region before then to keep all of it usable offline. Without
+   * it, every resource stays usable offline.
+   */
+  readonly usableOfflineUntilUnixMs?: bigint;
+  /**
+   * The resources that are stale now, tiles included.
+   */
+  readonly staleResourceCount: bigint;
+  /**
+   * The stale resources that maps can't use now without the server.
+   */
+  readonly unusableResourceCount: bigint;
+}
 
 /**
  * An offline region in the runtime's cache file.
@@ -2627,19 +3103,47 @@ export interface OpenGlTextureFrame {
 }
 
 /**
- * How a gesture's pan keeps moving the map's content after release.
+ * Where a platform-recognized pinch is.
  *
- * See `mln_pan_momentum` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * See `mln_pinch_phase` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
-export interface PanMomentum {
+export const PinchPhase = {
+  begin: 0,
+  update: 1,
   /**
-   * How fast the map's content moved on the screen at release, in logical
-   * pixels per second. The pan moves only when this is set.
+   * The fingers lifted: the pinch glides on.
    */
-  velocity?: ScreenPoint;
-  decay?: MomentumDecay;
-}
+  end: 2,
+  /**
+   * The platform took the pinch away: nothing continues, and the camera's
+   * animations stop.
+   */
+  cancel: 3,
+} as const;
+/** One of the PinchPhase values, or a value this binding does not know. */
+export type PinchPhase =
+  | (typeof PinchPhase)[keyof typeof PinchPhase]
+  | (number & {});
+
+/**
+ * What kind of device a pointer is.
+ *
+ * See `mln_pointer_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export const PointerKind = {
+  mouse: 0,
+  /**
+   * Two touches pinch, twist, and tilt, and a held second tap zooms.
+   */
+  touch: 1,
+  pen: 2,
+} as const;
+/** One of the PointerKind values, or a value this binding does not know. */
+export type PointerKind =
+  | (typeof PointerKind)[keyof typeof PointerKind]
+  | (number & {});
 
 /**
  * An image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
@@ -2843,6 +3347,14 @@ export const RenderBackend = {
   vulkan: 2,
   openGl: 3,
   webGpu: 4,
+  /**
+   * D3D12, on Windows. It compiles its shaders at run time with DXC, which your
+   * app ships: `dxcompiler.dll`, 1.8.2502 or later, beside your app's
+   * executable or in another directory of the DLL search path, which doesn't
+   * take the library's own directory. Without it, the library renders on
+   * another backend.
+   */
+  d3d12: 5,
 } as const;
 /** One of the RenderBackend values, or a value this binding does not know. */
 export type RenderBackend =
@@ -2860,6 +3372,7 @@ export const RenderBackendFlag = {
   vulkan: 2,
   openGl: 4,
   webGpu: 8,
+  d3d12: 16,
 } as const;
 /** A bitwise OR of RenderBackendFlag flags. */
 export type RenderBackendFlag = number;
@@ -2978,16 +3491,18 @@ export interface RenderSessionAttachOptions {
    *
    * - `RenderDriverKind.callerGraphicsThread` for a borrowed ring of WebGPU
    *   textures.
-   * - `RenderDriverKind.coreWorker` for an offscreen target, a window, or an
-   *   exported ring.
+   * - `RenderDriverKind.coreWorker` for an offscreen target, a window, a
+   *   DirectComposition visual, or an exported ring.
+   * - `RenderDriverKind.callerGraphicsThread` for a XAML `SwapChainPanel`, on
+   *   the panel's UI thread.
    * - Either one for a web canvas. In a browser both run on the thread that
    *   loaded the library: `RenderDriverKind.coreWorker` in the library's own
    *   tasks, and `RenderDriverKind.callerGraphicsThread` when you service the
    *   session.
    * - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
-   *   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
-   *   these on `RenderDriverKind.coreWorker` only, and fails an attach with
-   *   `RenderDriverKind.callerGraphicsThread` then.
+   *   borrowed ring of Metal, Vulkan, D3D12, or OpenGL textures. A build may
+   *   drive these on `RenderDriverKind.coreWorker` only, and fails an attach
+   *   with `RenderDriverKind.callerGraphicsThread` then.
    *
    * An attach with another driver fails with `Status.unsupported`.
    */
@@ -3179,7 +3694,15 @@ export type RenderTarget =
       readonly value: WebGpuBorrowedTexturesTarget;
     }
   | { readonly kind: "exportedRing"; readonly value: ExportedRingTarget }
-  | { readonly kind: "webCanvas"; readonly value: WebCanvasTarget };
+  | { readonly kind: "webCanvas"; readonly value: WebCanvasTarget }
+  | {
+      readonly kind: "d3d12BorrowedTextures";
+      readonly value: D3d12BorrowedTexturesTarget;
+    }
+  | {
+      readonly kind: "d3d12Composition";
+      readonly value: D3d12CompositionTarget;
+    };
 
 /**
  * A render target kind, as a bit in a set.
@@ -3203,6 +3726,8 @@ export const RenderTargetKindFlag = {
   webGpuBorrowedTextures: 16384,
   exportedRing: 32768,
   webCanvas: 65536,
+  d3d12BorrowedTextures: 131072,
+  d3d12Composition: 262144,
 } as const;
 /** A bitwise OR of RenderTargetKindFlag flags. */
 export type RenderTargetKindFlag = number;
@@ -3490,11 +4015,15 @@ export interface ResourceResponse {
    */
   errorMessage?: string;
   /**
-   * Whether the library must request the resource again before it reuses this
-   * copy.
+   * Whether the library must not use this copy once it expires until it
+   * requests the resource again, not even while the server can't be reached, as
+   * `Cache-Control: must-revalidate` or `no-cache` says.
    */
   mustRevalidate?: boolean;
   modifiedUnixMs?: bigint;
+  /**
+   * When this copy stops being fresh. Without it, the copy never expires.
+   */
   expiresUnixMs?: bigint;
   /**
    * Empty when the resource has no ETag.
@@ -3504,6 +4033,11 @@ export interface ResourceResponse {
    * When to retry, for `ResourceResponseStatus.error`.
    */
   retryAfterUnixMs?: bigint;
+  /**
+   * Whether the library must not store this copy, as `Cache-Control: no-store`
+   * says.
+   */
+  noStore?: boolean;
 }
 
 /**
@@ -3973,8 +4507,8 @@ export interface RuntimeOptions {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
  */
 export interface ScreenBox {
-  min?: ScreenPoint;
-  max?: ScreenPoint;
+  min: ScreenPoint;
+  max: ScreenPoint;
 }
 
 /**
@@ -5142,6 +5676,14 @@ export const DIAGNOSTIC_MESSAGE_CAPACITY: number = 4096;
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 export const FRAME_DEMAND_TOKEN_STILL_IMAGE: bigint = 18446744073709551615n;
+
+/**
+ * The most events that one input or tick reports.
+ *
+ * See `MLN_GESTURE_RESULT_EVENT_CAPACITY` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+export const GESTURE_RESULT_EVENT_CAPACITY: number = 4;
 
 /**
  * The most textures that a render session's texture ring can have.

@@ -52,14 +52,16 @@ a library thread. The wakes and the event handler run on library threads too, so
 they set flags and push an SDL event that wakes the main loop, which acts on
 them. A redraw wake asks for a frame, and a frame wake drains the frame results.
 
-`src/pacer.zig` paces the frames to the display, since the library presents
-without waiting for it, and SDL has no frame clock for a window that it doesn't
-draw. On Wayland, each demanded frame commits a frame callback on the window's
-surface, and the next demand waits until the compositor calls it. So a hidden
-window, which gets no frame callbacks, demands no frames. On X11, a thread waits
-out the display's refresh period. On Windows, that thread first waits on
-`DwmFlush` for the desktop compositor's next frame. On macOS, the frame pacer
-from `FramePacer.create` follows the display and demands the frames.
+On macOS, `RenderSession.setFramePacing` with SDL's Metal view paces the frames
+to the display of the window, and the session demands them itself. Elsewhere,
+the library has no source of display refreshes, so `src/pacer.zig` paces the
+frames, since the library presents without waiting for the display, and SDL has
+no frame clock for a window that it doesn't draw. On Wayland, each demanded
+frame commits a frame callback on the window's surface, and the next demand
+waits until the compositor calls it. So a hidden window, which gets no frame
+callbacks, demands no frames. On X11, a thread waits out the display's refresh
+period. On Windows, that thread first waits on `DwmFlush` for the desktop
+compositor's next frame.
 
 The window's size in pixels and its display's scale factor set the session's
 size in logical pixels and the map's scale factor. When the window changes size
@@ -70,7 +72,8 @@ nothing changed. While the window is minimized on Windows, frames finish without
 presenting, and the view demands one again when the window shows. Before the
 window closes, the view releases the session, the map, and the runtime.
 
-`src/Gestures.zig` turns mouse, touch, touchpad pinch, and key input into camera
-changes, and measures each gesture's speed so the map keeps moving after
-release. SDL can't tell a touchpad scroll from a mouse wheel, so both zoom.
-Everything else matches the browser example in `examples/browser`.
+`src/Gestures.zig` passes mouse, touch screen, touchpad pinch, wheel, and key
+input to the library's `GestureRecognizer`, which drags, pinches, twists, and
+tilts the map, keeps it gliding after a flick, and moves the camera itself. The
+recognizer says when it next needs a tick, and an SDL timer wakes the event loop
+for it. SDL can't tell a touchpad scroll from a mouse wheel, so both zoom.

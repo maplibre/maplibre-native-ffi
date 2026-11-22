@@ -34,11 +34,16 @@ public sealed record ResourceResponse
     public string ErrorMessage { get; init; } = "";
 
     /// <summary>
-    /// Whether the library must request the resource again before it reuses
-    /// this copy.
+    /// Whether the library must not use this copy once it expires until it
+    /// requests the resource again, not even while the server can't be reached,
+    /// as <c>Cache-Control: must-revalidate</c> or <c>no-cache</c> says.
     /// </summary>
     public bool MustRevalidate { get; init; }
     public long? ModifiedUnixMs { get; init; }
+
+    /// <summary>
+    /// When this copy stops being fresh. Without it, the copy never expires.
+    /// </summary>
     public long? ExpiresUnixMs { get; init; }
 
     /// <summary>
@@ -50,4 +55,10 @@ public sealed record ResourceResponse
     /// When to retry, for <c>ResourceResponseStatus.Error</c>.
     /// </summary>
     public long? RetryAfterUnixMs { get; init; }
+
+    /// <summary>
+    /// Whether the library must not store this copy, as <c>Cache-Control:
+    /// no-store</c> says.
+    /// </summary>
+    public bool NoStore { get; init; }
 }

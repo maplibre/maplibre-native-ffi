@@ -5,9 +5,11 @@ import {
   type Camera,
   CameraTransitionOutcome,
   CameraUpdateMode,
-  GesturePhase,
+  type GestureRecognizerHandle,
+  type GestureResult,
   type MapHandle,
   MapProjectionHandle,
+  PointerKind,
   type ScreenPoint,
 } from "../../src/index.ts";
 
@@ -16,33 +18,48 @@ function useCamera(_camera?: Camera): void {}
 function flyEnded(_completed: boolean): void {}
 
 // #region gesture
-function beginGesture(map: MapHandle): void {
-  map.discarding.applyCameraDelta({
-    gesturePhase: GesturePhase.begin,
-  });
+function createRecognizer(map: MapHandle): GestureRecognizerHandle {
+  return map.gestureRecognizerCreate();
 }
 
-function applyDrag(map: MapHandle, movement: ScreenPoint): void {
-  map.discarding.applyCameraDelta({
-    offset: movement,
-    gesturePhase: GesturePhase.update,
-  });
+function scheduleTick(_result: GestureResult): void {
+  // On the next frame, or at result.nextTickMs.
 }
 
-function applyPinch(
-  map: MapHandle,
-  scale: number,
-  center: ScreenPoint,
+function pointerDown(
+  recognizer: GestureRecognizerHandle,
+  id: number,
+  position: ScreenPoint,
+  timeMs: number,
 ): void {
-  map.discarding.applyCameraDelta({
-    scale,
-    anchor: center,
-    gesturePhase: GesturePhase.update,
-  });
+  const result = recognizer.handle(
+    {
+      kind: "pointerDown",
+      value: { id, kind: PointerKind.touch, position },
+    },
+    timeMs,
+  );
+  scheduleTick(result);
 }
 
-function endGesture(map: MapHandle): void {
-  map.discarding.applyCameraDelta({ gesturePhase: GesturePhase.end });
+function pointerMove(
+  recognizer: GestureRecognizerHandle,
+  id: number,
+  position: ScreenPoint,
+  timeMs: number,
+): void {
+  const result = recognizer.handle(
+    { kind: "pointerMove", value: { id, position } },
+    timeMs,
+  );
+  scheduleTick(result);
+}
+
+function tick(
+  recognizer: GestureRecognizerHandle,
+  timeMs: number,
+): void {
+  scheduleTick(recognizer.tick(timeMs));
 }
 // #endregion gesture
 
@@ -99,10 +116,11 @@ export async function camera(map: MapHandle): Promise<void> {
   map.discarding.setBounds({ bounds, minZoom: 5, maxZoom: 16 });
   // #endregion limit
 
-  beginGesture(map);
-  applyDrag(map, { x: 12, y: -4 });
-  applyPinch(map, 1.1, { x: 200, y: 150 });
-  endGesture(map);
+  const recognizer = createRecognizer(map);
+  pointerDown(recognizer, 1, { x: 100, y: 100 }, 0);
+  pointerMove(recognizer, 1, { x: 112, y: 96 }, 16);
+  tick(recognizer, 32);
+  recognizer.release();
 
   // #region convert
   const projection = MapProjectionHandle.create(

@@ -5,7 +5,7 @@ from concurrent.futures import Future
 from ._future import completed_future
 from ._generated_operations import (
     _AcquiredFrameHandleOperations,
-    _FramePacerHandleOperations,
+    _GestureRecognizerHandleOperations,
     _GpuDeviceHandleOperations,
     _MapHandleOperations,
     _MapProjectionHandleOperations,
@@ -44,15 +44,15 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
         return int(self._native.id)
 
 
-class FramePacerHandle(_FramePacerHandleOperations, ScopedHandleMixin):
-    """Demands render sessions' frames at a display's refreshes.
+class GestureRecognizerHandle(_GestureRecognizerHandleOperations, ScopedHandleMixin):
+    """A gesture recognizer that moves a map's camera.
 
-    See `mln_frame_pacer` in the
+    See `mln_gesture_recognizer` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     """
 
     __module__ = "maplibre_native_ffi"
-    _handle_name = "FramePacerHandle"
+    _handle_name = "GestureRecognizerHandle"
 
     def __init__(self):
         raise TypeError("native handles are returned by their owning operations")

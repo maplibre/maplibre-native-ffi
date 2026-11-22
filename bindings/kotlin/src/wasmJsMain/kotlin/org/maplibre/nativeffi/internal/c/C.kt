@@ -19,6 +19,12 @@ internal actual object C {
       word(outDiagnostic),
     )
 
+  actual fun mln_acquired_frame_get_d3d12_texture(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_acquired_frame_get_d3d12_texture(frame, word(outFrame), word(outDiagnostic))
+
   actual fun mln_acquired_frame_get_dma_buf(frame: Long, outFrame: Long, outDiagnostic: Long): Int =
     mln_kw_mln_acquired_frame_get_dma_buf(frame, word(outFrame), word(outDiagnostic))
 
@@ -110,15 +116,51 @@ internal actual object C {
     mln_kw_mln_delivery_queue_release(queue)
   }
 
-  actual fun mln_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_frame_pacer_create(word(options), word(outPacer), word(outDiagnostic))
+  actual fun mln_gesture_recognizer_create(
+    map: Long,
+    options: Long,
+    outRecognizer: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_gesture_recognizer_create(
+      map,
+      word(options),
+      word(outRecognizer),
+      word(outDiagnostic),
+    )
 
-  actual fun mln_frame_pacer_release(pacer: Long) {
-    mln_kw_mln_frame_pacer_release(pacer)
+  actual fun mln_gesture_recognizer_handle(
+    recognizer: Long,
+    input: Long,
+    timeMs: Double,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_gesture_recognizer_handle(
+      recognizer,
+      word(input),
+      timeMs,
+      word(outResult),
+      word(outDiagnostic),
+    )
+
+  actual fun mln_gesture_recognizer_release(recognizer: Long) {
+    mln_kw_mln_gesture_recognizer_release(recognizer)
   }
 
-  actual fun mln_frame_pacer_set_options(pacer: Long, options: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_frame_pacer_set_options(pacer, word(options), word(outDiagnostic))
+  actual fun mln_gesture_recognizer_set_options(
+    recognizer: Long,
+    options: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_gesture_recognizer_set_options(recognizer, word(options), word(outDiagnostic))
+
+  actual fun mln_gesture_recognizer_tick(
+    recognizer: Long,
+    timeMs: Double,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_gesture_recognizer_tick(recognizer, timeMs, word(outResult), word(outDiagnostic))
 
   actual fun mln_gpu_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
     mln_kw_mln_gpu_device_create(word(options), word(outDevice), word(outDiagnostic))
@@ -130,6 +172,12 @@ internal actual object C {
   ): Int =
     mln_kw_mln_gpu_device_get_capabilities(device, word(outCapabilities), word(outDiagnostic))
 
+  actual fun mln_gpu_device_get_d3d12_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_gpu_device_get_d3d12_context(device, word(outResult), word(outDiagnostic))
+
   actual fun mln_gpu_device_get_vulkan_context(
     device: Long,
     outResult: Long,
@@ -139,6 +187,12 @@ internal actual object C {
   actual fun mln_gpu_device_release(device: Long) {
     mln_kw_mln_gpu_device_release(device)
   }
+
+  actual fun mln_gpu_device_wrap_d3d12(
+    descriptor: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int = mln_kw_mln_gpu_device_wrap_d3d12(word(descriptor), word(outDevice), word(outDiagnostic))
 
   actual fun mln_gpu_device_wrap_metal(
     descriptor: Long,
@@ -1443,11 +1497,11 @@ internal actual object C {
   actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     mln_kw_mln_render_session_service_driver_work(session, word(outDiagnostic))
 
-  actual fun mln_render_session_set_frame_pacer(
+  actual fun mln_render_session_set_frame_pacing(
     session: Long,
-    pacer: Long,
+    options: Long,
     outDiagnostic: Long,
-  ): Int = mln_kw_mln_render_session_set_frame_pacer(session, pacer, word(outDiagnostic))
+  ): Int = mln_kw_mln_render_session_set_frame_pacing(session, word(options), word(outDiagnostic))
 
   actual fun mln_render_session_set_target(
     session: Long,
@@ -1592,6 +1646,19 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_kw_mln_runtime_get_offline_region(runtime, regionId, word(completion), word(outDiagnostic))
+
+  actual fun mln_runtime_get_offline_region_expiry(
+    runtime: Long,
+    regionId: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_runtime_get_offline_region_expiry(
+      runtime,
+      regionId,
+      word(completion),
+      word(outDiagnostic),
+    )
 
   actual fun mln_runtime_get_offline_region_status(
     runtime: Long,
@@ -1828,6 +1895,11 @@ private fun mln_kw_mln_acquired_frame_get_android_hardware_buffer(p0: Long, p1: 
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_android_hardware_buffer(p0, p1, p2)",
   )
 
+private fun mln_kw_mln_acquired_frame_get_d3d12_texture(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_d3d12_texture(p0, p1, p2)",
+  )
+
 private fun mln_kw_mln_acquired_frame_get_dma_buf(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_acquired_frame_get_dma_buf(p0, p1, p2)",
@@ -1903,14 +1975,34 @@ private fun mln_kw_mln_delivery_queue_dispatch(p0: Long, p1: Int): Int =
 private fun mln_kw_mln_delivery_queue_release(p0: Long): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_delivery_queue_release(p0)")
 
-private fun mln_kw_mln_frame_pacer_create(p0: Int, p1: Int, p2: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_frame_pacer_create(p0, p1, p2)")
+private fun mln_kw_mln_gesture_recognizer_create(p0: Long, p1: Int, p2: Int, p3: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gesture_recognizer_create(p0, p1, p2, p3)",
+  )
 
-private fun mln_kw_mln_frame_pacer_release(p0: Long): Unit =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_frame_pacer_release(p0)")
+private fun mln_kw_mln_gesture_recognizer_handle(
+  p0: Long,
+  p1: Int,
+  p2: Double,
+  p3: Int,
+  p4: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gesture_recognizer_handle(p0, p1, p2, p3, p4)",
+  )
 
-private fun mln_kw_mln_frame_pacer_set_options(p0: Long, p1: Int, p2: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_frame_pacer_set_options(p0, p1, p2)")
+private fun mln_kw_mln_gesture_recognizer_release(p0: Long): Unit =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gesture_recognizer_release(p0)")
+
+private fun mln_kw_mln_gesture_recognizer_set_options(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gesture_recognizer_set_options(p0, p1, p2)",
+  )
+
+private fun mln_kw_mln_gesture_recognizer_tick(p0: Long, p1: Double, p2: Int, p3: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gesture_recognizer_tick(p0, p1, p2, p3)",
+  )
 
 private fun mln_kw_mln_gpu_device_create(p0: Int, p1: Int, p2: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_create(p0, p1, p2)")
@@ -1920,6 +2012,11 @@ private fun mln_kw_mln_gpu_device_get_capabilities(p0: Long, p1: Int, p2: Int): 
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_get_capabilities(p0, p1, p2)",
   )
 
+private fun mln_kw_mln_gpu_device_get_d3d12_context(p0: Long, p1: Int, p2: Int): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_get_d3d12_context(p0, p1, p2)",
+  )
+
 private fun mln_kw_mln_gpu_device_get_vulkan_context(p0: Long, p1: Int, p2: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_get_vulkan_context(p0, p1, p2)",
@@ -1927,6 +2024,9 @@ private fun mln_kw_mln_gpu_device_get_vulkan_context(p0: Long, p1: Int, p2: Int)
 
 private fun mln_kw_mln_gpu_device_release(p0: Long): Unit =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_release(p0)")
+
+private fun mln_kw_mln_gpu_device_wrap_d3d12(p0: Int, p1: Int, p2: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_wrap_d3d12(p0, p1, p2)")
 
 private fun mln_kw_mln_gpu_device_wrap_metal(p0: Int, p1: Int, p2: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_gpu_device_wrap_metal(p0, p1, p2)")
@@ -2798,9 +2898,9 @@ private fun mln_kw_mln_render_session_service_driver_work(p0: Long, p1: Int): In
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_service_driver_work(p0, p1)",
   )
 
-private fun mln_kw_mln_render_session_set_frame_pacer(p0: Long, p1: Long, p2: Int): Int =
+private fun mln_kw_mln_render_session_set_frame_pacing(p0: Long, p1: Int, p2: Int): Int =
   js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_set_frame_pacer(p0, p1, p2)",
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_render_session_set_frame_pacing(p0, p1, p2)",
   )
 
 private fun mln_kw_mln_render_session_set_target(p0: Long, p1: Int, p2: Int, p3: Int): Int =
@@ -2898,6 +2998,16 @@ private fun mln_kw_mln_runtime_dispose(p0: Long, p1: Int): Int =
 private fun mln_kw_mln_runtime_get_offline_region(p0: Long, p1: Long, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_get_offline_region(p0, p1, p2, p3)",
+  )
+
+private fun mln_kw_mln_runtime_get_offline_region_expiry(
+  p0: Long,
+  p1: Long,
+  p2: Int,
+  p3: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_runtime_get_offline_region_expiry(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_runtime_get_offline_region_status(

@@ -10,7 +10,6 @@ import org.junit.Test;
 import org.maplibre.nativeffi.AnimationOptions;
 import org.maplibre.nativeffi.BoundOptions;
 import org.maplibre.nativeffi.Camera;
-import org.maplibre.nativeffi.CameraDelta;
 import org.maplibre.nativeffi.CameraFitUpdate;
 import org.maplibre.nativeffi.CameraOptions;
 import org.maplibre.nativeffi.CameraQueryResult;
@@ -18,12 +17,17 @@ import org.maplibre.nativeffi.CameraTransitionHandler;
 import org.maplibre.nativeffi.CameraTransitionOutcome;
 import org.maplibre.nativeffi.CameraUpdate;
 import org.maplibre.nativeffi.CameraUpdateMode;
-import org.maplibre.nativeffi.GesturePhase;
+import org.maplibre.nativeffi.GestureInput;
+import org.maplibre.nativeffi.GesturePointer;
+import org.maplibre.nativeffi.GesturePointerDown;
+import org.maplibre.nativeffi.GestureRecognizerHandle;
+import org.maplibre.nativeffi.GestureResult;
 import org.maplibre.nativeffi.LatLng;
 import org.maplibre.nativeffi.LatLngBounds;
 import org.maplibre.nativeffi.MapHandle;
 import org.maplibre.nativeffi.MapProjectionHandle;
 import org.maplibre.nativeffi.MapSnapshot;
+import org.maplibre.nativeffi.PointerKind;
 import org.maplibre.nativeffi.ScreenPoint;
 
 public class CameraTest {
@@ -42,34 +46,42 @@ public class CameraTest {
   }
 
   // #region gesture
-  private static void beginGesture(MapHandle map) {
-    map.getDiscarding()
-        .applyCameraDelta(
-            CameraDelta.of().withGesturePhase(GesturePhase.BEGIN));
+  private static GestureRecognizerHandle createRecognizer(
+      MapHandle map) {
+    return map.gestureRecognizerCreate(null);
   }
 
-  private static void applyDrag(MapHandle map, ScreenPoint movement) {
-    map.getDiscarding()
-        .applyCameraDelta(
-            CameraDelta.of()
-                .withOffset(movement)
-                .withGesturePhase(GesturePhase.UPDATE));
+  private static void scheduleTick(GestureResult result) {
+    // On the next frame, or at result.getNextTickMs().
   }
 
-  private static void applyPinch(
-      MapHandle map, double scale, ScreenPoint center) {
-    map.getDiscarding()
-        .applyCameraDelta(
-            CameraDelta.of()
-                .withScale(scale)
-                .withAnchor(center)
-                .withGesturePhase(GesturePhase.UPDATE));
+  private static void pointerDown(
+      GestureRecognizerHandle recognizer,
+      int id,
+      ScreenPoint position,
+      double timeMs) {
+    GestureInput input =
+        new GestureInput.PointerDown(
+            GesturePointerDown.of()
+                .withId(id)
+                .withKind(PointerKind.TOUCH)
+                .withPosition(position));
+    scheduleTick(recognizer.handle(input, timeMs));
   }
 
-  private static void endGesture(MapHandle map) {
-    map.getDiscarding()
-        .applyCameraDelta(
-            CameraDelta.of().withGesturePhase(GesturePhase.END));
+  private static void pointerMove(
+      GestureRecognizerHandle recognizer,
+      int id,
+      ScreenPoint position,
+      double timeMs) {
+    GestureInput input =
+        new GestureInput.PointerMove(GesturePointer.of(id, position));
+    scheduleTick(recognizer.handle(input, timeMs));
+  }
+
+  private static void tick(
+      GestureRecognizerHandle recognizer, double timeMs) {
+    scheduleTick(recognizer.tick(timeMs));
   }
 
   // #endregion gesture
@@ -152,10 +164,14 @@ public class CameraTest {
                   .withMaxZoom(16.0));
       // #endregion limit
 
-      beginGesture(map);
-      applyDrag(map, new ScreenPoint(12.0, -4.0));
-      applyPinch(map, 1.1, new ScreenPoint(200.0, 150.0));
-      endGesture(map);
+      try (GestureRecognizerHandle recognizer =
+          createRecognizer(map)) {
+        pointerDown(
+            recognizer, 1, new ScreenPoint(100.0, 100.0), 0.0);
+        pointerMove(
+            recognizer, 1, new ScreenPoint(112.0, 96.0), 16.0);
+        tick(recognizer, 32.0);
+      }
 
       // #region convert
       ScreenPoint point;

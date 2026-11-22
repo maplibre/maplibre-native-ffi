@@ -1,6 +1,6 @@
-// A view backed by a CAMetalLayer, which reports its layer, its size in
-// logical pixels, and its scale factor to the controller, and passes its input
-// to the gestures.
+// A view backed by a CAMetalLayer, which reports itself, its size in logical
+// pixels, and its scale factor to the controller, and passes its input to the
+// gestures.
 
 import MaplibreNativeFFI
 import QuartzCore
@@ -24,16 +24,19 @@ import SwiftUI
       CAMetalLayer.self
     }
 
+    var metalLayer: CAMetalLayer {
+      layer as! CAMetalLayer
+    }
+
     private let controller: MapController
-    private var gestures: TouchGestures?
+    private lazy var gestures = MapGestures(view: self) { [weak controller] in
+      controller?.gestures
+    }
 
     init(controller: MapController) {
       self.controller = controller
       super.init(frame: .zero)
       isMultipleTouchEnabled = true
-      gestures = TouchGestures(view: self) { [weak self] delta in
-        try? self?.controller.map?.discarding.applyCameraDelta(delta)
-      }
       registerForTraitChanges([UITraitDisplayScale.self]) { (
         view: MetalView,
         _
@@ -50,7 +53,10 @@ import SwiftUI
     override func didMoveToWindow() {
       super.didMoveToWindow()
       controller.setScaleFactor(traitCollection.displayScale)
-      controller.setLayer(window == nil ? nil : layer as? CAMetalLayer)
+      controller.setView(window == nil ? nil : self)
+      if window == nil {
+        gestures.stop()
+      }
     }
 
     override func layoutSubviews() {
@@ -59,16 +65,19 @@ import SwiftUI
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with _: UIEvent?) {
-      gestures?.began(touches)
+      gestures.touchesBegan(touches)
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+      gestures.touchesMoved(touches, with: event)
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with _: UIEvent?) {
-      gestures?.ended(touches)
+      gestures.touchesEnded(touches)
     }
 
-    /// A recognizer that takes over the touches cancels them here.
     override func touchesCancelled(_ touches: Set<UITouch>, with _: UIEvent?) {
-      gestures?.ended(touches)
+      gestures.touchesCancelled(touches)
     }
   }
 
@@ -86,11 +95,14 @@ import SwiftUI
   }
 
   final class MetalView: NSView {
+    var metalLayer: CAMetalLayer {
+      layer as! CAMetalLayer
+    }
+
     private let controller: MapController
-    private lazy var gestures =
-      PointerGestures(view: self) { [weak self] delta in
-        try? self?.controller.map?.discarding.applyCameraDelta(delta)
-      }
+    private lazy var gestures = MapGestures(view: self) { [weak controller] in
+      controller?.gestures
+    }
 
     init(controller: MapController) {
       self.controller = controller
@@ -123,7 +135,10 @@ import SwiftUI
     override func viewDidMoveToWindow() {
       super.viewDidMoveToWindow()
       viewDidChangeBackingProperties()
-      controller.setLayer(window == nil ? nil : layer as? CAMetalLayer)
+      controller.setView(window == nil ? nil : self)
+      if window == nil {
+        gestures.stop()
+      }
     }
 
     /// The window moved to a display of another density.
@@ -140,10 +155,7 @@ import SwiftUI
     }
 
     override func mouseDown(with event: NSEvent) {
-      gestures.mouseDown(
-        event,
-        rotating: event.modifierFlags.contains(.control)
-      )
+      gestures.mouseDown(event, modes: [])
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -155,7 +167,7 @@ import SwiftUI
     }
 
     override func rightMouseDown(with event: NSEvent) {
-      gestures.mouseDown(event, rotating: true)
+      gestures.mouseDown(event, modes: .rotate)
     }
 
     override func rightMouseDragged(with event: NSEvent) {
@@ -164,6 +176,10 @@ import SwiftUI
 
     override func rightMouseUp(with event: NSEvent) {
       gestures.mouseUp(event)
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+      gestures.flagsChanged(event)
     }
 
     override func scrollWheel(with event: NSEvent) {
@@ -180,6 +196,12 @@ import SwiftUI
 
     override func smartMagnify(with event: NSEvent) {
       gestures.smartMagnify(event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+      if !gestures.keyDown(event) {
+        super.keyDown(with: event)
+      }
     }
   }
 #endif

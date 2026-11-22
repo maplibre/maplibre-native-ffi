@@ -1,7 +1,7 @@
 # The tools of the web presets, for `MISE_ENV=web`. See the development overview.
 #
-# The presets build mln-rs's browser package with its own `just c-web` recipe
-# (cmake/mln_ffi_web.cmake). It runs wasm-bindgen, whose version must be the
+# The presets build mln-rs's browser package with its own `c-web:build` task
+# script (cmake/mln_ffi_web.cmake). It runs wasm-bindgen, whose version must be the
 # wasm-bindgen crate's in mln-rs's Cargo.lock, and binaryen's wasm-opt. These
 # follow mln-rs's mise.toml.
 #
@@ -14,6 +14,5 @@
 # AR_wasm32_unknown_unknown at its clang and llvm-ar.
 
 [tools]
-"aqua:casey/just" = "1.59.0"
 "github:wasm-bindgen/wasm-bindgen" = "0.2.130"
 "aqua:WebAssembly/binaryen" = "133"

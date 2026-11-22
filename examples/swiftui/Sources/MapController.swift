@@ -1,12 +1,11 @@
-// A continuous map on a CAMetalLayer. The view reports its layer, size, and
-// scale factor, and the scene reports whether the window is visible. The
-// controller attaches a session to the layer, and keeps the map and session
-// as these change. Everything else matches the browser example in
+// A continuous map on a CAMetalLayer. The view reports itself, its size, and
+// its scale factor, and the scene reports whether the window is visible. The
+// controller attaches a session to the view's layer, and keeps the map and
+// session as these change. Everything else matches the browser example in
 // examples/browser.
 
 import MaplibreNativeFFI
 import Observation
-import QuartzCore
 
 private let styleUrl = "https://tiles.openfreemap.org/styles/liberty"
 
@@ -30,12 +29,13 @@ final class MapController {
   @ObservationIgnored private var failed = false
 
   @ObservationIgnored private var runtime: RuntimeHandle?
-  @ObservationIgnored private var pacer: FramePacerHandle?
-  @ObservationIgnored private(set) var map: MapHandle?
+  @ObservationIgnored private var map: MapHandle?
   @ObservationIgnored private var session: RenderSessionHandle?
+  /// Moves the map's camera with the view's input.
+  @ObservationIgnored private(set) var gestures: GestureRecognizerHandle?
 
   // What the view reports.
-  @ObservationIgnored private var layer: CAMetalLayer?
+  @ObservationIgnored private weak var view: MetalView?
   @ObservationIgnored private var size: LogicalSize?
   @ObservationIgnored private var scaleFactor: Double?
   @ObservationIgnored private var visible = true
@@ -61,22 +61,23 @@ final class MapController {
     let previous = changes
     changes = Task {
       await previous?.value
-      let (session, map, runtime, pacer) = (session, map, runtime, pacer)
+      let (session, map, runtime) = (session, map, runtime)
+      gestures?.release()
+      gestures = nil
       self.session = nil
       self.map = nil
       self.runtime = nil
-      self.pacer = nil
       sessionExtent = nil
       hasTarget = false
       try? await session?.release()
       try? map?.dispose()
       try? runtime?.dispose()
-      pacer?.release()
     }
   }
 
-  func setLayer(_ layer: CAMetalLayer?) {
-    self.layer = layer
+  /// The view, while it is in a window.
+  func setView(_ view: MetalView?) {
+    self.view = view
     update()
   }
 
@@ -117,11 +118,12 @@ final class MapController {
     // The platform takes the surface away, as when the app goes to the
     // background or the view leaves its window. Release it from the session,
     // and keep the session and its tiles for when the view shows again. This
-    // runs even after a failure, since the session can still render.
-    guard visible, let layer else {
+    // runs even after a failure, since the session can still render. A
+    // layer's release and replacement complete without a GPU sync.
+    guard visible, let view else {
       if let session, hasTarget {
         hasTarget = false
-        try await session.releaseTarget()
+        _ = try await session.releaseTarget()
       }
       return
     }
@@ -139,12 +141,12 @@ final class MapController {
       map = try await createMap(extent: extent)
     }
     guard let session, let sessionExtent else {
-      try attach(map: map, layer: layer, extent: extent)
+      try attach(map: map, view: view, extent: extent)
       return
     }
     if !hasTarget {
-      try await session.setTarget(.metalLayer(
-        MetalLayerTarget(logicalSize: size, layer: layer)
+      _ = try await session.setTarget(.metalLayer(
+        MetalLayerTarget(logicalSize: size, layer: view.metalLayer)
       ))
       hasTarget = true
       self.sessionExtent = LogicalExtent(
@@ -170,6 +172,7 @@ final class MapController {
     ))
     self.map = map
     try await map.ready
+    gestures = try map.gestureRecognizerCreate()
     try map.discarding.updateCamera(
       CameraUpdate(mode: .jump, camera: initialCamera)
     )
@@ -186,22 +189,20 @@ final class MapController {
       .setEventHandler(RuntimeEventHandler { [weak self] events in
         Task { @MainActor [weak self] in self?.handle(events) }
       })
-    // The pacer demands each session's frames at the display's refreshes.
-    pacer = try FramePacerHandle.create()
     return runtime
   }
 
-  /// Attaches a session to the layer, on a device that the session creates.
-  /// The map was created at `extent`, which the session takes.
+  /// Attaches a session to the view's layer, on a device that the session
+  /// creates. The map was created at `extent`, which the session takes.
   private func attach(
     map: MapHandle,
-    layer: CAMetalLayer,
+    view: MetalView,
     extent: LogicalExtent
   ) throws {
     let session = try map.attach(
       target: .metalLayer(MetalLayerTarget(
         logicalSize: LogicalSize(width: extent.width, height: extent.height),
-        layer: layer
+        layer: view.metalLayer
       )),
       options: RenderSessionAttachOptions(
         driver: .coreWorker,
@@ -214,7 +215,9 @@ final class MapController {
     self.session = session
     hasTarget = true
     sessionExtent = extent
-    try session.setFramePacer(pacer)
+    // The library demands each frame at a refresh of the display that shows
+    // the view.
+    try session.setFramePacing(options: FramePacingOptions(view: view))
   }
 
   private func handle(_ events: [RuntimeEvent]) {

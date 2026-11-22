@@ -57,7 +57,7 @@ public sealed unsafe partial class RenderSessionHandle
         NativeMethods.mln_render_session_dispose(live, diagnostic);
 
     NativeHandleState<MlnRenderSession> INativeOwner<MlnRenderSession>.State => state;
-    internal MlnRenderSession Handle => state.Handle;
+    internal MlnRenderSession NativeHandle => state.Handle;
 
     /// <summary>
     /// The native handle value. It stays readable after release.
@@ -121,7 +121,7 @@ public sealed unsafe partial class RenderSessionHandle
         {
             size = (uint)sizeof(mln_render_abandon_result),
         };
-        Check(NativeMethods.mln_render_session_abandon(Handle, &outResult, Diagnostic));
+        Check(NativeMethods.mln_render_session_abandon(NativeHandle, &outResult, Diagnostic));
         return CopyRenderAbandonResult(outResult);
     }
 
@@ -152,7 +152,7 @@ public sealed unsafe partial class RenderSessionHandle
     {
         using var call = Enter(this);
         MlnAcquiredFrame outFrame = default;
-        Check(NativeMethods.mln_render_session_acquire_frame(Handle, &outFrame, Diagnostic));
+        Check(NativeMethods.mln_render_session_acquire_frame(NativeHandle, &outFrame, Diagnostic));
         if (outFrame.Value == 0)
             return null;
         return AcquiredFrameHandle.Adopt(this, outFrame);
@@ -177,7 +177,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_barrier(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -202,7 +202,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_clear_data(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -214,7 +214,10 @@ public sealed unsafe partial class RenderSessionHandle
     /// </summary>
     /// <remarks>
     /// <para>The frame shows the map commands that you sent before the call,
-    /// except the changes that an open command group holds back.</para>
+    /// except the changes that an open command group holds back, and the map's
+    /// camera animations as they are at the time of the call. Demand each frame
+    /// when the display is ready for it, so that animations move evenly.
+    /// <c>RenderSessionHandle.SetFramePacing()</c> does that for you.</para>
     /// <para>You can call it once the attach call returns. While the attach
     /// runs, the demand waits for it to complete. Every demand finishes with
     /// one frame result that carries its token, and
@@ -240,7 +243,9 @@ public sealed unsafe partial class RenderSessionHandle
     {
         using var call = Enter(this);
         var nativeDemand = NativeFrameDemand(demand);
-        Check(NativeMethods.mln_render_session_demand_frame(Handle, &nativeDemand, Diagnostic));
+        Check(
+            NativeMethods.mln_render_session_demand_frame(NativeHandle, &nativeDemand, Diagnostic)
+        );
     }
 
     /// <summary>
@@ -264,7 +269,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_detach(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -290,7 +295,7 @@ public sealed unsafe partial class RenderSessionHandle
         };
         Check(
             NativeMethods.mln_render_session_drain_frame_results(
-                Handle,
+                NativeHandle,
                 &outBatch,
                 &outView,
                 Diagnostic
@@ -325,7 +330,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_dump_debug_logs(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -347,7 +352,11 @@ public sealed unsafe partial class RenderSessionHandle
             size = (uint)sizeof(mln_render_session_capabilities),
         };
         Check(
-            NativeMethods.mln_render_session_get_capabilities(Handle, &outCapabilities, Diagnostic)
+            NativeMethods.mln_render_session_get_capabilities(
+                NativeHandle,
+                &outCapabilities,
+                Diagnostic
+            )
         );
         return CopyRenderSessionCapabilities(outCapabilities);
     }
@@ -383,7 +392,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_get_cluster_children(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             clusterId,
             NativeCompletion.Start<string>(
@@ -427,7 +436,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_get_cluster_expansion_zoom(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             clusterId,
             NativeCompletion.Start<uint>(
@@ -472,7 +481,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_get_cluster_leaves(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             clusterId,
             limit,
@@ -511,7 +520,7 @@ public sealed unsafe partial class RenderSessionHandle
         {
             Check(
                 NativeMethods.mln_render_session_get_failure(
-                    Handle,
+                    NativeHandle,
                     outMessage,
                     messageCapacity,
                     &outMessageLength,
@@ -541,7 +550,9 @@ public sealed unsafe partial class RenderSessionHandle
         {
             size = (uint)sizeof(mln_render_session_snapshot),
         };
-        Check(NativeMethods.mln_render_session_get_snapshot(Handle, &outSnapshot, Diagnostic));
+        Check(
+            NativeMethods.mln_render_session_get_snapshot(NativeHandle, &outSnapshot, Diagnostic)
+        );
         return CopyRenderSessionSnapshot(outSnapshot);
     }
 
@@ -567,7 +578,7 @@ public sealed unsafe partial class RenderSessionHandle
             : NativeRenderedFeatureQueryOptions(options, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_query_rendered_features(
-            Handle,
+            NativeHandle,
             &nativeGeometry,
             options is null ? null : &nativeOptions,
             NativeCompletion.Start<RenderedFeature[]>(
@@ -605,7 +616,7 @@ public sealed unsafe partial class RenderSessionHandle
             : NativeSourceFeatureQueryOptions(options, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_query_source_features(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             options is null ? null : &nativeOptions,
             NativeCompletion.Start<SourceFeature[]>(
@@ -643,7 +654,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_read_texture(
-            Handle,
+            NativeHandle,
             NativeCompletion.Start<TextureReadbackResult>(
                 &nativeCompletion,
                 static nativeResult =>
@@ -675,7 +686,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_reduce_memory_use(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -734,18 +745,21 @@ public sealed unsafe partial class RenderSessionHandle
     /// app goes to the background. Release every acquired frame first. Frame
     /// demands that are still pending, and later ones until you give the
     /// session a new target, finish with <c>RenderResult.TargetNotReady</c>.
-    /// Once the release completes, you can destroy the old target. An Android
-    /// or OpenHarmony window can go away sooner, as <c>AndroidWindowTarget</c>
-    /// and <c>OhosWindowTarget</c> say.</para>
-    /// <para>For a borrowed ring, a completed release also means that the
-    /// session has stopped waiting on the consumer sync that you released its
-    /// frames with, so you can reuse or destroy the textures. The session waits
-    /// about a second at most for that sync, and logs a warning when the wait
-    /// runs out. It checks the sync without blocking a thread: keep servicing a
-    /// session driven by <c>RenderDriverKind.CallerGraphicsThread</c> until the
-    /// release completes. The session keeps nothing of the released textures: a
-    /// texture that a later target gives it again is a new one, even one that
-    /// you discarded a frame of.</para>
+    /// Once the release of a window or surface completes, you can destroy it.
+    /// An Android or OpenHarmony window can go away sooner, as
+    /// <c>AndroidWindowTarget</c> and <c>OhosWindowTarget</c> say.</para>
+    /// <para>For a borrowed ring, the release completes with an <c>GpuSync</c>
+    /// of <c>RenderSessionCapabilities.ProducerSyncKind</c>, or
+    /// <c>GpuSyncKind.CpuComplete</c> when the session has no textures since an
+    /// earlier release. Wait for it before you reuse or destroy the textures,
+    /// as you wait for an acquired frame's producer sync: for
+    /// <c>GpuSyncKind.QueueOrder</c>, destroy them once work that you submit to
+    /// the queue after the completion has finished. The session's GPU work on
+    /// the textures, and its waits for the consumer syncs that you released its
+    /// frames with, end there, so keep those syncs until then too. The session
+    /// keeps nothing of the released textures: a texture that a later target
+    /// gives it again is a new one, even one that you discarded a frame of. For
+    /// another target, the completion has no value.</para>
     /// <para>See <c>mln_render_session_release_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -754,15 +768,26 @@ public sealed unsafe partial class RenderSessionHandle
     /// offscreen or into an exported ring.</description></item>
     /// <item><description><c>Status.TargetLost</c> when the session loses its
     /// target before the release runs.</description></item>
+    /// <item><description><c>Status.NativeError</c> when the session can't
+    /// submit its work on a borrowed ring's textures. It keeps them
+    /// then.</description></item>
     /// </list>
     /// </remarks>
-    public Task ReleaseTargetAsync()
+    public Task<GpuSync?> ReleaseTargetAsync()
     {
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_release_target(
-            Handle,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            NativeHandle,
+            NativeCompletion.Start<GpuSync?>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.OptionalValue<mln_gpu_sync, GpuSync>(
+                        nativeResult,
+                        CopyGpuSync
+                    ),
+                out var nativePending
+            ),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -800,7 +825,7 @@ public sealed unsafe partial class RenderSessionHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_resize(
-            Handle,
+            NativeHandle,
             NativeLogicalExtent(extent),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -835,40 +860,73 @@ public sealed unsafe partial class RenderSessionHandle
     public void ServiceDriverWork()
     {
         using var call = Enter(this);
-        Check(NativeMethods.mln_render_session_service_driver_work(Handle, Diagnostic));
+        Check(NativeMethods.mln_render_session_service_driver_work(NativeHandle, Diagnostic));
     }
 
     /// <summary>
-    /// Sets the frame pacer that demands the session's frames.
+    /// Paces the session's frames to the display.
     /// </summary>
     /// <remarks>
     /// <para>At the first display refresh after the session has something new
-    /// to draw, <c>pacer</c> demands a frame without flags and with token 0.
-    /// One pacer can serve many sessions. A null <c>pacer</c> stops pacing the
-    /// session. You can call it once the attach call returns.</para>
-    /// <para>See <c>mln_render_session_set_frame_pacer</c> in the <see
+    /// to draw, the library demands a frame without flags and with token 0,
+    /// unless you demanded one first. Each call replaces the session's pacing,
+    /// and a null <c>options</c> stops it. You can call it once the attach call
+    /// returns.</para>
+    /// <para>On iOS, macOS, and tvOS, the library uses a <c>CADisplayLink</c>
+    /// on a thread of its own. With <c>FramePacingOptions.View</c>, call it on
+    /// the main thread. The library asks the system for the frame rate limit's
+    /// refresh rate. On iPhone, a rate above 60 needs
+    /// <c>CADisableMinimumFrameDurationOnPhone</c> in the app's
+    /// <c>Info.plist</c>.</para>
+    /// <para>On Android, the library follows the display through the calling
+    /// thread's <c>AChoreographer</c>. Call it on a thread with an
+    /// <c>ALooper</c>, such as the app's main thread, and keep that thread
+    /// running its looper while the session is paced. <c>AChoreographer</c> can
+    /// stop while the phone's display is off, even while a Surface on another
+    /// display, such as an Android Auto projection, still shows the map. The
+    /// library then keeps demanding frames from a timer on the looper, within
+    /// the frame rate limit, until vsyncs arrive again.</para>
+    /// <para>On OpenHarmony, the library uses <c>OH_NativeVSync</c>, from any
+    /// thread.</para>
+    /// <para>See <c>mln_render_session_set_frame_pacing</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
     /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when <c>options</c>
+    /// sets <c>maximum_frames_per_second</c> to 0, or sets <c>view</c> to
+    /// null.</description></item>
+    /// <item><description><c>Status.Unsupported</c> on the other platforms,
+    /// such as visionOS, Linux, and Windows, where the library has no source of
+    /// display refreshes, on macOS before 14, and when <c>options</c> sets
+    /// <c>view</c> on a platform other than macOS, iOS, and
+    /// tvOS.</description></item>
     /// <item><description><c>Status.TargetLost</c> or
     /// <c>Status.NativeError</c>, as <c>RenderSessionSnapshot.FailureStatus</c>
     /// reports, when the session has failed.</description></item>
     /// <item><description><c>Status.InvalidState</c> when you attached the
     /// session with a redraw wake, or detached, abandoned, released, or
-    /// disposed it.</description></item>
+    /// disposed it, on Android when the calling thread has no <c>ALooper</c>,
+    /// and when <c>options</c> sets <c>view</c> off the main thread or, on iOS
+    /// and tvOS, to a view in no window.</description></item>
+    /// <item><description><c>Status.NativeError</c> on iOS, macOS, and tvOS
+    /// when the system has no display to follow, and on OpenHarmony when the
+    /// system can't report the display's refreshes to the
+    /// process.</description></item>
     /// </list>
     /// </remarks>
-    public void SetFramePacer(FramePacerHandle? pacer = null)
+    public void SetFramePacing(FramePacingOptions? options = null)
     {
-        using var scope = new NativeCallScope(this);
+        using var call = Enter(this);
+        var nativeOptions = options is null
+            ? default(mln_frame_pacing_options)
+            : NativeFramePacingOptions(options);
         Check(
-            NativeMethods.mln_render_session_set_frame_pacer(
-                Handle,
-                scope.UseOptional(pacer),
+            NativeMethods.mln_render_session_set_frame_pacing(
+                NativeHandle,
+                options is null ? null : &nativeOptions,
                 Diagnostic
             )
         );
-        scope.Accept();
     }
 
     /// <summary>
@@ -884,11 +942,13 @@ public sealed unsafe partial class RenderSessionHandle
     /// uses the old target. A borrowed ring takes only a ring of the kind it
     /// attached with, with as many textures, with depth textures only when it
     /// attached with them, and with the same formats, final layouts, and owner.
-    /// Release every acquired frame of a borrowed ring first. Once the
-    /// replacement completes, the session has also stopped waiting on the
-    /// consumer sync of the textures that the new ring doesn't have, as
-    /// <c>RenderSessionHandle.ReleaseTargetAsync()</c> says, so you can reuse
-    /// or destroy them.</para>
+    /// Release every acquired frame of a borrowed ring first. For a borrowed
+    /// ring, the replacement completes with an <c>GpuSync</c>: wait for it
+    /// before you reuse or destroy the textures that the new ring doesn't have,
+    /// as <c>RenderSessionHandle.ReleaseTargetAsync()</c> says. When it lets go
+    /// of no textures, such as after a release, the sync is
+    /// <c>GpuSyncKind.CpuComplete</c>. For another target, the completion has
+    /// no value.</para>
     /// <para>See <c>mln_render_session_set_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -918,15 +978,23 @@ public sealed unsafe partial class RenderSessionHandle
     /// render to the new target.</description></item>
     /// </list>
     /// </remarks>
-    public Task SetTargetAsync(RenderTarget target)
+    public Task<GpuSync?> SetTargetAsync(RenderTarget target)
     {
         using var scope = new NativeCallScope(this);
         var nativeTarget = NativeRenderTarget(target, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_render_session_set_target(
-            Handle,
+            NativeHandle,
             &nativeTarget,
-            NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
+            NativeCompletion.Start<GpuSync?>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.OptionalValue<mln_gpu_sync, GpuSync>(
+                        nativeResult,
+                        CopyGpuSync
+                    ),
+                out var nativePending
+            ),
             Diagnostic
         );
         return scope.Accepted(nativePending.Submitted(nativeStatus));
@@ -953,7 +1021,7 @@ public sealed unsafe partial class RenderSessionHandle
 
         public void Resize(LogicalExtent extent)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_render_session_resize(

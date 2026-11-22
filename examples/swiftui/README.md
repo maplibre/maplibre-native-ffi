@@ -26,10 +26,15 @@ open `MaplibreExample.xcodeproj`. When Xcode resolves the package without the
 `Package.resolved`; restore it with Git.
 
 `Sources/MapSurface.swift` hosts a view backed by a `CAMetalLayer`, and reports
-its layer, size, and scale factor. `Sources/MapController.swift` attaches a
-render session to the layer on a library thread, and paces its frames with a
-frame pacer that follows the display. When the app goes to the background, the
-controller releases the session's target and keeps the session, and gives it the
-layer again when the app comes back. A resize or a move to a display of another
-density resizes the session, which gives the map its new size and scale factor.
-Everything else matches the browser example in `examples/browser`.
+itself, its size, and its scale factor. `Sources/MapController.swift` attaches a
+render session to the view's layer on a library thread, and has the session pace
+its frames to the display that shows the view. When the app goes to the
+background, the controller releases the session's target and keeps the session,
+and gives it the layer again when the app comes back. A resize or a move to a
+display of another density resizes the session, which gives the map its new size
+and scale factor.
+
+`Sources/Gestures.swift` passes the view's touches, mouse, trackpad, and keys to
+the map's gesture recognizer, which moves the camera, and ticks the recognizer
+with a display link or a timer when it asks. Everything else matches the browser
+example in `examples/browser`.

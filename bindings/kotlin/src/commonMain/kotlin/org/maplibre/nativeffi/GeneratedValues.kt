@@ -47,8 +47,9 @@ public class CacheDatabaseOperation(@get:JvmName("getRawValue") public val rawVa
     /** The `rawValue` of [CLEAR]. */
     public const val CLEAR_VALUE: UInt = 1u
     /**
-     * Keeps the ambient cache's resources, but makes maps check each one with the server before
-     * they use it again. Offline regions keep their resources as they are.
+     * Keeps the ambient cache's resources, but makes them stale: maps check each one with the
+     * server when they next use it, and show it meanwhile unless the server requires checking it
+     * first. Offline regions keep their resources as they are.
      */
     @JvmField
     public val INVALIDATE: CacheDatabaseOperation = CacheDatabaseOperation(INVALIDATE_VALUE)
@@ -148,11 +149,11 @@ public class CameraChangeSource(@get:JvmName("getRawValue") public val rawValue:
     @JvmField public val COMMAND: CameraChangeSource = CameraChangeSource(COMMAND_VALUE)
     /** The `rawValue` of [COMMAND]. */
     public const val COMMAND_VALUE: UInt = 0u
-    /** A camera command with a gesture phase. */
+    /** A gesture that a gesture recognizer recognized. */
     @JvmField public val GESTURE: CameraChangeSource = CameraChangeSource(GESTURE_VALUE)
     /** The `rawValue` of [GESTURE]. */
     public const val GESTURE_VALUE: UInt = 1u
-    /** The momentum and bearing snap that a gesture's end started. */
+    /** The glide and snap after a gesture recognizer's gesture. */
     @JvmField public val MOMENTUM: CameraChangeSource = CameraChangeSource(MOMENTUM_VALUE)
     /** The `rawValue` of [MOMENTUM]. */
     public const val MOMENTUM_VALUE: UInt = 2u
@@ -203,10 +204,10 @@ public class CameraTransitionOutcome(@get:JvmName("getRawValue") public val rawV
     /** The `rawValue` of [COMPLETED]. */
     public const val COMPLETED_VALUE: UInt = 0u
     /**
-     * `MapHandle.cancelCameraTransitions()`, `MapHandle.cancelCameraTransitionsWithId()`, a
-     * gesture's `GesturePhase.BEGIN` or `GesturePhase.CANCEL`, `MapHandle.setFreeCameraOptions()`,
-     * or a resize that moved the camera back inside its bounds stopped the change. A command that
-     * fails before it moves the camera also reports this.
+     * `MapHandle.cancelCameraTransitions()`, `MapHandle.cancelCameraTransitionsWithId()`, a gesture
+     * that a gesture recognizer begins or cancels, `MapHandle.setFreeCameraOptions()`, or a resize
+     * that moved the camera back inside its bounds stopped the change. A command that fails before
+     * it moves the camera also reports this.
      */
     @JvmField
     public val CANCELLED: CameraTransitionOutcome = CameraTransitionOutcome(CANCELLED_VALUE)
@@ -392,6 +393,53 @@ public class ConstrainMode(@get:JvmName("getRawValue") public val rawValue: UInt
 }
 
 /**
+ * What shows a D3D12 composition swap chain.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_d3d12_composition_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public class D3d12CompositionKind(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      1u -> "VISUAL"
+      2u -> "SWAP_CHAIN_PANEL"
+      else -> "D3d12CompositionKind($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean =
+    other is D3d12CompositionKind && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /** An `IDCompositionVisual`, whose content the session sets to its swap chain. */
+    @JvmField public val VISUAL: D3d12CompositionKind = D3d12CompositionKind(VISUAL_VALUE)
+    /** The `rawValue` of [VISUAL]. */
+    public const val VISUAL_VALUE: UInt = 1u
+    /**
+     * A XAML `SwapChainPanel`'s `ISwapChainPanelNative`, of WinUI or UWP, whose swap chain the
+     * session sets.
+     */
+    @JvmField
+    public val SWAP_CHAIN_PANEL: D3d12CompositionKind = D3d12CompositionKind(SWAP_CHAIN_PANEL_VALUE)
+    /** The `rawValue` of [SWAP_CHAIN_PANEL]. */
+    public const val SWAP_CHAIN_PANEL_VALUE: UInt = 2u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): D3d12CompositionKind =
+      when (rawValue) {
+        VISUAL_VALUE -> VISUAL
+        SWAP_CHAIN_PANEL_VALUE -> SWAP_CHAIN_PANEL
+        else -> D3d12CompositionKind(rawValue)
+      }
+  }
+}
+
+/**
  * A format of depth and stencil textures, as a bit in a set.
  *
  * Later versions may add flags; unknown bits keep their place in `rawValue`.
@@ -525,71 +573,163 @@ public class FrameDemandFlag(@get:JvmName("getRawValue") public val rawValue: UI
 }
 
 /**
- * Where a camera change falls in a gesture that the user makes.
- *
- * `GesturePhase.BEGIN` and `GesturePhase.UPDATE` mark a gesture in progress, and `GesturePhase.END`
- * and `GesturePhase.CANCEL` end it.
+ * The part of the camera that a notch is on.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
- * See `mln_gesture_phase` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * See `mln_gesture_axis` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
-public class GesturePhase(@get:JvmName("getRawValue") public val rawValue: UInt) {
+public class GestureAxis(@get:JvmName("getRawValue") public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
-      0u -> "NONE"
-      1u -> "BEGIN"
-      2u -> "UPDATE"
-      3u -> "END"
-      4u -> "CANCEL"
-      else -> "GesturePhase($rawValue)"
+      0u -> "ZOOM"
+      1u -> "BEARING"
+      2u -> "PITCH"
+      else -> "GestureAxis($rawValue)"
     }
 
-  override fun equals(other: Any?): Boolean = other is GesturePhase && other.rawValue == rawValue
+  override fun equals(other: Any?): Boolean = other is GestureAxis && other.rawValue == rawValue
 
   override fun hashCode(): Int = rawValue.hashCode()
 
   public companion object {
-    /** The change isn't part of a gesture. */
-    @JvmField public val NONE: GesturePhase = GesturePhase(NONE_VALUE)
-    /** The `rawValue` of [NONE]. */
-    public const val NONE_VALUE: UInt = 0u
-    /**
-     * The gesture starts. This cancels every running camera animation before the change applies.
-     */
-    @JvmField public val BEGIN: GesturePhase = GesturePhase(BEGIN_VALUE)
-    /** The `rawValue` of [BEGIN]. */
-    public const val BEGIN_VALUE: UInt = 1u
-    /**
-     * The gesture continues. To start a gesture that keeps the running camera animations, start it
-     * with this phase instead of `GesturePhase.BEGIN`.
-     */
-    @JvmField public val UPDATE: GesturePhase = GesturePhase(UPDATE_VALUE)
-    /** The `rawValue` of [UPDATE]. */
-    public const val UPDATE_VALUE: UInt = 2u
-    @JvmField public val END: GesturePhase = GesturePhase(END_VALUE)
-    /** The `rawValue` of [END]. */
-    public const val END_VALUE: UInt = 3u
-    /**
-     * The platform cancelled the gesture. This also cancels every running camera animation after
-     * the change applies.
-     */
-    @JvmField public val CANCEL: GesturePhase = GesturePhase(CANCEL_VALUE)
-    /** The `rawValue` of [CANCEL]. */
-    public const val CANCEL_VALUE: UInt = 4u
+    @JvmField public val ZOOM: GestureAxis = GestureAxis(ZOOM_VALUE)
+    /** The `rawValue` of [ZOOM]. */
+    public const val ZOOM_VALUE: UInt = 0u
+    @JvmField public val BEARING: GestureAxis = GestureAxis(BEARING_VALUE)
+    /** The `rawValue` of [BEARING]. */
+    public const val BEARING_VALUE: UInt = 1u
+    @JvmField public val PITCH: GestureAxis = GestureAxis(PITCH_VALUE)
+    /** The `rawValue` of [PITCH]. */
+    public const val PITCH_VALUE: UInt = 2u
 
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
     @JvmName("of")
-    public fun of(rawValue: UInt): GesturePhase =
+    public fun of(rawValue: UInt): GestureAxis =
+      when (rawValue) {
+        ZOOM_VALUE -> ZOOM
+        BEARING_VALUE -> BEARING
+        PITCH_VALUE -> PITCH
+        else -> GestureAxis(rawValue)
+      }
+  }
+}
+
+/**
+ * What a one-pointer drag or a double tap does instead of its default, from the pointer's held
+ * buttons or from held keys. A drag reads its modes when it starts and keeps them until it ends,
+ * and a double tap when it lifts; rotating wins over a box zoom.
+ *
+ * Later versions may add flags; unknown bits keep their place in `rawValue`.
+ *
+ * See `mln_gesture_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public class GestureMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  public infix fun or(other: GestureMode): GestureMode = of(rawValue or other.rawValue)
+
+  public infix fun and(other: GestureMode): GestureMode = of(rawValue and other.rawValue)
+
+  public operator fun contains(other: GestureMode): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  override fun toString(): String =
+    flagLabel(
+      rawValue.toULong(),
+      "NONE",
+      listOf(1uL to "ROTATE", 2uL to "BOX_ZOOM", 4uL to "ZOOM_OUT"),
+    )
+
+  override fun equals(other: Any?): Boolean = other is GestureMode && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /** No flags. */
+    @JvmField public val NONE: GestureMode = GestureMode(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 0u
+    /** Sideways turns the map and up and down tilts it. */
+    @JvmField public val ROTATE: GestureMode = GestureMode(ROTATE_VALUE)
+    /** The `rawValue` of [ROTATE]. */
+    public const val ROTATE_VALUE: UInt = 1u
+    /** Draws a box that the map zooms to when the pointer lifts. */
+    @JvmField public val BOX_ZOOM: GestureMode = GestureMode(BOX_ZOOM_VALUE)
+    /** The `rawValue` of [BOX_ZOOM]. */
+    public const val BOX_ZOOM_VALUE: UInt = 2u
+    /** A double tap zooms out instead of in. */
+    @JvmField public val ZOOM_OUT: GestureMode = GestureMode(ZOOM_OUT_VALUE)
+    /** The `rawValue` of [ZOOM_OUT]. */
+    public const val ZOOM_OUT_VALUE: UInt = 4u
+
+    /**
+     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
+     */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): GestureMode =
       when (rawValue) {
         NONE_VALUE -> NONE
-        BEGIN_VALUE -> BEGIN
-        UPDATE_VALUE -> UPDATE
-        END_VALUE -> END
-        CANCEL_VALUE -> CANCEL
-        else -> GesturePhase(rawValue)
+        ROTATE_VALUE -> ROTATE
+        BOX_ZOOM_VALUE -> BOX_ZOOM
+        ZOOM_OUT_VALUE -> ZOOM_OUT
+        else -> GestureMode(rawValue)
+      }
+  }
+}
+
+/**
+ * When a gesture recognizer next needs `GestureRecognizerHandle.tick()`.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_gesture_next_tick` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public class GestureNextTick(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "NONE"
+      1u -> "FRAME"
+      2u -> "AT"
+      else -> "GestureNextTick($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean = other is GestureNextTick && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /** Not until the next input. */
+    @JvmField public val NONE: GestureNextTick = GestureNextTick(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 0u
+    /**
+     * Every display frame, while a delta eases or a gesture, its glide, or its snap may reach a
+     * notch.
+     */
+    @JvmField public val FRAME: GestureNextTick = GestureNextTick(FRAME_VALUE)
+    /** The `rawValue` of [FRAME]. */
+    public const val FRAME_VALUE: UInt = 1u
+    /**
+     * At `next_tick_ms`, on the inputs' clock: when a press becomes a long press, or idle deltas
+     * end.
+     */
+    @JvmField public val AT: GestureNextTick = GestureNextTick(AT_VALUE)
+    /** The `rawValue` of [AT]. */
+    public const val AT_VALUE: UInt = 2u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): GestureNextTick =
+      when (rawValue) {
+        NONE_VALUE -> NONE
+        FRAME_VALUE -> FRAME
+        AT_VALUE -> AT
+        else -> GestureNextTick(rawValue)
       }
   }
 }
@@ -1310,18 +1450,18 @@ public class MapMode(@get:JvmName("getRawValue") public val rawValue: UInt) {
 }
 
 /**
- * How a part of a gesture's momentum slows from its release speed.
+ * How a part's glide unfolds from its release speed.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
  *
  * See `mln_momentum_decay_model` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
 public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue: UInt) {
   override fun toString(): String =
     when (rawValue) {
       0u -> "FRICTION"
-      1u -> "EASE"
+      1u -> "CURVE"
       else -> "MomentumDecayModel($rawValue)"
     }
 
@@ -1339,13 +1479,15 @@ public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue:
     /** The `rawValue` of [FRICTION]. */
     public const val FRICTION_VALUE: UInt = 0u
     /**
-     * The part eases `distance` over `duration_ms`, along `easing`, as a camera animation does. The
-     * caller plans the glide, for example from the platform's own fling physics, such as Android's
-     * OverScroller.
+     * The glide lasts `duration_ms` × (speed / `reference_speed`) to the power of
+     * `duration_exponent`, and follows `easing`, starting at the release speed. Its defaults are
+     * Android's OverScroller fling, in its density-independent pixels: a reference speed of 1000,
+     * 555.182 ms, an exponent of 0.7362676, the curve (0.175, 0.5, 0.35, 1), a minimum speed of 50
+     * and a maximum of 8000.
      */
-    @JvmField public val EASE: MomentumDecayModel = MomentumDecayModel(EASE_VALUE)
-    /** The `rawValue` of [EASE]. */
-    public const val EASE_VALUE: UInt = 1u
+    @JvmField public val CURVE: MomentumDecayModel = MomentumDecayModel(CURVE_VALUE)
+    /** The `rawValue` of [CURVE]. */
+    public const val CURVE_VALUE: UInt = 1u
 
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
@@ -1353,7 +1495,7 @@ public class MomentumDecayModel(@get:JvmName("getRawValue") public val rawValue:
     public fun of(rawValue: UInt): MomentumDecayModel =
       when (rawValue) {
         FRICTION_VALUE -> FRICTION
-        EASE_VALUE -> EASE
+        CURVE_VALUE -> CURVE
         else -> MomentumDecayModel(rawValue)
       }
   }
@@ -1596,6 +1738,104 @@ public class OpenGlContextProviderFlag(@get:JvmName("getRawValue") public val ra
 }
 
 /**
+ * Where a platform-recognized pinch is.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_pinch_phase` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public class PinchPhase(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "BEGIN"
+      1u -> "UPDATE"
+      2u -> "END"
+      3u -> "CANCEL"
+      else -> "PinchPhase($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean = other is PinchPhase && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    @JvmField public val BEGIN: PinchPhase = PinchPhase(BEGIN_VALUE)
+    /** The `rawValue` of [BEGIN]. */
+    public const val BEGIN_VALUE: UInt = 0u
+    @JvmField public val UPDATE: PinchPhase = PinchPhase(UPDATE_VALUE)
+    /** The `rawValue` of [UPDATE]. */
+    public const val UPDATE_VALUE: UInt = 1u
+    /** The fingers lifted: the pinch glides on. */
+    @JvmField public val END: PinchPhase = PinchPhase(END_VALUE)
+    /** The `rawValue` of [END]. */
+    public const val END_VALUE: UInt = 2u
+    /** The platform took the pinch away: nothing continues, and the camera's animations stop. */
+    @JvmField public val CANCEL: PinchPhase = PinchPhase(CANCEL_VALUE)
+    /** The `rawValue` of [CANCEL]. */
+    public const val CANCEL_VALUE: UInt = 3u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): PinchPhase =
+      when (rawValue) {
+        BEGIN_VALUE -> BEGIN
+        UPDATE_VALUE -> UPDATE
+        END_VALUE -> END
+        CANCEL_VALUE -> CANCEL
+        else -> PinchPhase(rawValue)
+      }
+  }
+}
+
+/**
+ * What kind of device a pointer is.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_pointer_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public class PointerKind(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "MOUSE"
+      1u -> "TOUCH"
+      2u -> "PEN"
+      else -> "PointerKind($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean = other is PointerKind && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    @JvmField public val MOUSE: PointerKind = PointerKind(MOUSE_VALUE)
+    /** The `rawValue` of [MOUSE]. */
+    public const val MOUSE_VALUE: UInt = 0u
+    /** Two touches pinch, twist, and tilt, and a held second tap zooms. */
+    @JvmField public val TOUCH: PointerKind = PointerKind(TOUCH_VALUE)
+    /** The `rawValue` of [TOUCH]. */
+    public const val TOUCH_VALUE: UInt = 1u
+    @JvmField public val PEN: PointerKind = PointerKind(PEN_VALUE)
+    /** The `rawValue` of [PEN]. */
+    public const val PEN_VALUE: UInt = 2u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): PointerKind =
+      when (rawValue) {
+        MOUSE_VALUE -> MOUSE
+        TOUCH_VALUE -> TOUCH
+        PEN_VALUE -> PEN
+        else -> PointerKind(rawValue)
+      }
+  }
+}
+
+/**
  * A projection that a style's
  * &#91;projection&#93;(https://maplibre.org/maplibre-style-spec/projection/) names.
  *
@@ -1705,6 +1945,7 @@ public class RenderBackend(@get:JvmName("getRawValue") public val rawValue: UInt
       2u -> "VULKAN"
       3u -> "OPEN_GL"
       4u -> "WEB_GPU"
+      5u -> "D3D12"
       else -> "RenderBackend($rawValue)"
     }
 
@@ -1725,6 +1966,15 @@ public class RenderBackend(@get:JvmName("getRawValue") public val rawValue: UInt
     @JvmField public val WEB_GPU: RenderBackend = RenderBackend(WEB_GPU_VALUE)
     /** The `rawValue` of [WEB_GPU]. */
     public const val WEB_GPU_VALUE: UInt = 4u
+    /**
+     * D3D12, on Windows. It compiles its shaders at run time with DXC, which your app ships:
+     * `dxcompiler.dll`, 1.8.2502 or later, beside your app's executable or in another directory of
+     * the DLL search path, which doesn't take the library's own directory. Without it, the library
+     * renders on another backend.
+     */
+    @JvmField public val D3D12: RenderBackend = RenderBackend(D3D12_VALUE)
+    /** The `rawValue` of [D3D12]. */
+    public const val D3D12_VALUE: UInt = 5u
 
     /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
     @JvmStatic
@@ -1735,6 +1985,7 @@ public class RenderBackend(@get:JvmName("getRawValue") public val rawValue: UInt
         VULKAN_VALUE -> VULKAN
         OPEN_GL_VALUE -> OPEN_GL
         WEB_GPU_VALUE -> WEB_GPU
+        D3D12_VALUE -> D3D12
         else -> RenderBackend(rawValue)
       }
   }
@@ -1761,7 +2012,7 @@ public class RenderBackendFlag(@get:JvmName("getRawValue") public val rawValue: 
     flagLabel(
       rawValue.toULong(),
       "NONE",
-      listOf(1uL to "METAL", 2uL to "VULKAN", 4uL to "OPEN_GL", 8uL to "WEB_GPU"),
+      listOf(1uL to "METAL", 2uL to "VULKAN", 4uL to "OPEN_GL", 8uL to "WEB_GPU", 16uL to "D3D12"),
     )
 
   override fun equals(other: Any?): Boolean =
@@ -1786,6 +2037,9 @@ public class RenderBackendFlag(@get:JvmName("getRawValue") public val rawValue: 
     @JvmField public val WEB_GPU: RenderBackendFlag = RenderBackendFlag(WEB_GPU_VALUE)
     /** The `rawValue` of [WEB_GPU]. */
     public const val WEB_GPU_VALUE: UInt = 8u
+    @JvmField public val D3D12: RenderBackendFlag = RenderBackendFlag(D3D12_VALUE)
+    /** The `rawValue` of [D3D12]. */
+    public const val D3D12_VALUE: UInt = 16u
 
     /**
      * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
@@ -1799,6 +2053,7 @@ public class RenderBackendFlag(@get:JvmName("getRawValue") public val rawValue: 
         VULKAN_VALUE -> VULKAN
         OPEN_GL_VALUE -> OPEN_GL
         WEB_GPU_VALUE -> WEB_GPU
+        D3D12_VALUE -> D3D12
         else -> RenderBackendFlag(rawValue)
       }
   }
@@ -2122,6 +2377,8 @@ public class RenderTargetKindFlag(@get:JvmName("getRawValue") public val rawValu
         16384uL to "WEB_GPU_BORROWED_TEXTURES",
         32768uL to "EXPORTED_RING",
         65536uL to "WEB_CANVAS",
+        131072uL to "D3D12_BORROWED_TEXTURES",
+        262144uL to "D3D12_COMPOSITION",
       ),
     )
 
@@ -2194,6 +2451,16 @@ public class RenderTargetKindFlag(@get:JvmName("getRawValue") public val rawValu
     @JvmField public val WEB_CANVAS: RenderTargetKindFlag = RenderTargetKindFlag(WEB_CANVAS_VALUE)
     /** The `rawValue` of [WEB_CANVAS]. */
     public const val WEB_CANVAS_VALUE: UInt = 65536u
+    @JvmField
+    public val D3D12_BORROWED_TEXTURES: RenderTargetKindFlag =
+      RenderTargetKindFlag(D3D12_BORROWED_TEXTURES_VALUE)
+    /** The `rawValue` of [D3D12_BORROWED_TEXTURES]. */
+    public const val D3D12_BORROWED_TEXTURES_VALUE: UInt = 131072u
+    @JvmField
+    public val D3D12_COMPOSITION: RenderTargetKindFlag =
+      RenderTargetKindFlag(D3D12_COMPOSITION_VALUE)
+    /** The `rawValue` of [D3D12_COMPOSITION]. */
+    public const val D3D12_COMPOSITION_VALUE: UInt = 262144u
 
     /**
      * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
@@ -2218,6 +2485,8 @@ public class RenderTargetKindFlag(@get:JvmName("getRawValue") public val rawValu
         WEB_GPU_BORROWED_TEXTURES_VALUE -> WEB_GPU_BORROWED_TEXTURES
         EXPORTED_RING_VALUE -> EXPORTED_RING
         WEB_CANVAS_VALUE -> WEB_CANVAS
+        D3D12_BORROWED_TEXTURES_VALUE -> D3D12_BORROWED_TEXTURES
+        D3D12_COMPOSITION_VALUE -> D3D12_COMPOSITION
         else -> RenderTargetKindFlag(rawValue)
       }
   }
@@ -3901,6 +4170,91 @@ public class AndroidHardwareBufferFrame(
 }
 
 /**
+ * The D3D12 texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for `MetalTextureFrame`.
+ * Otherwise they are zero.
+ *
+ * See `mln_d3d12_texture_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public class D3d12TextureFrame(
+  @get:JvmName("getWidth") public val width: UInt,
+  @get:JvmName("getHeight") public val height: UInt,
+  public val scaleFactor: Double,
+  /** The texture's index in the descriptor's `textures`, or in the ring. */
+  @get:JvmName("getSlot") public val slot: UInt,
+  /** The `ID3D12Resource`. */
+  resource: NativePointer,
+  /** The resource's `ID3D12Device`. */
+  device: NativePointer,
+  /** The resource's `DXGI_FORMAT`. */
+  @get:JvmName("getFormat") public val format: UInt,
+  /** The `D3D12_RESOURCE_STATES` that the frame left the resource in. */
+  @get:JvmName("getState") public val state: UInt,
+  /** The `ID3D12Resource` that holds the frame's depth and stencil. */
+  depthResource: NativePointer,
+  /** The depth resource's `DXGI_FORMAT`. */
+  @get:JvmName("getDepthFormat") public val depthFormat: UInt,
+  /** The `D3D12_RESOURCE_STATES` that the frame left the depth resource in. */
+  @get:JvmName("getDepthState") public val depthState: UInt,
+) {
+  @get:JvmSynthetic @set:JvmSynthetic internal var bindingScope: ViewScope? = null
+  private val storedResource: NativePointer = resource
+  public val resource: NativePointer
+    get() {
+      bindingScope?.ensureActive()
+      return storedResource
+    }
+
+  private val storedDevice: NativePointer = device
+  public val device: NativePointer
+    get() {
+      bindingScope?.ensureActive()
+      return storedDevice
+    }
+
+  private val storedDepthResource: NativePointer = depthResource
+  public val depthResource: NativePointer
+    get() {
+      bindingScope?.ensureActive()
+      return storedDepthResource
+    }
+
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      width: Int,
+      height: Int,
+      scaleFactor: Double,
+      slot: Int,
+      resource: NativePointer,
+      device: NativePointer,
+      format: Int,
+      state: Int,
+      depthResource: NativePointer,
+      depthFormat: Int,
+      depthState: Int,
+    ): D3d12TextureFrame =
+      D3d12TextureFrame(
+        width = width.toUInt(),
+        height = height.toUInt(),
+        scaleFactor = scaleFactor,
+        slot = slot.toUInt(),
+        resource = resource,
+        device = device,
+        format = format.toUInt(),
+        state = state.toUInt(),
+        depthResource = depthResource,
+        depthFormat = depthFormat.toUInt(),
+        depthState = depthState.toUInt(),
+      )
+  }
+}
+
+/**
  * Where one plane of a dmabuf keeps its data.
  *
  * See `mln_dma_buf_plane` in the
@@ -5140,45 +5494,6 @@ public data class LogicalSize(
 }
 
 /**
- * Options for creating a frame pacer, or for `FramePacerHandle.setOptions()`.
- *
- * See `mln_frame_pacer_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
- */
-public data class FramePacerOptions(
-  /**
-   * The most frames per second that the pacer demands, greater than zero. The pacer skips display
-   * refreshes to stay within it. By default, it can demand frames at every refresh.
-   */
-  @get:JvmSynthetic public val maximumFramesPerSecond: UInt? = null,
-  /**
-   * Removes the frame rate limit, so the pacer can demand frames at every display refresh, as it
-   * does by default.
-   */
-  public val unlimitedFramesPerSecond: Boolean = false,
-) {
-  @PublishedApi
-  @JvmName("getMaximumFramesPerSecond")
-  internal fun maximumFramesPerSecondForJava(): Int? = maximumFramesPerSecond?.toInt()
-
-  @PublishedApi
-  internal fun withMaximumFramesPerSecond(maximumFramesPerSecond: Int): FramePacerOptions =
-    copy(maximumFramesPerSecond = maximumFramesPerSecond.toUInt())
-
-  @PublishedApi
-  internal fun withUnlimitedFramesPerSecond(unlimitedFramesPerSecond: Boolean): FramePacerOptions =
-    copy(unlimitedFramesPerSecond = unlimitedFramesPerSecond)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): FramePacerOptions = FramePacerOptions()
-  }
-}
-
-/**
  * Options for `GpuDeviceHandle.create()`.
  *
  * Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and `adapter_luid`. Without one,
@@ -5191,8 +5506,8 @@ public data class FramePacerOptions(
 public data class GpuDeviceOptions(
   /**
    * The backend that the device renders with. By default, the platform's own: Metal on Apple
-   * platforms, Vulkan elsewhere, or OpenGL where the system has no Vulkan driver, and in a browser
-   * the build's one backend: WebGPU or OpenGL (WebGL2).
+   * platforms, Vulkan elsewhere, then D3D12 on Windows, or OpenGL where the system has neither, and
+   * in a browser the build's one backend: WebGPU or OpenGL (WebGL2).
    */
   public val backend: RenderBackend? = null,
   /**
@@ -5207,7 +5522,8 @@ public data class GpuDeviceOptions(
   public val adapterUuid: ByteArray? = null,
   /**
    * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which Vulkan reports as
-   * `VkPhysicalDeviceIDProperties.deviceLUID`. Only a Vulkan device takes one.
+   * `VkPhysicalDeviceIDProperties.deviceLUID` and D3D12 as `ID3D12Device::GetAdapterLuid`. Only a
+   * Vulkan or D3D12 device takes one.
    */
   public val adapterLuid: ByteArray? = null,
   /**
@@ -5283,6 +5599,23 @@ public data class GpuDeviceOptions(
     @JvmStatic @PublishedApi internal fun of(): GpuDeviceOptions = GpuDeviceOptions()
   }
 }
+
+/**
+ * Your D3D12 device and direct command queue, for `GpuDeviceHandle.wrapD3d12()`.
+ *
+ * See `mln_d3d12_device_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class D3d12DeviceDescriptor(
+  /** Your `ID3D12Device`. */
+  public val device: NativePointer,
+  /**
+   * Your `ID3D12CommandQueue` of `D3D12_COMMAND_LIST_TYPE_DIRECT` on `device`, which sessions on
+   * the device submit to. Submit your reads of a borrowed ring's textures to it for
+   * `GpuSyncKind.QUEUE_ORDER`.
+   */
+  public val commandQueue: NativePointer,
+)
 
 /**
  * Your Metal device and command queue, for `GpuDeviceHandle.wrapMetal()`.
@@ -5636,42 +5969,335 @@ public data class StyleExpressionOptions(
 }
 
 /**
- * What a GPU device can do.
+ * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`) and (`x2`, `y2`).
  *
- * See `mln_gpu_device_capabilities` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ * `x1` and `x2` are between 0 and 1.
+ *
+ * See `mln_unit_bezier` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class GpuDeviceCapabilities(
-  public val backend: RenderBackend,
-  /** The kinds of `RenderTarget` that sessions on the device render to. */
-  public val targetKinds: RenderTargetKindFlag,
-  /**
-   * The ways that the device can share the textures of an exported ring. A kind is here only once
-   * the device has exported a texture of it, so a driver that offers an extension but can't
-   * allocate the memory reports no kind of it.
-   */
-  public val exportKinds: GpuExportKindFlag,
-  /** The kinds of `GpuSync` that the device can signal and wait on. */
-  public val syncKinds: GpuSyncKindFlag,
-  /** The formats of the depth textures that a borrowed ring takes. */
-  public val depthStencilFormats: DepthStencilFormatFlag,
-  /**
-   * The kinds of `export_kinds` whose rings also share each frame's depth texture, with
-   * `RenderSessionAttachOptions.keepDepth`. An IOSurface or a dmabuf holds no depth format, so only
-   * `GpuExportKind.OPAQUE_FD` can be here.
-   */
-  public val depthExportKinds: GpuExportKindFlag,
-)
+public data class UnitBezier(
+  public val x1: Double = 0.0,
+  public val y1: Double = 0.0,
+  public val x2: Double = 0.0,
+  public val y2: Double = 0.0,
+) {
+  @PublishedApi internal fun withX1(x1: Double): UnitBezier = copy(x1 = x1)
+
+  @PublishedApi internal fun withY1(y1: Double): UnitBezier = copy(y1 = y1)
+
+  @PublishedApi internal fun withX2(x2: Double): UnitBezier = copy(x2 = x2)
+
+  @PublishedApi internal fun withY2(y2: Double): UnitBezier = copy(y2 = y2)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): UnitBezier = UnitBezier()
+  }
+}
 
 /**
- * The Vulkan objects of a device, as `GpuDeviceHandle.getVulkanContext()` reports them.
+ * How one part of a gesture glides after release.
  *
- * See `mln_gpu_device_vulkan_context_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ * Speeds and distances are in the part's unit: logical pixels for pan, zoom levels for zoom, and
+ * degrees for bearing and pitch, with speeds per second. A setting whose bit isn't set keeps its
+ * current value. A new `model` starts from its defaults: friction from the part's, which
+ * `MapHandle.gestureRecognizerCreate()` lists, and a curve from Android's fling. Settings of the
+ * other model are an error. `min_speed` is finite and not negative, `duration_exponent` finite and
+ * above -1, and every other number positive; the maximums may be infinite.
+ *
+ * See `mln_momentum_decay` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
-public data class GpuDeviceVulkanContextResult(
-  public val context: VulkanContextDescriptor,
-)
+public data class MomentumDecay(
+  public val model: MomentumDecayModel? = null,
+  /** For `MomentumDecayModel.FRICTION`. */
+  public val halfLifeMs: Double? = null,
+  /** For `MomentumDecayModel.FRICTION`, the speed at which it ends. */
+  public val stopSpeed: Double? = null,
+  /** For `MomentumDecayModel.CURVE`, the speed that lasts `duration_ms`. */
+  public val referenceSpeed: Double? = null,
+  /** For `MomentumDecayModel.CURVE`. */
+  public val durationMs: Double? = null,
+  /** For `MomentumDecayModel.CURVE`, how the duration grows with the speed. */
+  public val durationExponent: Double? = null,
+  /**
+   * For `MomentumDecayModel.CURVE`, the share of the glide covered over the share of its duration.
+   * Its control points are between 0 and 1, and `x1` and `y1` above 0, so the glide starts moving
+   * and never passes its end.
+   */
+  public val easing: UnitBezier? = null,
+  /** A slower release doesn't glide. */
+  public val minSpeed: Double? = null,
+  /** A faster release counts as this. */
+  public val maxSpeed: Double? = null,
+  /**
+   * The farthest the part glides. A release that would glide farther counts as the speed that
+   * glides this far.
+   */
+  public val maxDistance: Double? = null,
+) {
+  @PublishedApi
+  internal fun withModel(model: MomentumDecayModel): MomentumDecay = copy(model = model)
+
+  @PublishedApi
+  internal fun withHalfLifeMs(halfLifeMs: Double): MomentumDecay = copy(halfLifeMs = halfLifeMs)
+
+  @PublishedApi
+  internal fun withStopSpeed(stopSpeed: Double): MomentumDecay = copy(stopSpeed = stopSpeed)
+
+  @PublishedApi
+  internal fun withReferenceSpeed(referenceSpeed: Double): MomentumDecay =
+    copy(referenceSpeed = referenceSpeed)
+
+  @PublishedApi
+  internal fun withDurationMs(durationMs: Double): MomentumDecay = copy(durationMs = durationMs)
+
+  @PublishedApi
+  internal fun withDurationExponent(durationExponent: Double): MomentumDecay =
+    copy(durationExponent = durationExponent)
+
+  @PublishedApi internal fun withEasing(easing: UnitBezier): MomentumDecay = copy(easing = easing)
+
+  @PublishedApi
+  internal fun withMinSpeed(minSpeed: Double): MomentumDecay = copy(minSpeed = minSpeed)
+
+  @PublishedApi
+  internal fun withMaxSpeed(maxSpeed: Double): MomentumDecay = copy(maxSpeed = maxSpeed)
+
+  @PublishedApi
+  internal fun withMaxDistance(maxDistance: Double): MomentumDecay = copy(maxDistance = maxDistance)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): MomentumDecay = MomentumDecay()
+  }
+}
+
+/**
+ * How gestures move the map's content.
+ *
+ * See `mln_gesture_pan_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GesturePanOptions(
+  /** Whether drags, two fingers moving together, and deltas pan. */
+  public val enabled: Boolean? = null,
+  /** Whether a release glides on. */
+  public val glides: Boolean? = null,
+  public val momentum: MomentumDecay? = null,
+) {
+  @PublishedApi
+  internal fun withEnabled(enabled: Boolean): GesturePanOptions = copy(enabled = enabled)
+
+  @PublishedApi internal fun withGlides(glides: Boolean): GesturePanOptions = copy(glides = glides)
+
+  @PublishedApi
+  internal fun withMomentum(momentum: MomentumDecay): GesturePanOptions = copy(momentum = momentum)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GesturePanOptions = GesturePanOptions()
+  }
+}
+
+/**
+ * Where a part settles after a gesture that changed it.
+ *
+ * The targets are every `spacing` from `offset`, in the part's unit. Bearing targets lie within one
+ * turn from `offset`, and the bearing takes the shorter way around to the nearest. Once the part's
+ * glide ends, or right away when it has none, the part eases to the nearest target if it is within
+ * `tolerance` of it, and otherwise stays where it is. A setting whose bit isn't set keeps its
+ * current value.
+ *
+ * See `mln_momentum_snap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class MomentumSnap(
+  /** Positive. */
+  public val spacing: Double? = null,
+  /** Finite. */
+  public val offset: Double? = null,
+  /** Not negative. */
+  public val tolerance: Double? = null,
+  /** Zero settles without easing. */
+  public val durationMs: Double? = null,
+) {
+  @PublishedApi internal fun withSpacing(spacing: Double): MomentumSnap = copy(spacing = spacing)
+
+  @PublishedApi internal fun withOffset(offset: Double): MomentumSnap = copy(offset = offset)
+
+  @PublishedApi
+  internal fun withTolerance(tolerance: Double): MomentumSnap = copy(tolerance = tolerance)
+
+  @PublishedApi
+  internal fun withDurationMs(durationMs: Double): MomentumSnap = copy(durationMs = durationMs)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): MomentumSnap = MomentumSnap()
+  }
+}
+
+/**
+ * Values every `spacing` from `offset`, in the part's unit, that report an `GestureEvent.Notch` as
+ * a gesture moves the part to or across one, for the host to play as haptic feedback. Bearing
+ * notches lie within one turn from the offset.
+ *
+ * See `mln_gesture_notch` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GestureNotch(
+  /** Positive. */
+  public val spacing: Double = 0.0,
+  /** Finite. */
+  public val offset: Double = 0.0,
+  /** The host's name for the feedback, which the notch's events carry. */
+  @get:JvmName("getKind") public val kind: UInt = 0u,
+) {
+  @PublishedApi internal fun withSpacing(spacing: Double): GestureNotch = copy(spacing = spacing)
+
+  @PublishedApi internal fun withOffset(offset: Double): GestureNotch = copy(offset = offset)
+
+  @PublishedApi internal fun withKind(kind: Int): GestureNotch = copy(kind = kind.toUInt())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GestureNotch = GestureNotch()
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(spacing: Double, offset: Double, kind: Int): GestureNotch =
+      GestureNotch(spacing = spacing, offset = offset, kind = kind.toUInt())
+  }
+}
+
+/**
+ * How gestures move the zoom, the bearing, or the pitch.
+ *
+ * See `mln_gesture_axis_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GestureAxisOptions(
+  /** Whether gestures move the part. */
+  public val enabled: Boolean? = null,
+  /** Whether a release glides on. */
+  public val glides: Boolean? = null,
+  public val momentum: MomentumDecay? = null,
+  /** Whether the part settles once its glide ends. */
+  public val snaps: Boolean? = null,
+  public val snap: MomentumSnap? = null,
+  /**
+   * Where the part reports notches while gestures, their glides, and their snaps move it, replacing
+   * the ones it had. Several notches at one value report one event, with the kind of the first in
+   * the list.
+   */
+  public val notches: List<GestureNotch>? = null,
+) {
+  @PublishedApi
+  internal fun withEnabled(enabled: Boolean): GestureAxisOptions = copy(enabled = enabled)
+
+  @PublishedApi internal fun withGlides(glides: Boolean): GestureAxisOptions = copy(glides = glides)
+
+  @PublishedApi
+  internal fun withMomentum(momentum: MomentumDecay): GestureAxisOptions = copy(momentum = momentum)
+
+  @PublishedApi internal fun withSnaps(snaps: Boolean): GestureAxisOptions = copy(snaps = snaps)
+
+  @PublishedApi internal fun withSnap(snap: MomentumSnap): GestureAxisOptions = copy(snap = snap)
+
+  @PublishedApi
+  internal fun withNotches(notches: List<GestureNotch>): GestureAxisOptions =
+    copy(notches = notches)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GestureAxisOptions = GestureAxisOptions()
+  }
+}
+
+/**
+ * How a gesture recognizer moves each part of the camera.
+ *
+ * Settings whose bits aren't set keep their values. A new recognizer moves every part, and glides
+ * each by friction with a half-life of 140 ms, a minimum speed of 0, and no maximum speed or
+ * distance, with these exceptions:
+ *
+ * - Pan stops at 10 logical pixels per second, needs a release of at least 200, and counts a
+ *   release faster than 10000 as 10000.
+ * - Zoom stops at 0.01 levels per second and glides at most 2.5 levels. Its snap, when on, settles
+ *   on the nearest whole level within half a level.
+ * - Bearing stops at 1 degree per second and needs a release of at least 60. It snaps to north
+ *   within 7 degrees, and has a notch of kind 0 at north.
+ * - Pitch stops at 1 degree per second and needs a release of at least 5. Its snap, when on,
+ *   settles flat within 7 degrees.
+ *
+ * Snaps take 300 ms. A double tap zooms in a level and a two-finger tap out.
+ *
+ * See `mln_gesture_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GestureOptions(
+  /**
+   * Zoom levels that a double tap zooms in, eased; with `GestureMode.ZOOM_OUT` it zooms out
+   * instead. 0 leaves double taps to the host. Finite.
+   */
+  public val doubleTapZoom: Double? = null,
+  /**
+   * Zoom levels that a two-finger tap zooms, eased; negative zooms out. 0 leaves two-finger taps to
+   * the host. Finite.
+   */
+  public val twoFingerTapZoom: Double? = null,
+  public val pan: GesturePanOptions = GesturePanOptions(),
+  public val zoom: GestureAxisOptions = GestureAxisOptions(),
+  public val bearing: GestureAxisOptions = GestureAxisOptions(),
+  public val pitch: GestureAxisOptions = GestureAxisOptions(),
+) {
+  @PublishedApi
+  internal fun withDoubleTapZoom(doubleTapZoom: Double): GestureOptions =
+    copy(doubleTapZoom = doubleTapZoom)
+
+  @PublishedApi
+  internal fun withTwoFingerTapZoom(twoFingerTapZoom: Double): GestureOptions =
+    copy(twoFingerTapZoom = twoFingerTapZoom)
+
+  @PublishedApi internal fun withPan(pan: GesturePanOptions): GestureOptions = copy(pan = pan)
+
+  @PublishedApi internal fun withZoom(zoom: GestureAxisOptions): GestureOptions = copy(zoom = zoom)
+
+  @PublishedApi
+  internal fun withBearing(bearing: GestureAxisOptions): GestureOptions = copy(bearing = bearing)
+
+  @PublishedApi
+  internal fun withPitch(pitch: GestureAxisOptions): GestureOptions = copy(pitch = pitch)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GestureOptions = GestureOptions()
+  }
+}
 
 /**
  * The frame's Metal command buffer, outside the map's render pass.
@@ -5733,6 +6359,24 @@ public data class WebGpuCustomLayerEncoder(
 }
 
 /**
+ * The frame's D3D12 command list, outside the map's render pass.
+ *
+ * Record work such as copies and render passes of your own, with the barriers that it needs, and
+ * leave the resources that you use in the states that you found them in. Don't close or execute
+ * `command_list`. After the callback returns, the map sets its own descriptor heaps and root
+ * signature again.
+ *
+ * See `mln_d3d12_custom_layer_encoder` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class D3d12CustomLayerEncoder(
+  /** The `ID3D12Device` that the session renders on, to make objects with. */
+  public val device: NativePointer,
+  /** The frame's `ID3D12GraphicsCommandList`, outside a render pass. */
+  public val commandList: NativePointer,
+)
+
+/**
  * The frame that a custom layer draws into, as its callbacks get it.
  *
  * The view and the frame projection are the ones that the frame draws the map with, so they are
@@ -5788,6 +6432,9 @@ public sealed interface CustomLayerPrerenderParametersEncoder {
     CustomLayerPrerenderParametersEncoder
 
   public data class WebGpu(public val value: WebGpuCustomLayerEncoder) :
+    CustomLayerPrerenderParametersEncoder
+
+  public data class D3d12(public val value: D3d12CustomLayerEncoder) :
     CustomLayerPrerenderParametersEncoder
 
   public data object None : CustomLayerPrerenderParametersEncoder
@@ -6010,6 +6657,58 @@ public data class WebGpuCustomLayerPass(
 }
 
 /**
+ * The map's D3D12 render pass, at a custom layer's place in the style.
+ *
+ * Set your own pipeline state, root signature, descriptor heaps, vertex and index buffers,
+ * primitive topology, viewport, scissor rectangle, and stencil reference, with pipeline states for
+ * `color_format` and `depth_stencil_format`, and draw. After the callback returns, the map sets
+ * again what its own draws need. Record nothing that a render pass can't hold, such as barriers,
+ * copies, or other render targets, and don't end the pass.
+ *
+ * See `mln_d3d12_custom_layer_pass` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class D3d12CustomLayerPass(
+  /** The `ID3D12Device` that the session renders on, to make objects with. */
+  public val device: NativePointer,
+  /** The frame's `ID3D12GraphicsCommandList`, in the render pass that `BeginRenderPass` began. */
+  public val commandList: NativePointer,
+  /** The `D3D12_CPU_DESCRIPTOR_HANDLE` of the pass's render target view. */
+  @get:JvmName("getRenderTargetView") public val renderTargetView: ULong,
+  /** The `DXGI_FORMAT` of the pass's color attachment. */
+  @get:JvmName("getColorFormat") public val colorFormat: UInt,
+  /** The `D3D12_CPU_DESCRIPTOR_HANDLE` of the pass's depth-stencil view, or 0 when it has none. */
+  @get:JvmName("getDepthStencilView") public val depthStencilView: ULong,
+  /**
+   * The `DXGI_FORMAT` of the pass's depth-stencil attachment, or `DXGI_FORMAT_UNKNOWN` when it has
+   * none.
+   */
+  @get:JvmName("getDepthStencilFormat") public val depthStencilFormat: UInt,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      device: NativePointer,
+      commandList: NativePointer,
+      renderTargetView: Long,
+      colorFormat: Int,
+      depthStencilView: Long,
+      depthStencilFormat: Int,
+    ): D3d12CustomLayerPass =
+      D3d12CustomLayerPass(
+        device = device,
+        commandList = commandList,
+        renderTargetView = renderTargetView.toULong(),
+        colorFormat = colorFormat.toUInt(),
+        depthStencilView = depthStencilView.toULong(),
+        depthStencilFormat = depthStencilFormat.toUInt(),
+      )
+  }
+}
+
+/**
  * The map's render pass at a custom layer's place in the style, by the backend that the session
  * renders with.
  *
@@ -6027,6 +6726,8 @@ public sealed interface CustomLayerRenderParametersPass {
 
   public data class WebGpu(public val value: WebGpuCustomLayerPass) :
     CustomLayerRenderParametersPass
+
+  public data class D3d12(public val value: D3d12CustomLayerPass) : CustomLayerRenderParametersPass
 
   public data class Unknown(
     @get:JvmName("getTag") public val tag: UInt,
@@ -6192,280 +6893,6 @@ public data class PremultipliedRgba8Image(
 }
 
 /**
- * A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`) and (`x2`, `y2`).
- *
- * `x1` and `x2` are between 0 and 1.
- *
- * See `mln_unit_bezier` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class UnitBezier(
-  public val x1: Double = 0.0,
-  public val y1: Double = 0.0,
-  public val x2: Double = 0.0,
-  public val y2: Double = 0.0,
-) {
-  @PublishedApi internal fun withX1(x1: Double): UnitBezier = copy(x1 = x1)
-
-  @PublishedApi internal fun withY1(y1: Double): UnitBezier = copy(y1 = y1)
-
-  @PublishedApi internal fun withX2(x2: Double): UnitBezier = copy(x2 = x2)
-
-  @PublishedApi internal fun withY2(y2: Double): UnitBezier = copy(y2 = y2)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): UnitBezier = UnitBezier()
-  }
-}
-
-/**
- * How one part of a gesture's momentum slows from its release speed.
- *
- * Speeds and distances are in the part's unit: logical pixels for pan, zoom levels for zoom, and
- * degrees for bearing and pitch. A setting whose bit isn't set takes the part's default, which
- * `GestureMomentum` lists. `min_speed` is finite and not negative, and every other number is finite
- * and positive. A friction decay can serve every release, as a preset that matches a platform's
- * scrolling. An eased glide takes its direction from the part's velocity, and its distance and
- * duration from the caller's plan.
- *
- * See `mln_momentum_decay` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class MomentumDecay(
-  public val model: MomentumDecayModel? = null,
-  /** For `MomentumDecayModel.FRICTION`, how long the speed takes to halve. */
-  public val halfLifeMs: Double? = null,
-  /** For `MomentumDecayModel.FRICTION`, the speed at which it ends. */
-  public val stopSpeed: Double? = null,
-  /** Required for `MomentumDecayModel.EASE`. */
-  public val distance: Double? = null,
-  /** Required for `MomentumDecayModel.EASE`. */
-  public val durationMs: Double? = null,
-  /**
-   * For `MomentumDecayModel.EASE`, the share of `distance` covered over the share of `duration_ms`.
-   * Its control points are between 0 and 1, so the glide never passes its distance. Defaults to (0,
-   * 0, 0.25, 1), the curve that camera animations ease along by default. Android's scroll fling
-   * follows (0.175, 0.5, 0.35, 1).
-   */
-  public val easing: UnitBezier? = null,
-  /** A slower release starts no momentum. */
-  public val minSpeed: Double? = null,
-  /** For `MomentumDecayModel.FRICTION`, a faster release counts as this. */
-  public val maxSpeed: Double? = null,
-  /**
-   * The farthest the part moves. A friction release that would move farther starts slower, so it
-   * ends sooner, and a planned glide moves at most this far over its duration.
-   */
-  public val maxDistance: Double? = null,
-) {
-  @PublishedApi
-  internal fun withModel(model: MomentumDecayModel): MomentumDecay = copy(model = model)
-
-  @PublishedApi
-  internal fun withHalfLifeMs(halfLifeMs: Double): MomentumDecay = copy(halfLifeMs = halfLifeMs)
-
-  @PublishedApi
-  internal fun withStopSpeed(stopSpeed: Double): MomentumDecay = copy(stopSpeed = stopSpeed)
-
-  @PublishedApi
-  internal fun withDistance(distance: Double): MomentumDecay = copy(distance = distance)
-
-  @PublishedApi
-  internal fun withDurationMs(durationMs: Double): MomentumDecay = copy(durationMs = durationMs)
-
-  @PublishedApi internal fun withEasing(easing: UnitBezier): MomentumDecay = copy(easing = easing)
-
-  @PublishedApi
-  internal fun withMinSpeed(minSpeed: Double): MomentumDecay = copy(minSpeed = minSpeed)
-
-  @PublishedApi
-  internal fun withMaxSpeed(maxSpeed: Double): MomentumDecay = copy(maxSpeed = maxSpeed)
-
-  @PublishedApi
-  internal fun withMaxDistance(maxDistance: Double): MomentumDecay = copy(maxDistance = maxDistance)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): MomentumDecay = MomentumDecay()
-  }
-}
-
-/**
- * How a gesture's pan keeps moving the map's content after release.
- *
- * See `mln_pan_momentum` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class PanMomentum(
-  /**
-   * How fast the map's content moved on the screen at release, in logical pixels per second. The
-   * pan moves only when this is set.
-   */
-  public val velocity: ScreenPoint? = null,
-  public val decay: MomentumDecay = MomentumDecay(),
-) {
-  @PublishedApi
-  internal fun withVelocity(velocity: ScreenPoint): PanMomentum = copy(velocity = velocity)
-
-  @PublishedApi internal fun withDecay(decay: MomentumDecay): PanMomentum = copy(decay = decay)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): PanMomentum = PanMomentum()
-  }
-}
-
-/**
- * Where a part settles after a gesture that changed it.
- *
- * The targets are every `spacing` from `offset`, in the part's unit. Bearing targets wrap around
- * the circle. Once the part's glide ends, or right away when it doesn't move, the part eases to the
- * nearest target if it is within `tolerance` of it, and otherwise stays where it is. A setting
- * whose bit isn't set takes the part's default, which `GestureMomentum` lists.
- *
- * See `mln_momentum_snap` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class MomentumSnap(
-  /** Positive. */
-  public val spacing: Double? = null,
-  /** Defaults to 0. */
-  public val offset: Double? = null,
-  /** Not negative. */
-  public val tolerance: Double? = null,
-  /** Zero settles without easing. Defaults to 300. */
-  public val durationMs: Double? = null,
-) {
-  @PublishedApi internal fun withSpacing(spacing: Double): MomentumSnap = copy(spacing = spacing)
-
-  @PublishedApi internal fun withOffset(offset: Double): MomentumSnap = copy(offset = offset)
-
-  @PublishedApi
-  internal fun withTolerance(tolerance: Double): MomentumSnap = copy(tolerance = tolerance)
-
-  @PublishedApi
-  internal fun withDurationMs(durationMs: Double): MomentumSnap = copy(durationMs = durationMs)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): MomentumSnap = MomentumSnap()
-  }
-}
-
-/**
- * How a gesture's zoom, bearing, or pitch keeps changing after release.
- *
- * See `mln_anchored_momentum` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class AnchoredMomentum(
-  /**
-   * How fast the value changed at release: zoom levels per second for zoom, and degrees per second
-   * for bearing and pitch. The part moves only when this is set.
-   */
-  public val velocity: Double? = null,
-  /**
-   * The screen point that the change keeps in place. Without one, the change keeps the center of
-   * the view in place.
-   */
-  public val anchor: ScreenPoint? = null,
-  public val decay: MomentumDecay = MomentumDecay(),
-  /** Where the part settles. Without this, it stays where the gesture and its glide leave it. */
-  public val snap: MomentumSnap? = null,
-) {
-  @PublishedApi
-  internal fun withVelocity(velocity: Double): AnchoredMomentum = copy(velocity = velocity)
-
-  @PublishedApi
-  internal fun withAnchor(anchor: ScreenPoint): AnchoredMomentum = copy(anchor = anchor)
-
-  @PublishedApi internal fun withDecay(decay: MomentumDecay): AnchoredMomentum = copy(decay = decay)
-
-  @PublishedApi internal fun withSnap(snap: MomentumSnap): AnchoredMomentum = copy(snap = snap)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): AnchoredMomentum = AnchoredMomentum()
-  }
-}
-
-/**
- * How a gesture keeps moving the camera after the user lets go.
- *
- * A part moves only when its velocity is set, and each part slows on its own. Every part defaults
- * to `MomentumDecayModel.FRICTION` with a half-life of 140 ms, and these other defaults:
- *
- * - Pan stops at 10 logical pixels per second, needs a release of at least 200, and counts a
- *   release faster than 10000 as 10000.
- * - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its snap settles on the
- *   nearest whole level.
- * - Bearing stops at 1 degree per second and needs a release of at least 60. Its snap settles on
- *   north within 7 degrees.
- * - Pitch stops at 1 degree per second and needs a release of at least 5. Its snap settles flat
- *   within 7 degrees.
- *
- * See `mln_gesture_momentum` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class GestureMomentum(
-  public val pan: PanMomentum = PanMomentum(),
-  public val zoom: AnchoredMomentum = AnchoredMomentum(),
-  public val bearing: AnchoredMomentum = AnchoredMomentum(),
-  public val pitch: AnchoredMomentum = AnchoredMomentum(),
-) {
-  @PublishedApi internal fun withPan(pan: PanMomentum): GestureMomentum = copy(pan = pan)
-
-  @PublishedApi internal fun withZoom(zoom: AnchoredMomentum): GestureMomentum = copy(zoom = zoom)
-
-  @PublishedApi
-  internal fun withBearing(bearing: AnchoredMomentum): GestureMomentum = copy(bearing = bearing)
-
-  @PublishedApi
-  internal fun withPitch(pitch: AnchoredMomentum): GestureMomentum = copy(pitch = pitch)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): GestureMomentum = GestureMomentum()
-  }
-}
-
-/**
- * How fast each part of a camera change moves.
- *
- * See `mln_camera_velocity` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class CameraVelocity(
-  /** How fast the map's content moves on the screen, in logical pixels per second. */
-  public val pan: ScreenPoint,
-  /** In zoom levels per second. */
-  public val zoom: Double,
-  /** In degrees per second. */
-  public val bearing: Double,
-  /** In degrees per second. */
-  public val pitch: Double,
-)
-
-/**
  * The end of a camera change.
  *
  * See `mln_camera_transition_end` in the
@@ -6478,22 +6905,13 @@ public data class CameraTransitionEnd(
    * the map closed first.
    */
   @get:JvmName("getGeneration") public val generation: ULong,
-  /**
-   * How fast a gesture's momentum still moved when it was cancelled, which the next gesture can add
-   * to its own release velocities. Zero for every other end.
-   */
-  public val velocity: CameraVelocity,
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
     @JvmStatic
     @PublishedApi
-    internal fun of(
-      outcome: CameraTransitionOutcome,
-      generation: Long,
-      velocity: CameraVelocity,
-    ): CameraTransitionEnd =
-      CameraTransitionEnd(outcome = outcome, generation = generation.toULong(), velocity = velocity)
+    internal fun of(outcome: CameraTransitionOutcome, generation: Long): CameraTransitionEnd =
+      CameraTransitionEnd(outcome = outcome, generation = generation.toULong())
   }
 }
 
@@ -6561,7 +6979,7 @@ public data class AnimationOptions(
 }
 
 /**
- * A change to the camera from where it is now, for gestures.
+ * A change to the camera from where it is now.
  *
  * See `mln_camera_delta` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -6580,13 +6998,7 @@ public data class CameraDelta(
    * it combines with `offset` only in a delta without a duration.
    */
   public val anchor: ScreenPoint? = null,
-  /**
-   * How the gesture keeps moving after this delta. Only a delta in the `GesturePhase.END` phase
-   * carries it.
-   */
-  public val momentum: GestureMomentum? = null,
   public val animation: AnimationOptions = AnimationOptions(),
-  public val gesturePhase: GesturePhase = GesturePhase.NONE,
 ) {
   @PublishedApi internal fun withOffset(offset: ScreenPoint): CameraDelta = copy(offset = offset)
 
@@ -6599,14 +7011,7 @@ public data class CameraDelta(
   @PublishedApi internal fun withAnchor(anchor: ScreenPoint): CameraDelta = copy(anchor = anchor)
 
   @PublishedApi
-  internal fun withMomentum(momentum: GestureMomentum): CameraDelta = copy(momentum = momentum)
-
-  @PublishedApi
   internal fun withAnimation(animation: AnimationOptions): CameraDelta = copy(animation = animation)
-
-  @PublishedApi
-  internal fun withGesturePhase(gesturePhase: GesturePhase): CameraDelta =
-    copy(gesturePhase = gesturePhase)
 
   public companion object {
     /**
@@ -7236,10 +7641,13 @@ public data class DmaBufFormat(
  *   AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM, with the usage AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT,
  *   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of `android_hardware_buffer_usage`. Get
  *   each frame's buffer with `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
- * - `GpuExportKind.DXGI_SHARED_HANDLE`: D3D11 textures of the format DXGI_FORMAT_B8G8R8A8_UNORM on
- *   the device's GPU, which bind as shader resources and render targets. Open them on a D3D11 or
- *   D3D12 device of the same adapter, which you pick with `GpuDeviceOptions.adapterLuid`. Get each
- *   frame's texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+ * - `GpuExportKind.DXGI_SHARED_HANDLE`: textures of the format DXGI_FORMAT_B8G8R8A8_UNORM on the
+ *   device's GPU, which bind as shader resources and render targets: D3D11 textures on a Vulkan
+ *   device, and committed D3D12 resources in a shared heap on a D3D12 device, which each frame
+ *   leaves in D3D12_RESOURCE_STATE_COMMON. Open them on a D3D11 or D3D12 device of the same
+ *   adapter, which you pick with `GpuDeviceOptions.adapterLuid`. Get each frame's texture with
+ *   `AcquiredFrameHandle.withDxgiSharedTexture()`, and on a D3D12 device its resource with
+ *   `AcquiredFrameHandle.withD3d12Texture()`.
  * - `GpuExportKind.DMA_BUF`: dmabufs of a format and modifier from `dma_buf_formats`. Get each
  *   frame's buffer with `AcquiredFrameHandle.withDmaBuf()`.
  * - `GpuExportKind.OPAQUE_FD`: the memory of Vulkan images, which only a Vulkan device or an OpenGL
@@ -7252,12 +7660,13 @@ public data class DmaBufFormat(
  * platform's backends whose device exports one of `export_kinds`.
  *
  * Each frame hands over with `GpuSyncKind.CPU_COMPLETE` or with the sync kind that crosses APIs on
- * its platform: `GpuSyncKind.METAL_SHARED_EVENT` for an IOSurface, and `GpuSyncKind.SYNC_FD` for
- * the others, where the device has them. For a reader that waits on neither, such as a Wayland
- * compositor without explicit synchronization or Flutter's `copyPixelBuffer`, leave them out of
- * `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes before you acquire
- * it, and release each frame only once the reader is done with its texture. Give the ring 3
- * textures, so the session can render while you hold two frames.
+ * its platform: `GpuSyncKind.METAL_SHARED_EVENT` for an IOSurface, `GpuSyncKind.D3D12_FENCE` for a
+ * DXGI shared texture, and `GpuSyncKind.SYNC_FD` for the others, where the device has them. For a
+ * reader that waits on neither, such as a Wayland compositor without explicit synchronization or
+ * Flutter's `copyPixelBuffer`, leave them out of `RenderSessionAttachOptions.producerSyncKinds`, so
+ * that each frame finishes before you acquire it, and release each frame only once the reader is
+ * done with its texture. Give the ring 3 textures, so the session can render while you hold two
+ * frames.
  *
  * See `mln_exported_ring_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -7377,6 +7786,129 @@ public data class WebCanvasTarget(
 }
 
 /**
+ * A D3D12 texture of a borrowed ring.
+ *
+ * See `mln_d3d12_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class D3d12BorrowedTexture(
+  /** Your `ID3D12Resource`. */
+  public val resource: NativePointer,
+)
+
+/**
+ * A ring of your D3D12 textures to render into, on the D3D12 device that you attach on.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels, which is usually
+ * `logical_size` times the map's scale factor. Each texture must be a 2D resource of the device
+ * with that size, one mip level, one array slice, one sample,
+ * `D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET`, and one typed color format that the device renders
+ * into, such as DXGI_FORMAT_R8G8B8A8_UNORM or DXGI_FORMAT_B8G8R8A8_UNORM. The ring holds up to
+ * `TEXTURE_RING_MAX_DEPTH` distinct textures, and references each.
+ *
+ * Each texture is in `state` when the session has it, and each frame leaves it there.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against the map, as
+ * `FrameProjection` says: one for each of `textures`, at the same index, or none. Each frame clears
+ * the one at its slot, renders the map's depth and stencil into it, stores them, and leaves it in
+ * `depth_state`. They must have the size of `textures`, one format of
+ * `GpuDeviceCapabilities.depthStencilFormats` (DXGI_FORMAT_D24_UNORM_S8_UINT or
+ * DXGI_FORMAT_D32_FLOAT_S8X24_UINT), one sample, and `D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL`.
+ *
+ * See `mln_d3d12_borrowed_textures_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class D3d12BorrowedTexturesTarget(
+  public val logicalSize: LogicalSize,
+  @get:JvmName("getPhysicalWidth") public val physicalWidth: UInt,
+  @get:JvmName("getPhysicalHeight") public val physicalHeight: UInt,
+  public val textures: List<D3d12BorrowedTexture>,
+  /** The textures' `D3D12_RESOURCE_STATES`. */
+  @get:JvmName("getState") public val state: UInt = 0u,
+  public val depthTextures: List<D3d12BorrowedTexture> = emptyList(),
+  /** The depth textures' `D3D12_RESOURCE_STATES`. */
+  @get:JvmName("getDepthState") public val depthState: UInt = 0u,
+) {
+  @PublishedApi
+  internal fun withState(state: Int): D3d12BorrowedTexturesTarget = copy(state = state.toUInt())
+
+  @PublishedApi
+  internal fun withDepthTextures(
+    depthTextures: List<D3d12BorrowedTexture>,
+  ): D3d12BorrowedTexturesTarget = copy(depthTextures = depthTextures)
+
+  @PublishedApi
+  internal fun withDepthState(depthState: Int): D3d12BorrowedTexturesTarget =
+    copy(depthState = depthState.toUInt())
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<D3d12BorrowedTexture>,
+    ): D3d12BorrowedTexturesTarget =
+      D3d12BorrowedTexturesTarget(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+      )
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      logicalSize: LogicalSize,
+      physicalWidth: Int,
+      physicalHeight: Int,
+      textures: List<D3d12BorrowedTexture>,
+      state: Int,
+      depthTextures: List<D3d12BorrowedTexture>,
+      depthState: Int,
+    ): D3d12BorrowedTexturesTarget =
+      D3d12BorrowedTexturesTarget(
+        logicalSize = logicalSize,
+        physicalWidth = physicalWidth.toUInt(),
+        physicalHeight = physicalHeight.toUInt(),
+        textures = textures,
+        state = state.toUInt(),
+        depthTextures = depthTextures,
+        depthState = depthState.toUInt(),
+      )
+  }
+}
+
+/**
+ * A composition swap chain to present to, which your DirectComposition visual or XAML
+ * `SwapChainPanel` shows.
+ *
+ * The session renders on D3D12: on the D3D12 device that you attach on, or on one that it makes
+ * without a device. It makes a flip-model swap chain for composition of `logical_size` at the map's
+ * scale factor, with premultiplied alpha, and sets it as the visual's content or the panel's swap
+ * chain. Commit your DirectComposition device once the attach completes. A panel takes its swap
+ * chain only on its UI thread: attach it there with `RenderDriverKind.CALLER_GRAPHICS_THREAD`, and
+ * service the session there. Scale the visual or the panel to show the swap chain at the display's
+ * scale. The session references `object` until a replacement or release of the target completes, or
+ * the session ends.
+ *
+ * See `mln_d3d12_composition_target` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class D3d12CompositionTarget(
+  public val logicalSize: LogicalSize,
+  public val kind: D3d12CompositionKind,
+  /** Your `IDCompositionVisual*` or `ISwapChainPanelNative*`. */
+  public val `object`: NativePointer,
+)
+
+/**
  * What a render session renders into: one kind of target, and its descriptor.
  *
  * Every target has a size in logical pixels, which sets the map's size. The session renders it at
@@ -7426,6 +7958,11 @@ public sealed interface RenderTarget {
   public data class ExportedRing(public val value: ExportedRingTarget) : RenderTarget
 
   public data class WebCanvas(public val value: WebCanvasTarget) : RenderTarget
+
+  public data class D3d12BorrowedTextures(public val value: D3d12BorrowedTexturesTarget) :
+    RenderTarget
+
+  public data class D3d12Composition(public val value: D3d12CompositionTarget) : RenderTarget
 }
 
 /**
@@ -7439,13 +7976,17 @@ public data class RenderSessionAttachOptions(
    * The thread that runs the session's graphics work, which depends on the target:
    *
    * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a borrowed ring of WebGPU textures.
-   * - `RenderDriverKind.CORE_WORKER` for an offscreen target, a window, or an exported ring.
+   * - `RenderDriverKind.CORE_WORKER` for an offscreen target, a window, a DirectComposition visual,
+   *   or an exported ring.
+   * - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a XAML `SwapChainPanel`, on the panel's UI
+   *   thread.
    * - Either one for a web canvas. In a browser both run on the thread that loaded the library:
    *   `RenderDriverKind.CORE_WORKER` in the library's own tasks, and
    *   `RenderDriverKind.CALLER_GRAPHICS_THREAD` when you service the session.
    * - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a borrowed ring of
-   *   Metal, Vulkan, or OpenGL textures. A build may drive these on `RenderDriverKind.CORE_WORKER`
-   *   only, and fails an attach with `RenderDriverKind.CALLER_GRAPHICS_THREAD` then.
+   *   Metal, Vulkan, D3D12, or OpenGL textures. A build may drive these on
+   *   `RenderDriverKind.CORE_WORKER` only, and fails an attach with
+   *   `RenderDriverKind.CALLER_GRAPHICS_THREAD` then.
    *
    * An attach with another driver fails with `Status.UNSUPPORTED`.
    */
@@ -7843,6 +8384,7 @@ public data class MapSnapshot(
   /** Whether the style and every resource that the view needs have loaded. */
   public val fullyLoaded: Boolean,
   public val renderingStatsViewEnabled: Boolean,
+  /** Whether a gesture recognizer's gesture, or the glide and snap after it, moves the camera. */
   public val gestureInProgress: Boolean,
   public val transitionInProgress: Boolean,
   public val eventMask: RuntimeEventFlag,
@@ -8424,7 +8966,6 @@ public data class CameraUpdate(
   public val mode: CameraUpdateMode = CameraUpdateMode.JUMP,
   public val camera: CameraOptions = CameraOptions(),
   public val animation: AnimationOptions = AnimationOptions(),
-  public val gesturePhase: GesturePhase = GesturePhase.NONE,
 ) {
   @PublishedApi internal fun withMode(mode: CameraUpdateMode): CameraUpdate = copy(mode = mode)
 
@@ -8434,10 +8975,6 @@ public data class CameraUpdate(
   internal fun withAnimation(animation: AnimationOptions): CameraUpdate =
     copy(animation = animation)
 
-  @PublishedApi
-  internal fun withGesturePhase(gesturePhase: GesturePhase): CameraUpdate =
-    copy(gesturePhase = gesturePhase)
-
   public companion object {
     /**
      * Creates a value from the members without defaults, for Java, which sets the others with the
@@ -8446,6 +8983,365 @@ public data class CameraUpdate(
     @JvmStatic @PublishedApi internal fun of(): CameraUpdate = CameraUpdate()
   }
 }
+
+/**
+ * A pointer went down. The host sends no pointer whose buttons mean nothing, such as a mouse's
+ * middle button.
+ *
+ * See `mln_gesture_pointer_down` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GesturePointerDown(
+  @get:JvmName("getId") public val id: UInt = 0u,
+  public val kind: PointerKind = PointerKind.MOUSE,
+  public val position: ScreenPoint = ScreenPoint(),
+  /** The modes of the pointer's held buttons. */
+  public val modes: GestureMode = GestureMode.NONE,
+) {
+  @PublishedApi internal fun withId(id: Int): GesturePointerDown = copy(id = id.toUInt())
+
+  @PublishedApi internal fun withKind(kind: PointerKind): GesturePointerDown = copy(kind = kind)
+
+  @PublishedApi
+  internal fun withPosition(position: ScreenPoint): GesturePointerDown = copy(position = position)
+
+  @PublishedApi internal fun withModes(modes: GestureMode): GesturePointerDown = copy(modes = modes)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GesturePointerDown = GesturePointerDown()
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      id: Int,
+      kind: PointerKind,
+      position: ScreenPoint,
+      modes: GestureMode,
+    ): GesturePointerDown =
+      GesturePointerDown(id = id.toUInt(), kind = kind, position = position, modes = modes)
+  }
+}
+
+/**
+ * A pointer moved, went up, or was taken away.
+ *
+ * See `mln_gesture_pointer` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GesturePointer(
+  @get:JvmName("getId") public val id: UInt = 0u,
+  /** Unused for `GestureInput.PointerCancel`. */
+  public val position: ScreenPoint = ScreenPoint(),
+) {
+  @PublishedApi internal fun withId(id: Int): GesturePointer = copy(id = id.toUInt())
+
+  @PublishedApi
+  internal fun withPosition(position: ScreenPoint): GesturePointer = copy(position = position)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GesturePointer = GesturePointer()
+
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(id: Int, position: ScreenPoint): GesturePointer =
+      GesturePointer(id = id.toUInt(), position = position)
+  }
+}
+
+/**
+ * Camera movement from anything but a pointer, such as a wheel, a trackpad scroll, a dial, a crown,
+ * keys, or buttons, which the host converts into camera units. Zooms and turns hold `position` in
+ * place.
+ *
+ * A continuous delta, such as a trackpad scroll, applies at once. A discrete one, such as a wheel
+ * detent or a key press, eases, and a quick run of them merges into one ease that speeds up. Deltas
+ * are one gesture until they idle. The recommended amounts are a third of a level per wheel detent,
+ * 1/300 of a level per pixel of trackpad scrolling, and, for keys, 100 logical pixels of pan, a
+ * level of zoom, 15 degrees of bearing, and 10 of pitch.
+ *
+ * See `mln_gesture_delta` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GestureDelta(
+  public val position: ScreenPoint = ScreenPoint(),
+  public val discrete: Boolean = false,
+  /** How far the map's content moves on the screen, in logical pixels. */
+  public val pan: ScreenPoint = ScreenPoint(),
+  /** Zoom levels to add. */
+  public val zoom: Double = 0.0,
+  /** Degrees to turn clockwise. */
+  public val bearing: Double = 0.0,
+  /** Degrees to tilt. */
+  public val pitch: Double = 0.0,
+) {
+  @PublishedApi
+  internal fun withPosition(position: ScreenPoint): GestureDelta = copy(position = position)
+
+  @PublishedApi
+  internal fun withDiscrete(discrete: Boolean): GestureDelta = copy(discrete = discrete)
+
+  @PublishedApi internal fun withPan(pan: ScreenPoint): GestureDelta = copy(pan = pan)
+
+  @PublishedApi internal fun withZoom(zoom: Double): GestureDelta = copy(zoom = zoom)
+
+  @PublishedApi internal fun withBearing(bearing: Double): GestureDelta = copy(bearing = bearing)
+
+  @PublishedApi internal fun withPitch(pitch: Double): GestureDelta = copy(pitch = pitch)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GestureDelta = GestureDelta()
+  }
+}
+
+/**
+ * A pinch the platform recognized, such as a macOS trackpad's magnify and rotate or a browser's
+ * Ctrl+wheel. Each update zooms by `scale` (above 1 zooms in) and turns `rotation` degrees
+ * clockwise on the screen since the last, around `center`. It glides on when it ends, as a touch
+ * pinch does.
+ *
+ * See `mln_gesture_pinch` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GesturePinch(
+  public val center: ScreenPoint = ScreenPoint(),
+  public val scale: Double = 0.0,
+  public val rotation: Double = 0.0,
+  public val phase: PinchPhase = PinchPhase.BEGIN,
+) {
+  @PublishedApi internal fun withCenter(center: ScreenPoint): GesturePinch = copy(center = center)
+
+  @PublishedApi internal fun withScale(scale: Double): GesturePinch = copy(scale = scale)
+
+  @PublishedApi
+  internal fun withRotation(rotation: Double): GesturePinch = copy(rotation = rotation)
+
+  @PublishedApi internal fun withPhase(phase: PinchPhase): GesturePinch = copy(phase = phase)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): GesturePinch = GesturePinch()
+  }
+}
+
+/**
+ * One input, in logical pixels from the map's top-left corner.
+ *
+ * When the view loses focus, the host cancels the pointers it sent and sends empty modes.
+ *
+ * See `mln_gesture_input` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public sealed interface GestureInput {
+  public data class PointerDown(public val value: GesturePointerDown) : GestureInput
+
+  public data class PointerMove(public val value: GesturePointer) : GestureInput
+
+  public data class PointerUp(public val value: GesturePointer) : GestureInput
+
+  public data class PointerCancel(public val value: GesturePointer) : GestureInput
+
+  public data class Modes(public val value: GestureMode) : GestureInput
+
+  public data class Delta(public val value: GestureDelta) : GestureInput
+
+  public data class Pinch(public val value: GesturePinch) : GestureInput
+}
+
+/**
+ * A rectangle of the screen, from its `min` corner to its `max` corner.
+ *
+ * See `mln_screen_box` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public data class ScreenBox(
+  public val min: ScreenPoint = ScreenPoint(),
+  public val max: ScreenPoint = ScreenPoint(),
+) {
+  @PublishedApi internal fun withMin(min: ScreenPoint): ScreenBox = copy(min = min)
+
+  @PublishedApi internal fun withMax(max: ScreenPoint): ScreenBox = copy(max = max)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): ScreenBox = ScreenBox()
+  }
+}
+
+/**
+ * A tap, at `position`, by the pointer `id`.
+ *
+ * See `mln_gesture_tap` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GestureTap(
+  /** Unused for `GestureEvent.TwoFingerTap`. */
+  @get:JvmName("getId") public val id: UInt,
+  public val position: ScreenPoint,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(id: Int, position: ScreenPoint): GestureTap =
+      GestureTap(id = id.toUInt(), position = position)
+  }
+}
+
+/**
+ * A notch that a part reached.
+ *
+ * See `mln_gesture_notch_event` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GestureNotchEvent(
+  public val axis: GestureAxis,
+  /** The notch's kind, from the options. */
+  @get:JvmName("getKind") public val kind: UInt,
+  /** In the part's unit; a bearing from 0 up to 360 degrees. */
+  public val value: Double,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(axis: GestureAxis, kind: Int, value: Double): GestureNotchEvent =
+      GestureNotchEvent(axis = axis, kind = kind.toUInt(), value = value)
+  }
+}
+
+/**
+ * What a gesture means beyond moving the camera. Double taps and two-finger taps also zoom, as the
+ * options say.
+ *
+ * See `mln_gesture_event` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public sealed interface GestureEvent {
+  public data class Tap(public val value: GestureTap) : GestureEvent
+
+  public data class DoubleTap(public val value: GestureTap) : GestureEvent
+
+  public data class TwoFingerTap(public val value: GestureTap) : GestureEvent
+
+  public data class Notch(public val value: GestureNotchEvent) : GestureEvent
+
+  public data class LongPress(public val value: GestureTap) : GestureEvent
+
+  public data class Unknown(
+    @get:JvmName("getTag") public val tag: UInt,
+    public val bytes: ByteArray,
+  ) : GestureEvent {
+    private fun contentFields(): Array<Any?> = arrayOf(tag, bytes)
+
+    override fun equals(other: Any?): Boolean =
+      this === other || other is Unknown && contentFields().contentDeepEquals(other.contentFields())
+
+    override fun hashCode(): Int = contentFields().contentDeepHashCode()
+
+    public companion object {
+      /** Creates a value, for Java, which can't call the constructor. */
+      @JvmStatic
+      @PublishedApi
+      internal fun of(tag: Int, bytes: ByteArray): Unknown =
+        Unknown(tag = tag.toUInt(), bytes = bytes)
+    }
+  }
+}
+
+/**
+ * What an input or a tick did.
+ *
+ * See `mln_gesture_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public data class GestureResult(
+  /**
+   * Whether the recognizer used the input, so the host stops the platform's default for it. Ticks
+   * report false.
+   */
+  public val handled: Boolean,
+  public val nextTick: GestureNextTick,
+  /** For `GestureNextTick.AT`. */
+  public val nextTickMs: Double,
+  /**
+   * Whether a box-zoom drag is drawing `box_zoom`, which the host shows, in logical pixels corner
+   * to corner.
+   */
+  public val boxZoomActive: Boolean,
+  public val boxZoom: ScreenBox,
+  public val events: List<GestureEvent>,
+)
+
+/**
+ * What a GPU device can do.
+ *
+ * See `mln_gpu_device_capabilities` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class GpuDeviceCapabilities(
+  public val backend: RenderBackend,
+  /** The kinds of `RenderTarget` that sessions on the device render to. */
+  public val targetKinds: RenderTargetKindFlag,
+  /**
+   * The ways that the device can share the textures of an exported ring. A kind is here only once
+   * the device has exported a texture of it, so a driver that offers an extension but can't
+   * allocate the memory reports no kind of it.
+   */
+  public val exportKinds: GpuExportKindFlag,
+  /** The kinds of `GpuSync` that the device can signal and wait on. */
+  public val syncKinds: GpuSyncKindFlag,
+  /** The formats of the depth textures that a borrowed ring takes. */
+  public val depthStencilFormats: DepthStencilFormatFlag,
+  /**
+   * The kinds of `export_kinds` whose rings also share each frame's depth texture, with
+   * `RenderSessionAttachOptions.keepDepth`. An IOSurface or a dmabuf holds no depth format, so only
+   * `GpuExportKind.OPAQUE_FD` can be here.
+   */
+  public val depthExportKinds: GpuExportKindFlag,
+)
+
+/**
+ * The D3D12 objects of a device, as `GpuDeviceHandle.getD3d12Context()` reports them.
+ *
+ * See `mln_gpu_device_d3d12_context_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class GpuDeviceD3d12ContextResult(
+  /** The `ID3D12Device`. */
+  public val device: NativePointer,
+  /** The direct `ID3D12CommandQueue` that sessions on the device submit to. */
+  public val commandQueue: NativePointer,
+)
+
+/**
+ * The Vulkan objects of a device, as `GpuDeviceHandle.getVulkanContext()` reports them.
+ *
+ * See `mln_gpu_device_vulkan_context_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+ */
+public data class GpuDeviceVulkanContextResult(
+  public val context: VulkanContextDescriptor,
+)
 
 /**
  * A projection's camera, as `MapProjectionHandle.getCamera()` reports it.
@@ -8605,29 +9501,6 @@ public data class RenderSessionSnapshot(
         failureStatus = failureStatus,
         hasTarget = hasTarget,
       )
-  }
-}
-
-/**
- * A rectangle of the screen, from its `min` corner to its `max` corner.
- *
- * See `mln_screen_box` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class ScreenBox(
-  public val min: ScreenPoint = ScreenPoint(),
-  public val max: ScreenPoint = ScreenPoint(),
-) {
-  @PublishedApi internal fun withMin(min: ScreenPoint): ScreenBox = copy(min = min)
-
-  @PublishedApi internal fun withMax(max: ScreenPoint): ScreenBox = copy(max = max)
-
-  public companion object {
-    /**
-     * Creates a value from the members without defaults, for Java, which sets the others with the
-     * `withX` methods.
-     */
-    @JvmStatic @PublishedApi internal fun of(): ScreenBox = ScreenBox()
   }
 }
 
@@ -8814,6 +9687,45 @@ public data class TextureReadbackResult(
 }
 
 /**
+ * Options for `RenderSessionHandle.setFramePacing()`.
+ *
+ * See `mln_frame_pacing_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+public data class FramePacingOptions(
+  /**
+   * The most frames per second that the library demands, greater than zero. It skips display
+   * refreshes to stay within it. By default, it can demand a frame at every refresh.
+   */
+  @get:JvmSynthetic public val maximumFramesPerSecond: UInt? = null,
+  /**
+   * The `NSView*` on macOS, or the `UIView*` on iOS and tvOS, that shows the session's frames, to
+   * pace them to its window's display rather than the main one. On iOS and tvOS, set the pacing
+   * again when the scene moves to another screen, as `windowScene:didUpdateEffectiveGeometry:`
+   * reports.
+   */
+  public val view: NativePointer? = null,
+) {
+  @PublishedApi
+  @JvmName("getMaximumFramesPerSecond")
+  internal fun maximumFramesPerSecondForJava(): Int? = maximumFramesPerSecond?.toInt()
+
+  @PublishedApi
+  internal fun withMaximumFramesPerSecond(maximumFramesPerSecond: Int): FramePacingOptions =
+    copy(maximumFramesPerSecond = maximumFramesPerSecond.toUInt())
+
+  @PublishedApi internal fun withView(view: NativePointer): FramePacingOptions = copy(view = view)
+
+  public companion object {
+    /**
+     * Creates a value from the members without defaults, for Java, which sets the others with the
+     * `withX` methods.
+     */
+    @JvmStatic @PublishedApi internal fun of(): FramePacingOptions = FramePacingOptions()
+  }
+}
+
+/**
  * The answer to a resource request.
  *
  * See `mln_resource_response` in the
@@ -8827,14 +9739,21 @@ public data class ResourceResponse(
   public val bytes: ByteArray = byteArrayOf(),
   /** A description of the error, for `ResourceResponseStatus.ERROR`. */
   public val errorMessage: String = "",
-  /** Whether the library must request the resource again before it reuses this copy. */
+  /**
+   * Whether the library must not use this copy once it expires until it requests the resource
+   * again, not even while the server can't be reached, as `Cache-Control: must-revalidate` or
+   * `no-cache` says.
+   */
   public val mustRevalidate: Boolean = false,
   public val modifiedUnixMs: Long? = null,
+  /** When this copy stops being fresh. Without it, the copy never expires. */
   public val expiresUnixMs: Long? = null,
   /** Empty when the resource has no ETag. */
   public val etag: String = "",
   /** When to retry, for `ResourceResponseStatus.ERROR`. */
   public val retryAfterUnixMs: Long? = null,
+  /** Whether the library must not store this copy, as `Cache-Control: no-store` says. */
+  public val noStore: Boolean = false,
 ) {
   private fun contentFields(): Array<Any?> =
     arrayOf(
@@ -8847,6 +9766,7 @@ public data class ResourceResponse(
       expiresUnixMs,
       etag,
       retryAfterUnixMs,
+      noStore,
     )
 
   override fun equals(other: Any?): Boolean =
@@ -8885,6 +9805,9 @@ public data class ResourceResponse(
   @PublishedApi
   internal fun withRetryAfterUnixMs(retryAfterUnixMs: Long): ResourceResponse =
     copy(retryAfterUnixMs = retryAfterUnixMs)
+
+  @PublishedApi
+  internal fun withNoStore(noStore: Boolean): ResourceResponse = copy(noStore = noStore)
 
   public companion object {
     /**
@@ -8954,21 +9877,29 @@ public data class MapOptions(
    */
   public val tileCacheEnabled: Boolean? = null,
   /**
-   * Fonts for the text that a style's own fonts don't draw, such as scripts that need complex
-   * shaping, like Myanmar or Devanagari. A JSON array of font files, each an object with a `url`
-   * and an optional `unicode-range`, as in a font face of a style's `font-faces`, which every font
-   * stack uses after the style's own font faces. Empty for the system's fonts, unless
-   * `system_fonts_enabled` is false.
+   * Fonts for the text that a style's own fonts don't draw. A JSON array of font files, each an
+   * object with a `url` and an optional `unicode-range`, as in a font face of a style's
+   * `font-faces`. They shape, in order, the text that glyph PBFs can't shape, such as Myanmar or
+   * Devanagari, or all the text of a style without glyph PBFs, and draw the glyphs that come from
+   * local fonts: those a style's PBFs lack, and CJK with `local_ideographs_enabled`. Empty for the
+   * system's fonts alone.
    */
   public val fallbackFontFaces: String = "",
   /**
-   * Whether the map falls back to the system's fonts for CJK and the scripts that need complex
-   * shaping when `fallback_font_faces` is empty: fonts that the platform's font matcher picks for
-   * the user's preferred languages. Without it, the map does. The first map that uses them waits
-   * for them to be found. In the browser, the browser draws CJK glyphs in its sans-serif font
-   * instead, where `fallback_font_faces` doesn't cover them.
+   * Whether the map draws from the system's fonts what the style's fonts and `fallback_font_faces`
+   * don't: fonts that the platform's font matcher picks for the font stack's names, or for the
+   * character and the user's preferred languages. It shapes with them the text that glyph PBFs
+   * can't shape, and all the text of a style without glyph PBFs. Without it, the map does. The
+   * first map that uses them waits for the matcher to load. In the browser, the browser draws those
+   * glyphs in the font stack's families, then its sans-serif font, one at a time.
    */
   public val systemFontsEnabled: Boolean? = null,
+  /**
+   * Whether CJK ideographs, kana and hangul come from local fonts (`fallback_font_faces`, then the
+   * system's) before glyph PBFs, rather than from a glyph PBF downloaded for every few characters.
+   * Without it, they do.
+   */
+  public val localIdeographsEnabled: Boolean? = null,
 ) {
   @PublishedApi internal fun withMapMode(mapMode: MapMode): MapOptions = copy(mapMode = mapMode)
 
@@ -8990,6 +9921,10 @@ public data class MapOptions(
   @PublishedApi
   internal fun withSystemFontsEnabled(systemFontsEnabled: Boolean): MapOptions =
     copy(systemFontsEnabled = systemFontsEnabled)
+
+  @PublishedApi
+  internal fun withLocalIdeographsEnabled(localIdeographsEnabled: Boolean): MapOptions =
+    copy(localIdeographsEnabled = localIdeographsEnabled)
 
   public companion object {
     /**
@@ -9160,6 +10095,49 @@ public data class OfflineRegionInfo(
       other is OfflineRegionInfo && contentFields().contentDeepEquals(other.contentFields())
 
   override fun hashCode(): Int = contentFields().contentDeepHashCode()
+}
+
+/**
+ * How long the resources that an offline region holds stay usable.
+ *
+ * See `mln_offline_region_expiry` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class OfflineRegionExpiry(
+  /**
+   * When the first of the region's resources goes stale, which may have passed. Maps show a stale
+   * resource while they check it with the server, unless it must be checked first, and the region's
+   * download refreshes it. Without it, no resource ever goes stale.
+   */
+  public val staleAfterUnixMs: Long?,
+  /**
+   * When the first of the region's resources that the server requires checking once stale stops
+   * being usable without the server, which may have passed. Refresh the region before then to keep
+   * all of it usable offline. Without it, every resource stays usable offline.
+   */
+  public val usableOfflineUntilUnixMs: Long?,
+  /** The resources that are stale now, tiles included. */
+  @get:JvmName("getStaleResourceCount") public val staleResourceCount: ULong,
+  /** The stale resources that maps can't use now without the server. */
+  @get:JvmName("getUnusableResourceCount") public val unusableResourceCount: ULong,
+) {
+  public companion object {
+    /** Creates a value, for Java, which can't call the constructor. */
+    @JvmStatic
+    @PublishedApi
+    internal fun of(
+      staleAfterUnixMs: Long?,
+      usableOfflineUntilUnixMs: Long?,
+      staleResourceCount: Long,
+      unusableResourceCount: Long,
+    ): OfflineRegionExpiry =
+      OfflineRegionExpiry(
+        staleAfterUnixMs = staleAfterUnixMs,
+        usableOfflineUntilUnixMs = usableOfflineUntilUnixMs,
+        staleResourceCount = staleResourceCount.toULong(),
+        unusableResourceCount = unusableResourceCount.toULong(),
+      )
+  }
 }
 
 /**
@@ -10448,6 +11426,14 @@ public const val DIAGNOSTIC_MESSAGE_CAPACITY: UInt = 4096u
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public const val FRAME_DEMAND_TOKEN_STILL_IMAGE: ULong = 18446744073709551615uL
+
+/**
+ * The most events that one input or tick reports.
+ *
+ * See `MLN_GESTURE_RESULT_EVENT_CAPACITY` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+public const val GESTURE_RESULT_EVENT_CAPACITY: Int = 4
 
 /**
  * The most textures that a render session's texture ring can have.

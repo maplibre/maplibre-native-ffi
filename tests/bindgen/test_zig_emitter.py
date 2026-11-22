@@ -175,10 +175,13 @@ void mln_query_release(mln_query query);
         )
         self.assertIn(
             "`Map.cancelCameraTransitions()`, `Map.cancelCameraTransitionsWithId()`, "
-            "a gesture's `GesturePhase.begin` or `GesturePhase.cancel`",
+            "a gesture",
             summary,
         )
         self.assertNotIn("mln_map_cancel_camera_transitions", summary)
+        self.assertIn("For `MomentumDecayModel.friction`.", source)
+        # A tag that only its union uses names the variant it selects.
+        self.assertIn("`GestureEvent.notch` as", source)
 
     def test_generated_values_and_keyword_parameters_round_trip(self):
         zig_tool = require_tool(self, "zig", BINDING)
@@ -191,6 +194,7 @@ void mln_query_release(mln_query query);
                 "defaults",
                 "absent_handle",
                 "owned_argument",
+                "counted_inline_array",
             ),
             defines=("MLN_PROTOCOL_COMPLETION_RUNTIME", "MLN_PROTOCOL_ABI_VERSION"),
         )

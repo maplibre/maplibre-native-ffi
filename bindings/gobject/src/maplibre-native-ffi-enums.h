@@ -64,8 +64,10 @@ GType maplibre_native_ffi_error_get_type(void) G_GNUC_CONST;
  *   cache's resources and frees the space they used. Offline regions keep their
  *   resources.
  * @MAPLIBRE_NATIVE_FFI_CACHE_DATABASE_OPERATION_INVALIDATE: Keeps the ambient
- *   cache's resources, but makes maps check each one with the server before
- *   they use it again. Offline regions keep their resources as they are.
+ *   cache's resources, but makes them stale: maps check each one with the
+ *   server when they next use it, and show it meanwhile unless the server
+ *   requires checking it first. Offline regions keep their resources as they
+ *   are.
  * @MAPLIBRE_NATIVE_FFI_CACHE_DATABASE_OPERATION_PACK: Compacts the whole
  *   database file to free the disk space that it no longer uses.
  * @MAPLIBRE_NATIVE_FFI_CACHE_DATABASE_OPERATION_RESET: Deletes the whole
@@ -115,10 +117,10 @@ GType maplibre_native_ffi_camera_change_mode_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_COMMAND: A camera command outside a
  *   gesture, or the map itself, as when a resize keeps the camera within its
  *   bounds.
- * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_GESTURE: A camera command with a
- *   gesture phase.
- * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_MOMENTUM: The momentum and bearing
- *   snap that a gesture's end started.
+ * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_GESTURE: A gesture that a gesture
+ *   recognizer recognized.
+ * @MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_MOMENTUM: The glide and snap after
+ *   a gesture recognizer's gesture.
  *
  * What moved the camera.
  *
@@ -142,8 +144,7 @@ GType maplibre_native_ffi_camera_change_source_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_CAMERA_TRANSITION_OUTCOME_CANCELLED:
  *   `maplibre_native_ffi_map_cancel_camera_transitions_async()`,
  *   `maplibre_native_ffi_map_cancel_camera_transitions_with_id_async()`, a
- *   gesture's `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_BEGIN` or
- *   `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_CANCEL`,
+ *   gesture that a gesture recognizer begins or cancels,
  *   `maplibre_native_ffi_map_set_free_camera_options_async()`, or a resize that
  *   moved the camera back inside its bounds stopped the change. A command that
  *   fails before it moves the camera also reports this.
@@ -248,6 +249,28 @@ GType maplibre_native_ffi_constrain_mode_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_constrain_mode_get_type())
 
 /**
+ * MaplibreNativeFfiD3d12CompositionKind:
+ * @MAPLIBRE_NATIVE_FFI_D3D12_COMPOSITION_KIND_VISUAL: An `IDCompositionVisual`,
+ *   whose content the session sets to its swap chain.
+ * @MAPLIBRE_NATIVE_FFI_D3D12_COMPOSITION_KIND_SWAP_CHAIN_PANEL: A XAML
+ *   `SwapChainPanel`'s `ISwapChainPanelNative`, of WinUI or UWP, whose swap
+ *   chain the session sets.
+ *
+ * What shows a D3D12 composition swap chain.
+ *
+ * See `mln_d3d12_composition_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_D3D12_COMPOSITION_KIND_VISUAL = 1,
+  MAPLIBRE_NATIVE_FFI_D3D12_COMPOSITION_KIND_SWAP_CHAIN_PANEL = 2,
+} MaplibreNativeFfiD3d12CompositionKind;
+
+GType maplibre_native_ffi_d3d12_composition_kind_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_D3D12_COMPOSITION_KIND \
+  (maplibre_native_ffi_d3d12_composition_kind_get_type())
+
+/**
  * MaplibreNativeFfiDepthStencilFormatFlag:
  * @MAPLIBRE_NATIVE_FFI_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8: 24-bit
  *   normalized depth and 8-bit stencil: VK_FORMAT_D24_UNORM_S8_UINT,
@@ -301,39 +324,76 @@ GType maplibre_native_ffi_frame_demand_flag_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_frame_demand_flag_get_type())
 
 /**
- * MaplibreNativeFfiGesturePhase:
- * @MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_NONE: The change isn't part of a gesture.
- * @MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_BEGIN: The gesture starts. This cancels
- *   every running camera animation before the change applies.
- * @MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_UPDATE: The gesture continues. To start a
- *   gesture that keeps the running camera animations, start it with this phase
- *   instead of `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_BEGIN`.
- * @MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_END:
- * @MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_CANCEL: The platform cancelled the
- *   gesture. This also cancels every running camera animation after the change
- *   applies.
+ * MaplibreNativeFfiGestureAxis:
+ * @MAPLIBRE_NATIVE_FFI_GESTURE_AXIS_ZOOM:
+ * @MAPLIBRE_NATIVE_FFI_GESTURE_AXIS_BEARING:
+ * @MAPLIBRE_NATIVE_FFI_GESTURE_AXIS_PITCH:
  *
- * Where a camera change falls in a gesture that the user makes.
+ * The part of the camera that a notch is on.
  *
- * `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_BEGIN` and
- * `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_UPDATE` mark a gesture in progress, and
- * `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_END` and
- * `MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_CANCEL` end it.
- *
- * See `mln_gesture_phase` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * See `mln_gesture_axis` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
 typedef enum {
-  MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_NONE = 0,
-  MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_BEGIN = 1,
-  MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_UPDATE = 2,
-  MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_END = 3,
-  MAPLIBRE_NATIVE_FFI_GESTURE_PHASE_CANCEL = 4,
-} MaplibreNativeFfiGesturePhase;
+  MAPLIBRE_NATIVE_FFI_GESTURE_AXIS_ZOOM = 0,
+  MAPLIBRE_NATIVE_FFI_GESTURE_AXIS_BEARING = 1,
+  MAPLIBRE_NATIVE_FFI_GESTURE_AXIS_PITCH = 2,
+} MaplibreNativeFfiGestureAxis;
 
-GType maplibre_native_ffi_gesture_phase_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_PHASE \
-  (maplibre_native_ffi_gesture_phase_get_type())
+GType maplibre_native_ffi_gesture_axis_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_AXIS \
+  (maplibre_native_ffi_gesture_axis_get_type())
+
+/**
+ * MaplibreNativeFfiGestureMode:
+ * @MAPLIBRE_NATIVE_FFI_GESTURE_MODE_ROTATE: Sideways turns the map and up and
+ *   down tilts it.
+ * @MAPLIBRE_NATIVE_FFI_GESTURE_MODE_BOX_ZOOM: Draws a box that the map zooms to
+ *   when the pointer lifts.
+ * @MAPLIBRE_NATIVE_FFI_GESTURE_MODE_ZOOM_OUT: A double tap zooms out instead of
+ *   in.
+ *
+ * What a one-pointer drag or a double tap does instead of its default, from the
+ * pointer's held buttons or from held keys. A drag reads its modes when it
+ * starts and keeps them until it ends, and a double tap when it lifts; rotating
+ * wins over a box zoom.
+ *
+ * See `mln_gesture_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_GESTURE_MODE_ROTATE = 1,
+  MAPLIBRE_NATIVE_FFI_GESTURE_MODE_BOX_ZOOM = 2,
+  MAPLIBRE_NATIVE_FFI_GESTURE_MODE_ZOOM_OUT = 4,
+} MaplibreNativeFfiGestureMode;
+
+GType maplibre_native_ffi_gesture_mode_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_MODE \
+  (maplibre_native_ffi_gesture_mode_get_type())
+
+/**
+ * MaplibreNativeFfiGestureNextTick:
+ * @MAPLIBRE_NATIVE_FFI_GESTURE_NEXT_TICK_NONE: Not until the next input.
+ * @MAPLIBRE_NATIVE_FFI_GESTURE_NEXT_TICK_FRAME: Every display frame, while a
+ *   delta eases or a gesture, its glide, or its snap may reach a notch.
+ * @MAPLIBRE_NATIVE_FFI_GESTURE_NEXT_TICK_AT: At `next_tick_ms`, on the inputs'
+ *   clock: when a press becomes a long press, or idle deltas end.
+ *
+ * When a gesture recognizer next needs
+ * `maplibre_native_ffi_gesture_recognizer_tick()`.
+ *
+ * See `mln_gesture_next_tick` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_GESTURE_NEXT_TICK_NONE = 0,
+  MAPLIBRE_NATIVE_FFI_GESTURE_NEXT_TICK_FRAME = 1,
+  MAPLIBRE_NATIVE_FFI_GESTURE_NEXT_TICK_AT = 2,
+} MaplibreNativeFfiGestureNextTick;
+
+GType maplibre_native_ffi_gesture_next_tick_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_NEXT_TICK \
+  (maplibre_native_ffi_gesture_next_tick_get_type())
 
 /**
  * MaplibreNativeFfiGpuExportKind:
@@ -641,19 +701,22 @@ GType maplibre_native_ffi_map_mode_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_FRICTION: The speed halves every
  *   `half_life_ms`, until it drops to `stop_speed`. UIScrollView's normal
  *   deceleration is a half-life of 346 ms, and its fast deceleration 69 ms.
- * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_EASE: The part eases `distance`
- *   over `duration_ms`, along `easing`, as a camera animation does. The caller
- *   plans the glide, for example from the platform's own fling physics, such as
- *   Android's OverScroller.
+ * @MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_CURVE: The glide lasts
+ *   `duration_ms` × (speed / `reference_speed`) to the power of
+ *   `duration_exponent`, and follows `easing`, starting at the release speed.
+ *   Its defaults are Android's OverScroller fling, in its density-independent
+ *   pixels: a reference speed of 1000, 555.182 ms, an exponent of 0.7362676,
+ *   the curve (0.175, 0.5, 0.35, 1), a minimum speed of 50 and a maximum of
+ *   8000.
  *
- * How a part of a gesture's momentum slows from its release speed.
+ * How a part's glide unfolds from its release speed.
  *
  * See `mln_momentum_decay_model` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
 typedef enum {
   MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_FRICTION = 0,
-  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_EASE = 1,
+  MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY_MODEL_CURVE = 1,
 } MaplibreNativeFfiMomentumDecayModel;
 
 GType maplibre_native_ffi_momentum_decay_model_get_type(void) G_GNUC_CONST;
@@ -768,6 +831,53 @@ GType maplibre_native_ffi_open_gl_context_provider_flag_get_type(
   (maplibre_native_ffi_open_gl_context_provider_flag_get_type())
 
 /**
+ * MaplibreNativeFfiPinchPhase:
+ * @MAPLIBRE_NATIVE_FFI_PINCH_PHASE_BEGIN:
+ * @MAPLIBRE_NATIVE_FFI_PINCH_PHASE_UPDATE:
+ * @MAPLIBRE_NATIVE_FFI_PINCH_PHASE_END: The fingers lifted: the pinch glides
+ *   on.
+ * @MAPLIBRE_NATIVE_FFI_PINCH_PHASE_CANCEL: The platform took the pinch away:
+ *   nothing continues, and the camera's animations stop.
+ *
+ * Where a platform-recognized pinch is.
+ *
+ * See `mln_pinch_phase` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_PINCH_PHASE_BEGIN = 0,
+  MAPLIBRE_NATIVE_FFI_PINCH_PHASE_UPDATE = 1,
+  MAPLIBRE_NATIVE_FFI_PINCH_PHASE_END = 2,
+  MAPLIBRE_NATIVE_FFI_PINCH_PHASE_CANCEL = 3,
+} MaplibreNativeFfiPinchPhase;
+
+GType maplibre_native_ffi_pinch_phase_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_PINCH_PHASE \
+  (maplibre_native_ffi_pinch_phase_get_type())
+
+/**
+ * MaplibreNativeFfiPointerKind:
+ * @MAPLIBRE_NATIVE_FFI_POINTER_KIND_MOUSE:
+ * @MAPLIBRE_NATIVE_FFI_POINTER_KIND_TOUCH: Two touches pinch, twist, and tilt,
+ *   and a held second tap zooms.
+ * @MAPLIBRE_NATIVE_FFI_POINTER_KIND_PEN:
+ *
+ * What kind of device a pointer is.
+ *
+ * See `mln_pointer_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_POINTER_KIND_MOUSE = 0,
+  MAPLIBRE_NATIVE_FFI_POINTER_KIND_TOUCH = 1,
+  MAPLIBRE_NATIVE_FFI_POINTER_KIND_PEN = 2,
+} MaplibreNativeFfiPointerKind;
+
+GType maplibre_native_ffi_pointer_kind_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_POINTER_KIND \
+  (maplibre_native_ffi_pointer_kind_get_type())
+
+/**
  * MaplibreNativeFfiProjectionType:
  * @MAPLIBRE_NATIVE_FFI_PROJECTION_TYPE_MERCATOR:
  * @MAPLIBRE_NATIVE_FFI_PROJECTION_TYPE_VERTICAL_PERSPECTIVE: Draws the map as a
@@ -821,6 +931,11 @@ GType maplibre_native_ffi_render_abandon_disposition_get_type(
  * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_VULKAN:
  * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_OPEN_GL:
  * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_WEB_GPU:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_D3D12: D3D12, on Windows. It compiles its
+ *   shaders at run time with DXC, which your app ships: `dxcompiler.dll`,
+ *   1.8.2502 or later, beside your app's executable or in another directory of
+ *   the DLL search path, which doesn't take the library's own directory.
+ *   Without it, the library renders on another backend.
  *
  * A render backend.
  *
@@ -832,6 +947,7 @@ typedef enum {
   MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_VULKAN = 2,
   MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_OPEN_GL = 3,
   MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_WEB_GPU = 4,
+  MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_D3D12 = 5,
 } MaplibreNativeFfiRenderBackend;
 
 GType maplibre_native_ffi_render_backend_get_type(void) G_GNUC_CONST;
@@ -844,6 +960,7 @@ GType maplibre_native_ffi_render_backend_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_VULKAN:
  * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_OPEN_GL:
  * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_WEB_GPU:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_D3D12:
  *
  * A render backend, as a bit in a set.
  *
@@ -855,6 +972,7 @@ typedef enum {
   MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_VULKAN = 2,
   MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_OPEN_GL = 4,
   MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_WEB_GPU = 8,
+  MAPLIBRE_NATIVE_FFI_RENDER_BACKEND_FLAG_D3D12 = 16,
 } MaplibreNativeFfiRenderBackendFlag;
 
 GType maplibre_native_ffi_render_backend_flag_get_type(void) G_GNUC_CONST;
@@ -1006,6 +1124,8 @@ GType maplibre_native_ffi_render_session_state_get_type(void) G_GNUC_CONST;
  * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES:
  * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_EXPORTED_RING:
  * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WEB_CANVAS:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_D3D12_BORROWED_TEXTURES:
+ * @MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_D3D12_COMPOSITION:
  *
  * A render target kind, as a bit in a set.
  *
@@ -1028,6 +1148,8 @@ typedef enum {
   MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES = 16384,
   MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_EXPORTED_RING = 32768,
   MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_WEB_CANVAS = 65536,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_D3D12_BORROWED_TEXTURES = 131072,
+  MAPLIBRE_NATIVE_FFI_RENDER_TARGET_KIND_FLAG_D3D12_COMPOSITION = 262144,
 } MaplibreNativeFfiRenderTargetKindFlag;
 
 GType maplibre_native_ffi_render_target_kind_flag_get_type(void) G_GNUC_CONST;

@@ -52,4 +52,8 @@ public abstract record RenderTarget
     public sealed record ExportedRing(ExportedRingTarget Value) : RenderTarget;
 
     public sealed record WebCanvas(WebCanvasTarget Value) : RenderTarget;
+
+    public sealed record D3d12BorrowedTextures(D3d12BorrowedTexturesTarget Value) : RenderTarget;
+
+    public sealed record D3d12Composition(D3d12CompositionTarget Value) : RenderTarget;
 }

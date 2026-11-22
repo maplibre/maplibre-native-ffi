@@ -1,9 +1,9 @@
 # Builds the browser package of a web preset: mln-rs's `mln-rs-c` for
 # wasm32-unknown-unknown with one render backend, bound with wasm-bindgen into
 # a module that a JavaScript host loads and calls through its raw C exports.
-# mln-rs's `just c-web` recipe builds it, so the package has the Cargo
-# features, wasm-bindgen arguments, and wasm-opt passes that mln-rs checks it
-# with. The package has no C library to link, so a web preset builds no C
+# mln-rs's own `c-web:build` task script builds it, so the package has the
+# Cargo features, wasm-bindgen arguments, and wasm-opt passes that mln-rs checks
+# it with. The package has no C library to link, so a web preset builds no C
 # targets.
 
 include(mln_ffi_components)
@@ -50,7 +50,7 @@ endfunction()
 function(mln_ffi_add_web_package target)
   mln_ffi_check_mln_rs_headers()
   mln_ffi_web_feature(feature)
-  foreach(tool just wasm-bindgen wasm-opt)
+  foreach(tool bash wasm-bindgen wasm-opt)
     string(TOUPPER "MLN_FFI_${tool}" variable)
     string(REPLACE "-" "_" variable "${variable}")
     find_program(${variable} ${tool})
@@ -66,7 +66,9 @@ function(mln_ffi_add_web_package target)
   set(MLN_FFI_CARGO_TARGET_DIR "${PROJECT_SOURCE_DIR}/build/cargo"
       CACHE PATH "Cargo target directory for mln-rs")
 
-  # The recipe writes the package into <target dir>/c-web/<feature>.
+  # mln-rs's task script, which reads its arguments from mise's `usage_`
+  # variables, writes the package into <target dir>/c-web/<feature>.
+  set(script "${MLN_FFI_MLN_RS_DIR}/mise-tasks/c-web/build")
   set(package "${MLN_FFI_CARGO_TARGET_DIR}/c-web/${feature}")
   file(
     GLOB_RECURSE
@@ -84,19 +86,15 @@ function(mln_ffi_add_web_package target)
       -E
       env
       "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}"
-      "${MLN_FFI_JUST}"
-      --justfile
-      "${MLN_FFI_MLN_RS_DIR}/justfile"
-      --working-directory
-      "${MLN_FFI_MLN_RS_DIR}"
-      profile=release
-      c-web
-      ${feature}
+      usage_profile=release
+      "usage_backend=${feature}"
+      "${MLN_FFI_BASH}"
+      "${script}"
     DEPENDS
       ${sources} "${MLN_FFI_MLN_RS_DIR}/Cargo.toml"
-      "${MLN_FFI_MLN_RS_DIR}/Cargo.lock" "${MLN_FFI_MLN_RS_DIR}/justfile"
+      "${MLN_FFI_MLN_RS_DIR}/Cargo.lock" "${script}"
     WORKING_DIRECTORY "${MLN_FFI_MLN_RS_DIR}"
-    COMMENT "Building mln-rs-c's browser package for ${feature} with just c-web"
+    COMMENT "Building mln-rs-c's browser package for ${feature}"
     USES_TERMINAL
     VERBATIM)
   add_custom_target(

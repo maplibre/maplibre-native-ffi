@@ -38,7 +38,7 @@ public sealed unsafe partial class ResourceTransformRequestHandle
 
     NativeHandleState<MlnResourceTransformRequest> INativeOwner<MlnResourceTransformRequest>.State =>
         state;
-    internal MlnResourceTransformRequest Handle => state.Handle;
+    internal MlnResourceTransformRequest NativeHandle => state.Handle;
 
     /// <summary>
     /// The native handle value. It stays readable after release.

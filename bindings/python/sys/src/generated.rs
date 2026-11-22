@@ -4,13 +4,10 @@ use super::*;
 pub const MLN_C_VERSION: u32 = 0;
 pub const MLN_DIAGNOSTIC_MESSAGE_CAPACITY: u32 = 4096;
 pub const MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE: u64 = 18446744073709551615;
+pub const MLN_GESTURE_RESULT_EVENT_CAPACITY: i32 = 4;
 pub const MLN_HANDLE_NULL: u64 = 0;
 pub const MLN_TEXTURE_RING_MAX_DEPTH: u32 = 8;
 pub const MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL: u64 = 0;
-pub type mln_anchored_momentum_field = u32;
-pub const MLN_ANCHORED_MOMENTUM_VELOCITY: mln_anchored_momentum_field = 1;
-pub const MLN_ANCHORED_MOMENTUM_ANCHOR: mln_anchored_momentum_field = 2;
-pub const MLN_ANCHORED_MOMENTUM_SNAP: mln_anchored_momentum_field = 4;
 pub type mln_animation_option_field = u32;
 pub const MLN_ANIMATION_OPTION_DURATION: mln_animation_option_field = 1;
 pub const MLN_ANIMATION_OPTION_VELOCITY: mln_animation_option_field = 2;
@@ -43,7 +40,6 @@ pub const MLN_CAMERA_DELTA_SCALE: mln_camera_delta_field = 2;
 pub const MLN_CAMERA_DELTA_BEARING: mln_camera_delta_field = 4;
 pub const MLN_CAMERA_DELTA_PITCH: mln_camera_delta_field = 8;
 pub const MLN_CAMERA_DELTA_ANCHOR: mln_camera_delta_field = 16;
-pub const MLN_CAMERA_DELTA_MOMENTUM: mln_camera_delta_field = 32;
 pub type mln_camera_fit_option_field = u32;
 pub const MLN_CAMERA_FIT_OPTION_PADDING: mln_camera_fit_option_field = 1;
 pub const MLN_CAMERA_FIT_OPTION_BEARING: mln_camera_fit_option_field = 2;
@@ -86,6 +82,9 @@ pub const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP: mln_custom_geometry_source_opt
 pub type mln_custom_vector_source_option_field = u32;
 pub const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM: mln_custom_vector_source_option_field = 1;
 pub const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM: mln_custom_vector_source_option_field = 2;
+pub type mln_d3d12_composition_kind = u32;
+pub const MLN_D3D12_COMPOSITION_KIND_VISUAL: mln_d3d12_composition_kind = 1;
+pub const MLN_D3D12_COMPOSITION_KIND_SWAP_CHAIN_PANEL: mln_d3d12_composition_kind = 2;
 pub type mln_depth_stencil_format_flag = u32;
 pub const MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8: mln_depth_stencil_format_flag = 1;
 pub const MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH32_FLOAT_STENCIL8: mln_depth_stencil_format_flag = 2;
@@ -99,9 +98,9 @@ pub const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID: mln_feature_state_selector_fiel
 pub type mln_frame_demand_flag = u32;
 pub const MLN_FRAME_DEMAND_FORCE: mln_frame_demand_flag = 1;
 pub const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE: mln_frame_demand_flag = 4;
-pub type mln_frame_pacer_option_field = u32;
-pub const MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND: mln_frame_pacer_option_field = 1;
-pub const MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND: mln_frame_pacer_option_field = 2;
+pub type mln_frame_pacing_option_field = u32;
+pub const MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND: mln_frame_pacing_option_field = 1;
+pub const MLN_FRAME_PACING_OPTION_VIEW: mln_frame_pacing_option_field = 2;
 pub type mln_free_camera_option_field = u32;
 pub const MLN_FREE_CAMERA_OPTION_POSITION: mln_free_camera_option_field = 1;
 pub const MLN_FREE_CAMERA_OPTION_ORIENTATION: mln_free_camera_option_field = 2;
@@ -115,12 +114,46 @@ pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_RADIUS: mln_geo_json_source_option_
 pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: mln_geo_json_source_option_field = 64;
 pub const MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS: mln_geo_json_source_option_field = 128;
 pub const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER: mln_geo_json_source_option_field = 256;
-pub type mln_gesture_phase = u32;
-pub const MLN_GESTURE_PHASE_NONE: mln_gesture_phase = 0;
-pub const MLN_GESTURE_PHASE_BEGIN: mln_gesture_phase = 1;
-pub const MLN_GESTURE_PHASE_UPDATE: mln_gesture_phase = 2;
-pub const MLN_GESTURE_PHASE_END: mln_gesture_phase = 3;
-pub const MLN_GESTURE_PHASE_CANCEL: mln_gesture_phase = 4;
+pub type mln_gesture_axis = u32;
+pub const MLN_GESTURE_AXIS_ZOOM: mln_gesture_axis = 0;
+pub const MLN_GESTURE_AXIS_BEARING: mln_gesture_axis = 1;
+pub const MLN_GESTURE_AXIS_PITCH: mln_gesture_axis = 2;
+pub type mln_gesture_axis_option_field = u32;
+pub const MLN_GESTURE_AXIS_OPTION_ENABLED: mln_gesture_axis_option_field = 1;
+pub const MLN_GESTURE_AXIS_OPTION_GLIDES: mln_gesture_axis_option_field = 2;
+pub const MLN_GESTURE_AXIS_OPTION_MOMENTUM: mln_gesture_axis_option_field = 4;
+pub const MLN_GESTURE_AXIS_OPTION_SNAPS: mln_gesture_axis_option_field = 8;
+pub const MLN_GESTURE_AXIS_OPTION_SNAP: mln_gesture_axis_option_field = 16;
+pub const MLN_GESTURE_AXIS_OPTION_NOTCHES: mln_gesture_axis_option_field = 32;
+pub type mln_gesture_event_type = u32;
+pub const MLN_GESTURE_EVENT_TAP: mln_gesture_event_type = 1;
+pub const MLN_GESTURE_EVENT_DOUBLE_TAP: mln_gesture_event_type = 2;
+pub const MLN_GESTURE_EVENT_TWO_FINGER_TAP: mln_gesture_event_type = 3;
+pub const MLN_GESTURE_EVENT_NOTCH: mln_gesture_event_type = 4;
+pub const MLN_GESTURE_EVENT_LONG_PRESS: mln_gesture_event_type = 5;
+pub type mln_gesture_input_type = u32;
+pub const MLN_GESTURE_INPUT_POINTER_DOWN: mln_gesture_input_type = 1;
+pub const MLN_GESTURE_INPUT_POINTER_MOVE: mln_gesture_input_type = 2;
+pub const MLN_GESTURE_INPUT_POINTER_UP: mln_gesture_input_type = 3;
+pub const MLN_GESTURE_INPUT_POINTER_CANCEL: mln_gesture_input_type = 4;
+pub const MLN_GESTURE_INPUT_MODES: mln_gesture_input_type = 5;
+pub const MLN_GESTURE_INPUT_DELTA: mln_gesture_input_type = 6;
+pub const MLN_GESTURE_INPUT_PINCH: mln_gesture_input_type = 7;
+pub type mln_gesture_mode = u32;
+pub const MLN_GESTURE_MODE_ROTATE: mln_gesture_mode = 1;
+pub const MLN_GESTURE_MODE_BOX_ZOOM: mln_gesture_mode = 2;
+pub const MLN_GESTURE_MODE_ZOOM_OUT: mln_gesture_mode = 4;
+pub type mln_gesture_next_tick = u32;
+pub const MLN_GESTURE_NEXT_TICK_NONE: mln_gesture_next_tick = 0;
+pub const MLN_GESTURE_NEXT_TICK_FRAME: mln_gesture_next_tick = 1;
+pub const MLN_GESTURE_NEXT_TICK_AT: mln_gesture_next_tick = 2;
+pub type mln_gesture_option_field = u32;
+pub const MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM: mln_gesture_option_field = 1;
+pub const MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM: mln_gesture_option_field = 2;
+pub type mln_gesture_pan_option_field = u32;
+pub const MLN_GESTURE_PAN_OPTION_ENABLED: mln_gesture_pan_option_field = 1;
+pub const MLN_GESTURE_PAN_OPTION_GLIDES: mln_gesture_pan_option_field = 2;
+pub const MLN_GESTURE_PAN_OPTION_MOMENTUM: mln_gesture_pan_option_field = 4;
 pub type mln_gpu_device_option_field = u32;
 pub const MLN_GPU_DEVICE_OPTION_BACKEND: mln_gpu_device_option_field = 1;
 pub const MLN_GPU_DEVICE_OPTION_ADAPTER_INDEX: mln_gpu_device_option_field = 2;
@@ -205,6 +238,7 @@ pub type mln_map_option_field = u32;
 pub const MLN_MAP_OPTION_EVENT_MASK: mln_map_option_field = 1;
 pub const MLN_MAP_OPTION_TILE_CACHE_ENABLED: mln_map_option_field = 2;
 pub const MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED: mln_map_option_field = 4;
+pub const MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED: mln_map_option_field = 8;
 pub type mln_map_tile_option_field = u32;
 pub const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA: mln_map_tile_option_field = 1;
 pub const MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS: mln_map_tile_option_field = 2;
@@ -221,15 +255,16 @@ pub type mln_momentum_decay_field = u32;
 pub const MLN_MOMENTUM_DECAY_MODEL: mln_momentum_decay_field = 1;
 pub const MLN_MOMENTUM_DECAY_HALF_LIFE_MS: mln_momentum_decay_field = 2;
 pub const MLN_MOMENTUM_DECAY_STOP_SPEED: mln_momentum_decay_field = 4;
-pub const MLN_MOMENTUM_DECAY_DISTANCE: mln_momentum_decay_field = 8;
+pub const MLN_MOMENTUM_DECAY_REFERENCE_SPEED: mln_momentum_decay_field = 8;
 pub const MLN_MOMENTUM_DECAY_DURATION_MS: mln_momentum_decay_field = 16;
-pub const MLN_MOMENTUM_DECAY_EASING: mln_momentum_decay_field = 32;
-pub const MLN_MOMENTUM_DECAY_MIN_SPEED: mln_momentum_decay_field = 64;
-pub const MLN_MOMENTUM_DECAY_MAX_SPEED: mln_momentum_decay_field = 128;
-pub const MLN_MOMENTUM_DECAY_MAX_DISTANCE: mln_momentum_decay_field = 256;
+pub const MLN_MOMENTUM_DECAY_DURATION_EXPONENT: mln_momentum_decay_field = 32;
+pub const MLN_MOMENTUM_DECAY_EASING: mln_momentum_decay_field = 64;
+pub const MLN_MOMENTUM_DECAY_MIN_SPEED: mln_momentum_decay_field = 128;
+pub const MLN_MOMENTUM_DECAY_MAX_SPEED: mln_momentum_decay_field = 256;
+pub const MLN_MOMENTUM_DECAY_MAX_DISTANCE: mln_momentum_decay_field = 512;
 pub type mln_momentum_decay_model = u32;
 pub const MLN_MOMENTUM_DECAY_MODEL_FRICTION: mln_momentum_decay_model = 0;
-pub const MLN_MOMENTUM_DECAY_MODEL_EASE: mln_momentum_decay_model = 1;
+pub const MLN_MOMENTUM_DECAY_MODEL_CURVE: mln_momentum_decay_model = 1;
 pub type mln_momentum_snap_field = u32;
 pub const MLN_MOMENTUM_SNAP_SPACING: mln_momentum_snap_field = 1;
 pub const MLN_MOMENTUM_SNAP_OFFSET: mln_momentum_snap_field = 2;
@@ -249,6 +284,9 @@ pub const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY: mln_offline_region_definition_
 pub type mln_offline_region_download_state = u32;
 pub const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE: mln_offline_region_download_state = 0;
 pub const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE: mln_offline_region_download_state = 1;
+pub type mln_offline_region_expiry_field = u32;
+pub const MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER: mln_offline_region_expiry_field = 1;
+pub const MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL: mln_offline_region_expiry_field = 2;
 pub type mln_open_gl_client_api = u32;
 pub const MLN_OPEN_GL_CLIENT_API_UNSPECIFIED: mln_open_gl_client_api = 0;
 pub const MLN_OPEN_GL_CLIENT_API_GL: mln_open_gl_client_api = 1;
@@ -262,8 +300,15 @@ pub type mln_open_gl_context_provider_flag = u32;
 pub const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL: mln_open_gl_context_provider_flag = 1;
 pub const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL: mln_open_gl_context_provider_flag = 2;
 pub const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL: mln_open_gl_context_provider_flag = 4;
-pub type mln_pan_momentum_field = u32;
-pub const MLN_PAN_MOMENTUM_VELOCITY: mln_pan_momentum_field = 1;
+pub type mln_pinch_phase = u32;
+pub const MLN_PINCH_PHASE_BEGIN: mln_pinch_phase = 0;
+pub const MLN_PINCH_PHASE_UPDATE: mln_pinch_phase = 1;
+pub const MLN_PINCH_PHASE_END: mln_pinch_phase = 2;
+pub const MLN_PINCH_PHASE_CANCEL: mln_pinch_phase = 3;
+pub type mln_pointer_kind = u32;
+pub const MLN_POINTER_KIND_MOUSE: mln_pointer_kind = 0;
+pub const MLN_POINTER_KIND_TOUCH: mln_pointer_kind = 1;
+pub const MLN_POINTER_KIND_PEN: mln_pointer_kind = 2;
 pub type mln_projection_mode_option_field = u32;
 pub const MLN_PROJECTION_MODE_OPTION_AXONOMETRIC: mln_projection_mode_option_field = 1;
 pub const MLN_PROJECTION_MODE_OPTION_X_SKEW: mln_projection_mode_option_field = 2;
@@ -280,11 +325,13 @@ pub const MLN_RENDER_BACKEND_METAL: mln_render_backend = 1;
 pub const MLN_RENDER_BACKEND_VULKAN: mln_render_backend = 2;
 pub const MLN_RENDER_BACKEND_OPEN_GL: mln_render_backend = 3;
 pub const MLN_RENDER_BACKEND_WEB_GPU: mln_render_backend = 4;
+pub const MLN_RENDER_BACKEND_D3D12: mln_render_backend = 5;
 pub type mln_render_backend_flag = u32;
 pub const MLN_RENDER_BACKEND_FLAG_METAL: mln_render_backend_flag = 1;
 pub const MLN_RENDER_BACKEND_FLAG_VULKAN: mln_render_backend_flag = 2;
 pub const MLN_RENDER_BACKEND_FLAG_OPEN_GL: mln_render_backend_flag = 4;
 pub const MLN_RENDER_BACKEND_FLAG_WEB_GPU: mln_render_backend_flag = 8;
+pub const MLN_RENDER_BACKEND_FLAG_D3D12: mln_render_backend_flag = 16;
 pub type mln_render_driver_kind = u32;
 pub const MLN_RENDER_DRIVER_CORE_WORKER: mln_render_driver_kind = 1;
 pub const MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD: mln_render_driver_kind = 2;
@@ -324,6 +371,8 @@ pub const MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES: mln_render_target_ki
 pub const MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES: mln_render_target_kind = 15;
 pub const MLN_RENDER_TARGET_KIND_EXPORTED_RING: mln_render_target_kind = 16;
 pub const MLN_RENDER_TARGET_KIND_WEB_CANVAS: mln_render_target_kind = 17;
+pub const MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES: mln_render_target_kind = 18;
+pub const MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION: mln_render_target_kind = 19;
 pub type mln_render_target_kind_flag = u32;
 pub const MLN_RENDER_TARGET_KIND_FLAG_OFFSCREEN: mln_render_target_kind_flag = 1;
 pub const MLN_RENDER_TARGET_KIND_FLAG_METAL_LAYER: mln_render_target_kind_flag = 2;
@@ -341,6 +390,8 @@ pub const MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES: mln_render_targ
     16384;
 pub const MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING: mln_render_target_kind_flag = 32768;
 pub const MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS: mln_render_target_kind_flag = 65536;
+pub const MLN_RENDER_TARGET_KIND_FLAG_D3D12_BORROWED_TEXTURES: mln_render_target_kind_flag = 131072;
+pub const MLN_RENDER_TARGET_KIND_FLAG_D3D12_COMPOSITION: mln_render_target_kind_flag = 262144;
 pub type mln_rendered_feature_query_option_field = u32;
 pub const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS: mln_rendered_feature_query_option_field = 1;
 pub type mln_rendered_query_geometry_type = u32;
@@ -579,15 +630,6 @@ pub const MLN_VULKAN_IMAGE_OWNER_EXTERNAL: mln_vulkan_image_owner = 1;
 pub const MLN_VULKAN_IMAGE_OWNER_FOREIGN: mln_vulkan_image_owner = 2;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_anchored_momentum {
-    pub fields: mln_anchored_momentum_fields,
-    pub velocity: f64,
-    pub anchor: mln_screen_point,
-    pub decay: mln_momentum_decay,
-    pub snap: mln_momentum_snap,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_android_hardware_buffer_frame {
     pub size: u32,
     pub width: u32,
@@ -663,10 +705,7 @@ pub struct mln_camera_delta {
     pub bearing: f64,
     pub pitch: f64,
     pub anchor: mln_screen_point,
-    pub momentum: mln_gesture_momentum,
     pub animation: mln_animation_options,
-    pub gesture_phase: mln_gesture_phase,
-    pub reserved: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -712,7 +751,6 @@ pub struct mln_camera_transition_end {
     pub size: u32,
     pub outcome: mln_camera_transition_outcome,
     pub generation: u64,
-    pub velocity: mln_camera_velocity,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -729,16 +767,6 @@ pub struct mln_camera_update {
     pub mode: mln_camera_update_mode,
     pub camera: mln_camera_options,
     pub animation: mln_animation_options,
-    pub gesture_phase: mln_gesture_phase,
-    pub reserved: u32,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_camera_velocity {
-    pub pan: mln_screen_point,
-    pub zoom: f64,
-    pub bearing: f64,
-    pub pitch: f64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -792,6 +820,7 @@ pub union mln_custom_layer_encoder_data {
     pub metal: mln_metal_custom_layer_encoder,
     pub vulkan: mln_vulkan_custom_layer_encoder,
     pub web_gpu: mln_web_gpu_custom_layer_encoder,
+    pub d3d12: mln_d3d12_custom_layer_encoder,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -819,6 +848,7 @@ pub union mln_custom_layer_pass_data {
     pub vulkan: mln_vulkan_custom_layer_pass,
     pub open_gl: mln_open_gl_custom_layer_pass,
     pub web_gpu: mln_web_gpu_custom_layer_pass,
+    pub d3d12: mln_d3d12_custom_layer_pass,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -849,6 +879,70 @@ pub struct mln_custom_vector_source_options {
     pub max_zoom: f64,
     pub release_user_data: mln_user_data_release,
     pub queue: mln_delivery_queue,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_d3d12_borrowed_texture {
+    pub resource: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_d3d12_borrowed_textures_target {
+    pub logical_size: mln_logical_size,
+    pub physical_width: u32,
+    pub physical_height: u32,
+    pub textures: *const mln_d3d12_borrowed_texture,
+    pub texture_count: usize,
+    pub state: u32,
+    pub depth_textures: *const mln_d3d12_borrowed_texture,
+    pub depth_texture_count: usize,
+    pub depth_state: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_d3d12_composition_target {
+    pub logical_size: mln_logical_size,
+    pub kind: mln_d3d12_composition_kind,
+    pub object: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_d3d12_custom_layer_encoder {
+    pub device: *mut std::ffi::c_void,
+    pub command_list: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_d3d12_custom_layer_pass {
+    pub device: *mut std::ffi::c_void,
+    pub command_list: *mut std::ffi::c_void,
+    pub render_target_view: u64,
+    pub color_format: u32,
+    pub depth_stencil_view: u64,
+    pub depth_stencil_format: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_d3d12_device_descriptor {
+    pub size: u32,
+    pub device: *mut std::ffi::c_void,
+    pub command_queue: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_d3d12_texture_frame {
+    pub size: u32,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub slot: u32,
+    pub resource: *mut std::ffi::c_void,
+    pub device: *mut std::ffi::c_void,
+    pub format: u32,
+    pub state: u32,
+    pub depth_resource: *mut std::ffi::c_void,
+    pub depth_format: u32,
+    pub depth_state: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -967,10 +1061,11 @@ pub struct mln_frame_demand {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_frame_pacer_options {
+pub struct mln_frame_pacing_options {
     pub size: u32,
-    pub fields: mln_frame_pacer_option_fields,
+    pub fields: mln_frame_pacing_option_fields,
     pub maximum_frames_per_second: u32,
+    pub view: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1014,11 +1109,132 @@ pub struct mln_geo_json_source_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_gesture_momentum {
-    pub pan: mln_pan_momentum,
-    pub zoom: mln_anchored_momentum,
-    pub bearing: mln_anchored_momentum,
-    pub pitch: mln_anchored_momentum,
+pub struct mln_gesture_axis_options {
+    pub fields: mln_gesture_axis_option_fields,
+    pub enabled: bool,
+    pub glides: bool,
+    pub momentum: mln_momentum_decay,
+    pub snaps: bool,
+    pub snap: mln_momentum_snap,
+    pub notches: *const mln_gesture_notch,
+    pub notch_count: usize,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gesture_delta {
+    pub position: mln_screen_point,
+    pub discrete: bool,
+    pub pan: mln_screen_point,
+    pub zoom: f64,
+    pub bearing: f64,
+    pub pitch: f64,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct mln_gesture_event {
+    pub type_: mln_gesture_event_type,
+    pub data: mln_gesture_event_data,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union mln_gesture_event_data {
+    pub tap: mln_gesture_tap,
+    pub double_tap: mln_gesture_tap,
+    pub two_finger_tap: mln_gesture_tap,
+    pub notch: mln_gesture_notch_event,
+    pub long_press: mln_gesture_tap,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct mln_gesture_input {
+    pub size: u32,
+    pub type_: mln_gesture_input_type,
+    pub data: mln_gesture_input_data,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub union mln_gesture_input_data {
+    pub pointer_down: mln_gesture_pointer_down,
+    pub pointer_move: mln_gesture_pointer,
+    pub pointer_up: mln_gesture_pointer,
+    pub pointer_cancel: mln_gesture_pointer,
+    pub modes: mln_gesture_modes,
+    pub delta: mln_gesture_delta,
+    pub pinch: mln_gesture_pinch,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gesture_notch {
+    pub spacing: f64,
+    pub offset: f64,
+    pub kind: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gesture_notch_event {
+    pub axis: mln_gesture_axis,
+    pub kind: u32,
+    pub value: f64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gesture_options {
+    pub size: u32,
+    pub fields: mln_gesture_option_fields,
+    pub double_tap_zoom: f64,
+    pub two_finger_tap_zoom: f64,
+    pub pan: mln_gesture_pan_options,
+    pub zoom: mln_gesture_axis_options,
+    pub bearing: mln_gesture_axis_options,
+    pub pitch: mln_gesture_axis_options,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gesture_pan_options {
+    pub fields: mln_gesture_pan_option_fields,
+    pub enabled: bool,
+    pub glides: bool,
+    pub momentum: mln_momentum_decay,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gesture_pinch {
+    pub center: mln_screen_point,
+    pub scale: f64,
+    pub rotation: f64,
+    pub phase: mln_pinch_phase,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gesture_pointer {
+    pub id: u32,
+    pub position: mln_screen_point,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gesture_pointer_down {
+    pub id: u32,
+    pub kind: mln_pointer_kind,
+    pub position: mln_screen_point,
+    pub modes: mln_gesture_modes,
+}
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct mln_gesture_result {
+    pub size: u32,
+    pub handled: bool,
+    pub next_tick: mln_gesture_next_tick,
+    pub next_tick_ms: f64,
+    pub box_zoom_active: bool,
+    pub box_zoom: mln_screen_box,
+    pub event_count: usize,
+    pub events: [mln_gesture_event; 4],
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gesture_tap {
+    pub id: u32,
+    pub position: mln_screen_point,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1030,6 +1246,13 @@ pub struct mln_gpu_device_capabilities {
     pub sync_kinds: mln_gpu_sync_kind_flags,
     pub depth_stencil_formats: mln_depth_stencil_format_flags,
     pub depth_export_kinds: mln_gpu_export_kind_flags,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_gpu_device_d3d12_context_result {
+    pub size: u32,
+    pub device: *mut std::ffi::c_void,
+    pub command_queue: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1161,6 +1384,7 @@ pub struct mln_map_options {
     pub tile_cache_enabled: bool,
     pub fallback_font_faces: mln_buffer_view,
     pub system_fonts_enabled: bool,
+    pub local_ideographs_enabled: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1315,8 +1539,9 @@ pub struct mln_momentum_decay {
     pub model: mln_momentum_decay_model,
     pub half_life_ms: f64,
     pub stop_speed: f64,
-    pub distance: f64,
+    pub reference_speed: f64,
     pub duration_ms: f64,
+    pub duration_exponent: f64,
     pub easing: mln_unit_bezier,
     pub min_speed: f64,
     pub max_speed: f64,
@@ -1353,6 +1578,15 @@ pub struct mln_offline_region_definition {
 pub union mln_offline_region_definition_data {
     pub tile_pyramid: mln_offline_tile_pyramid_region_definition,
     pub geometry: mln_offline_geometry_region_definition,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_offline_region_expiry {
+    pub fields: mln_offline_region_expiry_fields,
+    pub stale_after_unix_ms: i64,
+    pub usable_offline_until_unix_ms: i64,
+    pub stale_resource_count: u64,
+    pub unusable_resource_count: u64,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -1466,13 +1700,6 @@ pub struct mln_open_gl_texture_frame {
     pub target: u32,
     pub depth_texture: u32,
     pub depth_internal_format: u32,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_pan_momentum {
-    pub fields: mln_pan_momentum_fields,
-    pub velocity: mln_screen_point,
-    pub decay: mln_momentum_decay,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1618,6 +1845,8 @@ pub union mln_render_target_data {
     pub web_gpu_borrowed_textures: mln_web_gpu_borrowed_textures_target,
     pub exported_ring: mln_exported_ring_target,
     pub web_canvas: mln_web_canvas_target,
+    pub d3d12_borrowed_textures: mln_d3d12_borrowed_textures_target,
+    pub d3d12_composition: mln_d3d12_composition_target,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1720,6 +1949,7 @@ pub struct mln_resource_response {
     pub expires_unix_ms: i64,
     pub etag: mln_buffer_view,
     pub retry_after_unix_ms: i64,
+    pub no_store: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2247,7 +2477,6 @@ pub struct mln_xlib_window_target {
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_acquired_frame(pub u64);
-pub type mln_anchored_momentum_fields = u32;
 pub type mln_animation_option_fields = u32;
 pub type mln_bound_option_fields = u32;
 pub type mln_camera_delta_fields = u32;
@@ -2297,12 +2526,16 @@ pub struct mln_delivery_queue(pub u64);
 pub type mln_depth_stencil_format_flags = u32;
 pub type mln_feature_state_selector_fields = u32;
 pub type mln_frame_demand_flags = u32;
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_frame_pacer(pub u64);
-pub type mln_frame_pacer_option_fields = u32;
+pub type mln_frame_pacing_option_fields = u32;
 pub type mln_free_camera_option_fields = u32;
 pub type mln_geo_json_source_option_fields = u32;
+pub type mln_gesture_axis_option_fields = u32;
+pub type mln_gesture_modes = u32;
+pub type mln_gesture_option_fields = u32;
+pub type mln_gesture_pan_option_fields = u32;
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct mln_gesture_recognizer(pub u64);
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_gpu_device(pub u64);
@@ -2339,9 +2572,9 @@ pub type mln_map_tile_option_fields = u32;
 pub type mln_map_viewport_option_fields = u32;
 pub type mln_momentum_decay_fields = u32;
 pub type mln_momentum_snap_fields = u32;
+pub type mln_offline_region_expiry_fields = u32;
 pub type mln_offline_region_id = i64;
 pub type mln_open_gl_context_provider_flags = u32;
-pub type mln_pan_momentum_fields = u32;
 pub type mln_projection_mode_option_fields = u32;
 pub type mln_queue_lock_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_render_backend_flags = u32;
@@ -2406,7 +2639,7 @@ pub type mln_web_object = u32;
 native_handles!(
     mln_acquired_frame,
     mln_delivery_queue,
-    mln_frame_pacer,
+    mln_gesture_recognizer,
     mln_gpu_device,
     mln_map,
     mln_map_projection,
@@ -2426,6 +2659,11 @@ unsafe extern "C" {
     pub fn mln_acquired_frame_get_android_hardware_buffer(
         frame: mln_acquired_frame,
         out_frame: *mut mln_android_hardware_buffer_frame,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_acquired_frame_get_d3d12_texture(
+        frame: mln_acquired_frame,
+        out_frame: *mut mln_d3d12_texture_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_get_dma_buf(
@@ -2525,15 +2763,29 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_delivery_queue_release(queue: mln_delivery_queue);
-    pub fn mln_frame_pacer_create(
-        options: *const mln_frame_pacer_options,
-        out_pacer: *mut mln_frame_pacer,
+    pub fn mln_gesture_recognizer_create(
+        map: mln_map,
+        options: *const mln_gesture_options,
+        out_recognizer: *mut mln_gesture_recognizer,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_frame_pacer_release(pacer: mln_frame_pacer);
-    pub fn mln_frame_pacer_set_options(
-        pacer: mln_frame_pacer,
-        options: *const mln_frame_pacer_options,
+    pub fn mln_gesture_recognizer_handle(
+        recognizer: mln_gesture_recognizer,
+        input: *const mln_gesture_input,
+        time_ms: f64,
+        out_result: *mut mln_gesture_result,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_gesture_recognizer_release(recognizer: mln_gesture_recognizer);
+    pub fn mln_gesture_recognizer_set_options(
+        recognizer: mln_gesture_recognizer,
+        options: *const mln_gesture_options,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_gesture_recognizer_tick(
+        recognizer: mln_gesture_recognizer,
+        time_ms: f64,
+        out_result: *mut mln_gesture_result,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_gpu_device_create(
@@ -2546,12 +2798,22 @@ unsafe extern "C" {
         out_capabilities: *mut mln_gpu_device_capabilities,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_gpu_device_get_d3d12_context(
+        device: mln_gpu_device,
+        out_result: *mut mln_gpu_device_d3d12_context_result,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_gpu_device_get_vulkan_context(
         device: mln_gpu_device,
         out_result: *mut mln_gpu_device_vulkan_context_result,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_gpu_device_release(device: mln_gpu_device);
+    pub fn mln_gpu_device_wrap_d3d12(
+        descriptor: *const mln_d3d12_device_descriptor,
+        out_device: *mut mln_gpu_device,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_gpu_device_wrap_metal(
         descriptor: *const mln_metal_device_descriptor,
         out_device: *mut mln_gpu_device,
@@ -3334,9 +3596,9 @@ unsafe extern "C" {
         session: mln_render_session,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_render_session_set_frame_pacer(
+    pub fn mln_render_session_set_frame_pacing(
         session: mln_render_session,
-        pacer: mln_frame_pacer,
+        options: *const mln_frame_pacing_options,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_session_set_target(
@@ -3428,6 +3690,12 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_runtime_get_offline_region(
+        runtime: mln_runtime,
+        region_id: mln_offline_region_id,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_runtime_get_offline_region_expiry(
         runtime: mln_runtime,
         region_id: mln_offline_region_id,
         completion: *const mln_completion,

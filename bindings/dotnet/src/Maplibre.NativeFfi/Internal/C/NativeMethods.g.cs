@@ -21,6 +21,13 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_acquired_frame_get_d3d12_texture(
+        MlnAcquiredFrame frame,
+        mln_d3d12_texture_frame* out_frame,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_get_dma_buf(
         MlnAcquiredFrame frame,
         mln_dma_buf_frame* out_frame,
@@ -119,19 +126,37 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_frame_pacer_create(
-        mln_frame_pacer_options* options,
-        MlnFramePacer* out_pacer,
+    internal static partial mln_status mln_gesture_recognizer_create(
+        MlnMap map,
+        mln_gesture_options* options,
+        MlnGestureRecognizer* out_recognizer,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial void mln_frame_pacer_release(MlnFramePacer pacer);
+    internal static partial mln_status mln_gesture_recognizer_handle(
+        MlnGestureRecognizer recognizer,
+        mln_gesture_input* input,
+        double time_ms,
+        mln_gesture_result* out_result,
+        mln_diagnostic* out_diagnostic
+    );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_frame_pacer_set_options(
-        MlnFramePacer pacer,
-        mln_frame_pacer_options* options,
+    internal static partial void mln_gesture_recognizer_release(MlnGestureRecognizer recognizer);
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_gesture_recognizer_set_options(
+        MlnGestureRecognizer recognizer,
+        mln_gesture_options* options,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_gesture_recognizer_tick(
+        MlnGestureRecognizer recognizer,
+        double time_ms,
+        mln_gesture_result* out_result,
         mln_diagnostic* out_diagnostic
     );
 
@@ -150,6 +175,13 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_gpu_device_get_d3d12_context(
+        MlnGpuDevice device,
+        mln_gpu_device_d3d12_context_result* out_result,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_gpu_device_get_vulkan_context(
         MlnGpuDevice device,
         mln_gpu_device_vulkan_context_result* out_result,
@@ -158,6 +190,13 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial void mln_gpu_device_release(MlnGpuDevice device);
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_gpu_device_wrap_d3d12(
+        mln_d3d12_device_descriptor* descriptor,
+        MlnGpuDevice* out_device,
+        mln_diagnostic* out_diagnostic
+    );
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_gpu_device_wrap_metal(
@@ -1199,9 +1238,9 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_set_frame_pacer(
+    internal static partial mln_status mln_render_session_set_frame_pacing(
         MlnRenderSession session,
-        MlnFramePacer pacer,
+        mln_frame_pacing_options* options,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1333,6 +1372,14 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_get_offline_region(
+        MlnRuntime runtime,
+        long region_id,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_runtime_get_offline_region_expiry(
         MlnRuntime runtime,
         long region_id,
         mln_completion* completion,

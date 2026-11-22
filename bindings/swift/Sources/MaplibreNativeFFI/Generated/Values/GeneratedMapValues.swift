@@ -3,64 +3,6 @@
 internal import MaplibreNativeC
 import Foundation
 
-/// How a gesture's zoom, bearing, or pitch keeps changing after release.
-///
-/// See `mln_anchored_momentum` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct AnchoredMomentum: Equatable, Hashable, Sendable {
-  /// How fast the value changed at release: zoom levels per second for zoom,
-  /// and degrees per second for bearing and pitch. The part moves only when
-  /// this is set.
-  public var velocity: Double?
-  /// The screen point that the change keeps in place. Without one, the change
-  /// keeps the center of the view in place.
-  public var anchor: ScreenPoint?
-  public var decay: MomentumDecay
-  /// Where the part settles. Without this, it stays where the gesture and its
-  /// glide leave it.
-  public var snap: MomentumSnap?
-  public init(
-    velocity: Double? = nil,
-    anchor: ScreenPoint? = nil,
-    decay: MomentumDecay = .init(),
-    snap: MomentumSnap? = nil
-  ) {
-    self.velocity = velocity
-    self.anchor = anchor
-    self.decay = decay
-    self.snap = snap
-  }
-
-  init(raw: mln_anchored_momentum) {
-    velocity = raw.fields & MLN_ANCHORED_MOMENTUM_VELOCITY.rawValue != 0 ? raw
-      .velocity : nil
-    anchor = raw.fields & MLN_ANCHORED_MOMENTUM_ANCHOR
-      .rawValue != 0 ? ScreenPoint(raw: raw.anchor) : nil
-    decay = MomentumDecay(raw: raw.decay)
-    snap = raw.fields & MLN_ANCHORED_MOMENTUM_SNAP
-      .rawValue != 0 ? MomentumSnap(raw: raw.snap) : nil
-  }
-
-  func nativeValue() -> mln_anchored_momentum {
-    var raw = mln_anchored_momentum()
-    raw.fields = 0
-    if let item = velocity {
-      raw.fields |= MLN_ANCHORED_MOMENTUM_VELOCITY.rawValue; raw
-        .velocity = item
-    }
-    if let item = anchor {
-      raw.fields |= MLN_ANCHORED_MOMENTUM_ANCHOR.rawValue; raw.anchor = item
-        .nativeValue()
-    }
-    raw.decay = decay.nativeValue()
-    if let item = snap {
-      raw.fields |= MLN_ANCHORED_MOMENTUM_SNAP.rawValue; raw.snap = item
-        .nativeValue()
-    }
-    return raw
-  }
-}
-
 /// How a camera change animates.
 ///
 /// See `mln_animation_options` in the
@@ -324,7 +266,7 @@ public struct CameraBounds: Equatable, Hashable, Sendable {
   }
 }
 
-/// A change to the camera from where it is now, for gestures.
+/// A change to the camera from where it is now.
 ///
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -341,29 +283,21 @@ public struct CameraDelta: Sendable {
   /// needs one of them, and it combines with `offset` only in a delta without a
   /// duration.
   public var anchor: ScreenPoint?
-  /// How the gesture keeps moving after this delta. Only a delta in the
-  /// `GesturePhase.end` phase carries it.
-  public var momentum: GestureMomentum?
   public var animation: AnimationOptions
-  public var gesturePhase: GesturePhase
   public init(
     offset: ScreenPoint? = nil,
     scale: Double? = nil,
     bearing: Double? = nil,
     pitch: Double? = nil,
     anchor: ScreenPoint? = nil,
-    momentum: GestureMomentum? = nil,
-    animation: AnimationOptions = .init(),
-    gesturePhase: GesturePhase = .init(rawValue: 0)
+    animation: AnimationOptions = .init()
   ) {
     self.offset = offset
     self.scale = scale
     self.bearing = bearing
     self.pitch = pitch
     self.anchor = anchor
-    self.momentum = momentum
     self.animation = animation
-    self.gesturePhase = gesturePhase
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_delta {
@@ -387,12 +321,7 @@ public struct CameraDelta: Sendable {
       raw.fields |= MLN_CAMERA_DELTA_ANCHOR.rawValue; raw.anchor = item
         .nativeValue()
     }
-    if let item = momentum {
-      raw.fields |= MLN_CAMERA_DELTA_MOMENTUM.rawValue; raw.momentum = item
-        .nativeValue()
-    }
     raw.animation = try animation.nativeValue(arena: arena)
-    raw.gesture_phase = mln_gesture_phase(rawValue: gesturePhase.rawValue)
     return raw
   }
 }
@@ -606,24 +535,17 @@ public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
   /// The generation of the first map snapshot that shows where the change left
   /// the camera, or 0 when the map closed first.
   public var generation: UInt64
-  /// How fast a gesture's momentum still moved when it was cancelled, which the
-  /// next gesture can add to its own release velocities. Zero for every other
-  /// end.
-  public var velocity: CameraVelocity
   public init(
     outcome: CameraTransitionOutcome = .init(rawValue: 0),
-    generation: UInt64 = 0,
-    velocity: CameraVelocity = .init()
+    generation: UInt64 = 0
   ) {
     self.outcome = outcome
     self.generation = generation
-    self.velocity = velocity
   }
 
   init(raw: mln_camera_transition_end) {
     outcome = CameraTransitionOutcome(rawValue: raw.outcome.rawValue)
     generation = raw.generation
-    velocity = CameraVelocity(raw: raw.velocity)
   }
 }
 
@@ -698,11 +620,10 @@ public struct CameraTransitionOutcome: RawRepresentable,
   /// The camera finished the change.
   public static let completed: CameraTransitionOutcome = .init(rawValue: 0)
   /// `MapHandle.cancelCameraTransitions()`,
-  /// `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
-  /// `GesturePhase.begin` or `GesturePhase.cancel`,
-  /// `MapHandle.setFreeCameraOptions()`, or a resize that moved the camera back
-  /// inside its bounds stopped the change. A command that fails before it moves
-  /// the camera also reports this.
+  /// `MapHandle.cancelCameraTransitionsWithId()`, a gesture that a gesture
+  /// recognizer begins or cancels, `MapHandle.setFreeCameraOptions()`, or a
+  /// resize that moved the camera back inside its bounds stopped the change. A
+  /// command that fails before it moves the camera also reports this.
   public static let cancelled: CameraTransitionOutcome = .init(rawValue: 1)
   /// The map closed before the change ended.
   public static let closed: CameraTransitionOutcome = .init(rawValue: 2)
@@ -736,17 +657,14 @@ public struct CameraUpdate: Sendable {
   public var mode: CameraUpdateMode
   public var camera: CameraOptions
   public var animation: AnimationOptions
-  public var gesturePhase: GesturePhase
   public init(
     mode: CameraUpdateMode = .init(rawValue: 0),
     camera: CameraOptions = .init(),
-    animation: AnimationOptions = .init(),
-    gesturePhase: GesturePhase = .init(rawValue: 0)
+    animation: AnimationOptions = .init()
   ) {
     self.mode = mode
     self.camera = camera
     self.animation = animation
-    self.gesturePhase = gesturePhase
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_camera_update {
@@ -755,7 +673,6 @@ public struct CameraUpdate: Sendable {
     raw.mode = mln_camera_update_mode(rawValue: mode.rawValue)
     raw.camera = camera.nativeValue()
     raw.animation = try animation.nativeValue(arena: arena)
-    raw.gesture_phase = mln_gesture_phase(rawValue: gesturePhase.rawValue)
     return raw
   }
 }
@@ -785,40 +702,6 @@ public struct CameraUpdateMode: RawRepresentable, CustomStringConvertible,
     case 2: return "fly"
     default: return "CameraUpdateMode(\(rawValue))"
     }
-  }
-}
-
-/// How fast each part of a camera change moves.
-///
-/// See `mln_camera_velocity` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraVelocity: Equatable, Hashable, Sendable {
-  /// How fast the map's content moves on the screen, in logical pixels per
-  /// second.
-  public var pan: ScreenPoint
-  /// In zoom levels per second.
-  public var zoom: Double
-  /// In degrees per second.
-  public var bearing: Double
-  /// In degrees per second.
-  public var pitch: Double
-  public init(
-    pan: ScreenPoint = .init(),
-    zoom: Double = 0,
-    bearing: Double = 0,
-    pitch: Double = 0
-  ) {
-    self.pan = pan
-    self.zoom = zoom
-    self.bearing = bearing
-    self.pitch = pitch
-  }
-
-  init(raw: mln_camera_velocity) {
-    pan = ScreenPoint(raw: raw.pan)
-    zoom = raw.zoom
-    bearing = raw.bearing
-    pitch = raw.pitch
   }
 }
 
@@ -1130,96 +1013,6 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// How a gesture keeps moving the camera after the user lets go.
-///
-/// A part moves only when its velocity is set, and each part slows on its own.
-/// Every part defaults to `MomentumDecayModel.friction` with a half-life of 140
-/// ms, and these other defaults:
-///
-/// - Pan stops at 10 logical pixels per second, needs a release of at least
-///   200, and counts a release faster than 10000 as 10000.
-/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
-///   snap settles on the nearest whole level.
-/// - Bearing stops at 1 degree per second and needs a release of at least 60.
-///   Its snap settles on north within 7 degrees.
-/// - Pitch stops at 1 degree per second and needs a release of at least 5. Its
-///   snap settles flat within 7 degrees.
-///
-/// See `mln_gesture_momentum` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct GestureMomentum: Equatable, Hashable, Sendable {
-  public var pan: PanMomentum
-  public var zoom: AnchoredMomentum
-  public var bearing: AnchoredMomentum
-  public var pitch: AnchoredMomentum
-  public init(
-    pan: PanMomentum = .init(),
-    zoom: AnchoredMomentum = .init(),
-    bearing: AnchoredMomentum = .init(),
-    pitch: AnchoredMomentum = .init()
-  ) {
-    self.pan = pan
-    self.zoom = zoom
-    self.bearing = bearing
-    self.pitch = pitch
-  }
-
-  init(raw: mln_gesture_momentum) {
-    pan = PanMomentum(raw: raw.pan)
-    zoom = AnchoredMomentum(raw: raw.zoom)
-    bearing = AnchoredMomentum(raw: raw.bearing)
-    pitch = AnchoredMomentum(raw: raw.pitch)
-  }
-
-  func nativeValue() -> mln_gesture_momentum {
-    var raw = mln_gesture_momentum()
-    raw.pan = pan.nativeValue()
-    raw.zoom = zoom.nativeValue()
-    raw.bearing = bearing.nativeValue()
-    raw.pitch = pitch.nativeValue()
-    return raw
-  }
-}
-
-/// Where a camera change falls in a gesture that the user makes.
-///
-/// `GesturePhase.begin` and `GesturePhase.update` mark a gesture in progress,
-/// and `GesturePhase.end` and `GesturePhase.cancel` end it.
-///
-/// See `mln_gesture_phase` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct GesturePhase: RawRepresentable, CustomStringConvertible,
-  NativeOpenValue, Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// The change isn't part of a gesture.
-  public static let none: GesturePhase = .init(rawValue: 0)
-  /// The gesture starts. This cancels every running camera animation before the
-  /// change applies.
-  public static let begin: GesturePhase = .init(rawValue: 1)
-  /// The gesture continues. To start a gesture that keeps the running camera
-  /// animations, start it with this phase instead of `GesturePhase.begin`.
-  public static let update: GesturePhase = .init(rawValue: 2)
-  public static let end: GesturePhase = .init(rawValue: 3)
-  /// The platform cancelled the gesture. This also cancels every running camera
-  /// animation after the change applies.
-  public static let cancel: GesturePhase = .init(rawValue: 4)
-  public var description: String {
-    switch rawValue {
-    case 0: return "none"
-    case 1: return "begin"
-    case 2: return "update"
-    case 3: return "end"
-    case 4: return "cancel"
-    default: return "GesturePhase(\(rawValue))"
-    }
-  }
-}
-
 /// A geographic coordinate, in degrees.
 ///
 /// See `mln_lat_lng` in the
@@ -1391,20 +1184,27 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   /// Whether the map keeps tiles in memory after they leave the view, so they
   /// show again without loading. Without it, the map keeps them.
   public var tileCacheEnabled: Bool?
-  /// Fonts for the text that a style's own fonts don't draw, such as scripts
-  /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
+  /// Fonts for the text that a style's own fonts don't draw. A JSON array of
   /// font files, each an object with a `url` and an optional `unicode-range`,
-  /// as in a font face of a style's `font-faces`, which every font stack uses
-  /// after the style's own font faces. Empty for the system's fonts, unless
-  /// `system_fonts_enabled` is false.
+  /// as in a font face of a style's `font-faces`. They shape, in order, the
+  /// text that glyph PBFs can't shape, such as Myanmar or Devanagari, or all
+  /// the text of a style without glyph PBFs, and draw the glyphs that come from
+  /// local fonts: those a style's PBFs lack, and CJK with
+  /// `local_ideographs_enabled`. Empty for the system's fonts alone.
   public var fallbackFontFaces: String
-  /// Whether the map falls back to the system's fonts for CJK and the scripts
-  /// that need complex shaping when `fallback_font_faces` is empty: fonts that
-  /// the platform's font matcher picks for the user's preferred languages.
-  /// Without it, the map does. The first map that uses them waits for them to
-  /// be found. In the browser, the browser draws CJK glyphs in its sans-serif
-  /// font instead, where `fallback_font_faces` doesn't cover them.
+  /// Whether the map draws from the system's fonts what the style's fonts and
+  /// `fallback_font_faces` don't: fonts that the platform's font matcher picks
+  /// for the font stack's names, or for the character and the user's preferred
+  /// languages. It shapes with them the text that glyph PBFs can't shape, and
+  /// all the text of a style without glyph PBFs. Without it, the map does. The
+  /// first map that uses them waits for the matcher to load. In the browser,
+  /// the browser draws those glyphs in the font stack's families, then its
+  /// sans-serif font, one at a time.
   public var systemFontsEnabled: Bool?
+  /// Whether CJK ideographs, kana and hangul come from local fonts
+  /// (`fallback_font_faces`, then the system's) before glyph PBFs, rather than
+  /// from a glyph PBF downloaded for every few characters. Without it, they do.
+  public var localIdeographsEnabled: Bool?
   public init(
     initialExtent: LogicalExtent,
     mapMode: MapMode = .init(rawValue: 0),
@@ -1412,7 +1212,8 @@ public struct MapOptions: Equatable, Hashable, Sendable {
     eventMask: RuntimeEventFlag? = nil,
     tileCacheEnabled: Bool? = nil,
     fallbackFontFaces: String = "",
-    systemFontsEnabled: Bool? = nil
+    systemFontsEnabled: Bool? = nil,
+    localIdeographsEnabled: Bool? = nil
   ) {
     self.initialExtent = initialExtent
     self.mapMode = mapMode
@@ -1421,6 +1222,7 @@ public struct MapOptions: Equatable, Hashable, Sendable {
     self.tileCacheEnabled = tileCacheEnabled
     self.fallbackFontFaces = fallbackFontFaces
     self.systemFontsEnabled = systemFontsEnabled
+    self.localIdeographsEnabled = localIdeographsEnabled
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_map_options {
@@ -1443,6 +1245,10 @@ public struct MapOptions: Equatable, Hashable, Sendable {
       raw.fields |= MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED.rawValue; raw
         .system_fonts_enabled = item
     }
+    if let item = localIdeographsEnabled {
+      raw.fields |= MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED.rawValue; raw
+        .local_ideographs_enabled = item
+    }
     return raw
   }
 }
@@ -1458,6 +1264,8 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   /// Whether the style and every resource that the view needs have loaded.
   public var fullyLoaded: Bool
   public var renderingStatsViewEnabled: Bool
+  /// Whether a gesture recognizer's gesture, or the glide and snap after it,
+  /// moves the camera.
   public var gestureInProgress: Bool
   public var transitionInProgress: Bool
   public var eventMask: RuntimeEventFlag
@@ -1823,216 +1631,6 @@ public struct Mat4: Equatable, Hashable, Sendable {
   }
 }
 
-/// How one part of a gesture's momentum slows from its release speed.
-///
-/// Speeds and distances are in the part's unit: logical pixels for pan, zoom
-/// levels for zoom, and degrees for bearing and pitch. A setting whose bit
-/// isn't set takes the part's default, which `GestureMomentum` lists.
-/// `min_speed` is finite and not negative, and every other number is finite and
-/// positive. A friction decay can serve every release, as a preset that matches
-/// a platform's scrolling. An eased glide takes its direction from the part's
-/// velocity, and its distance and duration from the caller's plan.
-///
-/// See `mln_momentum_decay` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MomentumDecay: Equatable, Hashable, Sendable {
-  public var model: MomentumDecayModel?
-  /// For `MomentumDecayModel.friction`, how long the speed takes to halve.
-  public var halfLifeMs: Double?
-  /// For `MomentumDecayModel.friction`, the speed at which it ends.
-  public var stopSpeed: Double?
-  /// Required for `MomentumDecayModel.ease`.
-  public var distance: Double?
-  /// Required for `MomentumDecayModel.ease`.
-  public var durationMs: Double?
-  /// For `MomentumDecayModel.ease`, the share of `distance` covered over the
-  /// share of `duration_ms`. Its control points are between 0 and 1, so the
-  /// glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
-  /// that camera animations ease along by default. Android's scroll fling
-  /// follows (0.175, 0.5, 0.35, 1).
-  public var easing: UnitBezier?
-  /// A slower release starts no momentum.
-  public var minSpeed: Double?
-  /// For `MomentumDecayModel.friction`, a faster release counts as this.
-  public var maxSpeed: Double?
-  /// The farthest the part moves. A friction release that would move farther
-  /// starts slower, so it ends sooner, and a planned glide moves at most this
-  /// far over its duration.
-  public var maxDistance: Double?
-  public init(
-    model: MomentumDecayModel? = nil,
-    halfLifeMs: Double? = nil,
-    stopSpeed: Double? = nil,
-    distance: Double? = nil,
-    durationMs: Double? = nil,
-    easing: UnitBezier? = nil,
-    minSpeed: Double? = nil,
-    maxSpeed: Double? = nil,
-    maxDistance: Double? = nil
-  ) {
-    self.model = model
-    self.halfLifeMs = halfLifeMs
-    self.stopSpeed = stopSpeed
-    self.distance = distance
-    self.durationMs = durationMs
-    self.easing = easing
-    self.minSpeed = minSpeed
-    self.maxSpeed = maxSpeed
-    self.maxDistance = maxDistance
-  }
-
-  init(raw: mln_momentum_decay) {
-    model = raw.fields & MLN_MOMENTUM_DECAY_MODEL
-      .rawValue != 0 ? MomentumDecayModel(rawValue: raw.model.rawValue) : nil
-    halfLifeMs = raw.fields & MLN_MOMENTUM_DECAY_HALF_LIFE_MS
-      .rawValue != 0 ? raw.half_life_ms : nil
-    stopSpeed = raw.fields & MLN_MOMENTUM_DECAY_STOP_SPEED.rawValue != 0 ? raw
-      .stop_speed : nil
-    distance = raw.fields & MLN_MOMENTUM_DECAY_DISTANCE.rawValue != 0 ? raw
-      .distance : nil
-    durationMs = raw.fields & MLN_MOMENTUM_DECAY_DURATION_MS.rawValue != 0 ? raw
-      .duration_ms : nil
-    easing = raw.fields & MLN_MOMENTUM_DECAY_EASING
-      .rawValue != 0 ? UnitBezier(raw: raw.easing) : nil
-    minSpeed = raw.fields & MLN_MOMENTUM_DECAY_MIN_SPEED.rawValue != 0 ? raw
-      .min_speed : nil
-    maxSpeed = raw.fields & MLN_MOMENTUM_DECAY_MAX_SPEED.rawValue != 0 ? raw
-      .max_speed : nil
-    maxDistance = raw.fields & MLN_MOMENTUM_DECAY_MAX_DISTANCE
-      .rawValue != 0 ? raw.max_distance : nil
-  }
-
-  func nativeValue() -> mln_momentum_decay {
-    var raw = mln_momentum_decay()
-    raw.fields = 0
-    if let item = model {
-      raw.fields |= MLN_MOMENTUM_DECAY_MODEL.rawValue; raw
-        .model = mln_momentum_decay_model(rawValue: item.rawValue)
-    }
-    if let item = halfLifeMs {
-      raw.fields |= MLN_MOMENTUM_DECAY_HALF_LIFE_MS.rawValue; raw
-        .half_life_ms = item
-    }
-    if let item = stopSpeed {
-      raw.fields |= MLN_MOMENTUM_DECAY_STOP_SPEED.rawValue; raw
-        .stop_speed = item
-    }
-    if let item = distance {
-      raw.fields |= MLN_MOMENTUM_DECAY_DISTANCE.rawValue; raw.distance = item
-    }
-    if let item = durationMs {
-      raw.fields |= MLN_MOMENTUM_DECAY_DURATION_MS.rawValue; raw
-        .duration_ms = item
-    }
-    if let item = easing {
-      raw.fields |= MLN_MOMENTUM_DECAY_EASING.rawValue; raw.easing = item
-        .nativeValue()
-    }
-    if let item = minSpeed {
-      raw.fields |= MLN_MOMENTUM_DECAY_MIN_SPEED.rawValue; raw.min_speed = item
-    }
-    if let item = maxSpeed {
-      raw.fields |= MLN_MOMENTUM_DECAY_MAX_SPEED.rawValue; raw.max_speed = item
-    }
-    if let item = maxDistance {
-      raw.fields |= MLN_MOMENTUM_DECAY_MAX_DISTANCE.rawValue; raw
-        .max_distance = item
-    }
-    return raw
-  }
-}
-
-/// How a part of a gesture's momentum slows from its release speed.
-///
-/// See `mln_momentum_decay_model` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MomentumDecayModel: RawRepresentable, CustomStringConvertible,
-  NativeOpenValue, Equatable, Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  /// The speed halves every `half_life_ms`, until it drops to `stop_speed`.
-  /// UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
-  /// deceleration 69 ms.
-  public static let friction: MomentumDecayModel = .init(rawValue: 0)
-  /// The part eases `distance` over `duration_ms`, along `easing`, as a camera
-  /// animation does. The caller plans the glide, for example from the
-  /// platform's own fling physics, such as Android's OverScroller.
-  public static let ease: MomentumDecayModel = .init(rawValue: 1)
-  public var description: String {
-    switch rawValue {
-    case 0: return "friction"
-    case 1: return "ease"
-    default: return "MomentumDecayModel(\(rawValue))"
-    }
-  }
-}
-
-/// Where a part settles after a gesture that changed it.
-///
-/// The targets are every `spacing` from `offset`, in the part's unit. Bearing
-/// targets wrap around the circle. Once the part's glide ends, or right away
-/// when it doesn't move, the part eases to the nearest target if it is within
-/// `tolerance` of it, and otherwise stays where it is. A setting whose bit
-/// isn't set takes the part's default, which `GestureMomentum` lists.
-///
-/// See `mln_momentum_snap` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MomentumSnap: Equatable, Hashable, Sendable {
-  /// Positive.
-  public var spacing: Double?
-  /// Defaults to 0.
-  public var offset: Double?
-  /// Not negative.
-  public var tolerance: Double?
-  /// Zero settles without easing. Defaults to 300.
-  public var durationMs: Double?
-  public init(
-    spacing: Double? = nil,
-    offset: Double? = nil,
-    tolerance: Double? = nil,
-    durationMs: Double? = nil
-  ) {
-    self.spacing = spacing
-    self.offset = offset
-    self.tolerance = tolerance
-    self.durationMs = durationMs
-  }
-
-  init(raw: mln_momentum_snap) {
-    spacing = raw.fields & MLN_MOMENTUM_SNAP_SPACING.rawValue != 0 ? raw
-      .spacing : nil
-    offset = raw.fields & MLN_MOMENTUM_SNAP_OFFSET.rawValue != 0 ? raw
-      .offset : nil
-    tolerance = raw.fields & MLN_MOMENTUM_SNAP_TOLERANCE.rawValue != 0 ? raw
-      .tolerance : nil
-    durationMs = raw.fields & MLN_MOMENTUM_SNAP_DURATION_MS.rawValue != 0 ? raw
-      .duration_ms : nil
-  }
-
-  func nativeValue() -> mln_momentum_snap {
-    var raw = mln_momentum_snap()
-    raw.fields = 0
-    if let item = spacing {
-      raw.fields |= MLN_MOMENTUM_SNAP_SPACING.rawValue; raw.spacing = item
-    }
-    if let item = offset {
-      raw.fields |= MLN_MOMENTUM_SNAP_OFFSET.rawValue; raw.offset = item
-    }
-    if let item = tolerance {
-      raw.fields |= MLN_MOMENTUM_SNAP_TOLERANCE.rawValue; raw.tolerance = item
-    }
-    if let item = durationMs {
-      raw.fields |= MLN_MOMENTUM_SNAP_DURATION_MS.rawValue; raw
-        .duration_ms = item
-    }
-    return raw
-  }
-}
-
 /// The screen direction that north points to when the bearing is 0.
 ///
 /// See `mln_north_orientation` in the
@@ -2176,6 +1774,48 @@ public enum OfflineRegionDefinition: Equatable, Hashable, Sendable {
   }
 }
 
+/// How long the resources that an offline region holds stay usable.
+///
+/// See `mln_offline_region_expiry` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct OfflineRegionExpiry: Equatable, Hashable, Sendable {
+  /// When the first of the region's resources goes stale, which may have
+  /// passed. Maps show a stale resource while they check it with the server,
+  /// unless it must be checked first, and the region's download refreshes it.
+  /// Without it, no resource ever goes stale.
+  public var staleAfterUnixMs: Int64?
+  /// When the first of the region's resources that the server requires checking
+  /// once stale stops being usable without the server, which may have passed.
+  /// Refresh the region before then to keep all of it usable offline. Without
+  /// it, every resource stays usable offline.
+  public var usableOfflineUntilUnixMs: Int64?
+  /// The resources that are stale now, tiles included.
+  public var staleResourceCount: UInt64
+  /// The stale resources that maps can't use now without the server.
+  public var unusableResourceCount: UInt64
+  public init(
+    staleAfterUnixMs: Int64? = nil,
+    usableOfflineUntilUnixMs: Int64? = nil,
+    staleResourceCount: UInt64 = 0,
+    unusableResourceCount: UInt64 = 0
+  ) {
+    self.staleAfterUnixMs = staleAfterUnixMs
+    self.usableOfflineUntilUnixMs = usableOfflineUntilUnixMs
+    self.staleResourceCount = staleResourceCount
+    self.unusableResourceCount = unusableResourceCount
+  }
+
+  init(raw: mln_offline_region_expiry) {
+    staleAfterUnixMs = raw.fields & MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER
+      .rawValue != 0 ? raw.stale_after_unix_ms : nil
+    usableOfflineUntilUnixMs = raw
+      .fields & MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL
+      .rawValue != 0 ? raw.usable_offline_until_unix_ms : nil
+    staleResourceCount = raw.stale_resource_count
+    unusableResourceCount = raw.unusable_resource_count
+  }
+}
+
 /// An offline region in the runtime's cache file.
 ///
 /// See `mln_offline_region_info` in the
@@ -2266,38 +1906,6 @@ public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
     raw.max_zoom = maxZoom
     raw.pixel_ratio = pixelRatio
     raw.include_ideographs = includeIdeographs
-    return raw
-  }
-}
-
-/// How a gesture's pan keeps moving the map's content after release.
-///
-/// See `mln_pan_momentum` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct PanMomentum: Equatable, Hashable, Sendable {
-  /// How fast the map's content moved on the screen at release, in logical
-  /// pixels per second. The pan moves only when this is set.
-  public var velocity: ScreenPoint?
-  public var decay: MomentumDecay
-  public init(velocity: ScreenPoint? = nil, decay: MomentumDecay = .init()) {
-    self.velocity = velocity
-    self.decay = decay
-  }
-
-  init(raw: mln_pan_momentum) {
-    velocity = raw.fields & MLN_PAN_MOMENTUM_VELOCITY
-      .rawValue != 0 ? ScreenPoint(raw: raw.velocity) : nil
-    decay = MomentumDecay(raw: raw.decay)
-  }
-
-  func nativeValue() -> mln_pan_momentum {
-    var raw = mln_pan_momentum()
-    raw.fields = 0
-    if let item = velocity {
-      raw.fields |= MLN_PAN_MOMENTUM_VELOCITY.rawValue; raw.velocity = item
-        .nativeValue()
-    }
-    raw.decay = decay.nativeValue()
     return raw
   }
 }

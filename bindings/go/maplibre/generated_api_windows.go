@@ -11,6 +11,32 @@ package maplibre
 import "C"
 import "unsafe"
 
+// WithD3d12Texture gets the D3D12 texture of an acquired frame.
+//
+// It gets a borrowed ring's texture, or an exported ring's on a D3D12 device:
+// the resource whose memory the ring shares, and the frame's depth resource
+// with RenderSessionAttachOptions.KeepDepth. Wait for
+// AcquiredFrameHandle.WithProducerSync() before you use them.
+//
+// See mln_acquired_frame_get_d3d12_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+//
+// Errors:
+//   - StatusUnsupported when the frame isn't of a D3D12 device.
+//   - StatusTargetLost when the session failed, or you detached, abandoned, or
+//     disposed it.
+func (receiver *AcquiredFrameHandle) WithD3d12Texture(callback func(D3d12TextureFrameView) error) error {
+	var outFrame C.mln_d3d12_texture_frame
+	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
+	return bindingWithView(bindingOwned(receiver.owner()), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_get_d3d12_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
+	}, func(scope *bindingScope) D3d12TextureFrameView {
+		return D3d12TextureFrameView{value: copyD3d12TextureFrame(outFrame), scope: scope}
+	})
+}
+
 // WithDxgiSharedTexture gets the DXGI shared texture of an exported ring's
 // acquired frame.
 //
@@ -40,5 +66,52 @@ func (receiver *AcquiredFrameHandle) WithDxgiSharedTexture(callback func(DxgiSha
 		return int32(C.mln_acquired_frame_get_dxgi_shared_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
 	}, func(scope *bindingScope) DxgiSharedTextureFrameView {
 		return DxgiSharedTextureFrameView{value: copyDxgiSharedTextureFrame(outFrame), scope: scope}
+	})
+}
+
+// D3d12Context gets the D3D12 device and direct command queue of a D3D12
+// device.
+//
+// Use them to make the textures of a borrowed ring that sessions on the device
+// render into, and to submit your reads of them, which the queue orders after
+// the frames submitted before them.
+//
+// See mln_gpu_device_get_d3d12_context in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+//
+// Errors:
+//   - StatusUnsupported when the device doesn't render with D3D12.
+func (receiver *GPUDeviceHandle) D3d12Context() (GPUDeviceD3d12ContextResult, error) {
+	var outResult C.mln_gpu_device_d3d12_context_result
+	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_gpu_device_get_d3d12_context(C.mln_gpu_device(raw), &outResult, diagnostic))
+	}, func(arena *bindingArena) GPUDeviceD3d12ContextResult {
+		return copyGPUDeviceD3d12ContextResult(outResult)
+	})
+}
+
+// WrapD3d12GPUDevice wraps your D3D12 device and direct command queue, so that
+// sessions render on them.
+//
+// Sessions on the device render into your textures and submit to your queue.
+//
+// See mln_gpu_device_wrap_d3d12 in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+//
+// Errors:
+//   - StatusUnsupported when SupportedRenderBackendMask() lacks
+//     RenderBackendFlagD3d12, when the device runs no shader model 6.0, when
+//     command_queue isn't a direct queue of device, or when the library can't
+//     load DXC (dxcompiler.dll) to compile its shaders.
+//   - StatusInvalidArgument when device or command_queue isn't of its
+//     interface.
+func WrapD3d12GPUDevice(descriptor D3d12DeviceDescriptor) (*GPUDeviceHandle, error) {
+	var outDevice C.mln_gpu_device
+	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_gpu_device_wrap_d3d12(bindingStore(nativeD3d12DeviceDescriptor(descriptor, arena), arena), &outDevice, diagnostic))
+	}, func(arena *bindingArena) *GPUDeviceHandle {
+		adopted := adoptGPUDeviceHandle(uint64(outDevice), nil)
+		return adopted
 	})
 }

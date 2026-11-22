@@ -156,6 +156,35 @@ public sealed class GeneratedValueTests
         Assert.Equal(9, line.data.line_string.points[1].x);
     }
 
+    // A fixed array that a count field sizes copies only the elements the count covers, and a
+    // count past the array's end fails instead of reading beyond it.
+    [Fact]
+    public unsafe void ACountedInlineArrayCopiesOnlyItsCountedElements()
+    {
+        var result = new mln_gesture_result
+        {
+            size = (uint)sizeof(mln_gesture_result),
+            event_count = 2,
+        };
+        for (var i = 0; i < 4; i++)
+        {
+            result.events[i].type = mln_gesture_event_type.MLN_GESTURE_EVENT_TAP;
+            result.events[i].data.tap.id = (uint)i;
+        }
+        result.events[1].type = mln_gesture_event_type.MLN_GESTURE_EVENT_LONG_PRESS;
+
+        Assert.Equal(
+            [
+                new GestureEvent.Tap(new GestureTap(0, default)),
+                new GestureEvent.LongPress(new GestureTap(1, default)),
+            ],
+            GeneratedValues.CopyGestureResult(result).Events
+        );
+
+        result.event_count = 5;
+        Assert.Throws<InvalidOperationException>(() => GeneratedValues.CopyGestureResult(result));
+    }
+
     [Fact]
     public unsafe void AnOutputUnionWithAnUnknownTagKeepsTheTag()
     {

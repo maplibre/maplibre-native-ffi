@@ -54,44 +54,50 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let waitForUpdate: FrameDemandFlag = .init(rawValue: 4)
 }
 
-/// Options for creating a frame pacer, or for `FramePacerHandle.setOptions()`.
+/// Options for `RenderSessionHandle.setFramePacing()`.
 ///
-/// See `mln_frame_pacer_options` in the
+/// See `mln_frame_pacing_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-public struct FramePacerOptions: Equatable, Hashable, Sendable {
-  /// Removes the frame rate limit, so the pacer can demand frames at every
-  /// display refresh, as it does by default.
-  public var unlimitedFramesPerSecond: Bool
-  /// The most frames per second that the pacer demands, greater than zero. The
-  /// pacer skips display refreshes to stay within it. By default, it can demand
-  /// frames at every refresh.
+public struct FramePacingOptions: Equatable, Hashable, Sendable {
+  /// The most frames per second that the library demands, greater than zero. It
+  /// skips display refreshes to stay within it. By default, it can demand a
+  /// frame at every refresh.
   public var maximumFramesPerSecond: UInt32?
+  /// The `NSView*` on macOS, or the `UIView*` on iOS and tvOS, that shows the
+  /// session's frames, to pace them to its window's display rather than the
+  /// main one. On iOS and tvOS, set the pacing again when the scene moves to
+  /// another screen, as `windowScene:didUpdateEffectiveGeometry:` reports.
+  public var view: NativePointer?
   public init(
-    unlimitedFramesPerSecond: Bool = false,
-    maximumFramesPerSecond: UInt32? = nil
+    maximumFramesPerSecond: UInt32? = nil,
+    view: NativePointer? = nil
   ) {
-    self.unlimitedFramesPerSecond = unlimitedFramesPerSecond
     self.maximumFramesPerSecond = maximumFramesPerSecond
+    self.view = view
   }
 
-  init(raw: mln_frame_pacer_options) {
-    unlimitedFramesPerSecond = raw
-      .fields & MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND.rawValue != 0
+  init(raw: mln_frame_pacing_options) {
     maximumFramesPerSecond = raw
-      .fields & MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND
+      .fields & MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND
       .rawValue != 0 ? raw.maximum_frames_per_second : nil
+    view = raw.fields & MLN_FRAME_PACING_OPTION_VIEW
+      .rawValue != 0 ? NativePointer(bitPattern: unsafeBitCast(
+        raw.view,
+        to: UInt.self
+      )) : nil
   }
 
-  func nativeValue() -> mln_frame_pacer_options {
-    var raw = mln_frame_pacer_options()
+  func nativeValue() -> mln_frame_pacing_options {
+    var raw = mln_frame_pacing_options()
     raw.fields = 0
-    if unlimitedFramesPerSecond {
-      raw.fields |= MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND.rawValue
-    }
-    raw.size = UInt32(MemoryLayout<mln_frame_pacer_options>.size)
+    raw.size = UInt32(MemoryLayout<mln_frame_pacing_options>.size)
     if let item = maximumFramesPerSecond {
-      raw.fields |= MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND
+      raw.fields |= MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND
         .rawValue; raw.maximum_frames_per_second = item
+    }
+    if let item = view {
+      raw.fields |= MLN_FRAME_PACING_OPTION_VIEW.rawValue; raw.view = item
+        .unsafeMutableRawPointer
     }
     return raw
   }

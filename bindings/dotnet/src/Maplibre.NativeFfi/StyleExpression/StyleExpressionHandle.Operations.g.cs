@@ -37,7 +37,7 @@ public sealed unsafe partial class StyleExpressionHandle
     }
 
     NativeHandleState<MlnStyleExpression> INativeOwner<MlnStyleExpression>.State => state;
-    internal MlnStyleExpression Handle => state.Handle;
+    internal MlnStyleExpression NativeHandle => state.Handle;
 
     /// <summary>
     /// The native handle value. It stays readable after release.
@@ -128,7 +128,7 @@ public sealed unsafe partial class StyleExpressionHandle
         {
             Check(
                 NativeMethods.mln_style_expression_evaluate(
-                    Handle,
+                    NativeHandle,
                     inputs is null ? null : &nativeInputs,
                     outJson,
                     jsonCapacity,
@@ -159,7 +159,7 @@ public sealed unsafe partial class StyleExpressionHandle
         {
             size = (uint)sizeof(mln_style_expression_info),
         };
-        Check(NativeMethods.mln_style_expression_get_info(Handle, &outInfo, Diagnostic));
+        Check(NativeMethods.mln_style_expression_get_info(NativeHandle, &outInfo, Diagnostic));
         return CopyStyleExpressionInfo(outInfo);
     }
 

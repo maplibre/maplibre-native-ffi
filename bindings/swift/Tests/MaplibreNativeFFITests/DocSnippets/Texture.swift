@@ -18,6 +18,10 @@
   /// The host's draw, which samples the image view.
   private func drawMap(_: UInt64) {}
 
+  /// The host's wait for a GPU sync, as for an acquired frame's
+  /// producer sync.
+  private func waitForSync(_: GpuSync) {}
+
   private func destroyTextures(_: [UInt64], _: [UInt64]) {}
 
   @MainActor private func drawFrame() throws {
@@ -111,7 +115,12 @@
       finalLayout: 5
     )
 
-    try await session.setTarget(.vulkanBorrowedTextures(resized))
+    let released = try await session
+      .setTarget(.vulkanBorrowedTextures(resized))
+    // The session's last work on the old textures.
+    if let released {
+      waitForSync(released)
+    }
     // vkDestroyImageView and vkDestroyImage
     destroyTextures(images, views)
     // #endregion resize-borrowed

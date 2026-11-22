@@ -25,7 +25,8 @@ import org.maplibre.nativeffi.CameraOptions
 import org.maplibre.nativeffi.CameraUpdate
 import org.maplibre.nativeffi.CameraUpdateMode
 import org.maplibre.nativeffi.Completion
-import org.maplibre.nativeffi.FramePacerHandle
+import org.maplibre.nativeffi.FramePacingOptions
+import org.maplibre.nativeffi.GestureRecognizerHandle
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LogicalExtent
 import org.maplibre.nativeffi.LogicalSize
@@ -57,15 +58,14 @@ class MapController(application: Application) : AndroidViewModel(application) {
   var status by mutableStateOf(Status(""))
     private set
 
-  var map: MapHandle? = null
+  // Moves the map's camera with the view's gestures.
+  var gestures: GestureRecognizerHandle? = null
     private set
 
   private val main = Handler(Looper.getMainLooper())
   private val density = application.resources.displayMetrics.density
-  // Paces frames to the display through the main thread's choreographer. A paced session has no
-  // redraw wake: the pacer demands each frame.
-  private val pacer = FramePacerHandle.create()
   private var runtime: RuntimeHandle? = null
+  private var map: MapHandle? = null
   private var session: RenderSessionHandle? = null
   private var failed = false
 
@@ -134,6 +134,8 @@ class MapController(application: Application) : AndroidViewModel(application) {
     val session = session
     val map = map
     val runtime = runtime
+    gestures?.release()
+    gestures = null
     this.session = null
     this.map = null
     this.runtime = null
@@ -155,7 +157,6 @@ class MapController(application: Application) : AndroidViewModel(application) {
       } catch (error: MaplibreException) {
         Log.w(TAG, "Couldn't release the map", error)
       }
-      pacer.release()
     }
   }
 
@@ -180,6 +181,7 @@ class MapController(application: Application) : AndroidViewModel(application) {
       RuntimeEventHandler { events -> main.post { onEvents(map, events) } },
     )
     map.ready.await()
+    gestures = map.gestureRecognizerCreate()
     map.discarding.updateCamera(
       CameraUpdate(
         mode = CameraUpdateMode.JUMP,
@@ -243,7 +245,9 @@ class MapController(application: Application) : AndroidViewModel(application) {
             ),
         )
       this.session = attached
-      attached.setFramePacer(pacer)
+      // Paces frames to the display through the main thread's choreographer. A paced session has
+      // no redraw wake: the library demands each frame.
+      attached.setFramePacing(FramePacingOptions())
       attached.ready.await()
     } else {
       session.setAndroidSurfaceTarget(surface, size).await()

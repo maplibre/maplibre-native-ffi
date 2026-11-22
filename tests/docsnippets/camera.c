@@ -49,43 +49,54 @@ static void on_fly_end(
 // #endregion animate
 
 // #region gesture
-static void begin_gesture(mln_map map) {
-  const mln_camera_delta begin = {
-    .size = sizeof(mln_camera_delta),
-    .gesture_phase = MLN_GESTURE_PHASE_BEGIN,
-  };
-  mln_map_apply_camera_delta(map, &begin, NULL, NULL);
+static mln_gesture_recognizer create_recognizer(mln_map map) {
+  mln_gesture_recognizer recognizer = MLN_HANDLE_NULL;
+  mln_gesture_recognizer_create(map, NULL, &recognizer, NULL);
+  return recognizer;
 }
 
-static void apply_drag(mln_map map, mln_screen_point movement) {
-  const mln_camera_delta drag = {
-    .size = sizeof(mln_camera_delta),
-    .fields = MLN_CAMERA_DELTA_OFFSET,
-    .offset = movement,
-    .gesture_phase = MLN_GESTURE_PHASE_UPDATE,
-  };
-  mln_map_apply_camera_delta(map, &drag, NULL, NULL);
+static void schedule_tick(const mln_gesture_result* result) {
+  (void)result;  // On the next frame, or at result->next_tick_ms.
 }
 
-static void apply_pinch(
-  mln_map map, double scale, mln_screen_point center
+static void pointer_down(
+  mln_gesture_recognizer recognizer, uint32_t id,
+  mln_screen_point position, double time_ms
 ) {
-  const mln_camera_delta pinch = {
-    .size = sizeof(mln_camera_delta),
-    .fields = MLN_CAMERA_DELTA_SCALE | MLN_CAMERA_DELTA_ANCHOR,
-    .scale = scale,
-    .anchor = center,
-    .gesture_phase = MLN_GESTURE_PHASE_UPDATE,
+  const mln_gesture_input input = {
+    .size = sizeof(mln_gesture_input),
+    .type = MLN_GESTURE_INPUT_POINTER_DOWN,
+    .data.pointer_down = {
+      .id = id, .kind = MLN_POINTER_KIND_TOUCH, .position = position
+    },
   };
-  mln_map_apply_camera_delta(map, &pinch, NULL, NULL);
+  mln_gesture_result result = {.size = sizeof(mln_gesture_result)};
+  mln_gesture_recognizer_handle(
+    recognizer, &input, time_ms, &result, NULL
+  );
+  schedule_tick(&result);
 }
 
-static void end_gesture(mln_map map) {
-  const mln_camera_delta end = {
-    .size = sizeof(mln_camera_delta),
-    .gesture_phase = MLN_GESTURE_PHASE_END,
+static void pointer_move(
+  mln_gesture_recognizer recognizer, uint32_t id,
+  mln_screen_point position, double time_ms
+) {
+  const mln_gesture_input input = {
+    .size = sizeof(mln_gesture_input),
+    .type = MLN_GESTURE_INPUT_POINTER_MOVE,
+    .data.pointer_move = {.id = id, .position = position},
   };
-  mln_map_apply_camera_delta(map, &end, NULL, NULL);
+  mln_gesture_result result = {.size = sizeof(mln_gesture_result)};
+  mln_gesture_recognizer_handle(
+    recognizer, &input, time_ms, &result, NULL
+  );
+  schedule_tick(&result);
+}
+
+static void tick(mln_gesture_recognizer recognizer, double time_ms) {
+  mln_gesture_result result = {.size = sizeof(mln_gesture_result)};
+  mln_gesture_recognizer_tick(recognizer, time_ms, &result, NULL);
+  schedule_tick(&result);
 }
 // #endregion gesture
 
@@ -165,10 +176,15 @@ void mln_doc_camera(mln_map map) {
   mln_map_set_bounds(map, &limits, NULL, NULL);
   // #endregion limit
 
-  begin_gesture(map);
-  apply_drag(map, (mln_screen_point){.x = 12, .y = -4});
-  apply_pinch(map, 1.1, (mln_screen_point){.x = 200, .y = 150});
-  end_gesture(map);
+  mln_gesture_recognizer recognizer = create_recognizer(map);
+  pointer_down(
+    recognizer, 1, (mln_screen_point){.x = 100, .y = 100}, 0
+  );
+  pointer_move(
+    recognizer, 1, (mln_screen_point){.x = 112, .y = 96}, 16
+  );
+  tick(recognizer, 32);
+  mln_gesture_recognizer_release(recognizer);
 
   // #region convert
   mln_map_snapshot current = {.size = sizeof(mln_map_snapshot)};

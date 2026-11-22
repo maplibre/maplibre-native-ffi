@@ -32,7 +32,7 @@ public sealed unsafe partial class RuntimeHandle
         NativeMethods.mln_runtime_dispose(live, diagnostic);
 
     NativeHandleState<MlnRuntime> INativeOwner<MlnRuntime>.State => state;
-    internal MlnRuntime Handle => state.Handle;
+    internal MlnRuntime NativeHandle => state.Handle;
 
     /// <summary>
     /// The native handle value, which runtime events report as their
@@ -77,7 +77,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_event_handler(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -96,7 +96,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_http_header_transform(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -116,7 +116,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_resource_provider(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -135,7 +135,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_clear_resource_transform(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -208,7 +208,7 @@ public sealed unsafe partial class RuntimeHandle
         MlnMap outMap = default;
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_create_map(
-            Handle,
+            NativeHandle,
             &nativeOptions,
             &outMap,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
@@ -241,7 +241,7 @@ public sealed unsafe partial class RuntimeHandle
             var nativeDefinition = NativeOfflineRegionDefinition(definition, scope);
             mln_completion nativeCompletion;
             var nativeStatus = NativeMethods.mln_runtime_create_offline_region(
-                Handle,
+                NativeHandle,
                 &nativeDefinition,
                 (byte*)pinnedMetadata,
                 checked((nuint)metadata.Length),
@@ -278,7 +278,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_delete_offline_region(
-            Handle,
+            NativeHandle,
             regionId,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -300,7 +300,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_get_offline_region(
-            Handle,
+            NativeHandle,
             regionId,
             NativeCompletion.Start<OfflineRegionInfo?>(
                 &nativeCompletion,
@@ -308,6 +308,40 @@ public sealed unsafe partial class RuntimeHandle
                     NativeCompletion.OptionalValue<mln_offline_region_info, OfflineRegionInfo>(
                         nativeResult,
                         CopyOfflineRegionInfo
+                    ),
+                out var nativePending
+            ),
+            Diagnostic
+        );
+        return scope.Accepted(nativePending.Submitted(nativeStatus));
+    }
+
+    /// <summary>
+    /// Reads how long the resources of the offline region <c>regionId</c> stay
+    /// usable.
+    /// </summary>
+    /// <remarks>
+    /// <para>See <c>mln_runtime_get_offline_region_expiry</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.NotFound</c> when the cache file has no
+    /// region <c>regionId</c>.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task<OfflineRegionExpiry> GetOfflineRegionExpiryAsync(long regionId)
+    {
+        using var scope = new NativeCallScope(this);
+        mln_completion nativeCompletion;
+        var nativeStatus = NativeMethods.mln_runtime_get_offline_region_expiry(
+            NativeHandle,
+            regionId,
+            NativeCompletion.Start<OfflineRegionExpiry>(
+                &nativeCompletion,
+                static nativeResult =>
+                    NativeCompletion.Single<mln_offline_region_expiry, OfflineRegionExpiry>(
+                        nativeResult,
+                        CopyOfflineRegionExpiry
                     ),
                 out var nativePending
             ),
@@ -337,7 +371,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_get_offline_region_status(
-            Handle,
+            NativeHandle,
             regionId,
             NativeCompletion.Start<OfflineRegionStatus>(
                 &nativeCompletion,
@@ -354,16 +388,17 @@ public sealed unsafe partial class RuntimeHandle
     }
 
     /// <summary>
-    /// Makes maps check each resource of the offline region <c>regionId</c>
-    /// with the server before they use it.
+    /// Makes each resource of the offline region <c>regionId</c> stale, so maps
+    /// check it with the server when they next use it.
     /// </summary>
     /// <remarks>
-    /// <para>The region keeps its resources. Starting its download again
-    /// fetches the invalidated resources for offline use. If the style or a
-    /// TileJSON document is then missing or invalid, the download reports an
-    /// offline region response error and goes on from the stored copy.
-    /// Resources that the current style no longer lists stay in the region
-    /// until it's deleted.</para>
+    /// <para>The region keeps its resources, and maps show them while they
+    /// check them, except those that the server requires checking first.
+    /// Starting the region's download again checks every resource with the
+    /// server. If the style or a TileJSON document is then missing or invalid,
+    /// the download reports an offline region response error and goes on from
+    /// the stored copy. Resources that the current style no longer lists stay
+    /// in the region until it's deleted.</para>
     /// <para>See <c>mln_runtime_invalidate_offline_region</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -377,7 +412,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_invalidate_offline_region(
-            Handle,
+            NativeHandle,
             regionId,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -397,7 +432,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_list_offline_regions(
-            Handle,
+            NativeHandle,
             NativeCompletion.Start<OfflineRegionInfo[]>(
                 &nativeCompletion,
                 static nativeResult =>
@@ -434,7 +469,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_merge_offline_regions(
-            Handle,
+            NativeHandle,
             scope.Utf8(sideDatabasePath),
             NativeCompletion.Start<OfflineRegionInfo[]>(
                 &nativeCompletion,
@@ -490,7 +525,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_run_cache_database_operation(
-            Handle,
+            NativeHandle,
             (mln_cache_database_operation)operation,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -512,7 +547,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeHandler = NativeRuntimeEventHandler(handler, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_set_event_handler(
-            Handle,
+            NativeHandle,
             &nativeHandler,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -542,7 +577,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeTransform = NativeHttpHeaderTransform(transform, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_set_http_header_transform(
-            Handle,
+            NativeHandle,
             &nativeTransform,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -565,7 +600,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_set_maximum_ambient_cache_size(
-            Handle,
+            NativeHandle,
             size,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -577,8 +612,10 @@ public sealed unsafe partial class RuntimeHandle
     /// Starts or pauses the download of the offline region <c>regionId</c>.
     /// </summary>
     /// <remarks>
-    /// <para>Setting the state that the download already has does nothing. A
-    /// download stops when the runtime closes.</para>
+    /// <para>A download fetches the resources that the region lacks, and checks
+    /// those that are stale with the server, keeping each stored copy until its
+    /// refresh arrives. Setting the state that the download already has does
+    /// nothing. A download stops when the runtime closes.</para>
     /// <para>See <c>mln_runtime_set_offline_region_download_state</c> in the
     /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
@@ -593,7 +630,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_set_offline_region_download_state(
-            Handle,
+            NativeHandle,
             regionId,
             (mln_offline_region_download_state)state,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
@@ -624,7 +661,7 @@ public sealed unsafe partial class RuntimeHandle
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_set_offline_region_observed(
-            Handle,
+            NativeHandle,
             regionId,
             (ulong)events,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
@@ -650,7 +687,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeProvider = NativeResourceProvider(provider, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_set_resource_provider(
-            Handle,
+            NativeHandle,
             &nativeProvider,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -672,7 +709,7 @@ public sealed unsafe partial class RuntimeHandle
         var nativeTransform = NativeResourceTransform(transform, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_runtime_set_resource_transform(
-            Handle,
+            NativeHandle,
             &nativeTransform,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -702,7 +739,7 @@ public sealed unsafe partial class RuntimeHandle
             using var scope = new NativeCallScope(this);
             mln_completion nativeCompletion;
             var nativeStatus = NativeMethods.mln_runtime_update_offline_region_metadata(
-                Handle,
+                NativeHandle,
                 regionId,
                 (byte*)pinnedMetadata,
                 checked((nuint)metadata.Length),
@@ -742,7 +779,7 @@ public sealed unsafe partial class RuntimeHandle
 
         public void ClearEventHandler()
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(NativeMethods.mln_runtime_clear_event_handler(receiverHandle, null, Diagnostic));
             scope.Accept();
@@ -750,7 +787,7 @@ public sealed unsafe partial class RuntimeHandle
 
         public void ClearHttpHeaderTransform()
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_runtime_clear_http_header_transform(
@@ -764,7 +801,7 @@ public sealed unsafe partial class RuntimeHandle
 
         public void ClearResourceProvider()
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_runtime_clear_resource_provider(receiverHandle, null, Diagnostic)
@@ -774,7 +811,7 @@ public sealed unsafe partial class RuntimeHandle
 
         public void ClearResourceTransform()
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_runtime_clear_resource_transform(receiverHandle, null, Diagnostic)
@@ -784,7 +821,7 @@ public sealed unsafe partial class RuntimeHandle
 
         public void SetEventHandler(RuntimeEventHandler handler)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeHandler = NativeRuntimeEventHandler(handler, scope);
             Check(
@@ -800,7 +837,7 @@ public sealed unsafe partial class RuntimeHandle
 
         public void SetHttpHeaderTransform(HttpHeaderTransform transform)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeTransform = NativeHttpHeaderTransform(transform, scope);
             Check(
@@ -816,7 +853,7 @@ public sealed unsafe partial class RuntimeHandle
 
         public void SetResourceProvider(ResourceProvider provider)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeProvider = NativeResourceProvider(provider, scope);
             Check(
@@ -832,7 +869,7 @@ public sealed unsafe partial class RuntimeHandle
 
         public void SetResourceTransform(ResourceTransform transform)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeTransform = NativeResourceTransform(transform, scope);
             Check(

@@ -130,7 +130,8 @@ class SwiftEmitterTests(unittest.TestCase):
             "public init(`initialExtent`: LogicalExtent, `mapMode`: MapMode = "
             ".init(rawValue: 0), `fastPforEnabled`: Bool = false, `eventMask`: "
             "RuntimeEventFlag? = nil, `tileCacheEnabled`: Bool? = nil, "
-            '`fallbackFontFaces`: String = "", `systemFontsEnabled`: Bool? = nil)',
+            '`fallbackFontFaces`: String = "", `systemFontsEnabled`: Bool? = nil, '
+            "`localIdeographsEnabled`: Bool? = nil)",
             values,
         )
         self.assertNotIn("static var `default`", values)
@@ -202,11 +203,16 @@ class SwiftEmitterTests(unittest.TestCase):
         )
         self.assertIn(
             "`MapHandle.cancelCameraTransitions()`, "
-            "`MapHandle.cancelCameraTransitionsWithId()`, a gesture's "
-            "`GesturePhase.begin` or `GesturePhase.cancel`",
+            "`MapHandle.cancelCameraTransitionsWithId()`, a gesture",
             summary,
         )
         self.assertNotIn("mln_map_cancel_camera_transitions", summary)
+        gesture = emitted(swift, real_api())[
+            "Generated/Values/GeneratedGestureValues.swift"
+        ]
+        self.assertIn("For `MomentumDecayModel.friction`.", gesture)
+        # A tag that only its union uses names the variant it selects.
+        self.assertIn("`GestureEvent.notch` as", gesture)
 
     def test_generated_values_and_keyword_parameters_round_trip(self):
         swiftc = require_tool(self, "swiftc", ROOT / "bindings/swift")
@@ -220,6 +226,7 @@ class SwiftEmitterTests(unittest.TestCase):
                 "keywords",
                 "absent_handle",
                 "strided_records",
+                "counted_inline_array",
             ),
             defines=("MLN_PROTOCOL_COMPLETION_RUNTIME", "MLN_PROTOCOL_ABI_VERSION"),
         )

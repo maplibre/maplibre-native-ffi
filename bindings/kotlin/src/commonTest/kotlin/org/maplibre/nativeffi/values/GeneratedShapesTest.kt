@@ -11,12 +11,18 @@ import org.maplibre.nativeffi.CameraUpdateMode
 import org.maplibre.nativeffi.FeatureId
 import org.maplibre.nativeffi.FeatureStateSelector
 import org.maplibre.nativeffi.FrameDemandFlag
+import org.maplibre.nativeffi.GestureEvent
+import org.maplibre.nativeffi.GestureInput
+import org.maplibre.nativeffi.GesturePointer
+import org.maplibre.nativeffi.GesturePointerDown
+import org.maplibre.nativeffi.GestureTap
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LogSeverityFlag
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.MapProjectionHandle
 import org.maplibre.nativeffi.OfflineRegionDefinition
 import org.maplibre.nativeffi.PremultipliedRgba8Image
+import org.maplibre.nativeffi.ScreenPoint
 import org.maplibre.nativeffi.Status
 import org.maplibre.nativeffi.StyleExpressionHandle
 import org.maplibre.nativeffi.StyleExpressionInputs
@@ -66,6 +72,28 @@ class GeneratedShapesTest {
         assertEquals(emptyList(), projection.latLngsForPixelsUnwrapped(emptyList()))
       } finally {
         projection.release()
+      }
+    }
+  }
+
+  @Test
+  fun aCountedInlineArrayReadsOnlyTheEventsItCounts() = runSuspendTest {
+    withMap {
+      map.gestureRecognizerCreate().use { recognizer ->
+        val position = ScreenPoint(30.0, 16.0)
+        fun tap(timeMs: Double): List<GestureEvent> {
+          recognizer.handle(
+            GestureInput.PointerDown(GesturePointerDown(id = 2u, position = position)),
+            timeMs,
+          )
+          val up = GestureInput.PointerUp(GesturePointer(id = 2u, position = position))
+          return recognizer.handle(up, timeMs + 50).events
+        }
+        // The result holds room for more events than it counts, and each comes back as its own
+        // union variant.
+        val tap = GestureTap(id = 2u, position = position)
+        assertEquals(listOf(GestureEvent.Tap(tap)), tap(0.0))
+        assertEquals(listOf(GestureEvent.Tap(tap), GestureEvent.DoubleTap(tap)), tap(100.0))
       }
     }
   }

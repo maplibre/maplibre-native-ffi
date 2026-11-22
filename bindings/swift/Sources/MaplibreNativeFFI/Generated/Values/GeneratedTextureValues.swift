@@ -38,6 +38,80 @@ public struct AndroidHardwareBufferFrame: Equatable, Hashable, Sendable {
   }
 }
 
+/// The D3D12 texture of an acquired frame.
+///
+/// The depth members are set when the frame has a depth texture, as for
+/// `MetalTextureFrame`. Otherwise they are zero.
+///
+/// See `mln_d3d12_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct D3d12TextureFrame: Equatable, Hashable, Sendable {
+  public var width: UInt32
+  public var height: UInt32
+  public var scaleFactor: Double
+  /// The texture's index in the descriptor's `textures`, or in the ring.
+  public var slot: UInt32
+  /// The `ID3D12Resource`.
+  public var resource: NativePointer
+  /// The resource's `ID3D12Device`.
+  public var device: NativePointer
+  /// The resource's `DXGI_FORMAT`.
+  public var format: UInt32
+  /// The `D3D12_RESOURCE_STATES` that the frame left the resource in.
+  public var state: UInt32
+  /// The `ID3D12Resource` that holds the frame's depth and stencil.
+  public var depthResource: NativePointer
+  /// The depth resource's `DXGI_FORMAT`.
+  public var depthFormat: UInt32
+  /// The `D3D12_RESOURCE_STATES` that the frame left the depth resource in.
+  public var depthState: UInt32
+  public init(
+    width: UInt32 = 0,
+    height: UInt32 = 0,
+    scaleFactor: Double = 0,
+    slot: UInt32 = 0,
+    resource: NativePointer = .null,
+    device: NativePointer = .null,
+    format: UInt32 = 0,
+    state: UInt32 = 0,
+    depthResource: NativePointer = .null,
+    depthFormat: UInt32 = 0,
+    depthState: UInt32 = 0
+  ) {
+    self.width = width
+    self.height = height
+    self.scaleFactor = scaleFactor
+    self.slot = slot
+    self.resource = resource
+    self.device = device
+    self.format = format
+    self.state = state
+    self.depthResource = depthResource
+    self.depthFormat = depthFormat
+    self.depthState = depthState
+  }
+
+  init(raw: mln_d3d12_texture_frame) {
+    width = raw.width
+    height = raw.height
+    scaleFactor = raw.scale_factor
+    slot = raw.slot
+    resource = NativePointer(bitPattern: unsafeBitCast(
+      raw.resource,
+      to: UInt.self
+    ))
+    device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
+    format = raw.format
+    state = raw.state
+    depthResource = NativePointer(bitPattern: unsafeBitCast(
+      raw.depth_resource,
+      to: UInt.self
+    ))
+    depthFormat = raw.depth_format
+    depthState = raw.depth_state
+  }
+}
+
 /// The dmabuf of an exported ring's acquired frame.
 ///
 /// See `mln_dma_buf_frame` in the

@@ -28,11 +28,12 @@ with `Map.attach` to an exported ring target: a ring of three dmabufs that the
 library allocates, in the formats that `gdk_display_get_dmabuf_formats()`
 reports. The session renders on a library thread, with Vulkan or OpenGL alike,
 and needs no GL context of GTK's. A redraw wake asks for a frame, and the
-widget's frame clock demands it at the next tick. A frame wake drains the frame
-results and acquires the newest frame, which the widget wraps in a texture with
-`GdkDmabufTextureBuilder` and shows in a `GtkPicture` inside a
-`GtkGraphicsOffload`. When nothing clips the map, as in a maximized window, the
-compositor shows the buffer itself.
+widget's frame clock demands it at the next tick. The library can't pace a
+session itself on Linux, which gives it no display refreshes to follow. A frame
+wake drains the frame results and acquires the newest frame, which the widget
+wraps in a texture with `GdkDmabufTextureBuilder` and shows in a `GtkPicture`
+inside a `GtkGraphicsOffload`. When nothing clips the map, as in a maximized
+window, the compositor shows the buffer itself.
 
 `GdkDmabufTextureBuilder` takes no sync file, so the session attaches without
 `SYNC_FD` in its producer sync kinds, and each frame finishes rendering before
@@ -54,9 +55,10 @@ screen is locked, because the frame clock stops. When it leaves its window, it
 releases the session and keeps the map, and attaches a new session when it shows
 again.
 
-`src/gestures.vala` turns pointer, touch, and key input into camera changes. A
-drag, a pinch, or a touchpad scroll ends with its release velocities, so the map
-keeps moving after release. The velocities come from `GtkGestureSwipe`, from the
-`decelerate` signal of a kinetic `GtkEventControllerScroll`, and, for a pinch,
-from its last changes. Everything else matches the browser example in
-`examples/browser`.
+`src/gestures.vala` feeds the widget's raw input to the map's gesture
+recognizer: mouse buttons, touches, wheel and touchpad scrolling, touchpad
+pinches, and keys, in logical pixels from the widget's top-left corner. The
+recognizer moves the camera itself, and keeps it gliding after a release. Each
+result says when the recognizer next needs a tick: at every tick of the widget's
+frame clock while something moves, or at a time, from a timeout. Everything else
+matches the browser example in `examples/browser`.

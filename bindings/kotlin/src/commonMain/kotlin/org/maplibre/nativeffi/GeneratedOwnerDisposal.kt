@@ -12,8 +12,8 @@ internal object GeneratedOwnerDisposal {
   }
 
   @JvmSynthetic
-  fun framePacer(handle: Long) {
-    C.mln_frame_pacer_release(handle)
+  fun gestureRecognizer(handle: Long) {
+    C.mln_gesture_recognizer_release(handle)
   }
 
   @JvmSynthetic

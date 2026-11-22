@@ -29,12 +29,11 @@ surface's ID. The library's OpenHarmony window target takes the surface's
 `OHNativeWindow`, which ArkTS can't reach, so the app's one native module,
 `entry/src/main/cpp/ohos_window.c`, gets the window from the ID.
 `map/MapController.ets` attaches a render session to that window, gives the
-session each new window, and paces its frames to the display, as the browser
-example in `examples/browser` and the React Native example in
-`examples/react-native` do. The session renders on a library thread, in a
-graphics context that the library makes for the window. `map/gestures.ets` turns
-ArkUI's pan, pinch, and rotation gestures into camera changes, and passes their
-speed at release so that the map keeps moving.
+session each new window, and paces its frames to the display, as the React
+Native example in `examples/react-native` does. The session renders on a library
+thread, in a graphics context that the library makes for the window.
+`map/gestures.ets` passes the component's touches to the map's gesture
+recognizer, which moves the camera.
 
 DevEco Studio builds apps with hvigor. Its packages are on the OpenHarmony npm
 registry, but their license is unknown: their `package.json` names a

@@ -7,13 +7,13 @@ namespace Maplibre.NativeFfi;
 /// </summary>
 /// <remarks>
 /// <para>The targets are every <c>spacing</c> from <c>offset</c>, in the part's
-/// unit. Bearing targets wrap around the circle. Once the part's glide ends, or
-/// right away when it doesn't move, the part eases to the nearest target if it
-/// is within <c>tolerance</c> of it, and otherwise stays where it is. A setting
-/// whose bit isn't set takes the part's default, which <c>GestureMomentum</c>
-/// lists.</para>
+/// unit. Bearing targets lie within one turn from <c>offset</c>, and the
+/// bearing takes the shorter way around to the nearest. Once the part's glide
+/// ends, or right away when it has none, the part eases to the nearest target
+/// if it is within <c>tolerance</c> of it, and otherwise stays where it is. A
+/// setting whose bit isn't set keeps its current value.</para>
 /// <para>See <c>mln_momentum_snap</c> in the <see
-/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.</para>
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html">C API reference</see>.</para>
 /// </remarks>
 public sealed record MomentumSnap
 {
@@ -23,7 +23,7 @@ public sealed record MomentumSnap
     public double? Spacing { get; init; }
 
     /// <summary>
-    /// Defaults to 0.
+    /// Finite.
     /// </summary>
     public double? Offset { get; init; }
 
@@ -33,7 +33,7 @@ public sealed record MomentumSnap
     public double? Tolerance { get; init; }
 
     /// <summary>
-    /// Zero settles without easing. Defaults to 300.
+    /// Zero settles without easing.
     /// </summary>
     public double? DurationMs { get; init; }
 }

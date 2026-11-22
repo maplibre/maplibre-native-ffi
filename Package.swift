@@ -33,7 +33,6 @@ let targets: [Target] = [
   .target(
     name: "GraphicsSupport",
     path: "tests/graphics",
-    exclude: ["README.md"],
     cSettings: [
       .headerSearchPath(
         "../../third_party/Vulkan-Headers/include"

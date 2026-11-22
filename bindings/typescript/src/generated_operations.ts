@@ -15,14 +15,20 @@ import type {
   CustomGeometrySourceOptions,
   CustomLayerHost,
   CustomVectorSourceOptions,
+  D3d12DeviceDescriptor,
+  D3d12TextureFrame,
   DmaBufFrame,
   DxgiSharedTextureFrame,
   FeatureStateSelector,
   FrameDemand,
-  FramePacerOptions,
+  FramePacingOptions,
   FreeCameraOptions,
   GeoJsonSourceOptions,
+  GestureInput,
+  GestureOptions,
+  GestureResult,
   GpuDeviceCapabilities,
+  GpuDeviceD3d12ContextResult,
   GpuDeviceOptions,
   GpuDeviceVulkanContextResult,
   GpuSync,
@@ -46,6 +52,7 @@ import type {
   NetworkStatus,
   OfflineRegionDefinition,
   OfflineRegionDownloadState,
+  OfflineRegionExpiry,
   OfflineRegionInfo,
   OfflineRegionStatus,
   OpaqueFdFrame,
@@ -443,6 +450,40 @@ export class AcquiredFrameHandle extends Owner {
   }
 
   /**
+   * Gets the D3D12 texture of an acquired frame.
+   *
+   * It gets a borrowed ring's texture, or an exported ring's on a D3D12 device:
+   * the resource whose memory the ring shares, and the frame's depth resource
+   * with `RenderSessionAttachOptions.keepDepth`. Wait for
+   * `AcquiredFrameHandle.withProducerSync()` before you use them.
+   *
+   * See `mln_acquired_frame_get_d3d12_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the frame isn't of a D3D12 device.
+   * - `Status.targetLost` when the session failed, or you detached, abandoned,
+   *   or disposed it.
+   */
+  withD3d12Texture<T>(use: (view: ScopedD3d12TextureFrame) => T): T {
+    return new ViewScope(
+      ADOPT,
+      this,
+      (handle) => native.mln_acquired_frame_view_begin(handle),
+      (scope) => native.mln_acquired_frame_view_end(scope),
+    ).use((scope) =>
+      use(
+        new ScopedD3d12TextureFrame(
+          ADOPT,
+          scope,
+          native.mln_acquired_frame_get_d3d12_texture(this.id),
+        ),
+      ),
+    );
+  }
+
+  /**
    * Gets the dmabuf of an exported ring's acquired frame.
    *
    * Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
@@ -760,19 +801,19 @@ export class AcquiredFrameHandle extends Owner {
 defineDisposers(AcquiredFrameHandle, undefined, undefined);
 
 /**
- * Demands render sessions' frames at a display's refreshes.
+ * A gesture recognizer that moves a map's camera.
  *
- * See `mln_frame_pacer` in the
+ * See `mln_gesture_recognizer` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
-export class FramePacerHandle extends Owner {
+export class GestureRecognizerHandle extends Owner {
   /**
    * Created by the API, which passes a key that only it holds.
    *
    * @internal
    */
   constructor(key: AdoptKey, handle: bigint, registrations?: Registrations) {
-    super(key, handle, "FramePacerHandle", { registrations });
+    super(key, handle, "GestureRecognizerHandle", { registrations });
   }
   /**
    * Calls `release()`, for `await using`.
@@ -786,90 +827,61 @@ export class FramePacerHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Creates a frame pacer that follows the platform's display.
+   * Handles one input at `timeMs`, in milliseconds on any clock that only goes
+   * forward, the same for every input and frame.
    *
-   * On iOS, macOS, and tvOS, the pacer follows the display through a
-   * `CADisplayLink`. You can call it on any thread, and the pacer needs no run
-   * loop of yours. On macOS, it follows the main display, the one with the menu
-   * bar. With `FramePacerOptions.maximumFramesPerSecond`, the pacer also asks
-   * the system for that refresh rate. On iPhone, a rate above 60 needs
-   * `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
-   *
-   * On Android, the pacer follows the display through the calling thread's
-   * `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
-   * main thread, and keep that thread running its looper while sessions use the
-   * pacer. `AChoreographer` can stop while the phone's display is off, even
-   * while a Surface on another display, such as an Android Auto projection,
-   * still shows the map. The pacer then keeps demanding frames from a timer on
-   * the looper, within the frame rate limit, until vsyncs arrive again.
-   *
-   * On OpenHarmony, the pacer follows the display through `OH_NativeVSync`. You
-   * can call it on any thread, and the pacer needs no event loop of yours.
-   *
-   * See `mln_frame_pacer_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   * See `mln_gesture_recognizer_handle` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
    *
    * Errors:
    *
-   * - `Status.unsupported` on the other platforms, such as visionOS, Linux, and
-   *   Windows, where the library has no source of display refreshes.
-   * - `Status.invalidState` on Android when the calling thread has no
-   *   `ALooper`.
-   * - `Status.nativeError` on iOS, macOS, and tvOS when the system has no
-   *   display to follow, and on OpenHarmony when the system can't report the
-   *   display's refreshes to the process.
+   * - `Status.invalidArgument` when `input` isn't a valid input.
    */
-  static create(options?: FramePacerOptions): FramePacerHandle {
-    const handle = native.mln_frame_pacer_create(options);
-    return adopt(
-      handle,
-      () => new FramePacerHandle(ADOPT, handle),
-      (disposed) => native.mln_frame_pacer_release(disposed, undefined),
-    );
+  handle(input: GestureInput, timeMs: number): GestureResult {
+    return native.mln_gesture_recognizer_handle(this.id, input, timeMs);
   }
 
   /**
-   * Releases a frame pacer.
+   * Releases a gesture recognizer. A glide it started keeps going.
    *
-   * Render sessions that use the pacer stay paced until you release them or set
-   * another pacer.
-   *
-   * See `mln_frame_pacer_release` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   * See `mln_gesture_recognizer_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
    */
   release(): void {
     closeSync(this, (handle, token) =>
-      native.mln_frame_pacer_release(handle, token),
+      native.mln_gesture_recognizer_release(handle, token),
     );
   }
 
   /**
-   * Changes a frame pacer's settings.
+   * Changes the settings whose bits are set, from the next input on.
    *
-   * Settings that `options` doesn't set keep their current values. To remove
-   * the frame rate limit, set `FramePacerOptions.unlimitedFramesPerSecond`. You
-   * can call it on any thread.
-   *
-   * The sessions that the pacer serves follow the new settings from the next
-   * display refresh, including a refresh that they already wait for. The pacer
-   * counts a new limit from the last frames it demanded, so a higher limit can
-   * demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
-   * the system for the new limit's refresh rate, or for the display's own rate
-   * once the limit is removed.
-   *
-   * See `mln_frame_pacer_set_options` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   * See `mln_gesture_recognizer_set_options` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
    *
    * Errors:
    *
-   * - `Status.invalidState` when you released `pacer`, even while sessions
-   *   still use it.
+   * - `Status.invalidArgument` when an option is out of range.
    */
-  setOptions(options: FramePacerOptions): void {
-    native.mln_frame_pacer_set_options(this.id, options);
+  setOptions(options: GestureOptions): void {
+    native.mln_gesture_recognizer_set_options(this.id, options);
+  }
+
+  /**
+   * Times long presses, steps the eases of discrete deltas, ends deltas once
+   * they idle, and samples the camera for notches, at `timeMs` on the inputs'
+   * clock. Call it when the last result's `next_tick` says: on the next display
+   * frame, or at its time with a frame or a timer. A tick at any other time
+   * does no harm.
+   *
+   * See `mln_gesture_recognizer_tick` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+   */
+  tick(timeMs: number): GestureResult {
+    return native.mln_gesture_recognizer_tick(this.id, timeMs);
   }
 }
-defineDisposers(FramePacerHandle, "release", "release");
+defineDisposers(GestureRecognizerHandle, "release", "release");
 
 /**
  * A GPU, and the queue that render sessions on it share.
@@ -915,12 +927,12 @@ export class GpuDeviceHandle extends Owner {
    * - `Status.unsupported` when this build or platform lacks `backend`, when
    *   the device can't render with `open_gl_client_api`, when options name a
    *   GPU that the backend can't select (an OpenGL device takes no
-   *   `adapter_index`, `adapter_uuid`, or `adapter_luid`, and only a Vulkan
-   *   device takes `adapter_uuid` or `adapter_luid`), when a device that
-   *   doesn't render with Vulkan gets a `queue_lock`, or in a browser for every
-   *   backend: WebGPU makes devices asynchronously, and a WebGL2 context needs
-   *   a canvas. Attach without a device, which the session makes itself, or
-   *   wrap your WebGL2 context.
+   *   `adapter_index`, `adapter_uuid`, or `adapter_luid`, only a Vulkan device
+   *   takes `adapter_uuid`, and only a Vulkan or D3D12 device `adapter_luid`),
+   *   when a device that doesn't render with Vulkan gets a `queue_lock`, or in
+   *   a browser for every backend: WebGPU makes devices asynchronously, and a
+   *   WebGL2 context needs a canvas. Attach without a device, which the session
+   *   makes itself, or wrap your WebGL2 context.
    * - `Status.notFound` when no GPU matches `adapter_index`, `adapter_uuid`, or
    *   `adapter_luid`.
    * - `Status.nativeError` when the platform can't create the device.
@@ -947,6 +959,24 @@ export class GpuDeviceHandle extends Owner {
    */
   getCapabilities(): GpuDeviceCapabilities {
     return native.mln_gpu_device_get_capabilities(this.id);
+  }
+
+  /**
+   * Gets the D3D12 device and direct command queue of a D3D12 device.
+   *
+   * Use them to make the textures of a borrowed ring that sessions on the
+   * device render into, and to submit your reads of them, which the queue
+   * orders after the frames submitted before them.
+   *
+   * See `mln_gpu_device_get_d3d12_context` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when the device doesn't render with D3D12.
+   */
+  getD3d12Context(): GpuDeviceD3d12ContextResult {
+    return native.mln_gpu_device_get_d3d12_context(this.id);
   }
 
   /**
@@ -980,6 +1010,33 @@ export class GpuDeviceHandle extends Owner {
   release(): void {
     closeSync(this, (handle, token) =>
       native.mln_gpu_device_release(handle, token),
+    );
+  }
+
+  /**
+   * Wraps your D3D12 device and direct command queue, so that sessions render
+   * on them.
+   *
+   * Sessions on the device render into your textures and submit to your queue.
+   *
+   * See `mln_gpu_device_wrap_d3d12` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+   *   `RenderBackendFlag.d3d12`, when the device runs no shader model 6.0, when
+   *   `command_queue` isn't a direct queue of `device`, or when the library
+   *   can't load DXC (`dxcompiler.dll`) to compile its shaders.
+   * - `Status.invalidArgument` when `device` or `command_queue` isn't of its
+   *   interface.
+   */
+  static wrapD3d12(descriptor: D3d12DeviceDescriptor): GpuDeviceHandle {
+    const handle = native.mln_gpu_device_wrap_d3d12(descriptor);
+    return adopt(
+      handle,
+      () => new GpuDeviceHandle(ADOPT, handle),
+      (disposed) => native.mln_gpu_device_release(disposed, undefined),
     );
   }
 
@@ -1375,7 +1432,7 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Moves the camera relative to where it is, as a gesture does.
+   * Moves the camera relative to where it is.
    *
    * `delta` can pan the map's content by an offset on the screen, scale the
    * zoom, and add to the bearing and pitch. An anchor keeps one screen point in
@@ -1387,19 +1444,6 @@ export class MapHandle extends Owner {
    * A delta that replaces an animated one starts from where that animation left
    * the camera, so the rest of the replaced change never happens. To reach an
    * exact camera, use `MapHandle.updateCamera()`.
-   *
-   * A delta in the end phase can carry momentum, which keeps the camera moving
-   * from the gesture's release velocities and slows it on each rendered frame.
-   * The gesture lasts until the momentum ends: the snapshot keeps
-   * `gesture_in_progress` set, and camera events report
-   * `CameraChangeSource.momentum`. With momentum, `animation` sets only
-   * `transition_id` and the end handler, which runs when the gesture ends.
-   *
-   * A delta in the begin phase, `MapHandle.cancelCameraTransitions()`, or a
-   * cancellation by that ID stops the momentum. A later command that sets a
-   * field stops only the parts of the momentum that move that field. On a
-   * tilted map, the pan moves the map's content the same distance on the screen
-   * in every direction.
    *
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1748,6 +1792,29 @@ export class MapHandle extends Owner {
         );
         registrations.commit(rootsOf(this));
       }),
+    );
+  }
+
+  /**
+   * Creates a gesture recognizer that moves `map`'s camera.
+   *
+   * Its moves go to the map as camera commands, which apply asynchronously, and
+   * the map's snapshot and camera events report them as gestures. After the map
+   * is released, its moves do nothing. `options` may be null for every default.
+   *
+   * See `mln_gesture_recognizer_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument` when an option is out of range.
+   */
+  gestureRecognizerCreate(options?: GestureOptions): GestureRecognizerHandle {
+    const handle = native.mln_gesture_recognizer_create(this.id, options);
+    return adopt(
+      handle,
+      () => new GestureRecognizerHandle(ADOPT, handle),
+      (disposed) => native.mln_gesture_recognizer_release(disposed, undefined),
     );
   }
 
@@ -2344,6 +2411,12 @@ export class MapHandle extends Owner {
    *
    * See `mln_map_set_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidArgument`, changing nothing, when the minimum zoom would
+   *   be above the maximum zoom, the minimum pitch above the maximum pitch, or
+   *   the maximum zoom below the lowest zoom the map can show at its size.
    */
   setBounds(options: BoundOptions): Promise<CommandCompletion> {
     return command((completion) =>
@@ -3258,7 +3331,7 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Moves the camera relative to where it is, as a gesture does.
+   * Moves the camera relative to where it is.
    *
    * `delta` can pan the map's content by an offset on the screen, scale the
    * zoom, and add to the bearing and pitch. An anchor keeps one screen point in
@@ -3270,19 +3343,6 @@ export class MapHandleDiscarding {
    * A delta that replaces an animated one starts from where that animation left
    * the camera, so the rest of the replaced change never happens. To reach an
    * exact camera, use `MapHandle.updateCamera()`.
-   *
-   * A delta in the end phase can carry momentum, which keeps the camera moving
-   * from the gesture's release velocities and slows it on each rendered frame.
-   * The gesture lasts until the momentum ends: the snapshot keeps
-   * `gesture_in_progress` set, and camera events report
-   * `CameraChangeSource.momentum`. With momentum, `animation` sets only
-   * `transition_id` and the end handler, which runs when the gesture ends.
-   *
-   * A delta in the begin phase, `MapHandle.cancelCameraTransitions()`, or a
-   * cancellation by that ID stops the momentum. A later command that sets a
-   * field stops only the parts of the momentum that move that field. On a
-   * tilted map, the pan moves the map's content the same distance on the screen
-   * in every direction.
    *
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -4461,7 +4521,10 @@ export class RenderSessionHandle extends Owner {
    * Asks the session to render a frame.
    *
    * The frame shows the map commands that you sent before the call, except the
-   * changes that an open command group holds back.
+   * changes that an open command group holds back, and the map's camera
+   * animations as they are at the time of the call. Demand each frame when the
+   * display is ready for it, so that animations move evenly.
+   * `RenderSessionHandle.setFramePacing()` does that for you.
    *
    * You can call it once the attach call returns. While the attach runs, the
    * demand waits for it to complete. Every demand finishes with one frame
@@ -4821,18 +4884,21 @@ export class RenderSessionHandle extends Owner {
    * Use it when the platform takes a surface away, such as when your app goes
    * to the background. Release every acquired frame first. Frame demands that
    * are still pending, and later ones until you give the session a new target,
-   * finish with `RenderResult.targetNotReady`. Once the release completes, you
-   * can destroy the old target. An Android or OpenHarmony window can go away
-   * sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
+   * finish with `RenderResult.targetNotReady`. Once the release of a window or
+   * surface completes, you can destroy it. An Android or OpenHarmony window can
+   * go away sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
    *
-   * For a borrowed ring, a completed release also means that the session has
-   * stopped waiting on the consumer sync that you released its frames with, so
-   * you can reuse or destroy the textures. The session waits about a second at
-   * most for that sync, and logs a warning when the wait runs out. It checks
-   * the sync without blocking a thread: keep servicing a session driven by
-   * `RenderDriverKind.callerGraphicsThread` until the release completes. The
-   * session keeps nothing of the released textures: a texture that a later
-   * target gives it again is a new one, even one that you discarded a frame of.
+   * For a borrowed ring, the release completes with an `GpuSync` of
+   * `RenderSessionCapabilities.producerSyncKind`, or `GpuSyncKind.cpuComplete`
+   * when the session has no textures since an earlier release. Wait for it
+   * before you reuse or destroy the textures, as you wait for an acquired
+   * frame's producer sync: for `GpuSyncKind.queueOrder`, destroy them once work
+   * that you submit to the queue after the completion has finished. The
+   * session's GPU work on the textures, and its waits for the consumer syncs
+   * that you released its frames with, end there, so keep those syncs until
+   * then too. The session keeps nothing of the released textures: a texture
+   * that a later target gives it again is a new one, even one that you
+   * discarded a frame of. For another target, the completion has no value.
    *
    * See `mln_render_session_release_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4843,9 +4909,11 @@ export class RenderSessionHandle extends Owner {
    *   exported ring.
    * - `Status.targetLost` when the session loses its target before the release
    *   runs.
+   * - `Status.nativeError` when the session can't submit its work on a borrowed
+   *   ring's textures. It keeps them then.
    */
-  releaseTarget(): Promise<void> {
-    return run((completion) =>
+  releaseTarget(): Promise<GpuSync | undefined> {
+    return query<GpuSync | undefined>((completion) =>
       native.mln_render_session_release_target(this.id, completion),
     );
   }
@@ -4904,26 +4972,53 @@ export class RenderSessionHandle extends Owner {
   }
 
   /**
-   * Sets the frame pacer that demands the session's frames.
+   * Paces the session's frames to the display.
    *
    * At the first display refresh after the session has something new to draw,
-   * `pacer` demands a frame without flags and with token 0. One pacer can serve
-   * many sessions. A null `pacer` stops pacing the session. You can call it
-   * once the attach call returns.
+   * the library demands a frame without flags and with token 0, unless you
+   * demanded one first. Each call replaces the session's pacing, and a null
+   * `options` stops it. You can call it once the attach call returns.
    *
-   * See `mln_render_session_set_frame_pacer` in the
+   * On iOS, macOS, and tvOS, the library uses a `CADisplayLink` on a thread of
+   * its own. With `FramePacingOptions.view`, call it on the main thread. The
+   * library asks the system for the frame rate limit's refresh rate. On iPhone,
+   * a rate above 60 needs `CADisableMinimumFrameDurationOnPhone` in the app's
+   * `Info.plist`.
+   *
+   * On Android, the library follows the display through the calling thread's
+   * `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
+   * main thread, and keep that thread running its looper while the session is
+   * paced. `AChoreographer` can stop while the phone's display is off, even
+   * while a Surface on another display, such as an Android Auto projection,
+   * still shows the map. The library then keeps demanding frames from a timer
+   * on the looper, within the frame rate limit, until vsyncs arrive again.
+   *
+   * On OpenHarmony, the library uses `OH_NativeVSync`, from any thread.
+   *
+   * See `mln_render_session_set_frame_pacing` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    *
    * Errors:
    *
+   * - `Status.invalidArgument` when `options` sets `maximum_frames_per_second`
+   *   to 0, or sets `view` to null.
+   * - `Status.unsupported` on the other platforms, such as visionOS, Linux, and
+   *   Windows, where the library has no source of display refreshes, on macOS
+   *   before 14, and when `options` sets `view` on a platform other than macOS,
+   *   iOS, and tvOS.
    * - `Status.targetLost` or `Status.nativeError`, as
    *   `RenderSessionSnapshot.failureStatus` reports, when the session has
    *   failed.
    * - `Status.invalidState` when you attached the session with a redraw wake,
-   *   or detached, abandoned, released, or disposed it.
+   *   or detached, abandoned, released, or disposed it, on Android when the
+   *   calling thread has no `ALooper`, and when `options` sets `view` off the
+   *   main thread or, on iOS and tvOS, to a view in no window.
+   * - `Status.nativeError` on iOS, macOS, and tvOS when the system has no
+   *   display to follow, and on OpenHarmony when the system can't report the
+   *   display's refreshes to the process.
    */
-  setFramePacer(pacer?: FramePacerHandle): void {
-    native.mln_render_session_set_frame_pacer(this.id, pacer?.id);
+  setFramePacing(options?: FramePacingOptions): void {
+    native.mln_render_session_set_frame_pacing(this.id, options);
   }
 
   /**
@@ -4938,10 +5033,11 @@ export class RenderSessionHandle extends Owner {
    * borrowed ring takes only a ring of the kind it attached with, with as many
    * textures, with depth textures only when it attached with them, and with the
    * same formats, final layouts, and owner. Release every acquired frame of a
-   * borrowed ring first. Once the replacement completes, the session has also
-   * stopped waiting on the consumer sync of the textures that the new ring
-   * doesn't have, as `RenderSessionHandle.releaseTarget()` says, so you can
-   * reuse or destroy them.
+   * borrowed ring first. For a borrowed ring, the replacement completes with an
+   * `GpuSync`: wait for it before you reuse or destroy the textures that the
+   * new ring doesn't have, as `RenderSessionHandle.releaseTarget()` says. When
+   * it lets go of no textures, such as after a release, the sync is
+   * `GpuSyncKind.cpuComplete`. For another target, the completion has no value.
    *
    * See `mln_render_session_set_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4967,8 +5063,8 @@ export class RenderSessionHandle extends Owner {
    *   textures. Attach a new session instead.
    * - `Status.nativeError` when the library can't render to the new target.
    */
-  setTarget(target: RenderTarget): Promise<void> {
-    return run((completion) =>
+  setTarget(target: RenderTarget): Promise<GpuSync | undefined> {
+    return query<GpuSync | undefined>((completion) =>
       native.mln_render_session_set_target(this.id, target, completion),
     );
   }
@@ -5423,6 +5519,26 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
+   * Reads how long the resources of the offline region `regionId` stay usable.
+   *
+   * See `mln_runtime_get_offline_region_expiry` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.notFound` when the cache file has no region `regionId`.
+   */
+  getOfflineRegionExpiry(regionId: bigint): Promise<OfflineRegionExpiry> {
+    return query<OfflineRegionExpiry>((completion) =>
+      native.mln_runtime_get_offline_region_expiry(
+        this.id,
+        regionId,
+        completion,
+      ),
+    );
+  }
+
+  /**
    * Reads the download progress of the offline region `regionId`.
    *
    * While the download is active, the counts cover what it has visited. Once
@@ -5448,14 +5564,16 @@ export class RuntimeHandle extends Owner {
   }
 
   /**
-   * Makes maps check each resource of the offline region `regionId` with the
-   * server before they use it.
+   * Makes each resource of the offline region `regionId` stale, so maps check
+   * it with the server when they next use it.
    *
-   * The region keeps its resources. Starting its download again fetches the
-   * invalidated resources for offline use. If the style or a TileJSON document
-   * is then missing or invalid, the download reports an offline region response
-   * error and goes on from the stored copy. Resources that the current style no
-   * longer lists stay in the region until it's deleted.
+   * The region keeps its resources, and maps show them while they check them,
+   * except those that the server requires checking first. Starting the region's
+   * download again checks every resource with the server. If the style or a
+   * TileJSON document is then missing or invalid, the download reports an
+   * offline region response error and goes on from the stored copy. Resources
+   * that the current style no longer lists stay in the region until it's
+   * deleted.
    *
    * See `mln_runtime_invalidate_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -5614,8 +5732,10 @@ export class RuntimeHandle extends Owner {
   /**
    * Starts or pauses the download of the offline region `regionId`.
    *
-   * Setting the state that the download already has does nothing. A download
-   * stops when the runtime closes.
+   * A download fetches the resources that the region lacks, and checks those
+   * that are stale with the server, keeping each stored copy until its refresh
+   * arrives. Setting the state that the download already has does nothing. A
+   * download stops when the runtime closes.
    *
    * See `mln_runtime_set_offline_region_download_state` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -6014,6 +6134,71 @@ export class ScopedAndroidHardwareBufferFrame {
 
   get buffer(): AndroidHardwareBufferFrame["buffer"] {
     return this.#scope.active(this.#value).buffer;
+  }
+}
+
+/**
+ * A `D3d12TextureFrame` whose native objects stay valid only while the
+ * callback of {@link AcquiredFrameHandle.withD3d12Texture} runs. Its other members stay
+ * readable after the callback returns.
+ */
+export class ScopedD3d12TextureFrame {
+  readonly #value: D3d12TextureFrame;
+  readonly #scope: ViewScope;
+
+  /**
+   * Created by the API, which passes a key that only it holds.
+   *
+   * @internal
+   */
+  constructor(key: AdoptKey, scope: ViewScope, value: D3d12TextureFrame) {
+    checkKey(key);
+    this.#value = value;
+    this.#scope = scope;
+  }
+
+  get width(): D3d12TextureFrame["width"] {
+    return this.#value.width;
+  }
+
+  get height(): D3d12TextureFrame["height"] {
+    return this.#value.height;
+  }
+
+  get scaleFactor(): D3d12TextureFrame["scaleFactor"] {
+    return this.#value.scaleFactor;
+  }
+
+  get slot(): D3d12TextureFrame["slot"] {
+    return this.#value.slot;
+  }
+
+  get resource(): D3d12TextureFrame["resource"] {
+    return this.#scope.active(this.#value).resource;
+  }
+
+  get device(): D3d12TextureFrame["device"] {
+    return this.#scope.active(this.#value).device;
+  }
+
+  get format(): D3d12TextureFrame["format"] {
+    return this.#value.format;
+  }
+
+  get state(): D3d12TextureFrame["state"] {
+    return this.#value.state;
+  }
+
+  get depthResource(): D3d12TextureFrame["depthResource"] {
+    return this.#scope.active(this.#value).depthResource;
+  }
+
+  get depthFormat(): D3d12TextureFrame["depthFormat"] {
+    return this.#value.depthFormat;
+  }
+
+  get depthState(): D3d12TextureFrame["depthState"] {
+    return this.#value.depthState;
   }
 }
 

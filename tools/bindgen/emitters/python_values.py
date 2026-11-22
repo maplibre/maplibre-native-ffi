@@ -353,18 +353,20 @@ class Values:
                 if (plan.length or "").isdigit()
                 else f"{scope}.{rust_field(plan.length or 'count')}"
             )
-            values = (
-                f"&{expr}"
-                if plan.ctype.kind == "array"
-                else f"unsafe {{ generated_slice({expr}, {count})? }}"
-            )
+            if plan.counted_inline:
+                # The count selects the elements in use, never past the extent.
+                values = f'{expr}.get(..generated_count({count})?).ok_or_else(|| native_error("native count exceeds its array"))?'
+            elif plan.extent is not None:
+                values = f"&{expr}"
+            else:
+                values = f"unsafe {{ generated_slice({expr}, {count})? }}"
             if plan.stride:
                 values = f"unsafe {{ generated_strided_values({expr}, {count}, {scope}.{rust_field(plan.stride)})? }}"
             item = self.copy(
                 plan.element, "element" if plan.stride else "*element", scope=scope
             )
             body = f"generated_list(py, {values}, |element| {ok(item)})?"
-            if plan.nullable and plan.ctype.kind != "array":
+            if plan.nullable and plan.extent is None:
                 body = optional_copy(f"!{expr}.is_null()", body)
             return body
         self.fail(plan, "missing output copy")
@@ -441,7 +443,7 @@ class Values:
             return f"generated_input_{plan.native}(&{expr}, storage)?"
         if plan.kind == "array" and plan.element:
             inner = self.input(plan.element, "item", scope=scope)
-            if plan.ctype.kind == "array" or (plan.length and plan.length.isdigit()):
+            if plan.extent is not None or (plan.length and plan.length.isdigit()):
                 self.fail(plan, "fixed-length array input")
             check = f"{scope}.{rust_field(plan.length or 'count')} = generated_length(items.len())?;"
             body = f"{{ let items = generated_items(&{expr}, |item| {ok(inner)})?; {check} storage.keep_array(items) }}"

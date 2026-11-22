@@ -14,9 +14,9 @@ maplibre_native_ffi_acquired_frame_wrap(
   mln_acquired_frame handle, gpointer parent, gboolean borrowed,
   MaplibreNativeFfiReady* ready
 );
-G_GNUC_INTERNAL MaplibreNativeFfiFramePacer*
-maplibre_native_ffi_frame_pacer_wrap(
-  mln_frame_pacer handle, gpointer parent, gboolean borrowed,
+G_GNUC_INTERNAL MaplibreNativeFfiGestureRecognizer*
+maplibre_native_ffi_gesture_recognizer_wrap(
+  mln_gesture_recognizer handle, gpointer parent, gboolean borrowed,
   MaplibreNativeFfiReady* ready
 );
 G_GNUC_INTERNAL MaplibreNativeFfiGpuDevice* maplibre_native_ffi_gpu_device_wrap(

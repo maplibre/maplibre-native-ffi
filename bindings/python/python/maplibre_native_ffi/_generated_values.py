@@ -52,6 +52,126 @@ def _bytes(value):
 
 
 @dataclass(frozen=True, slots=True)
+class GestureInputPointerDownVariant:
+    value: GesturePointerDown
+    _tag = 1
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GesturePointerDown._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureInputPointerMoveVariant:
+    value: GesturePointer
+    _tag = 2
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GesturePointer._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureInputPointerUpVariant:
+    value: GesturePointer
+    _tag = 3
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GesturePointer._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureInputPointerCancelVariant:
+    value: GesturePointer
+    _tag = 4
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GesturePointer._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureInputModesVariant:
+    value: GestureMode
+    _tag = 5
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GestureMode(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureInputDeltaVariant:
+    value: GestureDelta
+    _tag = 6
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GestureDelta._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureInputPinchVariant:
+    value: GesturePinch
+    _tag = 7
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GesturePinch._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureEventTapVariant:
+    value: GestureTap
+    _tag = 1
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GestureTap._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureEventDoubleTapVariant:
+    value: GestureTap
+    _tag = 2
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GestureTap._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureEventTwoFingerTapVariant:
+    value: GestureTap
+    _tag = 3
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GestureTap._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureEventNotchVariant:
+    value: GestureNotchEvent
+    _tag = 4
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GestureNotchEvent._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class GestureEventLongPressVariant:
+    value: GestureTap
+    _tag = 5
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(GestureTap._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
 class OpenGlContextDescriptorWglVariant:
     value: WglContextDescriptor
     _tag = 1
@@ -229,6 +349,26 @@ class RenderTargetWebCanvasVariant:
     @classmethod
     def _from_native(cls, raw):
         return cls(WebCanvasTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetD3d12BorrowedTexturesVariant:
+    value: D3d12BorrowedTexturesTarget
+    _tag = 18
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(D3d12BorrowedTexturesTarget._from_native(raw))
+
+
+@dataclass(frozen=True, slots=True)
+class RenderTargetD3d12CompositionVariant:
+    value: D3d12CompositionTarget
+    _tag = 19
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(D3d12CompositionTarget._from_native(raw))
 
 
 @dataclass(frozen=True, slots=True)
@@ -516,6 +656,17 @@ class ConstrainMode(UnknownIntEnum):
     SCREEN = 3
 
 
+class D3d12CompositionKind(UnknownIntEnum):
+    """What shows a D3D12 composition swap chain.
+
+    See `mln_d3d12_composition_kind` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    VISUAL = 1
+    SWAP_CHAIN_PANEL = 2
+
+
 class DepthStencilFormatFlag(IntFlag):
     """A format of depth and stencil textures, as a bit in a set.
 
@@ -542,21 +693,43 @@ class FrameDemandFlag(IntFlag):
     WAIT_FOR_UPDATE = 4
 
 
-class GesturePhase(UnknownIntEnum):
-    """Where a camera change falls in a gesture that the user makes.
+class GestureAxis(UnknownIntEnum):
+    """The part of the camera that a notch is on.
 
-    `GesturePhase.BEGIN` and `GesturePhase.UPDATE` mark a gesture in
-    progress, and `GesturePhase.END` and `GesturePhase.CANCEL` end it.
+    See `mln_gesture_axis` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
 
-    See `mln_gesture_phase` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ZOOM = 0
+    BEARING = 1
+    PITCH = 2
+
+
+class GestureMode(IntFlag):
+    """What a one-pointer drag or a double tap does instead of its default, from
+    the pointer's held buttons or from held keys. A drag reads its modes when
+    it starts and keeps them until it ends, and a double tap when it lifts;
+    rotating wins over a box zoom.
+
+    See `mln_gesture_mode` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    ROTATE = 1
+    BOX_ZOOM = 2
+    ZOOM_OUT = 4
+
+
+class GestureNextTick(UnknownIntEnum):
+    """When a gesture recognizer next needs `GestureRecognizerHandle.tick()`.
+
+    See `mln_gesture_next_tick` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
     """
 
     NONE = 0
-    BEGIN = 1
-    UPDATE = 2
-    END = 3
-    CANCEL = 4
+    FRAME = 1
+    AT = 2
 
 
 class GpuExportKind(UnknownIntEnum):
@@ -719,14 +892,14 @@ class MapMode(UnknownIntEnum):
 
 
 class MomentumDecayModel(UnknownIntEnum):
-    """How a part of a gesture's momentum slows from its release speed.
+    """How a part's glide unfolds from its release speed.
 
     See `mln_momentum_decay_model` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
     """
 
     FRICTION = 0
-    EASE = 1
+    CURVE = 1
 
 
 class NetworkStatus(UnknownIntEnum):
@@ -788,6 +961,31 @@ class OpenGlContextProviderFlag(IntFlag):
     WEB_GL = 4
 
 
+class PinchPhase(UnknownIntEnum):
+    """Where a platform-recognized pinch is.
+
+    See `mln_pinch_phase` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    BEGIN = 0
+    UPDATE = 1
+    END = 2
+    CANCEL = 3
+
+
+class PointerKind(UnknownIntEnum):
+    """What kind of device a pointer is.
+
+    See `mln_pointer_kind` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    MOUSE = 0
+    TOUCH = 1
+    PEN = 2
+
+
 class ProjectionType(UnknownIntEnum):
     """A projection that a style's
     \\[projection\\](https://maplibre.org/maplibre-style-spec/projection/)
@@ -825,6 +1023,7 @@ class RenderBackend(UnknownIntEnum):
     VULKAN = 2
     OPEN_GL = 3
     WEB_GPU = 4
+    D3D12 = 5
 
 
 class RenderBackendFlag(IntFlag):
@@ -838,6 +1037,7 @@ class RenderBackendFlag(IntFlag):
     VULKAN = 2
     OPEN_GL = 4
     WEB_GPU = 8
+    D3D12 = 16
 
 
 class RenderDriverKind(UnknownIntEnum):
@@ -926,6 +1126,8 @@ class RenderTargetKindFlag(IntFlag):
     WEB_GPU_BORROWED_TEXTURES = 16384
     EXPORTED_RING = 32768
     WEB_CANVAS = 65536
+    D3D12_BORROWED_TEXTURES = 131072
+    D3D12_COMPOSITION = 262144
 
 
 class ResourceErrorReason(UnknownIntEnum):
@@ -1308,42 +1510,6 @@ class VulkanImageOwner(UnknownIntEnum):
 
 
 @dataclass(frozen=True, slots=True)
-class AnchoredMomentum:
-    """How a gesture's zoom, bearing, or pitch keeps changing after release.
-
-    See `mln_anchored_momentum` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    velocity: float | None = None
-    """How fast the value changed at release: zoom levels per second for zoom,
-    and degrees per second for bearing and pitch. The part moves only when
-    this is set.
-    """
-
-    anchor: ScreenPoint | None = None
-    """The screen point that the change keeps in place. Without one, the change
-    keeps the center of the view in place.
-    """
-
-    decay: MomentumDecay = field(default_factory=lambda: MomentumDecay())
-
-    snap: MomentumSnap | None = None
-    """Where the part settles. Without this, it stays where the gesture and its
-    glide leave it.
-    """
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            velocity=raw["velocity"],
-            anchor=_maybe(ScreenPoint._from_native, raw["anchor"]),
-            decay=MomentumDecay._from_native(raw["decay"]),
-            snap=_maybe(MomentumSnap._from_native, raw["snap"]),
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class AndroidHardwareBufferFrame:
     """The Android hardware buffer of an exported ring's acquired frame.
 
@@ -1589,7 +1755,7 @@ class CameraBounds:
 
 @dataclass(frozen=True, slots=True)
 class CameraDelta:
-    """A change to the camera from where it is now, for gestures.
+    """A change to the camera from where it is now.
 
     See `mln_camera_delta` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1613,14 +1779,7 @@ class CameraDelta:
     a duration.
     """
 
-    momentum: GestureMomentum | None = None
-    """How the gesture keeps moving after this delta. Only a delta in the
-    `GesturePhase.END` phase carries it.
-    """
-
     animation: AnimationOptions = field(default_factory=lambda: AnimationOptions())
-
-    gesture_phase: GesturePhase = GesturePhase.NONE
 
     @classmethod
     def _from_native(cls, raw):
@@ -1630,9 +1789,7 @@ class CameraDelta:
             bearing=raw["bearing"],
             pitch=raw["pitch"],
             anchor=_maybe(ScreenPoint._from_native, raw["anchor"]),
-            momentum=_maybe(GestureMomentum._from_native, raw["momentum"]),
             animation=AnimationOptions._from_native(raw["animation"]),
-            gesture_phase=GesturePhase(raw["gesture_phase"]),
         )
 
 
@@ -1775,18 +1932,11 @@ class CameraTransitionEnd:
     the camera, or 0 when the map closed first.
     """
 
-    velocity: CameraVelocity
-    """How fast a gesture's momentum still moved when it was cancelled, which
-    the next gesture can add to its own release velocities. Zero for every
-    other end.
-    """
-
     @classmethod
     def _from_native(cls, raw):
         return cls(
             outcome=CameraTransitionOutcome(raw["outcome"]),
             generation=raw["generation"],
-            velocity=CameraVelocity._from_native(raw["velocity"]),
         )
 
 
@@ -1826,47 +1976,12 @@ class CameraUpdate:
 
     animation: AnimationOptions = field(default_factory=lambda: AnimationOptions())
 
-    gesture_phase: GesturePhase = GesturePhase.NONE
-
     @classmethod
     def _from_native(cls, raw):
         return cls(
             mode=CameraUpdateMode(raw["mode"]),
             camera=CameraOptions._from_native(raw["camera"]),
             animation=AnimationOptions._from_native(raw["animation"]),
-            gesture_phase=GesturePhase(raw["gesture_phase"]),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class CameraVelocity:
-    """How fast each part of a camera change moves.
-
-    See `mln_camera_velocity` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    pan: ScreenPoint
-    """How fast the map's content moves on the screen, in logical pixels per
-    second.
-    """
-
-    zoom: float
-    """In zoom levels per second."""
-
-    bearing: float
-    """In degrees per second."""
-
-    pitch: float
-    """In degrees per second."""
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            pan=ScreenPoint._from_native(raw["pan"]),
-            zoom=raw["zoom"],
-            bearing=raw["bearing"],
-            pitch=raw["pitch"],
         )
 
 
@@ -2030,6 +2145,207 @@ class CustomVectorSourceOptions:
         assert callback is not None
         map = _adopt_value(map, "MapHandle")
         return callback(map, source_id, CanonicalTileId._from_native(tile_id))
+
+
+@dataclass(frozen=True, slots=True)
+class D3d12BorrowedTexture:
+    """A D3D12 texture of a borrowed ring.
+
+    See `mln_d3d12_borrowed_texture` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    resource: int
+    """Your `ID3D12Resource`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(resource=raw["resource"])
+
+
+@dataclass(frozen=True, slots=True)
+class D3d12BorrowedTexturesTarget:
+    """A ring of your D3D12 textures to render into, on the D3D12 device that
+    you attach on.
+
+    `physical_width` and `physical_height` give the textures' size in pixels,
+    which is usually `logical_size` times the map's scale factor. Each
+    texture must be a 2D resource of the device with that size, one mip
+    level, one array slice, one sample,
+    `D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET`, and one typed color format
+    that the device renders into, such as DXGI_FORMAT_R8G8B8A8_UNORM or
+    DXGI_FORMAT_B8G8R8A8_UNORM. The ring holds up to `TEXTURE_RING_MAX_DEPTH`
+    distinct textures, and references each.
+
+    Each texture is in `state` when the session has it, and each frame leaves
+    it there.
+
+    Give the ring `depth_textures` to draw into each frame depth-tested
+    against the map, as `FrameProjection` says: one for each of `textures`,
+    at the same index, or none. Each frame clears the one at its slot,
+    renders the map's depth and stencil into it, stores them, and leaves it
+    in `depth_state`. They must have the size of `textures`, one format of
+    `GpuDeviceCapabilities.depth_stencil_formats`
+    (DXGI_FORMAT_D24_UNORM_S8_UINT or DXGI_FORMAT_D32_FLOAT_S8X24_UINT), one
+    sample, and `D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL`.
+
+    See `mln_d3d12_borrowed_textures_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    physical_width: int
+
+    physical_height: int
+
+    textures: Sequence[D3d12BorrowedTexture]
+
+    state: int = 0
+    """The textures' `D3D12_RESOURCE_STATES`."""
+
+    depth_textures: Sequence[D3d12BorrowedTexture] = ()
+
+    depth_state: int = 0
+    """The depth textures' `D3D12_RESOURCE_STATES`."""
+
+    def __post_init__(self):
+        object.__setattr__(self, "textures", _sequence(self.textures))
+        object.__setattr__(self, "depth_textures", _sequence(self.depth_textures))
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            physical_width=raw["physical_width"],
+            physical_height=raw["physical_height"],
+            textures=tuple(
+                D3d12BorrowedTexture._from_native(item) for item in raw["textures"]
+            ),
+            state=raw["state"],
+            depth_textures=tuple(
+                D3d12BorrowedTexture._from_native(item)
+                for item in raw["depth_textures"]
+            ),
+            depth_state=raw["depth_state"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class D3d12CompositionTarget:
+    """A composition swap chain to present to, which your DirectComposition
+    visual or XAML `SwapChainPanel` shows.
+
+    The session renders on D3D12: on the D3D12 device that you attach on, or
+    on one that it makes without a device. It makes a flip-model swap chain
+    for composition of `logical_size` at the map's scale factor, with
+    premultiplied alpha, and sets it as the visual's content or the panel's
+    swap chain. Commit your DirectComposition device once the attach
+    completes. A panel takes its swap chain only on its UI thread: attach it
+    there with `RenderDriverKind.CALLER_GRAPHICS_THREAD`, and service the
+    session there. Scale the visual or the panel to show the swap chain at
+    the display's scale. The session references `object` until a replacement
+    or release of the target completes, or the session ends.
+
+    See `mln_d3d12_composition_target` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
+    logical_size: LogicalSize
+
+    kind: D3d12CompositionKind
+
+    object: int
+    """Your `IDCompositionVisual*` or `ISwapChainPanelNative*`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            logical_size=LogicalSize._from_native(raw["logical_size"]),
+            kind=D3d12CompositionKind(raw["kind"]),
+            object=raw["object"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class D3d12DeviceDescriptor:
+    """Your D3D12 device and direct command queue, for
+    `GpuDeviceHandle.wrap_d3d12()`.
+
+    See `mln_d3d12_device_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    """
+
+    device: int
+    """Your `ID3D12Device`."""
+
+    command_queue: int
+    """Your `ID3D12CommandQueue` of `D3D12_COMMAND_LIST_TYPE_DIRECT` on
+    `device`, which sessions on the device submit to. Submit your reads of a
+    borrowed ring's textures to it for `GpuSyncKind.QUEUE_ORDER`.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(device=raw["device"], command_queue=raw["command_queue"])
+
+
+@dataclass(frozen=True, slots=True)
+class D3d12TextureFrame:
+    """The D3D12 texture of an acquired frame.
+
+    The depth members are set when the frame has a depth texture, as for
+    `MetalTextureFrame`. Otherwise they are zero.
+
+    See `mln_d3d12_texture_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    width: int
+
+    height: int
+
+    scale_factor: float
+
+    slot: int
+    """The texture's index in the descriptor's `textures`, or in the ring."""
+
+    resource: int
+    """The `ID3D12Resource`."""
+
+    device: int
+    """The resource's `ID3D12Device`."""
+
+    format: int
+    """The resource's `DXGI_FORMAT`."""
+
+    state: int
+    """The `D3D12_RESOURCE_STATES` that the frame left the resource in."""
+
+    depth_resource: int
+    """The `ID3D12Resource` that holds the frame's depth and stencil."""
+
+    depth_format: int
+    """The depth resource's `DXGI_FORMAT`."""
+
+    depth_state: int
+    """The `D3D12_RESOURCE_STATES` that the frame left the depth resource in."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            slot=raw["slot"],
+            resource=raw["resource"],
+            device=raw["device"],
+            format=raw["format"],
+            state=raw["state"],
+            depth_resource=raw["depth_resource"],
+            depth_format=raw["depth_format"],
+            depth_state=raw["depth_state"],
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -2229,12 +2545,15 @@ class ExportedRingTarget:
       AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
       `android_hardware_buffer_usage`. Get each frame's buffer with
       `AcquiredFrameHandle.android_hardware_buffer()`.
-    - `GpuExportKind.DXGI_SHARED_HANDLE`: D3D11 textures of the format
+    - `GpuExportKind.DXGI_SHARED_HANDLE`: textures of the format
       DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
-      resources and render targets. Open them on a D3D11 or D3D12 device of
-      the same adapter, which you pick with `GpuDeviceOptions.adapter_luid`.
-      Get each frame's texture with
-      `AcquiredFrameHandle.dxgi_shared_texture()`.
+      resources and render targets: D3D11 textures on a Vulkan device, and
+      committed D3D12 resources in a shared heap on a D3D12 device, which
+      each frame leaves in D3D12_RESOURCE_STATE_COMMON. Open them on a D3D11
+      or D3D12 device of the same adapter, which you pick with
+      `GpuDeviceOptions.adapter_luid`. Get each frame's texture with
+      `AcquiredFrameHandle.dxgi_shared_texture()`, and on a D3D12 device its
+      resource with `AcquiredFrameHandle.d3d12_texture()`.
     - `GpuExportKind.DMA_BUF`: dmabufs of a format and modifier from
       `dma_buf_formats`. Get each frame's buffer with
       `AcquiredFrameHandle.dma_buf()`.
@@ -2252,11 +2571,11 @@ class ExportedRingTarget:
 
     Each frame hands over with `GpuSyncKind.CPU_COMPLETE` or with the sync
     kind that crosses APIs on its platform: `GpuSyncKind.METAL_SHARED_EVENT`
-    for an IOSurface, and `GpuSyncKind.SYNC_FD` for the others, where the
-    device has them. For a reader that waits on neither, such as a Wayland
-    compositor without explicit synchronization or Flutter's
-    `copyPixelBuffer`, leave them out of
-    `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
+    for an IOSurface, `GpuSyncKind.D3D12_FENCE` for a DXGI shared texture,
+    and `GpuSyncKind.SYNC_FD` for the others, where the device has them. For
+    a reader that waits on neither, such as a Wayland compositor without
+    explicit synchronization or Flutter's `copyPixelBuffer`, leave them out
+    of `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
     finishes before you acquire it, and release each frame only once the
     reader is done with its texture. Give the ring 3 textures, so the session
     can render while you hold two frames.
@@ -2387,27 +2706,30 @@ class FrameDemand:
 
 
 @dataclass(frozen=True, slots=True)
-class FramePacerOptions:
-    """Options for creating a frame pacer, or for
-    `FramePacerHandle.set_options()`.
+class FramePacingOptions:
+    """Options for `RenderSessionHandle.set_frame_pacing()`.
 
-    See `mln_frame_pacer_options` in the
+    See `mln_frame_pacing_options` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     """
 
     maximum_frames_per_second: int | None = None
-    """The most frames per second that the pacer demands, greater than zero. The
-    pacer skips display refreshes to stay within it. By default, it can
-    demand frames at every refresh.
+    """The most frames per second that the library demands, greater than zero.
+    It skips display refreshes to stay within it. By default, it can demand a
+    frame at every refresh.
     """
 
-    unlimited_frames_per_second: bool = False
+    view: int | None = None
+    """The `NSView*` on macOS, or the `UIView*` on iOS and tvOS, that shows the
+    session's frames, to pace them to its window's display rather than the
+    main one. On iOS and tvOS, set the pacing again when the scene moves to
+    another screen, as `windowScene:didUpdateEffectiveGeometry:` reports.
+    """
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            maximum_frames_per_second=raw["maximum_frames_per_second"],
-            unlimited_frames_per_second=raw["unlimited_frames_per_second"],
+            maximum_frames_per_second=raw["maximum_frames_per_second"], view=raw["view"]
         )
 
 
@@ -2590,42 +2912,400 @@ class GeoJsonSourceOptions:
 
 
 @dataclass(frozen=True, slots=True)
-class GestureMomentum:
-    """How a gesture keeps moving the camera after the user lets go.
+class GestureAxisOptions:
+    """How gestures move the zoom, the bearing, or the pitch.
 
-    A part moves only when its velocity is set, and each part slows on its
-    own. Every part defaults to `MomentumDecayModel.FRICTION` with a
-    half-life of 140 ms, and these other defaults:
-
-    - Pan stops at 10 logical pixels per second, needs a release of at least
-      200, and counts a release faster than 10000 as 10000.
-    - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
-      snap settles on the nearest whole level.
-    - Bearing stops at 1 degree per second and needs a release of at least
-      60. Its snap settles on north within 7 degrees.
-    - Pitch stops at 1 degree per second and needs a release of at least 5.
-      Its snap settles flat within 7 degrees.
-
-    See `mln_gesture_momentum` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    See `mln_gesture_axis_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
     """
 
-    pan: PanMomentum = field(default_factory=lambda: PanMomentum())
+    enabled: bool | None = None
+    """Whether gestures move the part."""
 
-    zoom: AnchoredMomentum = field(default_factory=lambda: AnchoredMomentum())
+    glides: bool | None = None
+    """Whether a release glides on."""
 
-    bearing: AnchoredMomentum = field(default_factory=lambda: AnchoredMomentum())
+    momentum: MomentumDecay | None = None
 
-    pitch: AnchoredMomentum = field(default_factory=lambda: AnchoredMomentum())
+    snaps: bool | None = None
+    """Whether the part settles once its glide ends."""
+
+    snap: MomentumSnap | None = None
+
+    notches: Sequence[GestureNotch] | None = None
+    """Where the part reports notches while gestures, their glides, and their
+    snaps move it, replacing the ones it had. Several notches at one value
+    report one event, with the kind of the first in the list.
+    """
+
+    def __post_init__(self):
+        object.__setattr__(self, "notches", _sequence(self.notches))
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            pan=PanMomentum._from_native(raw["pan"]),
-            zoom=AnchoredMomentum._from_native(raw["zoom"]),
-            bearing=AnchoredMomentum._from_native(raw["bearing"]),
-            pitch=AnchoredMomentum._from_native(raw["pitch"]),
+            enabled=raw["enabled"],
+            glides=raw["glides"],
+            momentum=_maybe(MomentumDecay._from_native, raw["momentum"]),
+            snaps=raw["snaps"],
+            snap=_maybe(MomentumSnap._from_native, raw["snap"]),
+            notches=None
+            if raw["notches"] is None
+            else (tuple(GestureNotch._from_native(item) for item in raw["notches"])),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class GestureDelta:
+    """Camera movement from anything but a pointer, such as a wheel, a trackpad
+    scroll, a dial, a crown, keys, or buttons, which the host converts into
+    camera units. Zooms and turns hold `position` in place.
+
+    A continuous delta, such as a trackpad scroll, applies at once. A
+    discrete one, such as a wheel detent or a key press, eases, and a quick
+    run of them merges into one ease that speeds up. Deltas are one gesture
+    until they idle. The recommended amounts are a third of a level per wheel
+    detent, 1/300 of a level per pixel of trackpad scrolling, and, for keys,
+    100 logical pixels of pan, a level of zoom, 15 degrees of bearing, and 10
+    of pitch.
+
+    See `mln_gesture_delta` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    position: ScreenPoint = field(default_factory=lambda: ScreenPoint())
+
+    discrete: bool = False
+
+    pan: ScreenPoint = field(default_factory=lambda: ScreenPoint())
+    """How far the map's content moves on the screen, in logical pixels."""
+
+    zoom: float = 0.0
+    """Zoom levels to add."""
+
+    bearing: float = 0.0
+    """Degrees to turn clockwise."""
+
+    pitch: float = 0.0
+    """Degrees to tilt."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            position=ScreenPoint._from_native(raw["position"]),
+            discrete=raw["discrete"],
+            pan=ScreenPoint._from_native(raw["pan"]),
+            zoom=raw["zoom"],
+            bearing=raw["bearing"],
+            pitch=raw["pitch"],
+        )
+
+
+type GestureEvent = (
+    GestureEventTapVariant
+    | GestureEventDoubleTapVariant
+    | GestureEventTwoFingerTapVariant
+    | GestureEventNotchVariant
+    | GestureEventLongPressVariant
+    | UnknownVariant
+)
+"""What a gesture means beyond moving the camera. Double taps and two-finger
+taps also zoom, as the options say.
+
+See `mln_gesture_event` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+"""
+
+type GestureInput = (
+    GestureInputPointerDownVariant
+    | GestureInputPointerMoveVariant
+    | GestureInputPointerUpVariant
+    | GestureInputPointerCancelVariant
+    | GestureInputModesVariant
+    | GestureInputDeltaVariant
+    | GestureInputPinchVariant
+)
+"""One input, in logical pixels from the map's top-left corner.
+
+When the view loses focus, the host cancels the pointers it sent and sends
+empty modes.
+
+See `mln_gesture_input` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class GestureNotch:
+    """Values every `spacing` from `offset`, in the part's unit, that report an
+    `GestureEventNotchVariant` as a gesture moves the part to or across one,
+    for the host to play as haptic feedback. Bearing notches lie within one
+    turn from the offset.
+
+    See `mln_gesture_notch` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    spacing: float = 0.0
+    """Positive."""
+
+    offset: float = 0.0
+    """Finite."""
+
+    kind: int = 0
+    """The host's name for the feedback, which the notch's events carry."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(spacing=raw["spacing"], offset=raw["offset"], kind=raw["kind"])
+
+
+@dataclass(frozen=True, slots=True)
+class GestureNotchEvent:
+    """A notch that a part reached.
+
+    See `mln_gesture_notch_event` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    axis: GestureAxis
+
+    kind: int
+    """The notch's kind, from the options."""
+
+    value: float
+    """In the part's unit; a bearing from 0 up to 360 degrees."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(axis=GestureAxis(raw["axis"]), kind=raw["kind"], value=raw["value"])
+
+
+@dataclass(frozen=True, slots=True)
+class GestureOptions:
+    """How a gesture recognizer moves each part of the camera.
+
+    Settings whose bits aren't set keep their values. A new recognizer moves
+    every part, and glides each by friction with a half-life of 140 ms, a
+    minimum speed of 0, and no maximum speed or distance, with these
+    exceptions:
+
+    - Pan stops at 10 logical pixels per second, needs a release of at least
+      200, and counts a release faster than 10000 as 10000.
+    - Zoom stops at 0.01 levels per second and glides at most 2.5 levels. Its
+      snap, when on, settles on the nearest whole level within half a level.
+    - Bearing stops at 1 degree per second and needs a release of at least
+      60. It snaps to north within 7 degrees, and has a notch of kind 0 at
+      north.
+    - Pitch stops at 1 degree per second and needs a release of at least 5.
+      Its snap, when on, settles flat within 7 degrees.
+
+    Snaps take 300 ms. A double tap zooms in a level and a two-finger tap
+    out.
+
+    See `mln_gesture_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    double_tap_zoom: float | None = None
+    """Zoom levels that a double tap zooms in, eased; with
+    `GestureMode.ZOOM_OUT` it zooms out instead. 0 leaves double taps to the
+    host. Finite.
+    """
+
+    two_finger_tap_zoom: float | None = None
+    """Zoom levels that a two-finger tap zooms, eased; negative zooms out. 0
+    leaves two-finger taps to the host. Finite.
+    """
+
+    pan: GesturePanOptions = field(default_factory=lambda: GesturePanOptions())
+
+    zoom: GestureAxisOptions = field(default_factory=lambda: GestureAxisOptions())
+
+    bearing: GestureAxisOptions = field(default_factory=lambda: GestureAxisOptions())
+
+    pitch: GestureAxisOptions = field(default_factory=lambda: GestureAxisOptions())
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            double_tap_zoom=raw["double_tap_zoom"],
+            two_finger_tap_zoom=raw["two_finger_tap_zoom"],
+            pan=GesturePanOptions._from_native(raw["pan"]),
+            zoom=GestureAxisOptions._from_native(raw["zoom"]),
+            bearing=GestureAxisOptions._from_native(raw["bearing"]),
+            pitch=GestureAxisOptions._from_native(raw["pitch"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GesturePanOptions:
+    """How gestures move the map's content.
+
+    See `mln_gesture_pan_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    enabled: bool | None = None
+    """Whether drags, two fingers moving together, and deltas pan."""
+
+    glides: bool | None = None
+    """Whether a release glides on."""
+
+    momentum: MomentumDecay | None = None
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            enabled=raw["enabled"],
+            glides=raw["glides"],
+            momentum=_maybe(MomentumDecay._from_native, raw["momentum"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GesturePinch:
+    """A pinch the platform recognized, such as a macOS trackpad's magnify and
+    rotate or a browser's Ctrl+wheel. Each update zooms by `scale` (above 1
+    zooms in) and turns `rotation` degrees clockwise on the screen since the
+    last, around `center`. It glides on when it ends, as a touch pinch does.
+
+    See `mln_gesture_pinch` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    center: ScreenPoint = field(default_factory=lambda: ScreenPoint())
+
+    scale: float = 0.0
+
+    rotation: float = 0.0
+
+    phase: PinchPhase = PinchPhase.BEGIN
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            center=ScreenPoint._from_native(raw["center"]),
+            scale=raw["scale"],
+            rotation=raw["rotation"],
+            phase=PinchPhase(raw["phase"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GesturePointer:
+    """A pointer moved, went up, or was taken away.
+
+    See `mln_gesture_pointer` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    id: int = 0
+
+    position: ScreenPoint = field(default_factory=lambda: ScreenPoint())
+    """Unused for `GestureInputPointerCancelVariant`."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(id=raw["id"], position=ScreenPoint._from_native(raw["position"]))
+
+
+@dataclass(frozen=True, slots=True)
+class GesturePointerDown:
+    """A pointer went down. The host sends no pointer whose buttons mean
+    nothing, such as a mouse's middle button.
+
+    See `mln_gesture_pointer_down` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    id: int = 0
+
+    kind: PointerKind = PointerKind.MOUSE
+
+    position: ScreenPoint = field(default_factory=lambda: ScreenPoint())
+
+    modes: GestureMode = field(default_factory=lambda: GestureMode(0))
+    """The modes of the pointer's held buttons."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            id=raw["id"],
+            kind=PointerKind(raw["kind"]),
+            position=ScreenPoint._from_native(raw["position"]),
+            modes=GestureMode(raw["modes"]),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GestureResult:
+    """What an input or a tick did.
+
+    See `mln_gesture_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    handled: bool
+    """Whether the recognizer used the input, so the host stops the platform's
+    default for it. Ticks report false.
+    """
+
+    next_tick: GestureNextTick
+
+    next_tick_ms: float
+    """For `GestureNextTick.AT`."""
+
+    box_zoom_active: bool
+    """Whether a box-zoom drag is drawing `box_zoom`, which the host shows, in
+    logical pixels corner to corner.
+    """
+
+    box_zoom: ScreenBox
+
+    events: tuple[GestureEvent, ...]
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            handled=raw["handled"],
+            next_tick=GestureNextTick(raw["next_tick"]),
+            next_tick_ms=raw["next_tick_ms"],
+            box_zoom_active=raw["box_zoom_active"],
+            box_zoom=ScreenBox._from_native(raw["box_zoom"]),
+            events=tuple(
+                _copy_variant(
+                    item,
+                    {
+                        "tap": GestureEventTapVariant,
+                        "double_tap": GestureEventDoubleTapVariant,
+                        "two_finger_tap": GestureEventTwoFingerTapVariant,
+                        "notch": GestureEventNotchVariant,
+                        "long_press": GestureEventLongPressVariant,
+                    },
+                    None,
+                )
+                for item in raw["events"]
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GestureTap:
+    """A tap, at `position`, by the pointer `id`.
+
+    See `mln_gesture_tap` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    """
+
+    id: int
+    """Unused for `GestureEventTwoFingerTapVariant`."""
+
+    position: ScreenPoint
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(id=raw["id"], position=ScreenPoint._from_native(raw["position"]))
 
 
 @dataclass(frozen=True, slots=True)
@@ -2674,6 +3354,26 @@ class GpuDeviceCapabilities:
 
 
 @dataclass(frozen=True, slots=True)
+class GpuDeviceD3d12ContextResult:
+    """The D3D12 objects of a device, as `GpuDeviceHandle.get_d3d12_context()`
+    reports them.
+
+    See `mln_gpu_device_d3d12_context_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    """
+
+    device: int
+    """The `ID3D12Device`."""
+
+    command_queue: int
+    """The direct `ID3D12CommandQueue` that sessions on the device submit to."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(device=raw["device"], command_queue=raw["command_queue"])
+
+
+@dataclass(frozen=True, slots=True)
 class GpuDeviceOptions:
     """Options for `GpuDeviceHandle.create()`.
 
@@ -2687,9 +3387,9 @@ class GpuDeviceOptions:
 
     backend: RenderBackend | None = None
     """The backend that the device renders with. By default, the platform's own:
-    Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system
-    has no Vulkan driver, and in a browser the build's one backend: WebGPU or
-    OpenGL (WebGL2).
+    Metal on Apple platforms, Vulkan elsewhere, then D3D12 on Windows, or
+    OpenGL where the system has neither, and in a browser the build's one
+    backend: WebGPU or OpenGL (WebGL2).
     """
 
     adapter_index: int | None = None
@@ -2705,8 +3405,9 @@ class GpuDeviceOptions:
 
     adapter_luid: Buffer | None = None
     """The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
-    which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a
-    Vulkan device takes one.
+    which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID` and
+    D3D12 as `ID3D12Device::GetAdapterLuid`. Only a Vulkan or D3D12 device
+    takes one.
     """
 
     open_gl_client_api: OpenGlClientApi | None = None
@@ -3046,21 +3747,31 @@ class MapOptions:
     """
 
     fallback_font_faces: str = ""
-    """Fonts for the text that a style's own fonts don't draw, such as scripts
-    that need complex shaping, like Myanmar or Devanagari. A JSON array of
+    """Fonts for the text that a style's own fonts don't draw. A JSON array of
     font files, each an object with a `url` and an optional `unicode-range`,
-    as in a font face of a style's `font-faces`, which every font stack uses
-    after the style's own font faces. Empty for the system's fonts, unless
-    `system_fonts_enabled` is false.
+    as in a font face of a style's `font-faces`. They shape, in order, the
+    text that glyph PBFs can't shape, such as Myanmar or Devanagari, or all
+    the text of a style without glyph PBFs, and draw the glyphs that come
+    from local fonts: those a style's PBFs lack, and CJK with
+    `local_ideographs_enabled`. Empty for the system's fonts alone.
     """
 
     system_fonts_enabled: bool | None = None
-    """Whether the map falls back to the system's fonts for CJK and the scripts
-    that need complex shaping when `fallback_font_faces` is empty: fonts that
-    the platform's font matcher picks for the user's preferred languages.
-    Without it, the map does. The first map that uses them waits for them to
-    be found. In the browser, the browser draws CJK glyphs in its sans-serif
-    font instead, where `fallback_font_faces` doesn't cover them.
+    """Whether the map draws from the system's fonts what the style's fonts and
+    `fallback_font_faces` don't: fonts that the platform's font matcher picks
+    for the font stack's names, or for the character and the user's preferred
+    languages. It shapes with them the text that glyph PBFs can't shape, and
+    all the text of a style without glyph PBFs. Without it, the map does. The
+    first map that uses them waits for the matcher to load. In the browser,
+    the browser draws those glyphs in the font stack's families, then its
+    sans-serif font, one at a time.
+    """
+
+    local_ideographs_enabled: bool | None = None
+    """Whether CJK ideographs, kana and hangul come from local fonts
+    (`fallback_font_faces`, then the system's) before glyph PBFs, rather than
+    from a glyph PBF downloaded for every few characters. Without it, they
+    do.
     """
 
     @classmethod
@@ -3073,6 +3784,7 @@ class MapOptions:
             tile_cache_enabled=raw["tile_cache_enabled"],
             fallback_font_faces=raw["fallback_font_faces"],
             system_fonts_enabled=raw["system_fonts_enabled"],
+            local_ideographs_enabled=raw["local_ideographs_enabled"],
         )
 
 
@@ -3110,6 +3822,9 @@ class MapSnapshot:
     rendering_stats_view_enabled: bool
 
     gesture_in_progress: bool
+    """Whether a gesture recognizer's gesture, or the glide and snap after it,
+    moves the camera.
+    """
 
     transition_in_progress: bool
 
@@ -3512,53 +4227,53 @@ class MetalTextureFrame:
 
 @dataclass(frozen=True, slots=True)
 class MomentumDecay:
-    """How one part of a gesture's momentum slows from its release speed.
+    """How one part of a gesture glides after release.
 
     Speeds and distances are in the part's unit: logical pixels for pan, zoom
-    levels for zoom, and degrees for bearing and pitch. A setting whose bit
-    isn't set takes the part's default, which `GestureMomentum` lists.
-    `min_speed` is finite and not negative, and every other number is finite
-    and positive. A friction decay can serve every release, as a preset that
-    matches a platform's scrolling. An eased glide takes its direction from
-    the part's velocity, and its distance and duration from the caller's
-    plan.
+    levels for zoom, and degrees for bearing and pitch, with speeds per
+    second. A setting whose bit isn't set keeps its current value. A new
+    `model` starts from its defaults: friction from the part's, which
+    `MapHandle.gesture_recognizer_create()` lists, and a curve from Android's
+    fling. Settings of the other model are an error. `min_speed` is finite
+    and not negative, `duration_exponent` finite and above -1, and every
+    other number positive; the maximums may be infinite.
 
     See `mln_momentum_decay` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
     """
 
     model: MomentumDecayModel | None = None
 
     half_life_ms: float | None = None
-    """For `MomentumDecayModel.FRICTION`, how long the speed takes to halve."""
+    """For `MomentumDecayModel.FRICTION`."""
 
     stop_speed: float | None = None
     """For `MomentumDecayModel.FRICTION`, the speed at which it ends."""
 
-    distance: float | None = None
-    """Required for `MomentumDecayModel.EASE`."""
+    reference_speed: float | None = None
+    """For `MomentumDecayModel.CURVE`, the speed that lasts `duration_ms`."""
 
     duration_ms: float | None = None
-    """Required for `MomentumDecayModel.EASE`."""
+    """For `MomentumDecayModel.CURVE`."""
+
+    duration_exponent: float | None = None
+    """For `MomentumDecayModel.CURVE`, how the duration grows with the speed."""
 
     easing: UnitBezier | None = None
-    """For `MomentumDecayModel.EASE`, the share of `distance` covered over the
-    share of `duration_ms`. Its control points are between 0 and 1, so the
-    glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
-    that camera animations ease along by default. Android's scroll fling
-    follows (0.175, 0.5, 0.35, 1).
+    """For `MomentumDecayModel.CURVE`, the share of the glide covered over the
+    share of its duration. Its control points are between 0 and 1, and `x1`
+    and `y1` above 0, so the glide starts moving and never passes its end.
     """
 
     min_speed: float | None = None
-    """A slower release starts no momentum."""
+    """A slower release doesn't glide."""
 
     max_speed: float | None = None
-    """For `MomentumDecayModel.FRICTION`, a faster release counts as this."""
+    """A faster release counts as this."""
 
     max_distance: float | None = None
-    """The farthest the part moves. A friction release that would move farther
-    starts slower, so it ends sooner, and a planned glide moves at most this
-    far over its duration.
+    """The farthest the part glides. A release that would glide farther counts
+    as the speed that glides this far.
     """
 
     @classmethod
@@ -3567,8 +4282,9 @@ class MomentumDecay:
             model=_maybe(MomentumDecayModel, raw["model"]),
             half_life_ms=raw["half_life_ms"],
             stop_speed=raw["stop_speed"],
-            distance=raw["distance"],
+            reference_speed=raw["reference_speed"],
             duration_ms=raw["duration_ms"],
+            duration_exponent=raw["duration_exponent"],
             easing=_maybe(UnitBezier._from_native, raw["easing"]),
             min_speed=raw["min_speed"],
             max_speed=raw["max_speed"],
@@ -3581,27 +4297,27 @@ class MomentumSnap:
     """Where a part settles after a gesture that changed it.
 
     The targets are every `spacing` from `offset`, in the part's unit.
-    Bearing targets wrap around the circle. Once the part's glide ends, or
-    right away when it doesn't move, the part eases to the nearest target if
-    it is within `tolerance` of it, and otherwise stays where it is. A
-    setting whose bit isn't set takes the part's default, which
-    `GestureMomentum` lists.
+    Bearing targets lie within one turn from `offset`, and the bearing takes
+    the shorter way around to the nearest. Once the part's glide ends, or
+    right away when it has none, the part eases to the nearest target if it
+    is within `tolerance` of it, and otherwise stays where it is. A setting
+    whose bit isn't set keeps its current value.
 
     See `mln_momentum_snap` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
     """
 
     spacing: float | None = None
     """Positive."""
 
     offset: float | None = None
-    """Defaults to 0."""
+    """Finite."""
 
     tolerance: float | None = None
     """Not negative."""
 
     duration_ms: float | None = None
-    """Zero settles without easing. Defaults to 300."""
+    """Zero settles without easing."""
 
     @classmethod
     def _from_native(cls, raw):
@@ -3658,6 +4374,44 @@ type OfflineRegionDefinition = (
 See `mln_offline_region_definition` in the
 [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 """
+
+
+@dataclass(frozen=True, slots=True)
+class OfflineRegionExpiry:
+    """How long the resources that an offline region holds stay usable.
+
+    See `mln_offline_region_expiry` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    stale_after_unix_ms: int | None
+    """When the first of the region's resources goes stale, which may have
+    passed. Maps show a stale resource while they check it with the server,
+    unless it must be checked first, and the region's download refreshes it.
+    Without it, no resource ever goes stale.
+    """
+
+    usable_offline_until_unix_ms: int | None
+    """When the first of the region's resources that the server requires
+    checking once stale stops being usable without the server, which may have
+    passed. Refresh the region before then to keep all of it usable offline.
+    Without it, every resource stays usable offline.
+    """
+
+    stale_resource_count: int
+    """The resources that are stale now, tiles included."""
+
+    unusable_resource_count: int
+    """The stale resources that maps can't use now without the server."""
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            stale_after_unix_ms=raw["stale_after_unix_ms"],
+            usable_offline_until_unix_ms=raw["usable_offline_until_unix_ms"],
+            stale_resource_count=raw["stale_resource_count"],
+            unusable_resource_count=raw["unusable_resource_count"],
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -4061,29 +4815,6 @@ class OpenGlTextureFrame:
 
 
 @dataclass(frozen=True, slots=True)
-class PanMomentum:
-    """How a gesture's pan keeps moving the map's content after release.
-
-    See `mln_pan_momentum` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    velocity: ScreenPoint | None = None
-    """How fast the map's content moved on the screen at release, in logical
-    pixels per second. The pan moves only when this is set.
-    """
-
-    decay: MomentumDecay = field(default_factory=lambda: MomentumDecay())
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            velocity=_maybe(ScreenPoint._from_native, raw["velocity"]),
-            decay=MomentumDecay._from_native(raw["decay"]),
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class PremultipliedRgba8Image:
     """An image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
 
@@ -4368,16 +5099,18 @@ class RenderSessionAttachOptions:
 
     - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a borrowed ring of WebGPU
       textures.
-    - `RenderDriverKind.CORE_WORKER` for an offscreen target, a window, or an
-      exported ring.
+    - `RenderDriverKind.CORE_WORKER` for an offscreen target, a window, a
+      DirectComposition visual, or an exported ring.
+    - `RenderDriverKind.CALLER_GRAPHICS_THREAD` for a XAML `SwapChainPanel`,
+      on the panel's UI thread.
     - Either one for a web canvas. In a browser both run on the thread that
       loaded the library: `RenderDriverKind.CORE_WORKER` in the library's own
       tasks, and `RenderDriverKind.CALLER_GRAPHICS_THREAD` when you service
       the session.
     - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
-      borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
-      these on `RenderDriverKind.CORE_WORKER` only, and fails an attach with
-      `RenderDriverKind.CALLER_GRAPHICS_THREAD` then.
+      borrowed ring of Metal, Vulkan, D3D12, or OpenGL textures. A build may
+      drive these on `RenderDriverKind.CORE_WORKER` only, and fails an attach
+      with `RenderDriverKind.CALLER_GRAPHICS_THREAD` then.
 
     An attach with another driver fails with `Status.UNSUPPORTED`.
     """
@@ -4535,6 +5268,8 @@ type RenderTarget = (
     | RenderTargetWebGpuBorrowedTexturesVariant
     | RenderTargetExportedRingVariant
     | RenderTargetWebCanvasVariant
+    | RenderTargetD3d12BorrowedTexturesVariant
+    | RenderTargetD3d12CompositionVariant
 )
 """What a render session renders into: one kind of target, and its descriptor.
 
@@ -4801,19 +5536,26 @@ class ResourceResponse:
     """A description of the error, for `ResourceResponseStatus.ERROR`."""
 
     must_revalidate: bool = False
-    """Whether the library must request the resource again before it reuses this
-    copy.
+    """Whether the library must not use this copy once it expires until it
+    requests the resource again, not even while the server can't be reached,
+    as `Cache-Control: must-revalidate` or `no-cache` says.
     """
 
     modified_unix_ms: int | None = None
 
     expires_unix_ms: int | None = None
+    """When this copy stops being fresh. Without it, the copy never expires."""
 
     etag: str = ""
     """Empty when the resource has no ETag."""
 
     retry_after_unix_ms: int | None = None
     """When to retry, for `ResourceResponseStatus.ERROR`."""
+
+    no_store: bool = False
+    """Whether the library must not store this copy, as `Cache-Control:
+    no-store` says.
+    """
 
     def __post_init__(self):
         object.__setattr__(self, "bytes", _bytes(self.bytes))
@@ -4830,6 +5572,7 @@ class ResourceResponse:
             expires_unix_ms=raw["expires_unix_ms"],
             etag=raw["etag"],
             retry_after_unix_ms=raw["retry_after_unix_ms"],
+            no_store=raw["no_store"],
         )
 
 
@@ -6610,6 +7353,13 @@ Your own demands can't use it.
 
 See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
 [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+"""
+
+GESTURE_RESULT_EVENT_CAPACITY: Final[int] = 4
+"""The most events that one input or tick reports.
+
+See `MLN_GESTURE_RESULT_EVENT_CAPACITY` in the
+[C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
 """
 
 TEXTURE_RING_MAX_DEPTH: Final[int] = 8

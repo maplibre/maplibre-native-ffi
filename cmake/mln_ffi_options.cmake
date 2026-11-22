@@ -41,8 +41,9 @@ function(mln_ffi_configure_options)
   if("metal" IN_LIST backends AND NOT APPLE)
     message(FATAL_ERROR "Metal builds require an Apple platform")
   endif()
-  # mln-rs draws with Metal alone on Apple platforms.
-  if(APPLE AND NOT backends STREQUAL "metal")
+  # mln-rs draws with Metal alone on Apple platforms. A web preset configured on
+  # a Mac has no toolchain of its own, so CMake reports the host as APPLE.
+  if(APPLE AND NOT MLN_FFI_WEB AND NOT backends STREQUAL "metal")
     message(FATAL_ERROR "Apple builds carry the Metal backend alone")
   endif()
   # The browser's WebGPU is the only one that a host hands the library a

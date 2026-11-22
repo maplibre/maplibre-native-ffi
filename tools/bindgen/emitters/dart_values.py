@@ -578,6 +578,32 @@ class Values:
         """A member's zero value, or None when a caller must give it."""
         return None if field.required else self.default_expression(field.value)
 
+    @staticmethod
+    def copied(typ):
+        """Whether a member's constructor argument is copied in an initializer,
+        as a list or bytes are."""
+        return typ.startswith("List<") or typ.rstrip("?") == "Uint8List"
+
+    def const_constructor(self, value):
+        """Whether a record's constructor is const, which no member's
+        initializer keeps it from."""
+        return not any(
+            self.copied(typ) or self.built_default(typ, field)
+            for _, typ, field in self.members(value)
+        )
+
+    def built_default(self, typ, field):
+        """Whether a member defaults to a record whose constructor is not
+        const, which a parameter can't default to, so an initializer builds
+        it."""
+        return (
+            not field.required
+            and not typ.endswith("?")
+            and field.value.kind == "record"
+            and self.field_default(field) is not None
+            and not self.const_constructor(field.value)
+        )
+
     def field_parameter(self, name, typ, field):
         if field.required:
             return f"required this.{name}"
@@ -585,6 +611,13 @@ class Values:
             return f"this.{name}"
         default = self.field_default(field)
         return f"this.{name} = {default}" if default else f"required this.{name}"
+
+    def field_argument(self, name, typ, field):
+        """A member's constructor parameter, and the initializer that builds
+        its default, or None."""
+        if self.built_default(typ, field):
+            return f"{typ}? {name}", f"{name} = {name} ?? {self.field_default(field)}"
+        return self.field_parameter(name, typ, field), None
 
     def default_expression(self, value):
         if value.nullable:
@@ -615,7 +648,8 @@ class Values:
                 default = self.field_default(field)
                 if default is None:
                     return None
-            return f"const {public_name(value.native)}()"
+            constant = "const " if self.const_constructor(value) else ""
+            return f"{constant}{public_name(value.native)}()"
         return None
 
     def enum_members(self, value):
@@ -753,7 +787,10 @@ class Values:
                 )
                 initializers.append(f"{name} = List.unmodifiable({name})")
             else:
-                args.append(self.field_parameter(name, typ, field))
+                argument, initializer = self.field_argument(name, typ, field)
+                args.append(argument)
+                if initializer:
+                    initializers.append(initializer)
             if field.name in skip:
                 continue
             expression = "value." + name
@@ -1270,9 +1307,11 @@ class Values:
             )
             args, initializers = [], []
             for name, typ, field in members:
-                copied = typ.startswith("List<") or typ.rstrip("?") == "Uint8List"
-                if not copied:
-                    args.append(self.field_parameter(name, typ, field))
+                if not self.copied(typ):
+                    argument, initializer = self.field_argument(name, typ, field)
+                    args.append(argument)
+                    if initializer:
+                        initializers.append(initializer)
                     continue
                 # A copied member converts in an initializer. Its zero value is
                 # empty, and a Uint8List has no const empty value, so null

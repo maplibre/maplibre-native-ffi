@@ -173,6 +173,7 @@ public enum CustomLayerEncoderData: Equatable, Hashable, Sendable {
   case metal(MetalCustomLayerEncoder)
   case vulkan(VulkanCustomLayerEncoder)
   case webGpu(WebGpuCustomLayerEncoder)
+  case d3d12(D3d12CustomLayerEncoder)
   case none
   case unknown(UInt32, Data)
 }
@@ -332,6 +333,7 @@ public enum CustomLayerPassData: Equatable, Hashable, Sendable {
   case vulkan(VulkanCustomLayerPass)
   case openGl(OpenGlCustomLayerPass)
   case webGpu(WebGpuCustomLayerPass)
+  case d3d12(D3d12CustomLayerPass)
   case unknown(UInt32, Data)
 }
 
@@ -382,7 +384,10 @@ public struct CustomLayerPrerenderParameters: Equatable, Hashable, Sendable {
             .vulkan)) case MLN_RENDER_BACKEND_WEB_GPU
                   .rawValue: return .webGpu(WebGpuCustomLayerEncoder(raw: raw
             .encoder
-            .web_gpu)) case MLN_RENDER_BACKEND_OPEN_GL
+            .web_gpu)) case MLN_RENDER_BACKEND_D3D12
+                  .rawValue: return .d3d12(D3d12CustomLayerEncoder(raw: raw
+            .encoder
+            .d3d12)) case MLN_RENDER_BACKEND_OPEN_GL
                   .rawValue: return .none default: return .unknown(
           raw.backend.rawValue,
           recordBytes
@@ -458,7 +463,9 @@ public struct CustomLayerRenderParameters: Equatable, Hashable, Sendable {
             .open_gl)) case MLN_RENDER_BACKEND_WEB_GPU
                   .rawValue: return try .webGpu(WebGpuCustomLayerPass(raw: raw
             .pass
-            .web_gpu)) default: return .unknown(
+            .web_gpu)) case MLN_RENDER_BACKEND_D3D12
+                  .rawValue: return .d3d12(D3d12CustomLayerPass(raw: raw.pass
+            .d3d12)) default: return .unknown(
           raw.backend.rawValue,
           recordBytes
             .map {
@@ -607,6 +614,93 @@ private func invokeCustomVectorSourceOptionsCancelTile(
     reportToStandardError(
       "mln_custom_source_cancel_tile_callback failed: \(error)\n"
     )
+  }
+}
+
+/// The frame's D3D12 command list, outside the map's render pass.
+///
+/// Record work such as copies and render passes of your own, with the barriers
+/// that it needs, and leave the resources that you use in the states that you
+/// found them in. Don't close or execute `command_list`. After the callback
+/// returns, the map sets its own descriptor heaps and root signature again.
+///
+/// See `mln_d3d12_custom_layer_encoder` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct D3d12CustomLayerEncoder: Equatable, Hashable, Sendable {
+  /// The `ID3D12Device` that the session renders on, to make objects with.
+  public var device: NativePointer
+  /// The frame's `ID3D12GraphicsCommandList`, outside a render pass.
+  public var commandList: NativePointer
+  public init(
+    device: NativePointer = .null,
+    commandList: NativePointer = .null
+  ) {
+    self.device = device
+    self.commandList = commandList
+  }
+
+  init(raw: mln_d3d12_custom_layer_encoder) {
+    device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
+    commandList = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_list,
+      to: UInt.self
+    ))
+  }
+}
+
+/// The map's D3D12 render pass, at a custom layer's place in the style.
+///
+/// Set your own pipeline state, root signature, descriptor heaps, vertex and
+/// index buffers, primitive topology, viewport, scissor rectangle, and stencil
+/// reference, with pipeline states for `color_format` and
+/// `depth_stencil_format`, and draw. After the callback returns, the map sets
+/// again what its own draws need. Record nothing that a render pass can't hold,
+/// such as barriers, copies, or other render targets, and don't end the pass.
+///
+/// See `mln_d3d12_custom_layer_pass` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+public struct D3d12CustomLayerPass: Equatable, Hashable, Sendable {
+  /// The `ID3D12Device` that the session renders on, to make objects with.
+  public var device: NativePointer
+  /// The frame's `ID3D12GraphicsCommandList`, in the render pass that
+  /// `BeginRenderPass` began.
+  public var commandList: NativePointer
+  /// The `D3D12_CPU_DESCRIPTOR_HANDLE` of the pass's render target view.
+  public var renderTargetView: UInt64
+  /// The `DXGI_FORMAT` of the pass's color attachment.
+  public var colorFormat: UInt32
+  /// The `D3D12_CPU_DESCRIPTOR_HANDLE` of the pass's depth-stencil view, or 0
+  /// when it has none.
+  public var depthStencilView: UInt64
+  /// The `DXGI_FORMAT` of the pass's depth-stencil attachment, or
+  /// `DXGI_FORMAT_UNKNOWN` when it has none.
+  public var depthStencilFormat: UInt32
+  public init(
+    device: NativePointer = .null,
+    commandList: NativePointer = .null,
+    renderTargetView: UInt64 = 0,
+    colorFormat: UInt32 = 0,
+    depthStencilView: UInt64 = 0,
+    depthStencilFormat: UInt32 = 0
+  ) {
+    self.device = device
+    self.commandList = commandList
+    self.renderTargetView = renderTargetView
+    self.colorFormat = colorFormat
+    self.depthStencilView = depthStencilView
+    self.depthStencilFormat = depthStencilFormat
+  }
+
+  init(raw: mln_d3d12_custom_layer_pass) {
+    device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
+    commandList = NativePointer(bitPattern: unsafeBitCast(
+      raw.command_list,
+      to: UInt.self
+    ))
+    renderTargetView = raw.render_target_view
+    colorFormat = raw.color_format
+    depthStencilView = raw.depth_stencil_view
+    depthStencilFormat = raw.depth_stencil_format
   }
 }
 

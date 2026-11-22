@@ -90,7 +90,7 @@ MLN_API mln_status mln_map_update_camera(
 ) MLN_NOEXCEPT;
 
 /**
- * Moves the camera relative to where it is, as a gesture does.
+ * Moves the camera relative to where it is.
  *
  * `delta` can pan the map's content by an offset on the screen, scale the zoom,
  * and add to the bearing and pitch. An anchor keeps one screen point in place
@@ -102,19 +102,6 @@ MLN_API mln_status mln_map_update_camera(
  * A delta that replaces an animated one starts from where that animation left
  * the camera, so the rest of the replaced change never happens. To reach an
  * exact camera, use mln_map_update_camera().
- *
- * A delta in the end phase can carry momentum, which keeps the camera moving
- * from the gesture's release velocities and slows it on each rendered frame.
- * The gesture lasts until the momentum ends: the snapshot keeps
- * `gesture_in_progress` set, and camera events report
- * MLN_CAMERA_CHANGE_SOURCE_MOMENTUM. With momentum, `animation` sets only
- * `transition_id` and the end handler, which runs when the gesture ends.
- *
- * A delta in the begin phase, mln_map_cancel_camera_transitions(), or a
- * cancellation by that ID stops the momentum. A later command that sets a
- * field stops only the parts of the momentum that move that field. On a tilted
- * map, the pan moves the map's content the same distance on the screen in
- * every direction.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_apply_camera_delta(
@@ -311,6 +298,11 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
  *
  * Limits that `options` doesn't set keep their current values. When the camera
  * is outside the new limits, it moves inside them.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT, changing nothing, when the minimum zoom would
+ *   be above the maximum zoom, the minimum pitch above the maximum pitch, or
+ *   the maximum zoom below the lowest zoom the map can show at its size.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_bounds(

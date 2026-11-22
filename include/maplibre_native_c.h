@@ -2,7 +2,7 @@
  * @file maplibre_native_c.h
  * The MapLibre Native C API. Every declaration follows the
  * [API
- * guidelines](https://maplibre.org/maplibre-native-ffi/development/guidelines/#api).
+ * guidelines](https://github.com/louwers/mln-rs/blob/main/crates/mln_c/README.md#api-guidelines).
  */
 
 #ifndef MAPLIBRE_NATIVE_C_H
@@ -12,6 +12,7 @@
 #include "maplibre_native_c/camera.h"            // IWYU pragma: export
 #include "maplibre_native_c/completion.h"        // IWYU pragma: export
 #include "maplibre_native_c/delivery.h"          // IWYU pragma: export
+#include "maplibre_native_c/gesture.h"           // IWYU pragma: export
 #include "maplibre_native_c/gpu_device.h"        // IWYU pragma: export
 #include "maplibre_native_c/logging.h"           // IWYU pragma: export
 #include "maplibre_native_c/map.h"               // IWYU pragma: export

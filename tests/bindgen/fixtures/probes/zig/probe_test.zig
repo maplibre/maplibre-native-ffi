@@ -51,6 +51,16 @@ test "a null handle output returns null and failures still report" {
     try std.testing.expectEqualStrings("exhausted", diagnostic.message());
 }
 
+test "generated counted inline arrays copy only the elements in use" {
+    var tracker = try api.ProbeTracker.open(null);
+    defer tracker.release();
+    var marks = try tracker.poll(std.testing.allocator, null);
+    defer marks.deinit();
+    try std.testing.expectEqual(@as(usize, 2), marks.value.marks.len);
+    try std.testing.expectEqual(@as(u32, 9), marks.value.marks[0].tap.id);
+    try std.testing.expectEqual(@as(f64, 1), marks.value.marks[1].level);
+}
+
 const callbacks = @import("callback.zig");
 var released_query: u64 = 0;
 

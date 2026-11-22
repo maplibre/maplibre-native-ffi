@@ -23,6 +23,16 @@ static jint mln_acquired_frame_get_android_hardware_buffer_jni(
   );
 }
 
+static jint mln_acquired_frame_get_d3d12_texture_jni(
+  JNIEnv* env, jclass type, jlong frame, jlong out_frame, jlong out_diagnostic
+) {
+  return (jint)mln_acquired_frame_get_d3d12_texture(
+    (mln_acquired_frame)frame,
+    MLN_JNI_POINTER(mln_d3d12_texture_frame*, out_frame),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_acquired_frame_get_dma_buf_jni(
   JNIEnv* env, jclass type, jlong frame, jlong out_frame, jlong out_diagnostic
 ) {
@@ -195,26 +205,53 @@ static void mln_delivery_queue_release_jni(
   mln_delivery_queue_release((mln_delivery_queue)queue);
 }
 
-static jint mln_frame_pacer_create_jni(
-  JNIEnv* env, jclass type, jlong options, jlong out_pacer, jlong out_diagnostic
+static jint mln_gesture_recognizer_create_jni(
+  JNIEnv* env, jclass type, jlong map, jlong options, jlong out_recognizer,
+  jlong out_diagnostic
 ) {
-  return (jint)mln_frame_pacer_create(
-    MLN_JNI_POINTER(const mln_frame_pacer_options*, options),
-    MLN_JNI_POINTER(mln_frame_pacer*, out_pacer),
+  return (jint)mln_gesture_recognizer_create(
+    (mln_map)map, MLN_JNI_POINTER(const mln_gesture_options*, options),
+    MLN_JNI_POINTER(mln_gesture_recognizer*, out_recognizer),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
-static void mln_frame_pacer_release_jni(JNIEnv* env, jclass type, jlong pacer) {
-  mln_frame_pacer_release((mln_frame_pacer)pacer);
+static jint mln_gesture_recognizer_handle_jni(
+  JNIEnv* env, jclass type, jlong recognizer, jlong input, jdouble time_ms,
+  jlong out_result, jlong out_diagnostic
+) {
+  return (jint)mln_gesture_recognizer_handle(
+    (mln_gesture_recognizer)recognizer,
+    MLN_JNI_POINTER(const mln_gesture_input*, input), (double)time_ms,
+    MLN_JNI_POINTER(mln_gesture_result*, out_result),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
 }
 
-static jint mln_frame_pacer_set_options_jni(
-  JNIEnv* env, jclass type, jlong pacer, jlong options, jlong out_diagnostic
+static void mln_gesture_recognizer_release_jni(
+  JNIEnv* env, jclass type, jlong recognizer
 ) {
-  return (jint)mln_frame_pacer_set_options(
-    (mln_frame_pacer)pacer,
-    MLN_JNI_POINTER(const mln_frame_pacer_options*, options),
+  mln_gesture_recognizer_release((mln_gesture_recognizer)recognizer);
+}
+
+static jint mln_gesture_recognizer_set_options_jni(
+  JNIEnv* env, jclass type, jlong recognizer, jlong options,
+  jlong out_diagnostic
+) {
+  return (jint)mln_gesture_recognizer_set_options(
+    (mln_gesture_recognizer)recognizer,
+    MLN_JNI_POINTER(const mln_gesture_options*, options),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_gesture_recognizer_tick_jni(
+  JNIEnv* env, jclass type, jlong recognizer, jdouble time_ms, jlong out_result,
+  jlong out_diagnostic
+) {
+  return (jint)mln_gesture_recognizer_tick(
+    (mln_gesture_recognizer)recognizer, (double)time_ms,
+    MLN_JNI_POINTER(mln_gesture_result*, out_result),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -241,6 +278,16 @@ static jint mln_gpu_device_get_capabilities_jni(
   );
 }
 
+static jint mln_gpu_device_get_d3d12_context_jni(
+  JNIEnv* env, jclass type, jlong device, jlong out_result, jlong out_diagnostic
+) {
+  return (jint)mln_gpu_device_get_d3d12_context(
+    (mln_gpu_device)device,
+    MLN_JNI_POINTER(mln_gpu_device_d3d12_context_result*, out_result),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_gpu_device_get_vulkan_context_jni(
   JNIEnv* env, jclass type, jlong device, jlong out_result, jlong out_diagnostic
 ) {
@@ -253,6 +300,17 @@ static jint mln_gpu_device_get_vulkan_context_jni(
 
 static void mln_gpu_device_release_jni(JNIEnv* env, jclass type, jlong device) {
   mln_gpu_device_release((mln_gpu_device)device);
+}
+
+static jint mln_gpu_device_wrap_d3d12_jni(
+  JNIEnv* env, jclass type, jlong descriptor, jlong out_device,
+  jlong out_diagnostic
+) {
+  return (jint)mln_gpu_device_wrap_d3d12(
+    MLN_JNI_POINTER(const mln_d3d12_device_descriptor*, descriptor),
+    MLN_JNI_POINTER(mln_gpu_device*, out_device),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
 }
 
 static jint mln_gpu_device_wrap_metal_jni(
@@ -1722,11 +1780,12 @@ static jint mln_render_session_service_driver_work_jni(
   );
 }
 
-static jint mln_render_session_set_frame_pacer_jni(
-  JNIEnv* env, jclass type, jlong session, jlong pacer, jlong out_diagnostic
+static jint mln_render_session_set_frame_pacing_jni(
+  JNIEnv* env, jclass type, jlong session, jlong options, jlong out_diagnostic
 ) {
-  return (jint)mln_render_session_set_frame_pacer(
-    (mln_render_session)session, (mln_frame_pacer)pacer,
+  return (jint)mln_render_session_set_frame_pacing(
+    (mln_render_session)session,
+    MLN_JNI_POINTER(const mln_frame_pacing_options*, options),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -1918,6 +1977,17 @@ static jint mln_runtime_get_offline_region_jni(
   jlong out_diagnostic
 ) {
   return (jint)mln_runtime_get_offline_region(
+    (mln_runtime)runtime, (mln_offline_region_id)region_id,
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_runtime_get_offline_region_expiry_jni(
+  JNIEnv* env, jclass type, jlong runtime, jlong region_id, jlong completion,
+  jlong out_diagnostic
+) {
+  return (jint)mln_runtime_get_offline_region_expiry(
     (mln_runtime)runtime, (mln_offline_region_id)region_id,
     MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
@@ -2150,6 +2220,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_acquired_frame_discard_jni},
   {"mln_acquired_frame_get_android_hardware_buffer", "(JJJ)I",
    (void*)mln_acquired_frame_get_android_hardware_buffer_jni},
+  {"mln_acquired_frame_get_d3d12_texture", "(JJJ)I",
+   (void*)mln_acquired_frame_get_d3d12_texture_jni},
   {"mln_acquired_frame_get_dma_buf", "(JJJ)I",
    (void*)mln_acquired_frame_get_dma_buf_jni},
   {"mln_acquired_frame_get_dxgi_shared_texture", "(JJJ)I",
@@ -2183,16 +2255,25 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_delivery_queue_dispatch", "(JJ)I",
    (void*)mln_delivery_queue_dispatch_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
-  {"mln_frame_pacer_create", "(JJJ)I", (void*)mln_frame_pacer_create_jni},
-  {"mln_frame_pacer_release", "(J)V", (void*)mln_frame_pacer_release_jni},
-  {"mln_frame_pacer_set_options", "(JJJ)I",
-   (void*)mln_frame_pacer_set_options_jni},
+  {"mln_gesture_recognizer_create", "(JJJJ)I",
+   (void*)mln_gesture_recognizer_create_jni},
+  {"mln_gesture_recognizer_handle", "(JJDJJ)I",
+   (void*)mln_gesture_recognizer_handle_jni},
+  {"mln_gesture_recognizer_release", "(J)V",
+   (void*)mln_gesture_recognizer_release_jni},
+  {"mln_gesture_recognizer_set_options", "(JJJ)I",
+   (void*)mln_gesture_recognizer_set_options_jni},
+  {"mln_gesture_recognizer_tick", "(JDJJ)I",
+   (void*)mln_gesture_recognizer_tick_jni},
   {"mln_gpu_device_create", "(JJJ)I", (void*)mln_gpu_device_create_jni},
   {"mln_gpu_device_get_capabilities", "(JJJ)I",
    (void*)mln_gpu_device_get_capabilities_jni},
+  {"mln_gpu_device_get_d3d12_context", "(JJJ)I",
+   (void*)mln_gpu_device_get_d3d12_context_jni},
   {"mln_gpu_device_get_vulkan_context", "(JJJ)I",
    (void*)mln_gpu_device_get_vulkan_context_jni},
   {"mln_gpu_device_release", "(J)V", (void*)mln_gpu_device_release_jni},
+  {"mln_gpu_device_wrap_d3d12", "(JJJ)I", (void*)mln_gpu_device_wrap_d3d12_jni},
   {"mln_gpu_device_wrap_metal", "(JJJ)I", (void*)mln_gpu_device_wrap_metal_jni},
   {"mln_gpu_device_wrap_open_gl", "(JJJ)I",
    (void*)mln_gpu_device_wrap_open_gl_jni},
@@ -2425,8 +2506,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_render_session_resize_jni},
   {"mln_render_session_service_driver_work", "(JJ)I",
    (void*)mln_render_session_service_driver_work_jni},
-  {"mln_render_session_set_frame_pacer", "(JJJ)I",
-   (void*)mln_render_session_set_frame_pacer_jni},
+  {"mln_render_session_set_frame_pacing", "(JJJ)I",
+   (void*)mln_render_session_set_frame_pacing_jni},
   {"mln_render_session_set_target", "(JJJJ)I",
    (void*)mln_render_session_set_target_jni},
   {"mln_resource_request_complete", "(JJJ)I",
@@ -2462,6 +2543,8 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_runtime_dispose", "(JJ)I", (void*)mln_runtime_dispose_jni},
   {"mln_runtime_get_offline_region", "(JJJJ)I",
    (void*)mln_runtime_get_offline_region_jni},
+  {"mln_runtime_get_offline_region_expiry", "(JJJJ)I",
+   (void*)mln_runtime_get_offline_region_expiry_jni},
   {"mln_runtime_get_offline_region_status", "(JJJJ)I",
    (void*)mln_runtime_get_offline_region_status_jni},
   {"mln_runtime_invalidate_offline_region", "(JJJJ)I",
@@ -2511,6 +2594,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_acquired_frame_discard_jni},
   {"mln_acquired_frame_get_android_hardware_buffer", "(JJJ)I",
    (void*)mln_acquired_frame_get_android_hardware_buffer_jni},
+  {"mln_acquired_frame_get_d3d12_texture", "(JJJ)I",
+   (void*)mln_acquired_frame_get_d3d12_texture_jni},
   {"mln_acquired_frame_get_dma_buf", "(JJJ)I",
    (void*)mln_acquired_frame_get_dma_buf_jni},
   {"mln_acquired_frame_get_dxgi_shared_texture", "(JJJ)I",
@@ -2544,16 +2629,25 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_delivery_queue_dispatch", "(JJ)I",
    (void*)mln_delivery_queue_dispatch_jni},
   {"mln_delivery_queue_release", "(J)V", (void*)mln_delivery_queue_release_jni},
-  {"mln_frame_pacer_create", "(JJJ)I", (void*)mln_frame_pacer_create_jni},
-  {"mln_frame_pacer_release", "(J)V", (void*)mln_frame_pacer_release_jni},
-  {"mln_frame_pacer_set_options", "(JJJ)I",
-   (void*)mln_frame_pacer_set_options_jni},
+  {"mln_gesture_recognizer_create", "(JJJJ)I",
+   (void*)mln_gesture_recognizer_create_jni},
+  {"mln_gesture_recognizer_handle", "(JJDJJ)I",
+   (void*)mln_gesture_recognizer_handle_jni},
+  {"mln_gesture_recognizer_release", "(J)V",
+   (void*)mln_gesture_recognizer_release_jni},
+  {"mln_gesture_recognizer_set_options", "(JJJ)I",
+   (void*)mln_gesture_recognizer_set_options_jni},
+  {"mln_gesture_recognizer_tick", "(JDJJ)I",
+   (void*)mln_gesture_recognizer_tick_jni},
   {"mln_gpu_device_create", "(JJJ)I", (void*)mln_gpu_device_create_jni},
   {"mln_gpu_device_get_capabilities", "(JJJ)I",
    (void*)mln_gpu_device_get_capabilities_jni},
+  {"mln_gpu_device_get_d3d12_context", "(JJJ)I",
+   (void*)mln_gpu_device_get_d3d12_context_jni},
   {"mln_gpu_device_get_vulkan_context", "(JJJ)I",
    (void*)mln_gpu_device_get_vulkan_context_jni},
   {"mln_gpu_device_release", "(J)V", (void*)mln_gpu_device_release_jni},
+  {"mln_gpu_device_wrap_d3d12", "(JJJ)I", (void*)mln_gpu_device_wrap_d3d12_jni},
   {"mln_gpu_device_wrap_metal", "(JJJ)I", (void*)mln_gpu_device_wrap_metal_jni},
   {"mln_gpu_device_wrap_open_gl", "(JJJ)I",
    (void*)mln_gpu_device_wrap_open_gl_jni},
@@ -2786,8 +2880,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
    (void*)mln_render_session_resize_jni},
   {"mln_render_session_service_driver_work", "(JJ)I",
    (void*)mln_render_session_service_driver_work_jni},
-  {"mln_render_session_set_frame_pacer", "(JJJ)I",
-   (void*)mln_render_session_set_frame_pacer_jni},
+  {"mln_render_session_set_frame_pacing", "(JJJ)I",
+   (void*)mln_render_session_set_frame_pacing_jni},
   {"mln_render_session_set_target", "(JJJJ)I",
    (void*)mln_render_session_set_target_jni},
   {"mln_resource_request_complete", "(JJJ)I",
@@ -2823,6 +2917,8 @@ const JNINativeMethod mln_jni_critical_methods[] = {
   {"mln_runtime_dispose", "(JJ)I", (void*)mln_runtime_dispose_jni},
   {"mln_runtime_get_offline_region", "(JJJJ)I",
    (void*)mln_runtime_get_offline_region_jni},
+  {"mln_runtime_get_offline_region_expiry", "(JJJJ)I",
+   (void*)mln_runtime_get_offline_region_expiry_jni},
   {"mln_runtime_get_offline_region_status", "(JJJJ)I",
    (void*)mln_runtime_get_offline_region_status_jni},
   {"mln_runtime_invalidate_offline_region", "(JJJJ)I",

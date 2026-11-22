@@ -136,6 +136,9 @@ def copier(values, value):
 
 
 def copies_borrowed(value):
+    if value.kind == "array" and value.extent is not None:
+        # An inline array is part of its record's own storage.
+        return copies_borrowed(value.element)
     if value.kind in {"array", "buffer", "reference"}:
         return True
     return any(copies_borrowed(field.value) for field in value.fields)

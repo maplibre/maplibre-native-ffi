@@ -41,9 +41,10 @@ typedef enum mln_cache_database_operation : uint32_t {
    */
   MLN_CACHE_DATABASE_OPERATION_CLEAR = 1,
   /**
-   * Keeps the ambient cache's resources, but makes maps check each one with the
-   * server before they use it again. Offline regions keep their resources as
-   * they are.
+   * Keeps the ambient cache's resources, but makes them stale: maps check each
+   * one with the server when they next use it, and show it meanwhile unless
+   * the server requires checking it first. Offline regions keep their
+   * resources as they are.
    */
   MLN_CACHE_DATABASE_OPERATION_INVALIDATE = 2,
   /**
@@ -259,9 +260,9 @@ typedef enum mln_camera_change_source : uint32_t {
    * keeps the camera within its bounds.
    */
   MLN_CAMERA_CHANGE_SOURCE_COMMAND = 0,
-  /** A camera command with a gesture phase. */
+  /** A gesture that a gesture recognizer recognized. */
   MLN_CAMERA_CHANGE_SOURCE_GESTURE = 1,
-  /** The momentum and bearing snap that a gesture's end started. */
+  /** The glide and snap after a gesture recognizer's gesture. */
   MLN_CAMERA_CHANGE_SOURCE_MOMENTUM = 2,
 } mln_camera_change_source;
 
@@ -872,12 +873,14 @@ typedef struct mln_resource_response {
   /** A description of the error, for MLN_RESOURCE_RESPONSE_STATUS_ERROR. */
   mln_buffer_view error_message;
   /**
-   * Whether the library must request the resource again before it reuses this
-   * copy.
+   * Whether the library must not use this copy once it expires until it
+   * requests the resource again, not even while the server can't be reached,
+   * as `Cache-Control: must-revalidate` or `no-cache` says.
    */
   bool must_revalidate;
   int64_t modified_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_MODIFIED");
+  /** When this copy stops being fresh. Without it, the copy never expires. */
   int64_t expires_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_EXPIRES");
   /** Empty when the resource has no ETag. */
@@ -885,6 +888,11 @@ typedef struct mln_resource_response {
   /** When to retry, for MLN_RESOURCE_RESPONSE_STATUS_ERROR. */
   int64_t retry_after_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_RETRY_AFTER");
+  /**
+   * Whether the library must not store this copy, as
+   * `Cache-Control: no-store` says.
+   */
+  bool no_store;
 } mln_resource_response;
 
 /**

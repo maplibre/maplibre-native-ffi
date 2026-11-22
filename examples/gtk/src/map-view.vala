@@ -139,11 +139,6 @@ namespace Example {
 			offload = new Gtk.GraphicsOffload (picture);
 			offload.set_parent (this);
 			gestures = new Gestures (this);
-			gestures.delta.connect ((delta) => {
-				if (maplibre_map != null) {
-					maplibre_map.apply_camera_delta_async.begin (delta);
-				}
-			});
 		}
 
 		public override void dispose () {
@@ -324,6 +319,7 @@ namespace Example {
 				camera = initial_camera (),
 			});
 			maplibre_map.set_style_url_async.begin (STYLE_URL);
+			gestures.set_map (maplibre_map);
 			show_status ("Loading the style…");
 			// The next pass attaches a session at the size GTK reports then.
 			change_queued = true;
@@ -488,6 +484,7 @@ namespace Example {
 		private async void release_map () throws GLib.Error {
 			var retired = maplibre_map;
 			maplibre_map = null;
+			gestures.set_map (null);
 			if (retired != null) {
 				yield retired.release_async ();
 			}

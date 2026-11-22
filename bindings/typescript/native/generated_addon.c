@@ -57,6 +57,36 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_acquired_frame_get_d3d12_texture(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_acquired_frame arg_frame = 0;
+  mln_d3d12_texture_frame arg_out_frame;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "frame")) goto done;
+    arg_frame = (mln_acquired_frame)number;
+  }
+  memset(&arg_out_frame, 0, sizeof arg_out_frame);
+  arg_out_frame.size = sizeof arg_out_frame;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_acquired_frame_get_d3d12_texture(
+    arg_frame, &arg_out_frame, &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_read_d3d12_texture_frame(
+    env, &(arg_out_frame), sizeof(arg_out_frame)
+  );
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_acquired_frame_get_dma_buf(
   napi_env env, napi_callback_info info
 ) {
@@ -458,81 +488,169 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_frame_pacer_create(
+static napi_value mln_ts_export_mln_gesture_recognizer_create(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
-  mln_frame_pacer_options arg_options;
+  mln_map arg_map = 0;
+  mln_gesture_options arg_options;
   const void* present_options = NULL;
-  mln_frame_pacer arg_out_pacer = MLN_HANDLE_NULL;
+  mln_gesture_recognizer arg_out_recognizer = MLN_HANDLE_NULL;
   mln_diagnostic diagnostic;
   mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  if (!mln_ts_is_absent(call, call->argv[0])) {
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  if (!mln_ts_is_absent(call, call->argv[1])) {
     memset(&arg_options, 0, sizeof arg_options);
     arg_options.size = sizeof arg_options;
-    if (!mln_ts_read_record(call, call->argv[0], "options")) goto done;
-    if (!mln_ts_write_frame_pacer_options(
-          call, call->argv[0], &arg_options, "options"
+    if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
+    if (!mln_ts_write_gesture_options(
+          call, call->argv[1], &arg_options, "options"
         ))
       goto done;
     present_options = &arg_options;
   }
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_frame_pacer_create(present_options, &arg_out_pacer, &diagnostic);
+  status = mln_gesture_recognizer_create(
+    arg_map, present_options, &arg_out_recognizer, &diagnostic
+  );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
-  call->result = mln_ts_u64(env, (uint64_t)arg_out_pacer);
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_recognizer);
 done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_frame_pacer_release(
+static napi_value mln_ts_export_mln_gesture_recognizer_handle(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
-  mln_frame_pacer arg_pacer = 0;
+  mln_gesture_recognizer arg_recognizer = 0;
+  mln_gesture_input arg_input;
+  double arg_time_ms;
+  mln_gesture_result arg_out_result;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 3)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "recognizer")) goto done;
+    arg_recognizer = (mln_gesture_recognizer)number;
+  }
+  memset(&arg_input, 0, sizeof arg_input);
+  arg_input.size = sizeof arg_input;
+  if (!mln_ts_read_record(call, call->argv[1], "input")) goto done;
+  if (!mln_ts_write_gesture_input(call, call->argv[1], &arg_input, "input"))
+    goto done;
+  memset(&arg_time_ms, 0, sizeof arg_time_ms);
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, call->argv[2], &number, "timeMs")) goto done;
+    arg_time_ms = (double)number;
+  }
+  memset(&arg_out_result, 0, sizeof arg_out_result);
+  arg_out_result.size = sizeof arg_out_result;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_gesture_recognizer_handle(
+    arg_recognizer, &arg_input, arg_time_ms, &arg_out_result, &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result =
+    mln_ts_read_gesture_result(env, &(arg_out_result), sizeof(arg_out_result));
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gesture_recognizer_release(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_gesture_recognizer arg_recognizer = 0;
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
   {
     uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "pacer")) goto done;
-    arg_pacer = (mln_frame_pacer)number;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "recognizer")) goto done;
+    arg_recognizer = (mln_gesture_recognizer)number;
   }
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
-  mln_frame_pacer_release(arg_pacer);
+  mln_gesture_recognizer_release(arg_recognizer);
   mln_ts_consume(call);
 done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_frame_pacer_set_options(
+static napi_value mln_ts_export_mln_gesture_recognizer_set_options(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
-  mln_frame_pacer arg_pacer = 0;
-  mln_frame_pacer_options arg_options;
+  mln_gesture_recognizer arg_recognizer = 0;
+  mln_gesture_options arg_options;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
   {
     uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "pacer")) goto done;
-    arg_pacer = (mln_frame_pacer)number;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "recognizer")) goto done;
+    arg_recognizer = (mln_gesture_recognizer)number;
   }
   memset(&arg_options, 0, sizeof arg_options);
   arg_options.size = sizeof arg_options;
   if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
-  if (!mln_ts_write_frame_pacer_options(
+  if (!mln_ts_write_gesture_options(
         call, call->argv[1], &arg_options, "options"
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status = mln_frame_pacer_set_options(arg_pacer, &arg_options, &diagnostic);
+  status = mln_gesture_recognizer_set_options(
+    arg_recognizer, &arg_options, &diagnostic
+  );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gesture_recognizer_tick(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_gesture_recognizer arg_recognizer = 0;
+  double arg_time_ms;
+  mln_gesture_result arg_out_result;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "recognizer")) goto done;
+    arg_recognizer = (mln_gesture_recognizer)number;
+  }
+  memset(&arg_time_ms, 0, sizeof arg_time_ms);
+  {
+    double number = 0;
+    if (!mln_ts_read_double(call, call->argv[1], &number, "timeMs")) goto done;
+    arg_time_ms = (double)number;
+  }
+  memset(&arg_out_result, 0, sizeof arg_out_result);
+  arg_out_result.size = sizeof arg_out_result;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_gesture_recognizer_tick(
+    arg_recognizer, arg_time_ms, &arg_out_result, &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result =
+    mln_ts_read_gesture_result(env, &(arg_out_result), sizeof(arg_out_result));
 done:
   return mln_ts_end(call);
 }
@@ -598,6 +716,35 @@ done:
   return mln_ts_end(call);
 }
 
+static napi_value mln_ts_export_mln_gpu_device_get_d3d12_context(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_gpu_device arg_device = 0;
+  mln_gpu_device_d3d12_context_result arg_out_result;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "device")) goto done;
+    arg_device = (mln_gpu_device)number;
+  }
+  memset(&arg_out_result, 0, sizeof arg_out_result);
+  arg_out_result.size = sizeof arg_out_result;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_gpu_device_get_d3d12_context(arg_device, &arg_out_result, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_read_gpu_device_d3d12_context_result(
+    env, &(arg_out_result), sizeof(arg_out_result)
+  );
+done:
+  return mln_ts_end(call);
+}
+
 static napi_value mln_ts_export_mln_gpu_device_get_vulkan_context(
   napi_env env, napi_callback_info info
 ) {
@@ -642,6 +789,33 @@ static napi_value mln_ts_export_mln_gpu_device_release(
   if (!mln_ts_read_owner(call, call->argv[1])) goto done;
   mln_gpu_device_release(arg_device);
   mln_ts_consume(call);
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_gpu_device_wrap_d3d12(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_d3d12_device_descriptor arg_descriptor;
+  mln_gpu_device arg_out_device = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 1)) return NULL;
+  memset(&arg_descriptor, 0, sizeof arg_descriptor);
+  arg_descriptor.size = sizeof arg_descriptor;
+  if (!mln_ts_read_record(call, call->argv[0], "descriptor")) goto done;
+  if (!mln_ts_write_d3d12_device_descriptor(
+        call, call->argv[0], &arg_descriptor, "descriptor"
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status =
+    mln_gpu_device_wrap_d3d12(&arg_descriptor, &arg_out_device, &diagnostic);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_u64(env, (uint64_t)arg_out_device);
 done:
   return mln_ts_end(call);
 }
@@ -5284,7 +5458,8 @@ static napi_value mln_ts_export_mln_render_session_release_target(
     arg_session = (mln_render_session)number;
   }
   if (!mln_ts_read_completion(
-        call, call->argv[1], false, NULL, &arg_completion, &present_completion
+        call, call->argv[1], false, mln_ts_decode_gpu_sync_optional,
+        &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5356,13 +5531,14 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_render_session_set_frame_pacer(
+static napi_value mln_ts_export_mln_render_session_set_frame_pacing(
   napi_env env, napi_callback_info info
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
   mln_render_session arg_session = 0;
-  uint64_t arg_pacer = 0;
+  mln_frame_pacing_options arg_options;
+  const void* present_options = NULL;
   mln_diagnostic diagnostic;
   mln_status status;
   if (!mln_ts_begin(call, env, info, 2)) return NULL;
@@ -5372,12 +5548,20 @@ static napi_value mln_ts_export_mln_render_session_set_frame_pacer(
     arg_session = (mln_render_session)number;
   }
   if (!mln_ts_is_absent(call, call->argv[1])) {
-    if (!mln_ts_read_u64(call, call->argv[1], &arg_pacer, "pacer")) goto done;
+    memset(&arg_options, 0, sizeof arg_options);
+    arg_options.size = sizeof arg_options;
+    if (!mln_ts_read_record(call, call->argv[1], "options")) goto done;
+    if (!mln_ts_write_frame_pacing_options(
+          call, call->argv[1], &arg_options, "options"
+        ))
+      goto done;
+    present_options = &arg_options;
   }
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status =
-    mln_render_session_set_frame_pacer(arg_session, arg_pacer, &diagnostic);
+  status = mln_render_session_set_frame_pacing(
+    arg_session, present_options, &diagnostic
+  );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
 done:
   return mln_ts_end(call);
@@ -5406,7 +5590,8 @@ static napi_value mln_ts_export_mln_render_session_set_target(
   if (!mln_ts_write_render_target(call, call->argv[1], &arg_target, "target"))
     goto done;
   if (!mln_ts_read_completion(
-        call, call->argv[2], false, NULL, &arg_completion, &present_completion
+        call, call->argv[2], false, mln_ts_decode_gpu_sync_optional,
+        &arg_completion, &present_completion
       ))
     goto done;
   diagnostic.size = sizeof diagnostic;
@@ -5981,6 +6166,45 @@ static napi_value mln_ts_export_mln_runtime_get_offline_region(
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
   status = mln_runtime_get_offline_region(
+    arg_runtime, arg_region_id, present_completion, &diagnostic
+  );
+  if (status == MLN_STATUS_OK) mln_ts_accept(call);
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_runtime_get_offline_region_expiry(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_runtime arg_runtime = 0;
+  mln_offline_region_id arg_region_id;
+  mln_completion arg_completion;
+  const mln_completion* present_completion = NULL;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 3)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "runtime")) goto done;
+    arg_runtime = (mln_runtime)number;
+  }
+  memset(&arg_region_id, 0, sizeof arg_region_id);
+  {
+    int64_t number = 0;
+    if (!mln_ts_read_i64(call, call->argv[1], &number, "regionId")) goto done;
+    arg_region_id = (int64_t)number;
+  }
+  if (!mln_ts_read_completion(
+        call, call->argv[2], false, mln_ts_decode_offline_region_expiry,
+        &arg_completion, &present_completion
+      ))
+    goto done;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_runtime_get_offline_region_expiry(
     arg_runtime, arg_region_id, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
@@ -6811,6 +7035,8 @@ static const mln_ts_export exports[] = {
   {"mln_acquired_frame_discard", mln_ts_export_mln_acquired_frame_discard},
   {"mln_acquired_frame_get_android_hardware_buffer",
    mln_ts_export_mln_acquired_frame_get_android_hardware_buffer},
+  {"mln_acquired_frame_get_d3d12_texture",
+   mln_ts_export_mln_acquired_frame_get_d3d12_texture},
   {"mln_acquired_frame_get_dma_buf",
    mln_ts_export_mln_acquired_frame_get_dma_buf},
   {"mln_acquired_frame_get_dxgi_shared_texture",
@@ -6838,15 +7064,24 @@ static const mln_ts_export exports[] = {
   {"mln_android_init", mln_ts_export_mln_android_init},
   {"mln_c_version", mln_ts_export_mln_c_version},
   {"mln_camera_for_tile", mln_ts_export_mln_camera_for_tile},
-  {"mln_frame_pacer_create", mln_ts_export_mln_frame_pacer_create},
-  {"mln_frame_pacer_release", mln_ts_export_mln_frame_pacer_release},
-  {"mln_frame_pacer_set_options", mln_ts_export_mln_frame_pacer_set_options},
+  {"mln_gesture_recognizer_create",
+   mln_ts_export_mln_gesture_recognizer_create},
+  {"mln_gesture_recognizer_handle",
+   mln_ts_export_mln_gesture_recognizer_handle},
+  {"mln_gesture_recognizer_release",
+   mln_ts_export_mln_gesture_recognizer_release},
+  {"mln_gesture_recognizer_set_options",
+   mln_ts_export_mln_gesture_recognizer_set_options},
+  {"mln_gesture_recognizer_tick", mln_ts_export_mln_gesture_recognizer_tick},
   {"mln_gpu_device_create", mln_ts_export_mln_gpu_device_create},
   {"mln_gpu_device_get_capabilities",
    mln_ts_export_mln_gpu_device_get_capabilities},
+  {"mln_gpu_device_get_d3d12_context",
+   mln_ts_export_mln_gpu_device_get_d3d12_context},
   {"mln_gpu_device_get_vulkan_context",
    mln_ts_export_mln_gpu_device_get_vulkan_context},
   {"mln_gpu_device_release", mln_ts_export_mln_gpu_device_release},
+  {"mln_gpu_device_wrap_d3d12", mln_ts_export_mln_gpu_device_wrap_d3d12},
   {"mln_gpu_device_wrap_metal", mln_ts_export_mln_gpu_device_wrap_metal},
   {"mln_gpu_device_wrap_open_gl", mln_ts_export_mln_gpu_device_wrap_open_gl},
   {"mln_gpu_device_wrap_vulkan", mln_ts_export_mln_gpu_device_wrap_vulkan},
@@ -7048,8 +7283,8 @@ static const mln_ts_export exports[] = {
   {"mln_render_session_resize", mln_ts_export_mln_render_session_resize},
   {"mln_render_session_service_driver_work",
    mln_ts_export_mln_render_session_service_driver_work},
-  {"mln_render_session_set_frame_pacer",
-   mln_ts_export_mln_render_session_set_frame_pacer},
+  {"mln_render_session_set_frame_pacing",
+   mln_ts_export_mln_render_session_set_frame_pacing},
   {"mln_render_session_set_target",
    mln_ts_export_mln_render_session_set_target},
   {"mln_resource_request_complete",
@@ -7084,6 +7319,8 @@ static const mln_ts_export exports[] = {
   {"mln_runtime_dispose", mln_ts_export_mln_runtime_dispose},
   {"mln_runtime_get_offline_region",
    mln_ts_export_mln_runtime_get_offline_region},
+  {"mln_runtime_get_offline_region_expiry",
+   mln_ts_export_mln_runtime_get_offline_region_expiry},
   {"mln_runtime_get_offline_region_status",
    mln_ts_export_mln_runtime_get_offline_region_status},
   {"mln_runtime_invalidate_offline_region",

@@ -12,13 +12,22 @@ internal readonly record struct Status(string Message, bool Error = false);
 
 // Every method runs on the UI thread. The binding calls the wakes and the event
 // handler on its own threads, and they post their work here.
-internal sealed class MapController(Dispatcher dispatcher) : IAsyncDisposable
+internal sealed class MapController : IAsyncDisposable
 {
     private const string StyleUrl = "https://tiles.openfreemap.org/styles/liberty";
 
+    private readonly Dispatcher dispatcher;
     private RuntimeHandle? runtime;
+    private MapHandle? map;
     private RenderSessionHandle? session;
     private bool failed;
+
+    // The view's input moves the camera through the recognizer. Its clock
+    // starts with the controller, and a timer ticks it when it asks for a
+    // time rather than a frame.
+    private GestureRecognizerHandle? gestures;
+    private readonly Stopwatch clock = Stopwatch.StartNew();
+    private readonly DispatcherTimer tickTimer;
 
     // The view's latest window and its client size in pixels, and the window
     // that the session presents to.
@@ -34,12 +43,24 @@ internal sealed class MapController(Dispatcher dispatcher) : IAsyncDisposable
 
     // The session's release, once the controller is disposed.
     private Task? released;
+
+    // Whether the controller waits for WPF's next frame, to demand a frame of
+    // the session or to tick the recognizer, and the last frame it handled.
+    private bool rendering;
     private bool frameRequested;
+    private bool ticksEachFrame;
+    private TimeSpan lastFrame;
 
-    // The WPF frame that the session last got a demand in.
-    private TimeSpan demandedFrame;
-
-    public MapHandle? Map { get; private set; }
+    public MapController(Dispatcher dispatcher)
+    {
+        this.dispatcher = dispatcher;
+        tickTimer = new DispatcherTimer(DispatcherPriority.Input, dispatcher);
+        tickTimer.Tick += (_, _) =>
+        {
+            tickTimer.Stop();
+            Tick();
+        };
+    }
 
     // The map's scale factor, which it keeps for its life.
     public double Scale { get; private set; } = 1;
@@ -109,18 +130,32 @@ internal sealed class MapController(Dispatcher dispatcher) : IAsyncDisposable
             Trace.TraceWarning($"Couldn't release the window: {failure}");
     }
 
+    // Passes one of the view's inputs to the recognizer, and returns whether
+    // it used the input.
+    public bool Input(GestureInput input)
+    {
+        if (gestures is null)
+            return false;
+        var result = gestures.Handle(input, clock.Elapsed.TotalMilliseconds);
+        ScheduleTick(result);
+        return result.Handled;
+    }
+
     public async ValueTask DisposeAsync()
     {
         var session = this.session;
-        var map = Map;
+        var map = this.map;
         var runtime = this.runtime;
         this.session = null;
-        Map = null;
+        this.map = null;
         this.runtime = null;
-        if (frameRequested)
+        gestures?.Release();
+        gestures = null;
+        tickTimer.Stop();
+        if (rendering)
         {
             CompositionTarget.Rendering -= OnRendering;
-            frameRequested = false;
+            rendering = false;
         }
         try
         {
@@ -153,14 +188,15 @@ internal sealed class MapController(Dispatcher dispatcher) : IAsyncDisposable
                     | RuntimeEventFlag.MapRenderError,
             }
         );
-        Map = map;
+        this.map = map;
         runtime.Discarding.SetEventHandler(
             new RuntimeEventHandler(events => dispatcher.InvokeAsync(() => OnEvents(map, events)))
         );
         await map.Ready;
         // The window closed while the map started.
-        if (Map != map)
+        if (this.map != map)
             return;
+        gestures = map.GestureRecognizerCreate();
         map.Discarding.UpdateCamera(
             new CameraUpdate
             {
@@ -220,7 +256,7 @@ internal sealed class MapController(Dispatcher dispatcher) : IAsyncDisposable
     {
         // The view can report its window before the map is ready to take a
         // session.
-        var map = Map;
+        var map = this.map;
         if (map is null)
             return;
         await map.Ready;
@@ -272,34 +308,74 @@ internal sealed class MapController(Dispatcher dispatcher) : IAsyncDisposable
         }
     }
 
-    // Demands a frame at WPF's next frame, which the desktop compositor paces to
-    // the display. WPF renders frames only while something subscribes, so an
-    // idle map costs nothing.
+    // Ticks the recognizer when it asks: at WPF's next frame, or at a time.
+    private void ScheduleTick(GestureResult result)
+    {
+        ticksEachFrame = result.NextTick == GestureNextTick.Frame;
+        if (ticksEachFrame)
+            WaitForFrame();
+        tickTimer.Stop();
+        if (result.NextTick == GestureNextTick.At)
+        {
+            var delay = result.NextTickMs - clock.Elapsed.TotalMilliseconds;
+            tickTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(0, delay));
+            tickTimer.Start();
+        }
+    }
+
+    private void Tick()
+    {
+        if (gestures is not null)
+            ScheduleTick(gestures.Tick(clock.Elapsed.TotalMilliseconds));
+    }
+
+    // Demands a frame at WPF's next frame. The session can't pace its frames
+    // on Windows, but the desktop compositor paces WPF's to the display.
     private void RequestFrame()
     {
-        if (frameRequested || session is not { Ready.IsCompletedSuccessfully: true })
+        if (session is not { Ready.IsCompletedSuccessfully: true })
             return;
         frameRequested = true;
+        WaitForFrame();
+    }
+
+    // WPF renders frames only while something subscribes, so an idle map costs
+    // nothing.
+    private void WaitForFrame()
+    {
+        if (rendering)
+            return;
+        rendering = true;
         CompositionTarget.Rendering += OnRendering;
     }
 
     private void OnRendering(object? sender, EventArgs e)
     {
-        // WPF can raise the event more than once in a frame, so a demand waits
-        // for a frame that had none.
+        // WPF can raise the event more than once in a frame, so the controller
+        // waits for a frame it hasn't handled.
         var frame = ((RenderingEventArgs)e).RenderingTime;
-        if (frame == demandedFrame)
+        if (frame == lastFrame)
             return;
-        demandedFrame = frame;
-        CompositionTarget.Rendering -= OnRendering;
-        frameRequested = false;
-        try
+        lastFrame = frame;
+        // The tick moves the camera before the demand, which shows the move.
+        if (ticksEachFrame)
+            Tick();
+        if (frameRequested)
         {
-            session?.DemandFrame(new FrameDemand());
+            frameRequested = false;
+            try
+            {
+                session?.DemandFrame(new FrameDemand());
+            }
+            catch (MaplibreException error)
+            {
+                Fail(error);
+            }
         }
-        catch (MaplibreException error)
+        if (!ticksEachFrame)
         {
-            Fail(error);
+            CompositionTarget.Rendering -= OnRendering;
+            rendering = false;
         }
     }
 

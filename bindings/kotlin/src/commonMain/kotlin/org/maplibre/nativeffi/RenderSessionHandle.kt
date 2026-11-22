@@ -140,7 +140,9 @@ private constructor(
    * Asks the session to render a frame.
    *
    * The frame shows the map commands that you sent before the call, except the changes that an open
-   * command group holds back.
+   * command group holds back, and the map's camera animations as they are at the time of the call.
+   * Demand each frame when the display is ready for it, so that animations move evenly.
+   * `RenderSessionHandle.setFramePacing()` does that for you.
    *
    * You can call it once the attach call returns. While the attach runs, the demand waits for it to
    * complete. Every demand finishes with one frame result that carries its token, and
@@ -554,16 +556,18 @@ private constructor(
    * Use it when the platform takes a surface away, such as when your app goes to the background.
    * Release every acquired frame first. Frame demands that are still pending, and later ones until
    * you give the session a new target, finish with `RenderResult.TARGET_NOT_READY`. Once the
-   * release completes, you can destroy the old target. An Android or OpenHarmony window can go away
-   * sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
+   * release of a window or surface completes, you can destroy it. An Android or OpenHarmony window
+   * can go away sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
    *
-   * For a borrowed ring, a completed release also means that the session has stopped waiting on the
-   * consumer sync that you released its frames with, so you can reuse or destroy the textures. The
-   * session waits about a second at most for that sync, and logs a warning when the wait runs out.
-   * It checks the sync without blocking a thread: keep servicing a session driven by
-   * `RenderDriverKind.CALLER_GRAPHICS_THREAD` until the release completes. The session keeps
-   * nothing of the released textures: a texture that a later target gives it again is a new one,
-   * even one that you discarded a frame of.
+   * For a borrowed ring, the release completes with an `GpuSync` of
+   * `RenderSessionCapabilities.producerSyncKind`, or `GpuSyncKind.CPU_COMPLETE` when the session
+   * has no textures since an earlier release. Wait for it before you reuse or destroy the textures,
+   * as you wait for an acquired frame's producer sync: for `GpuSyncKind.QUEUE_ORDER`, destroy them
+   * once work that you submit to the queue after the completion has finished. The session's GPU
+   * work on the textures, and its waits for the consumer syncs that you released its frames with,
+   * end there, so keep those syncs until then too. The session keeps nothing of the released
+   * textures: a texture that a later target gives it again is a new one, even one that you
+   * discarded a frame of. For another target, the completion has no value.
    *
    * See `mln_render_session_release_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -572,9 +576,18 @@ private constructor(
    *
    * - `Status.UNSUPPORTED` when the session renders offscreen or into an exported ring.
    * - `Status.TARGET_LOST` when the session loses its target before the release runs.
+   * - `Status.NATIVE_ERROR` when the session can't submit its work on a borrowed ring's textures.
+   *   It keeps them then.
    */
-  public fun releaseTarget(): Completion<Unit> =
-    nativeUnit(this, binding) {
+  public fun releaseTarget(): Completion<GpuSync?> =
+    nativeSubmit(
+      this,
+      binding,
+      { result ->
+        if (CompletionBridge.valueCount(result) == 0uL) null
+        else readGpuSync(CompletionBridge.value(result))
+      },
+    ) {
       check(C.mln_render_session_release_target(handle, completion, diagnostic))
     }
 
@@ -628,28 +641,50 @@ private constructor(
     }
 
   /**
-   * Sets the frame pacer that demands the session's frames.
+   * Paces the session's frames to the display.
    *
-   * At the first display refresh after the session has something new to draw, `pacer` demands a
-   * frame without flags and with token 0. One pacer can serve many sessions. A null `pacer` stops
-   * pacing the session. You can call it once the attach call returns.
+   * At the first display refresh after the session has something new to draw, the library demands a
+   * frame without flags and with token 0, unless you demanded one first. Each call replaces the
+   * session's pacing, and a null `options` stops it. You can call it once the attach call returns.
    *
-   * See `mln_render_session_set_frame_pacer` in the
+   * On iOS, macOS, and tvOS, the library uses a `CADisplayLink` on a thread of its own. With
+   * `FramePacingOptions.view`, call it on the main thread. The library asks the system for the
+   * frame rate limit's refresh rate. On iPhone, a rate above 60 needs
+   * `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
+   *
+   * On Android, the library follows the display through the calling thread's `AChoreographer`. Call
+   * it on a thread with an `ALooper`, such as the app's main thread, and keep that thread running
+   * its looper while the session is paced. `AChoreographer` can stop while the phone's display is
+   * off, even while a Surface on another display, such as an Android Auto projection, still shows
+   * the map. The library then keeps demanding frames from a timer on the looper, within the frame
+   * rate limit, until vsyncs arrive again.
+   *
+   * On OpenHarmony, the library uses `OH_NativeVSync`, from any thread.
+   *
+   * See `mln_render_session_set_frame_pacing` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    *
    * Errors:
    *
+   * - `Status.INVALID_ARGUMENT` when `options` sets `maximum_frames_per_second` to 0, or sets
+   *   `view` to null.
+   * - `Status.UNSUPPORTED` on the other platforms, such as visionOS, Linux, and Windows, where the
+   *   library has no source of display refreshes, on macOS before 14, and when `options` sets
+   *   `view` on a platform other than macOS, iOS, and tvOS.
    * - `Status.TARGET_LOST` or `Status.NATIVE_ERROR`, as `RenderSessionSnapshot.failureStatus`
    *   reports, when the session has failed.
    * - `Status.INVALID_STATE` when you attached the session with a redraw wake, or detached,
-   *   abandoned, released, or disposed it.
+   *   abandoned, released, or disposed it, on Android when the calling thread has no `ALooper`, and
+   *   when `options` sets `view` off the main thread or, on iOS and tvOS, to a view in no window.
+   * - `Status.NATIVE_ERROR` on iOS, macOS, and tvOS when the system has no display to follow, and
+   *   on OpenHarmony when the system can't report the display's refreshes to the process.
    */
-  public fun setFramePacer(pacer: FramePacerHandle? = null): Unit =
+  public fun setFramePacing(options: FramePacingOptions? = null): Unit =
     nativeCall(this, binding) {
       check(
-        C.mln_render_session_set_frame_pacer(
+        C.mln_render_session_set_frame_pacing(
           handle,
-          pacer?.let { argument(it, it.binding) } ?: 0L,
+          options?.let { writeFramePacingOptions(it) } ?: 0L,
           diagnostic,
         ),
       )
@@ -665,9 +700,11 @@ private constructor(
    * replacement completes, the session no longer uses the old target. A borrowed ring takes only a
    * ring of the kind it attached with, with as many textures, with depth textures only when it
    * attached with them, and with the same formats, final layouts, and owner. Release every acquired
-   * frame of a borrowed ring first. Once the replacement completes, the session has also stopped
-   * waiting on the consumer sync of the textures that the new ring doesn't have, as
-   * `RenderSessionHandle.releaseTarget()` says, so you can reuse or destroy them.
+   * frame of a borrowed ring first. For a borrowed ring, the replacement completes with an
+   * `GpuSync`: wait for it before you reuse or destroy the textures that the new ring doesn't have,
+   * as `RenderSessionHandle.releaseTarget()` says. When it lets go of no textures, such as after a
+   * release, the sync is `GpuSyncKind.CPU_COMPLETE`. For another target, the completion has no
+   * value.
    *
    * See `mln_render_session_set_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -690,8 +727,15 @@ private constructor(
    *   depth textures. Attach a new session instead.
    * - `Status.NATIVE_ERROR` when the library can't render to the new target.
    */
-  public fun setTarget(target: RenderTarget): Completion<Unit> =
-    nativeUnit(this, binding) {
+  public fun setTarget(target: RenderTarget): Completion<GpuSync?> =
+    nativeSubmit(
+      this,
+      binding,
+      { result ->
+        if (CompletionBridge.valueCount(result) == 0uL) null
+        else readGpuSync(CompletionBridge.value(result))
+      },
+    ) {
       check(
         C.mln_render_session_set_target(handle, writeRenderTarget(target), completion, diagnostic),
       )

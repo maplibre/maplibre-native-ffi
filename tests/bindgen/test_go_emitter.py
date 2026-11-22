@@ -115,7 +115,9 @@ class GoEmitterTests(unittest.TestCase):
         source = emitted(go, real_api())["generated_api.go"]
         self.assertIn("MapHandle.CancelCameraTransitions()", source)
         self.assertIn("MapHandle.CancelCameraTransitionsWithID()", source)
-        self.assertIn("GesturePhaseCancel, MapHandle.SetFreeCameraOptions()", source)
+        self.assertIn("// For MomentumDecayModelFriction.", source)
+        # A tag that only its union uses names the variant it selects.
+        self.assertIn("report an GestureEventNotchVariant as", source)
         self.assertNotIn("// mln_map_cancel_camera_transitions()", source)
 
     def test_a_callback_receives_its_slice_argument_as_a_slice(self):

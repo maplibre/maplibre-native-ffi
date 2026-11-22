@@ -19,8 +19,8 @@ const log = std.log.scoped(.map);
 const allocator = std.heap.smp_allocator;
 const style_url = "https://tiles.openfreemap.org/styles/liberty";
 
-/// The library's pacer demands the frames on macOS, and the view's own
-/// elsewhere.
+/// The session paces its own frames on macOS, and the view's pacer demands
+/// them elsewhere.
 const library_paced = builtin.os.tag == .macos;
 
 pub const Status = union(enum) {
@@ -100,13 +100,14 @@ pub fn init(self: *MapView, window: *c.SDL_Window, wake: *const fn () void) !voi
     }, &diagnostic);
     try self.map.discarding().setStyleUrl(style_url, &diagnostic);
 
-    try self.pacer.init(window, wake);
-    errdefer self.pacer.deinit();
+    if (!library_paced) try self.pacer.init(window, wake);
+    errdefer if (!library_paced) self.pacer.deinit();
     const attached = try self.attach(&diagnostic);
     self.session = attached.session;
     errdefer self.session.dispose(null) catch {};
     try attached.ready.await(&diagnostic);
-    if (library_paced) try self.session.setFramePacer(self.pacer.pacer, &diagnostic);
+    // The session follows the display of the window that shows the view.
+    if (library_paced) try self.session.setFramePacing(.{ .view = self.metal_view }, &diagnostic);
 }
 
 /// Releases the session, the map, and the runtime. The session lets go of the
@@ -114,7 +115,7 @@ pub fn init(self: *MapView, window: *c.SDL_Window, wake: *const fn () void) !voi
 pub fn deinit(self: *MapView) void {
     var diagnostic: maplibre.Diagnostic = .{};
     release(&self.session, &diagnostic) catch log.warn("couldn't release the session: {s}", .{diagnostic.message()});
-    self.pacer.deinit();
+    if (!library_paced) self.pacer.deinit();
     if (builtin.os.tag == .macos) c.SDL_Metal_DestroyView(self.metal_view);
     release(&self.map, &diagnostic) catch log.warn("couldn't release the map: {s}", .{diagnostic.message()});
     release(&self.runtime, &diagnostic) catch log.warn("couldn't release the runtime: {s}", .{diagnostic.message()});
@@ -154,12 +155,6 @@ pub fn resize(self: *MapView) void {
     self.extent = extent;
     var diagnostic: maplibre.Diagnostic = .{};
     self.session.discarding().resize(extent, &diagnostic) catch self.fail(diagnostic.message());
-}
-
-/// Moves the camera, as a gesture asks.
-pub fn applyCameraDelta(self: *MapView, delta: maplibre.CameraDelta) void {
-    var diagnostic: maplibre.Diagnostic = .{};
-    self.map.discarding().applyCameraDelta(delta, &diagnostic) catch self.fail(diagnostic.message());
 }
 
 /// How many of the map's logical pixels a point of SDL's window coordinates
@@ -278,7 +273,7 @@ fn windowExtent(window: *c.SDL_Window) !maplibre.LogicalExtent {
 }
 
 /// Shows an error. Once the view shows one, later ones don't replace it.
-fn fail(self: *MapView, message: []const u8) void {
+pub fn fail(self: *MapView, message: []const u8) void {
     log.err("the map failed: {s}", .{message});
     const copy = allocator.dupeSentinel(u8, message, 0) catch return;
     if (self.failure.cmpxchgStrong(null, copy.ptr, .acq_rel, .acquire) != null) allocator.free(copy);

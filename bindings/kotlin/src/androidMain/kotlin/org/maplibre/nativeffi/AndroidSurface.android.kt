@@ -43,7 +43,7 @@ public fun MapHandle.attachAndroidSurface(
 public fun RenderSessionHandle.setAndroidSurfaceTarget(
   surface: Surface,
   logicalSize: LogicalSize,
-): Completion<Unit> =
+): Completion<GpuSync?> =
   withAndroidWindow(surface) { window -> setTarget(androidWindow(logicalSize, window)) }
 
 private fun androidWindow(logicalSize: LogicalSize, window: Long): RenderTarget =

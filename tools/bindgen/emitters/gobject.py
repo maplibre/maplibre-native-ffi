@@ -1790,10 +1790,17 @@ def _symbols(bound: BoundApi) -> docs.Symbol:
         return constant_name(value, member)
 
     values = Values(bound, lambda name: None)
+    # A record that holds only a union presents the union's accessors.
+    presenters = {
+        record.union_member.value.native: record.native
+        for record in bound.values.values()
+        if record.union_member
+    }
 
     def field_(value: ValuePlan, member: FieldPlan) -> str | None:
         if value.kind == "union":
-            return f"{symbol_name(value.native)}_get_{member.name}"
+            owner = presenters.get(value.native, value.native)
+            return f"{symbol_name(owner)}_get_{member.name}"
         if value.kind == "record" and value.union_member:
             return None
         if values.transparent(value):

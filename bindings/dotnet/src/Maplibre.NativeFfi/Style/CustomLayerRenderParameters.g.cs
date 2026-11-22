@@ -51,6 +51,8 @@ public readonly partial record struct CustomLayerRenderParameters
 
         public sealed record WebGpu(WebGpuCustomLayerPass Value) : PassValue;
 
+        public sealed record D3d12(D3d12CustomLayerPass Value) : PassValue;
+
         public sealed record Unknown : PassValue
         {
             private readonly byte[] bytes;

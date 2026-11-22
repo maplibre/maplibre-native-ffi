@@ -475,7 +475,7 @@ def view(op: Operation, call: Call) -> tuple[str, str, set[str]]:
         "var viewScope = new NativeViewScope();",
         "void* token = null;",
         checked_call(
-            op.bound.source.functions_by_name[handle.view_begin], "Handle, &token"
+            op.bound.source.functions_by_name[handle.view_begin], "NativeHandle, &token"
         ),
         "try",
         "{",
@@ -694,7 +694,7 @@ def converted(op: Operation) -> Call:
     input_plans = {parameter.name: parameter.value for parameter in plan.inputs}
     asynchronous = plan.completion is not None
     records: set[str] = {receiver} if plan.scoped_receiver else set()
-    args = ["Pointer" if plan.scoped_receiver else "Handle"] if receiver else []
+    args = ["Pointer" if plan.scoped_receiver else "NativeHandle"] if receiver else []
     parameters = []
     # Parameters that may be absent, which default to null when trailing.
     omittable: set[str] = set()
@@ -1010,7 +1010,7 @@ def converted(op: Operation) -> Call:
             entry.append("using var scope = new NativeCallScope();")
     prologue = entry + prologue
     if op.discard:
-        prologue.insert(0, "var receiverHandle = owner.Handle;")
+        prologue.insert(0, "var receiverHandle = owner.NativeHandle;")
         args[0] = "receiverHandle"
     if pins and (plan.view or text):
         raise Unsupported("a pinned span requires a single native call")

@@ -1023,6 +1023,21 @@ typedef struct mln_vulkan_custom_layer_encoder {
 } mln_vulkan_custom_layer_encoder;
 
 /**
+ * The frame's D3D12 command list, outside the map's render pass.
+ *
+ * Record work such as copies and render passes of your own, with the barriers
+ * that it needs, and leave the resources that you use in the states that you
+ * found them in. Don't close or execute `command_list`. After the callback
+ * returns, the map sets its own descriptor heaps and root signature again.
+ */
+typedef struct mln_d3d12_custom_layer_encoder {
+  /** The `ID3D12Device` that the session renders on, to make objects with. */
+  void* device;
+  /** The frame's `ID3D12GraphicsCommandList`, outside a render pass. */
+  void* command_list;
+} mln_d3d12_custom_layer_encoder;
+
+/**
  * The frame's WebGPU command encoder, outside the map's render pass.
  *
  * End each pass that you begin on `encoder` before the callback returns, and
@@ -1052,6 +1067,8 @@ typedef union mln_custom_layer_encoder_data {
   );
   mln_web_gpu_custom_layer_encoder web_gpu
     MLN_BINDING("variant=MLN_RENDER_BACKEND_WEB_GPU;platforms=web");
+  mln_d3d12_custom_layer_encoder d3d12
+    MLN_BINDING("variant=MLN_RENDER_BACKEND_D3D12;platforms=windows");
 } mln_custom_layer_encoder_data;
 
 /** What a custom layer's prerender callback gets. */
@@ -1128,6 +1145,41 @@ typedef struct mln_vulkan_custom_layer_pass {
 } mln_vulkan_custom_layer_pass;
 
 /**
+ * The map's D3D12 render pass, at a custom layer's place in the style.
+ *
+ * Set your own pipeline state, root signature, descriptor heaps, vertex and
+ * index buffers, primitive topology, viewport, scissor rectangle, and stencil
+ * reference, with pipeline states for `color_format` and
+ * `depth_stencil_format`, and draw. After the callback returns, the map sets
+ * again what its own draws need. Record nothing that a render pass can't
+ * hold, such as barriers, copies, or other render targets, and don't end the
+ * pass.
+ */
+typedef struct mln_d3d12_custom_layer_pass {
+  /** The `ID3D12Device` that the session renders on, to make objects with. */
+  void* device;
+  /**
+   * The frame's `ID3D12GraphicsCommandList`, in the render pass that
+   * `BeginRenderPass` began.
+   */
+  void* command_list;
+  /** The `D3D12_CPU_DESCRIPTOR_HANDLE` of the pass's render target view. */
+  uint64_t render_target_view;
+  /** The `DXGI_FORMAT` of the pass's color attachment. */
+  uint32_t color_format;
+  /**
+   * The `D3D12_CPU_DESCRIPTOR_HANDLE` of the pass's depth-stencil view, or 0
+   * when it has none.
+   */
+  uint64_t depth_stencil_view;
+  /**
+   * The `DXGI_FORMAT` of the pass's depth-stencil attachment, or
+   * `DXGI_FORMAT_UNKNOWN` when it has none.
+   */
+  uint32_t depth_stencil_format;
+} mln_d3d12_custom_layer_pass;
+
+/**
  * The map's OpenGL framebuffer, at a custom layer's place in the style.
  *
  * The session's context is current, with `framebuffer` bound and the
@@ -1186,6 +1238,8 @@ typedef union mln_custom_layer_pass_data {
     MLN_BINDING("variant=MLN_RENDER_BACKEND_OPEN_GL");
   mln_web_gpu_custom_layer_pass web_gpu
     MLN_BINDING("variant=MLN_RENDER_BACKEND_WEB_GPU;platforms=web");
+  mln_d3d12_custom_layer_pass d3d12
+    MLN_BINDING("variant=MLN_RENDER_BACKEND_D3D12;platforms=windows");
 } mln_custom_layer_pass_data;
 
 /** What a custom layer's render callback gets. */

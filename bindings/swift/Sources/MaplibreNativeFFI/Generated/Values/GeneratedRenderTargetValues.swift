@@ -38,6 +38,174 @@ public struct AndroidWindowTarget: Equatable, Hashable, Sendable {
   }
 }
 
+/// A D3D12 texture of a borrowed ring.
+///
+/// See `mln_d3d12_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+public struct D3d12BorrowedTexture: Equatable, Hashable, Sendable {
+  /// Your `ID3D12Resource`.
+  public var resource: NativePointer
+  public init(resource: NativePointer) {
+    self.resource = resource
+  }
+
+  init(raw: mln_d3d12_borrowed_texture) {
+    resource = NativePointer(bitPattern: unsafeBitCast(
+      raw.resource,
+      to: UInt.self
+    ))
+  }
+
+  func nativeValue() -> mln_d3d12_borrowed_texture {
+    var raw = mln_d3d12_borrowed_texture()
+    raw.resource = resource.unsafeMutableRawPointer
+    return raw
+  }
+}
+
+/// A ring of your D3D12 textures to render into, on the D3D12 device that you
+/// attach on.
+///
+/// `physical_width` and `physical_height` give the textures' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. Each texture
+/// must be a 2D resource of the device with that size, one mip level, one array
+/// slice, one sample, `D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET`, and one typed
+/// color format that the device renders into, such as
+/// DXGI_FORMAT_R8G8B8A8_UNORM or DXGI_FORMAT_B8G8R8A8_UNORM. The ring holds up
+/// to `textureRingMaxDepth` distinct textures, and references each.
+///
+/// Each texture is in `state` when the session has it, and each frame leaves it
+/// there.
+///
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, renders the map's
+/// depth and stencil into it, stores them, and leaves it in `depth_state`. They
+/// must have the size of `textures`, one format of
+/// `GpuDeviceCapabilities.depthStencilFormats` (DXGI_FORMAT_D24_UNORM_S8_UINT
+/// or DXGI_FORMAT_D32_FLOAT_S8X24_UINT), one sample, and
+/// `D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL`.
+///
+/// See `mln_d3d12_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+public struct D3d12BorrowedTexturesTarget: Equatable, Hashable, Sendable {
+  public var logicalSize: LogicalSize
+  public var physicalWidth: UInt32
+  public var physicalHeight: UInt32
+  public var textures: [D3d12BorrowedTexture]
+  /// The textures' `D3D12_RESOURCE_STATES`.
+  public var state: UInt32
+  public var depthTextures: [D3d12BorrowedTexture]
+  /// The depth textures' `D3D12_RESOURCE_STATES`.
+  public var depthState: UInt32
+  public init(
+    logicalSize: LogicalSize,
+    physicalWidth: UInt32,
+    physicalHeight: UInt32,
+    textures: [D3d12BorrowedTexture],
+    state: UInt32 = 0,
+    depthTextures: [D3d12BorrowedTexture] = [],
+    depthState: UInt32 = 0
+  ) {
+    self.logicalSize = logicalSize
+    self.physicalWidth = physicalWidth
+    self.physicalHeight = physicalHeight
+    self.textures = textures
+    self.state = state
+    self.depthTextures = depthTextures
+    self.depthState = depthState
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_d3d12_borrowed_textures_target
+  {
+    var raw = mln_d3d12_borrowed_textures_target()
+    raw.logical_size = logicalSize.nativeValue()
+    raw.physical_width = physicalWidth
+    raw.physical_height = physicalHeight
+    raw.textures = arena.array(textures.map { $0.nativeValue() })
+    raw.texture_count = try NativeInputArena.count(textures.count)
+    raw.state = state
+    raw.depth_textures = arena.array(depthTextures.map { $0.nativeValue() })
+    raw.depth_texture_count = try NativeInputArena.count(depthTextures.count)
+    raw.depth_state = depthState
+    return raw
+  }
+}
+
+/// What shows a D3D12 composition swap chain.
+///
+/// See `mln_d3d12_composition_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+public struct D3d12CompositionKind: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// An `IDCompositionVisual`, whose content the session sets to its swap
+  /// chain.
+  public static let visual: D3d12CompositionKind = .init(rawValue: 1)
+  /// A XAML `SwapChainPanel`'s `ISwapChainPanelNative`, of WinUI or UWP, whose
+  /// swap chain the session sets.
+  public static let swapChainPanel: D3d12CompositionKind = .init(rawValue: 2)
+  public var description: String {
+    switch rawValue {
+    case 1: return "visual"
+    case 2: return "swapChainPanel"
+    default: return "D3d12CompositionKind(\(rawValue))"
+    }
+  }
+}
+
+/// A composition swap chain to present to, which your DirectComposition visual
+/// or XAML `SwapChainPanel` shows.
+///
+/// The session renders on D3D12: on the D3D12 device that you attach on, or on
+/// one that it makes without a device. It makes a flip-model swap chain for
+/// composition of `logical_size` at the map's scale factor, with premultiplied
+/// alpha, and sets it as the visual's content or the panel's swap chain. Commit
+/// your DirectComposition device once the attach completes. A panel takes its
+/// swap chain only on its UI thread: attach it there with
+/// `RenderDriverKind.callerGraphicsThread`, and service the session there.
+/// Scale the visual or the panel to show the swap chain at the display's scale.
+/// The session references `object` until a replacement or release of the target
+/// completes, or the session ends.
+///
+/// See `mln_d3d12_composition_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+public struct D3d12CompositionTarget: Equatable, Hashable, Sendable {
+  public var logicalSize: LogicalSize
+  public var kind: D3d12CompositionKind
+  /// Your `IDCompositionVisual*` or `ISwapChainPanelNative*`.
+  public var object: NativePointer
+  public init(
+    logicalSize: LogicalSize,
+    kind: D3d12CompositionKind,
+    object: NativePointer
+  ) {
+    self.logicalSize = logicalSize
+    self.kind = kind
+    self.object = object
+  }
+
+  init(raw: mln_d3d12_composition_target) {
+    logicalSize = LogicalSize(raw: raw.logical_size)
+    kind = D3d12CompositionKind(rawValue: raw.kind.rawValue)
+    object = NativePointer(bitPattern: unsafeBitCast(raw.object, to: UInt.self))
+  }
+
+  func nativeValue() -> mln_d3d12_composition_target {
+    var raw = mln_d3d12_composition_target()
+    raw.logical_size = logicalSize.nativeValue()
+    raw.kind = mln_d3d12_composition_kind(rawValue: kind.rawValue)
+    raw.object = object.unsafeMutableRawPointer
+    return raw
+  }
+}
+
 /// A format of depth and stencil textures, as a bit in a set.
 ///
 /// See `mln_depth_stencil_format_flag` in the
@@ -163,11 +331,15 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
 ///   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
 ///   `android_hardware_buffer_usage`. Get each frame's buffer with
 ///   `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
-/// - `GpuExportKind.dxgiSharedHandle`: D3D11 textures of the format
+/// - `GpuExportKind.dxgiSharedHandle`: textures of the format
 ///   DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
-///   resources and render targets. Open them on a D3D11 or D3D12 device of the
-///   same adapter, which you pick with `GpuDeviceOptions.adapterLuid`. Get each
-///   frame's texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+///   resources and render targets: D3D11 textures on a Vulkan device, and
+///   committed D3D12 resources in a shared heap on a D3D12 device, which each
+///   frame leaves in D3D12_RESOURCE_STATE_COMMON. Open them on a D3D11 or D3D12
+///   device of the same adapter, which you pick with
+///   `GpuDeviceOptions.adapterLuid`. Get each frame's texture with
+///   `AcquiredFrameHandle.withDxgiSharedTexture()`, and on a D3D12 device its
+///   resource with `AcquiredFrameHandle.withD3d12Texture()`.
 /// - `GpuExportKind.dmaBuf`: dmabufs of a format and modifier from
 ///   `dma_buf_formats`. Get each frame's buffer with
 ///   `AcquiredFrameHandle.withDmaBuf()`.
@@ -184,13 +356,14 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
 ///
 /// Each frame hands over with `GpuSyncKind.cpuComplete` or with the sync kind
 /// that crosses APIs on its platform: `GpuSyncKind.metalSharedEvent` for an
-/// IOSurface, and `GpuSyncKind.syncFd` for the others, where the device has
-/// them. For a reader that waits on neither, such as a Wayland compositor
-/// without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
-/// out of `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
-/// finishes before you acquire it, and release each frame only once the reader
-/// is done with its texture. Give the ring 3 textures, so the session can
-/// render while you hold two frames.
+/// IOSurface, `GpuSyncKind.d3d12Fence` for a DXGI shared texture, and
+/// `GpuSyncKind.syncFd` for the others, where the device has them. For a reader
+/// that waits on neither, such as a Wayland compositor without explicit
+/// synchronization or Flutter's `copyPixelBuffer`, leave them out of
+/// `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes
+/// before you acquire it, and release each frame only once the reader is done
+/// with its texture. Give the ring 3 textures, so the session can render while
+/// you hold two frames.
 ///
 /// See `mln_exported_ring_target` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -838,16 +1011,18 @@ public struct RenderSessionAttachOptions: Sendable {
   ///
   /// - `RenderDriverKind.callerGraphicsThread` for a borrowed ring of WebGPU
   ///   textures.
-  /// - `RenderDriverKind.coreWorker` for an offscreen target, a window, or an
-  ///   exported ring.
+  /// - `RenderDriverKind.coreWorker` for an offscreen target, a window, a
+  ///   DirectComposition visual, or an exported ring.
+  /// - `RenderDriverKind.callerGraphicsThread` for a XAML `SwapChainPanel`, on
+  ///   the panel's UI thread.
   /// - Either one for a web canvas. In a browser both run on the thread that
   ///   loaded the library: `RenderDriverKind.coreWorker` in the library's own
   ///   tasks, and `RenderDriverKind.callerGraphicsThread` when you service the
   ///   session.
   /// - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
-  ///   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
-  ///   these on `RenderDriverKind.coreWorker` only, and fails an attach with
-  ///   `RenderDriverKind.callerGraphicsThread` then.
+  ///   borrowed ring of Metal, Vulkan, D3D12, or OpenGL textures. A build may
+  ///   drive these on `RenderDriverKind.coreWorker` only, and fails an attach
+  ///   with `RenderDriverKind.callerGraphicsThread` then.
   ///
   /// An attach with another driver fails with `Status.unsupported`.
   public var driver: RenderDriverKind
@@ -1010,6 +1185,8 @@ public enum RenderTarget: Equatable, Hashable, Sendable {
   case webGpuBorrowedTextures(WebGpuBorrowedTexturesTarget)
   case exportedRing(ExportedRingTarget)
   case webCanvas(WebCanvasTarget)
+  case d3d12BorrowedTextures(D3d12BorrowedTexturesTarget)
+  case d3d12Composition(D3d12CompositionTarget)
   func nativeValue(arena: NativeInputArena) throws -> mln_render_target {
     var raw = mln_render_target()
     raw.size = UInt32(MemoryLayout<mln_render_target>.size)
@@ -1057,6 +1234,12 @@ public enum RenderTarget: Equatable, Hashable, Sendable {
       .exported_ring = try item.nativeValue(arena: arena)
     case let .webCanvas(item): raw.kind = MLN_RENDER_TARGET_KIND_WEB_CANVAS; raw
       .data.web_canvas = try item.nativeValue(arena: arena)
+    case let .d3d12BorrowedTextures(item): raw
+      .kind = MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES; raw.data
+      .d3d12_borrowed_textures = try item.nativeValue(arena: arena)
+    case let .d3d12Composition(item): raw
+      .kind = MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION; raw.data
+      .d3d12_composition = item.nativeValue()
     }
     return raw
   }
@@ -1093,6 +1276,10 @@ public struct RenderTargetKindFlag: OptionSet, NativeOpenValue, Equatable,
     .init(rawValue: 16384)
   public static let exportedRing: RenderTargetKindFlag = .init(rawValue: 32768)
   public static let webCanvas: RenderTargetKindFlag = .init(rawValue: 65536)
+  public static let d3d12BorrowedTextures: RenderTargetKindFlag =
+    .init(rawValue: 131_072)
+  public static let d3d12Composition: RenderTargetKindFlag =
+    .init(rawValue: 262_144)
 }
 
 /// A Vulkan image of a borrowed ring.
