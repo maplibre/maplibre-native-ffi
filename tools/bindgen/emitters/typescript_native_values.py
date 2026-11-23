@@ -307,6 +307,10 @@ class NativeValues:
             elif field.value.kind == "array":
                 count = field.value.length
                 assert count is not None
+                if field.value.extent is not None:
+                    raise Unsupported(
+                        f"{value.native}.{field.name}: inline array input"
+                    )
                 body = self.read_list(
                     field.value,
                     "member",
@@ -702,6 +706,16 @@ class NativeValues:
             '    napi_throw_range_error(env, NULL, "native record stride is too small");',
             "    return NULL;",
             "  }",
+        ]
+        if value.counted_inline:
+            # The count selects the elements in use, never past the extent.
+            lines += [
+                f"  if (count > {value.extent}) {{",
+                '    napi_throw_range_error(env, NULL, "native count exceeds its array");',
+                "    return NULL;",
+                "  }",
+            ]
+        lines += [
             "  napi_value result = mln_ts_array(env, count);",
             "  if (result == NULL) return NULL;",
             "  for (size_t index = 0; index < count; index++) {",

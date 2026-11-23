@@ -3,7 +3,6 @@ Camera struct
 CameraBounds struct
 CameraQueryResult struct
 CameraTransitionEnd struct
-CameraVelocity struct
 CanonicalTileId struct
 CustomLayerFrame struct
 DmaBufFormat struct
@@ -12,6 +11,13 @@ EdgeInsets struct
 FrameDemand struct
 FrameProjection struct
 FreeCamera struct
+GestureDelta struct
+GestureNotch struct
+GestureNotchEvent struct
+GesturePinch struct
+GesturePointer struct
+GesturePointerDown struct
+GestureTap struct
 GpuDeviceCapabilities struct
 GpuSync struct
 ImageContent struct
@@ -62,7 +68,6 @@ WebGlContextDescriptor struct
 WebGpuBorrowedTexture struct
 WebGpuCustomLayerEncoder struct
 CommandCompletion struct
-AnchoredMomentum.anchor#property no_accessor_method
 AndroidWindowTarget.logical_size#property no_accessor_method
 AnimationOptions.easing#property no_accessor_method
 BoundOptions.bounds#property no_accessor_method
@@ -72,6 +77,8 @@ CameraFitOptions.padding#property no_accessor_method
 CameraOptions.anchor#property no_accessor_method
 CameraOptions.center#property no_accessor_method
 CameraOptions.padding#property no_accessor_method
+D3d12BorrowedTexturesTarget.logical_size#property no_accessor_method
+D3d12CompositionTarget.logical_size#property no_accessor_method
 ExportedRingTarget.logical_size#property no_accessor_method
 FreeCameraOptions.orientation#property no_accessor_method
 FreeCameraOptions.position#property no_accessor_method
@@ -84,7 +91,6 @@ OfflineTilePyramidRegionDefinition.bounds#property no_accessor_method
 OhosWindowTarget.logical_size#property no_accessor_method
 OpenGlBorrowedTexturesTarget.logical_size#property no_accessor_method
 OpenGlSurfaceTarget.logical_size#property no_accessor_method
-PanMomentum.velocity#property no_accessor_method
 RenderedFeatureQueryOptions.layer_ids#property no_accessor_method
 SourceFeatureQueryOptions.source_layer_ids#property no_accessor_method
 StyleExpressionInputs.available_images#property no_accessor_method

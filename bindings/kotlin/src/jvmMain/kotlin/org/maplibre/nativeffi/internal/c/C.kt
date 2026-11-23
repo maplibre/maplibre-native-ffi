@@ -16,6 +16,8 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_acquired_frame_get_d3d12_texture =
+    Ffm.downcall("mln_acquired_frame_get_d3d12_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_dma_buf =
     Ffm.downcall("mln_acquired_frame_get_dma_buf", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_get_dxgi_shared_texture =
@@ -78,18 +80,49 @@ internal actual object C {
     Ffm.downcall("mln_delivery_queue_dispatch", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_delivery_queue_release =
     Ffm.downcall("mln_delivery_queue_release", null, JAVA_LONG)
-  private val mln_frame_pacer_create =
-    Ffm.downcall("mln_frame_pacer_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_frame_pacer_release = Ffm.downcall("mln_frame_pacer_release", null, JAVA_LONG)
-  private val mln_frame_pacer_set_options =
-    Ffm.downcall("mln_frame_pacer_set_options", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_gesture_recognizer_create =
+    Ffm.downcall(
+      "mln_gesture_recognizer_create",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_gesture_recognizer_handle =
+    Ffm.downcall(
+      "mln_gesture_recognizer_handle",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_DOUBLE,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_gesture_recognizer_release =
+    Ffm.downcall("mln_gesture_recognizer_release", null, JAVA_LONG)
+  private val mln_gesture_recognizer_set_options =
+    Ffm.downcall("mln_gesture_recognizer_set_options", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_gesture_recognizer_tick =
+    Ffm.downcall(
+      "mln_gesture_recognizer_tick",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_DOUBLE,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_gpu_device_create =
     Ffm.downcall("mln_gpu_device_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_gpu_device_get_capabilities =
     Ffm.downcall("mln_gpu_device_get_capabilities", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_gpu_device_get_d3d12_context =
+    Ffm.downcall("mln_gpu_device_get_d3d12_context", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_gpu_device_get_vulkan_context =
     Ffm.downcall("mln_gpu_device_get_vulkan_context", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_gpu_device_release = Ffm.downcall("mln_gpu_device_release", null, JAVA_LONG)
+  private val mln_gpu_device_wrap_d3d12 =
+    Ffm.downcall("mln_gpu_device_wrap_d3d12", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_gpu_device_wrap_metal =
     Ffm.downcall("mln_gpu_device_wrap_metal", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_gpu_device_wrap_open_gl =
@@ -954,8 +987,8 @@ internal actual object C {
     )
   private val mln_render_session_service_driver_work =
     Ffm.downcall("mln_render_session_service_driver_work", JAVA_INT, JAVA_LONG, JAVA_LONG)
-  private val mln_render_session_set_frame_pacer =
-    Ffm.downcall("mln_render_session_set_frame_pacer", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_render_session_set_frame_pacing =
+    Ffm.downcall("mln_render_session_set_frame_pacing", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_set_target =
     Ffm.downcall(
       "mln_render_session_set_target",
@@ -1045,6 +1078,15 @@ internal actual object C {
   private val mln_runtime_get_offline_region =
     Ffm.downcall(
       "mln_runtime_get_offline_region",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
+  private val mln_runtime_get_offline_region_expiry =
+    Ffm.downcall(
+      "mln_runtime_get_offline_region_expiry",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -1208,6 +1250,12 @@ internal actual object C {
     mln_acquired_frame_get_android_hardware_buffer.invokeExact(frame, outFrame, outDiagnostic)
       as Int
 
+  actual fun mln_acquired_frame_get_d3d12_texture(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int = mln_acquired_frame_get_d3d12_texture.invokeExact(frame, outFrame, outDiagnostic) as Int
+
   actual fun mln_acquired_frame_get_dma_buf(frame: Long, outFrame: Long, outDiagnostic: Long): Int =
     mln_acquired_frame_get_dma_buf.invokeExact(frame, outFrame, outDiagnostic) as Int
 
@@ -1304,15 +1352,41 @@ internal actual object C {
     mln_delivery_queue_release.invoke(queue)
   }
 
-  actual fun mln_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
-    mln_frame_pacer_create.invokeExact(options, outPacer, outDiagnostic) as Int
+  actual fun mln_gesture_recognizer_create(
+    map: Long,
+    options: Long,
+    outRecognizer: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_gesture_recognizer_create.invokeExact(map, options, outRecognizer, outDiagnostic) as Int
 
-  actual fun mln_frame_pacer_release(pacer: Long) {
-    mln_frame_pacer_release.invoke(pacer)
+  actual fun mln_gesture_recognizer_handle(
+    recognizer: Long,
+    input: Long,
+    timeMs: Double,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_gesture_recognizer_handle.invokeExact(recognizer, input, timeMs, outResult, outDiagnostic)
+      as Int
+
+  actual fun mln_gesture_recognizer_release(recognizer: Long) {
+    mln_gesture_recognizer_release.invoke(recognizer)
   }
 
-  actual fun mln_frame_pacer_set_options(pacer: Long, options: Long, outDiagnostic: Long): Int =
-    mln_frame_pacer_set_options.invokeExact(pacer, options, outDiagnostic) as Int
+  actual fun mln_gesture_recognizer_set_options(
+    recognizer: Long,
+    options: Long,
+    outDiagnostic: Long,
+  ): Int = mln_gesture_recognizer_set_options.invokeExact(recognizer, options, outDiagnostic) as Int
+
+  actual fun mln_gesture_recognizer_tick(
+    recognizer: Long,
+    timeMs: Double,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_gesture_recognizer_tick.invokeExact(recognizer, timeMs, outResult, outDiagnostic) as Int
 
   actual fun mln_gpu_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int =
     mln_gpu_device_create.invokeExact(options, outDevice, outDiagnostic) as Int
@@ -1324,6 +1398,12 @@ internal actual object C {
   ): Int =
     mln_gpu_device_get_capabilities.invokeExact(device, outCapabilities, outDiagnostic) as Int
 
+  actual fun mln_gpu_device_get_d3d12_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int = mln_gpu_device_get_d3d12_context.invokeExact(device, outResult, outDiagnostic) as Int
+
   actual fun mln_gpu_device_get_vulkan_context(
     device: Long,
     outResult: Long,
@@ -1333,6 +1413,12 @@ internal actual object C {
   actual fun mln_gpu_device_release(device: Long) {
     mln_gpu_device_release.invoke(device)
   }
+
+  actual fun mln_gpu_device_wrap_d3d12(
+    descriptor: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int = mln_gpu_device_wrap_d3d12.invokeExact(descriptor, outDevice, outDiagnostic) as Int
 
   actual fun mln_gpu_device_wrap_metal(
     descriptor: Long,
@@ -2664,11 +2750,11 @@ internal actual object C {
   actual fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int =
     mln_render_session_service_driver_work.invokeExact(session, outDiagnostic) as Int
 
-  actual fun mln_render_session_set_frame_pacer(
+  actual fun mln_render_session_set_frame_pacing(
     session: Long,
-    pacer: Long,
+    options: Long,
     outDiagnostic: Long,
-  ): Int = mln_render_session_set_frame_pacer.invokeExact(session, pacer, outDiagnostic) as Int
+  ): Int = mln_render_session_set_frame_pacing.invokeExact(session, options, outDiagnostic) as Int
 
   actual fun mln_render_session_set_target(
     session: Long,
@@ -2803,6 +2889,15 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_runtime_get_offline_region.invokeExact(runtime, regionId, completion, outDiagnostic) as Int
+
+  actual fun mln_runtime_get_offline_region_expiry(
+    runtime: Long,
+    regionId: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_runtime_get_offline_region_expiry.invokeExact(runtime, regionId, completion, outDiagnostic)
+      as Int
 
   actual fun mln_runtime_get_offline_region_status(
     runtime: Long,

@@ -159,6 +159,9 @@ def result_converter(
 
 
 def borrows_memory(value):
+    if value.kind == "array" and value.extent is not None:
+        # An inline array is part of its record's own storage.
+        return borrows_memory(value.element)
     if value.kind in {"buffer", "array"}:
         return True
     if value.kind == "reference" and value.element:

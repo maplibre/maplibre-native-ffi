@@ -17,12 +17,12 @@ public enum CameraChangeSource : uint
     Command = 0,
 
     /// <summary>
-    /// A camera command with a gesture phase.
+    /// A gesture that a gesture recognizer recognized.
     /// </summary>
     Gesture = 1,
 
     /// <summary>
-    /// The momentum and bearing snap that a gesture's end started.
+    /// The glide and snap after a gesture recognizer's gesture.
     /// </summary>
     Momentum = 2,
 }

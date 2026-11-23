@@ -100,6 +100,13 @@ check(readings == [7, 9], "strided readings: \(readings)")
 try check(ledger.drain().isEmpty, "drained readings")
 try ledger.release()
 
+// A counted inline array copies only the elements that its count holds,
+// though native fills every slot.
+let tracker = try ProbeTrackerHandle.open()
+let marks = try tracker.poll().marks
+check(marks == [.tap(ProbeTap(id: 9)), .level(1)], "inline marks: \(marks)")
+try tracker.release()
+
 // Caller-sized text that fits the runtime's first storage, and text that
 // does not, which the runtime fetches again with enough storage.
 try check(probeZerosJson(count: 0) == "[]", "empty text")

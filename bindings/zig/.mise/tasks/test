@@ -10,7 +10,7 @@ set -euo pipefail
 # MLN_TEST_TIMEOUT_SCALE, which defaults to 3 on emulators and in the software
 # renderers of Alpine and the virtual machine, and to 1 on the host; the fixture
 # scales its waits by the same value.
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" zig
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 case "$usage_preset" in
   android-* | linux-musl-* | freebsd-*)

@@ -1,26 +1,25 @@
 //! Paces the map's frames to the display, so that the window gets at most one
-//! frame per refresh. The library presents each frame without waiting for the
-//! display, and SDL has no frame clock for a window that it doesn't draw.
+//! frame per refresh, where the session can't pace them itself. The library
+//! presents each frame without waiting for the display, and SDL has no frame
+//! clock for a window that it doesn't draw.
 //!
 //! On Wayland, a frame callback on the window's surface tells when the
 //! compositor wants the next frame. On X11, a thread waits out the display's
 //! refresh period. On Windows, `DwmFlush` waits for the desktop compositor's
-//! next frame. On macOS, the library's own frame pacer follows the display,
-//! and demands the frames itself.
+//! next frame. On macOS, the session paces its own frames.
 
 const std = @import("std");
 const builtin = @import("builtin");
-const maplibre = @import("maplibre_native_ffi");
 const c = @import("sdl");
 const MapView = @import("MapView.zig");
 
-/// The pacer of this platform. Each one, other than the library's, is ready
-/// for a demand at most once per refresh: `demanding` makes it wait for the
-/// next one, and it calls `wake` once it's ready again.
+/// The pacer of this platform, which is ready for a demand at most once per
+/// refresh: `demanding` makes it wait for the next one, and it calls `wake`
+/// once it's ready again. macOS needs none.
 pub const Pacer = switch (builtin.os.tag) {
     .linux, .freebsd => UnixPacer,
     .windows => ThreadPacer,
-    .macos => LibraryPacer,
+    .macos => void,
     else => @compileError("unsupported platform"),
 };
 
@@ -227,18 +226,5 @@ const ThreadPacer = struct {
             self.waiting.store(false, .release);
             self.wake();
         }
-    }
-};
-
-/// The library's pacer, which demands the session's frames itself.
-const LibraryPacer = struct {
-    pacer: maplibre.FramePacer,
-
-    pub fn init(self: *LibraryPacer, _: *c.SDL_Window, _: Wake) !void {
-        self.* = .{ .pacer = try maplibre.FramePacer.create(null, null) };
-    }
-
-    pub fn deinit(self: *LibraryPacer) void {
-        self.pacer.release();
     }
 };

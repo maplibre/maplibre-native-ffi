@@ -35,7 +35,7 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         NativeMethods.mln_acquired_frame_discard(live, diagnostic);
 
     NativeHandleState<MlnAcquiredFrame> INativeOwner<MlnAcquiredFrame>.State => state;
-    internal MlnAcquiredFrame Handle => state.Handle;
+    internal MlnAcquiredFrame NativeHandle => state.Handle;
 
     /// <summary>
     /// The native handle value. It stays readable after release.
@@ -102,12 +102,12 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(NativeHandle, &token, Diagnostic));
         try
         {
             Check(
                 NativeMethods.mln_acquired_frame_get_android_hardware_buffer(
-                    Handle,
+                    NativeHandle,
                     &outFrame,
                     Diagnostic
                 )
@@ -118,6 +118,52 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
                     viewScope
                 )
             );
+        }
+        finally
+        {
+            viewScope.Expire();
+            NativeMethods.mln_acquired_frame_view_end(token);
+        }
+    }
+
+    /// <summary>
+    /// Gets the D3D12 texture of an acquired frame.
+    /// </summary>
+    /// <remarks>
+    /// <para>It gets a borrowed ring's texture, or an exported ring's on a
+    /// D3D12 device: the resource whose memory the ring shares, and the frame's
+    /// depth resource with <c>RenderSessionAttachOptions.KeepDepth</c>. Wait
+    /// for <c>AcquiredFrameHandle.WithProducerSync()</c> before you use
+    /// them.</para>
+    /// <para>See <c>mln_acquired_frame_get_d3d12_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.Unsupported</c> when the frame isn't of a
+    /// D3D12 device.</description></item>
+    /// <item><description><c>Status.TargetLost</c> when the session failed, or
+    /// you detached, abandoned, or disposed it.</description></item>
+    /// </list>
+    /// </remarks>
+    [global::System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public void WithD3d12Texture(Action<D3d12TextureFrameView> callback)
+    {
+        using var call = Enter(this);
+        var outFrame = new mln_d3d12_texture_frame { size = (uint)sizeof(mln_d3d12_texture_frame) };
+        ArgumentNullException.ThrowIfNull(callback);
+        var viewScope = new NativeViewScope();
+        void* token = null;
+        Check(NativeMethods.mln_acquired_frame_view_begin(NativeHandle, &token, Diagnostic));
+        try
+        {
+            Check(
+                NativeMethods.mln_acquired_frame_get_d3d12_texture(
+                    NativeHandle,
+                    &outFrame,
+                    Diagnostic
+                )
+            );
+            callback(new D3d12TextureFrameView(CopyD3d12TextureFrame(outFrame), viewScope));
         }
         finally
         {
@@ -157,10 +203,12 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(NativeHandle, &token, Diagnostic));
         try
         {
-            Check(NativeMethods.mln_acquired_frame_get_dma_buf(Handle, &outFrame, Diagnostic));
+            Check(
+                NativeMethods.mln_acquired_frame_get_dma_buf(NativeHandle, &outFrame, Diagnostic)
+            );
             callback(new DmaBufFrameView(CopyDmaBufFrame(outFrame), viewScope));
         }
         finally
@@ -204,12 +252,12 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(NativeHandle, &token, Diagnostic));
         try
         {
             Check(
                 NativeMethods.mln_acquired_frame_get_dxgi_shared_texture(
-                    Handle,
+                    NativeHandle,
                     &outFrame,
                     Diagnostic
                 )
@@ -257,10 +305,12 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(NativeHandle, &token, Diagnostic));
         try
         {
-            Check(NativeMethods.mln_acquired_frame_get_io_surface(Handle, &outFrame, Diagnostic));
+            Check(
+                NativeMethods.mln_acquired_frame_get_io_surface(NativeHandle, &outFrame, Diagnostic)
+            );
             callback(new IoSurfaceFrameView(CopyIoSurfaceFrame(outFrame), viewScope));
         }
         finally
@@ -299,11 +349,15 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(NativeHandle, &token, Diagnostic));
         try
         {
             Check(
-                NativeMethods.mln_acquired_frame_get_metal_texture(Handle, &outFrame, Diagnostic)
+                NativeMethods.mln_acquired_frame_get_metal_texture(
+                    NativeHandle,
+                    &outFrame,
+                    Diagnostic
+                )
             );
             callback(new MetalTextureFrameView(CopyMetalTextureFrame(outFrame), viewScope));
         }
@@ -344,10 +398,12 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(NativeHandle, &token, Diagnostic));
         try
         {
-            Check(NativeMethods.mln_acquired_frame_get_opaque_fd(Handle, &outFrame, Diagnostic));
+            Check(
+                NativeMethods.mln_acquired_frame_get_opaque_fd(NativeHandle, &outFrame, Diagnostic)
+            );
             callback(new OpaqueFdFrameView(CopyOpaqueFdFrame(outFrame), viewScope));
         }
         finally
@@ -388,11 +444,15 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(NativeHandle, &token, Diagnostic));
         try
         {
             Check(
-                NativeMethods.mln_acquired_frame_get_open_gl_texture(Handle, &outFrame, Diagnostic)
+                NativeMethods.mln_acquired_frame_get_open_gl_texture(
+                    NativeHandle,
+                    &outFrame,
+                    Diagnostic
+                )
             );
             callback(new OpenGlTextureFrameView(CopyOpenGlTextureFrame(outFrame), viewScope));
         }
@@ -422,10 +482,16 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(NativeHandle, &token, Diagnostic));
         try
         {
-            Check(NativeMethods.mln_acquired_frame_get_producer_sync(Handle, &outSync, Diagnostic));
+            Check(
+                NativeMethods.mln_acquired_frame_get_producer_sync(
+                    NativeHandle,
+                    &outSync,
+                    Diagnostic
+                )
+            );
             callback(new GpuSyncView(CopyGpuSync(outSync), viewScope));
         }
         finally
@@ -451,7 +517,7 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         {
             size = (uint)sizeof(mln_render_frame_result),
         };
-        Check(NativeMethods.mln_acquired_frame_get_result(Handle, &outResult, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_get_result(NativeHandle, &outResult, Diagnostic));
         return CopyRenderFrameResult(outResult);
     }
 
@@ -487,11 +553,15 @@ public sealed unsafe partial class AcquiredFrameHandle : INativeOwner<MlnAcquire
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_acquired_frame_view_begin(Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(NativeHandle, &token, Diagnostic));
         try
         {
             Check(
-                NativeMethods.mln_acquired_frame_get_vulkan_texture(Handle, &outFrame, Diagnostic)
+                NativeMethods.mln_acquired_frame_get_vulkan_texture(
+                    NativeHandle,
+                    &outFrame,
+                    Diagnostic
+                )
             );
             callback(new VulkanTextureFrameView(CopyVulkanTextureFrame(outFrame), viewScope));
         }

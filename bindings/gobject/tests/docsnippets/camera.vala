@@ -11,35 +11,40 @@ namespace CameraSnippets {
 	}
 
 	// #region gesture
-	void begin_gesture (Map map) {
-		var delta = new CameraDelta () {
-			gesture_phase = GesturePhase.BEGIN,
-		};
-		map.apply_camera_delta_async.begin (delta);
+	GestureRecognizer create_recognizer (Map map) throws GLib.Error {
+		return map.gesture_recognizer_create (null);
 	}
 
-	void apply_drag (Map map, ScreenPoint movement) {
-		var delta = new CameraDelta () {
-			offset = movement,
-			gesture_phase = GesturePhase.UPDATE,
-		};
-		map.apply_camera_delta_async.begin (delta);
+	void schedule_tick (GestureResult result) {
+		// On the next frame, or at result.get_next_tick_ms ().
 	}
 
-	void apply_pinch (Map map, double scale, ScreenPoint center) {
-		var delta = new CameraDelta () {
-			scale = scale,
-			anchor = center,
-			gesture_phase = GesturePhase.UPDATE,
-		};
-		map.apply_camera_delta_async.begin (delta);
+	void pointer_down (
+		GestureRecognizer recognizer,
+		uint32 id,
+		ScreenPoint position,
+		double time_ms
+	) throws GLib.Error {
+		var input = new GestureInput.pointer_down ({
+			id: id, kind: PointerKind.TOUCH, position: position,
+		});
+		schedule_tick (recognizer.handle (input, time_ms));
 	}
 
-	void end_gesture (Map map) {
-		var delta = new CameraDelta () {
-			gesture_phase = GesturePhase.END,
-		};
-		map.apply_camera_delta_async.begin (delta);
+	void pointer_move (
+		GestureRecognizer recognizer,
+		uint32 id,
+		ScreenPoint position,
+		double time_ms
+	) throws GLib.Error {
+		var input = new GestureInput.pointer_move ({
+			id: id, position: position,
+		});
+		schedule_tick (recognizer.handle (input, time_ms));
+	}
+
+	void tick (GestureRecognizer recognizer, double time_ms) throws GLib.Error {
+		schedule_tick (recognizer.tick (time_ms));
 	}
 	// #endregion gesture
 
@@ -112,10 +117,11 @@ namespace CameraSnippets {
 		map.set_bounds_async.begin (limits);
 		// #endregion limit
 
-		begin_gesture (map);
-		apply_drag (map, { x: 12, y: -4 });
-		apply_pinch (map, 1.1, { x: 200, y: 150 });
-		end_gesture (map);
+		var recognizer = create_recognizer (map);
+		pointer_down (recognizer, 1, { x: 100, y: 100 }, 0);
+		pointer_move (recognizer, 1, { x: 112, y: 96 }, 16);
+		tick (recognizer, 32);
+		recognizer.release ();
 
 		// #region convert
 		var projection = new MapProjection.create (

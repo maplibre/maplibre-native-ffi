@@ -11,7 +11,7 @@ const int MLN_C_VERSION = 0;
 
 typedef mln_acquired_frame = Uint64;
 typedef mln_delivery_queue = Uint64;
-typedef mln_frame_pacer = Uint64;
+typedef mln_gesture_recognizer = Uint64;
 typedef mln_gpu_device = Uint64;
 typedef mln_map = Uint64;
 typedef mln_map_projection = Uint64;
@@ -128,16 +128,6 @@ typedef mln_user_data_releaseFunction = Void Function(Pointer<Void> user_data);
 typedef mln_wake_callback = Pointer<NativeFunction<mln_wake_callbackFunction>>;
 typedef mln_wake_callbackFunction = Void Function(Pointer<Void> user_data);
 
-final class mln_anchored_momentum extends Struct {
-  @Uint32()
-  external int fields;
-  @Double()
-  external double velocity;
-  external mln_screen_point anchor;
-  external mln_momentum_decay decay;
-  external mln_momentum_snap snap;
-}
-
 final class mln_android_hardware_buffer_frame extends Struct {
   @Uint32()
   external int size;
@@ -240,12 +230,7 @@ final class mln_camera_delta extends Struct {
   @Double()
   external double pitch;
   external mln_screen_point anchor;
-  external mln_gesture_momentum momentum;
   external mln_animation_options animation;
-  @Uint32()
-  external int gesture_phase;
-  @Uint32()
-  external int reserved;
 }
 
 final class mln_camera_fit_options extends Struct {
@@ -304,7 +289,6 @@ final class mln_camera_transition_end extends Struct {
   external int outcome;
   @Uint64()
   external int generation;
-  external mln_camera_velocity velocity;
 }
 
 final class mln_camera_transition_handler extends Struct {
@@ -322,20 +306,6 @@ final class mln_camera_update extends Struct {
   external int mode;
   external mln_camera_options camera;
   external mln_animation_options animation;
-  @Uint32()
-  external int gesture_phase;
-  @Uint32()
-  external int reserved;
-}
-
-final class mln_camera_velocity extends Struct {
-  external mln_screen_point pan;
-  @Double()
-  external double zoom;
-  @Double()
-  external double bearing;
-  @Double()
-  external double pitch;
 }
 
 final class mln_canonical_tile_id extends Struct {
@@ -405,6 +375,7 @@ final class mln_custom_layer_encoder_data extends Union {
   external mln_metal_custom_layer_encoder metal;
   external mln_vulkan_custom_layer_encoder vulkan;
   external mln_web_gpu_custom_layer_encoder web_gpu;
+  external mln_d3d12_custom_layer_encoder d3d12;
 }
 
 final class mln_custom_layer_frame extends Struct {
@@ -432,6 +403,7 @@ final class mln_custom_layer_pass_data extends Union {
   external mln_vulkan_custom_layer_pass vulkan;
   external mln_open_gl_custom_layer_pass open_gl;
   external mln_web_gpu_custom_layer_pass web_gpu;
+  external mln_d3d12_custom_layer_pass d3d12;
 }
 
 final class mln_custom_layer_prerender_parameters extends Struct {
@@ -469,6 +441,84 @@ final class mln_custom_vector_source_options extends Struct {
   external mln_user_data_release release_user_data;
   @Uint64()
   external int queue;
+}
+
+final class mln_d3d12_borrowed_texture extends Struct {
+  external Pointer<Void> resource;
+}
+
+final class mln_d3d12_borrowed_textures_target extends Struct {
+  external mln_logical_size logical_size;
+  @Uint32()
+  external int physical_width;
+  @Uint32()
+  external int physical_height;
+  external Pointer<mln_d3d12_borrowed_texture> textures;
+  @Size()
+  external int texture_count;
+  @Uint32()
+  external int state;
+  external Pointer<mln_d3d12_borrowed_texture> depth_textures;
+  @Size()
+  external int depth_texture_count;
+  @Uint32()
+  external int depth_state;
+}
+
+final class mln_d3d12_composition_target extends Struct {
+  external mln_logical_size logical_size;
+  @Uint32()
+  external int kind;
+  external Pointer<Void> object;
+}
+
+final class mln_d3d12_custom_layer_encoder extends Struct {
+  external Pointer<Void> device;
+  external Pointer<Void> command_list;
+}
+
+final class mln_d3d12_custom_layer_pass extends Struct {
+  external Pointer<Void> device;
+  external Pointer<Void> command_list;
+  @Uint64()
+  external int render_target_view;
+  @Uint32()
+  external int color_format;
+  @Uint64()
+  external int depth_stencil_view;
+  @Uint32()
+  external int depth_stencil_format;
+}
+
+final class mln_d3d12_device_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external Pointer<Void> device;
+  external Pointer<Void> command_queue;
+}
+
+final class mln_d3d12_texture_frame extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int width;
+  @Uint32()
+  external int height;
+  @Double()
+  external double scale_factor;
+  @Uint32()
+  external int slot;
+  external Pointer<Void> resource;
+  external Pointer<Void> device;
+  @Uint32()
+  external int format;
+  @Uint32()
+  external int state;
+  external Pointer<Void> depth_resource;
+  @Uint32()
+  external int depth_format;
+  @Uint32()
+  external int depth_state;
 }
 
 final class mln_delivery_queue_options extends Struct {
@@ -614,13 +664,14 @@ final class mln_frame_demand extends Struct {
   external int token;
 }
 
-final class mln_frame_pacer_options extends Struct {
+final class mln_frame_pacing_options extends Struct {
   @Uint32()
   external int size;
   @Uint32()
   external int fields;
   @Uint32()
   external int maximum_frames_per_second;
+  external Pointer<Void> view;
 }
 
 final class mln_frame_projection extends Struct {
@@ -677,11 +728,159 @@ final class mln_geo_json_source_options extends Struct {
   external bool cluster;
 }
 
-final class mln_gesture_momentum extends Struct {
-  external mln_pan_momentum pan;
-  external mln_anchored_momentum zoom;
-  external mln_anchored_momentum bearing;
-  external mln_anchored_momentum pitch;
+final class mln_gesture_axis_options extends Struct {
+  @Uint32()
+  external int fields;
+  @Bool()
+  external bool enabled;
+  @Bool()
+  external bool glides;
+  external mln_momentum_decay momentum;
+  @Bool()
+  external bool snaps;
+  external mln_momentum_snap snap;
+  external Pointer<mln_gesture_notch> notches;
+  @Size()
+  external int notch_count;
+}
+
+final class mln_gesture_delta extends Struct {
+  external mln_screen_point position;
+  @Bool()
+  external bool discrete;
+  external mln_screen_point pan;
+  @Double()
+  external double zoom;
+  @Double()
+  external double bearing;
+  @Double()
+  external double pitch;
+}
+
+final class mln_gesture_event extends Struct {
+  @Uint32()
+  external int type;
+  external mln_gesture_event_data data;
+}
+
+final class mln_gesture_event_data extends Union {
+  external mln_gesture_tap tap;
+  external mln_gesture_tap double_tap;
+  external mln_gesture_tap two_finger_tap;
+  external mln_gesture_notch_event notch;
+  external mln_gesture_tap long_press;
+}
+
+final class mln_gesture_input extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int type;
+  external mln_gesture_input_data data;
+}
+
+final class mln_gesture_input_data extends Union {
+  external mln_gesture_pointer_down pointer_down;
+  external mln_gesture_pointer pointer_move;
+  external mln_gesture_pointer pointer_up;
+  external mln_gesture_pointer pointer_cancel;
+  @Uint32()
+  external int modes;
+  external mln_gesture_delta delta;
+  external mln_gesture_pinch pinch;
+}
+
+final class mln_gesture_notch extends Struct {
+  @Double()
+  external double spacing;
+  @Double()
+  external double offset;
+  @Uint32()
+  external int kind;
+}
+
+final class mln_gesture_notch_event extends Struct {
+  @Uint32()
+  external int axis;
+  @Uint32()
+  external int kind;
+  @Double()
+  external double value;
+}
+
+final class mln_gesture_options extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int fields;
+  @Double()
+  external double double_tap_zoom;
+  @Double()
+  external double two_finger_tap_zoom;
+  external mln_gesture_pan_options pan;
+  external mln_gesture_axis_options zoom;
+  external mln_gesture_axis_options bearing;
+  external mln_gesture_axis_options pitch;
+}
+
+final class mln_gesture_pan_options extends Struct {
+  @Uint32()
+  external int fields;
+  @Bool()
+  external bool enabled;
+  @Bool()
+  external bool glides;
+  external mln_momentum_decay momentum;
+}
+
+final class mln_gesture_pinch extends Struct {
+  external mln_screen_point center;
+  @Double()
+  external double scale;
+  @Double()
+  external double rotation;
+  @Uint32()
+  external int phase;
+}
+
+final class mln_gesture_pointer extends Struct {
+  @Uint32()
+  external int id;
+  external mln_screen_point position;
+}
+
+final class mln_gesture_pointer_down extends Struct {
+  @Uint32()
+  external int id;
+  @Uint32()
+  external int kind;
+  external mln_screen_point position;
+  @Uint32()
+  external int modes;
+}
+
+final class mln_gesture_result extends Struct {
+  @Uint32()
+  external int size;
+  @Bool()
+  external bool handled;
+  @Uint32()
+  external int next_tick;
+  @Double()
+  external double next_tick_ms;
+  @Bool()
+  external bool box_zoom_active;
+  external mln_screen_box box_zoom;
+  @Size()
+  external int event_count;
+  @Array(4)
+  external Array<mln_gesture_event> events;
+}
+
+final class mln_gesture_tap extends Struct {
+  @Uint32()
+  external int id;
+  external mln_screen_point position;
 }
 
 final class mln_gpu_device_capabilities extends Struct {
@@ -699,6 +898,13 @@ final class mln_gpu_device_capabilities extends Struct {
   external int depth_stencil_formats;
   @Uint32()
   external int depth_export_kinds;
+}
+
+final class mln_gpu_device_d3d12_context_result extends Struct {
+  @Uint32()
+  external int size;
+  external Pointer<Void> device;
+  external Pointer<Void> command_queue;
 }
 
 final class mln_gpu_device_options extends Struct {
@@ -860,6 +1066,8 @@ final class mln_map_options extends Struct {
   external mln_buffer_view fallback_font_faces;
   @Bool()
   external bool system_fonts_enabled;
+  @Bool()
+  external bool local_ideographs_enabled;
 }
 
 final class mln_map_projection_camera_result extends Struct {
@@ -1053,9 +1261,11 @@ final class mln_momentum_decay extends Struct {
   @Double()
   external double stop_speed;
   @Double()
-  external double distance;
+  external double reference_speed;
   @Double()
   external double duration_ms;
+  @Double()
+  external double duration_exponent;
   external mln_unit_bezier easing;
   @Double()
   external double min_speed;
@@ -1102,6 +1312,19 @@ final class mln_offline_region_definition extends Struct {
 final class mln_offline_region_definition_data extends Union {
   external mln_offline_tile_pyramid_region_definition tile_pyramid;
   external mln_offline_geometry_region_definition geometry;
+}
+
+final class mln_offline_region_expiry extends Struct {
+  @Uint32()
+  external int fields;
+  @Int64()
+  external int stale_after_unix_ms;
+  @Int64()
+  external int usable_offline_until_unix_ms;
+  @Uint64()
+  external int stale_resource_count;
+  @Uint64()
+  external int unusable_resource_count;
 }
 
 final class mln_offline_region_info extends Struct {
@@ -1247,13 +1470,6 @@ final class mln_open_gl_texture_frame extends Struct {
   external int depth_texture;
   @Uint32()
   external int depth_internal_format;
-}
-
-final class mln_pan_momentum extends Struct {
-  @Uint32()
-  external int fields;
-  external mln_screen_point velocity;
-  external mln_momentum_decay decay;
 }
 
 final class mln_premultiplied_rgba8_image extends Struct {
@@ -1441,6 +1657,8 @@ final class mln_render_target_data extends Union {
   external mln_web_gpu_borrowed_textures_target web_gpu_borrowed_textures;
   external mln_exported_ring_target exported_ring;
   external mln_web_canvas_target web_canvas;
+  external mln_d3d12_borrowed_textures_target d3d12_borrowed_textures;
+  external mln_d3d12_composition_target d3d12_composition;
 }
 
 final class mln_rendered_feature extends Struct {
@@ -1569,6 +1787,8 @@ final class mln_resource_response extends Struct {
   external mln_buffer_view etag;
   @Int64()
   external int retry_after_unix_ms;
+  @Bool()
+  external bool no_store;
 }
 
 final class mln_resource_route extends Struct {
@@ -2202,11 +2422,6 @@ final class mln_xlib_window_target extends Struct {
   external int window;
 }
 
-// mln_anchored_momentum_field
-const MLN_ANCHORED_MOMENTUM_VELOCITY = 1;
-const MLN_ANCHORED_MOMENTUM_ANCHOR = 2;
-const MLN_ANCHORED_MOMENTUM_SNAP = 4;
-
 // mln_animation_option_field
 const MLN_ANIMATION_OPTION_DURATION = 1;
 const MLN_ANIMATION_OPTION_VELOCITY = 2;
@@ -2244,7 +2459,6 @@ const MLN_CAMERA_DELTA_SCALE = 2;
 const MLN_CAMERA_DELTA_BEARING = 4;
 const MLN_CAMERA_DELTA_PITCH = 8;
 const MLN_CAMERA_DELTA_ANCHOR = 16;
-const MLN_CAMERA_DELTA_MOMENTUM = 32;
 
 // mln_camera_fit_option_field
 const MLN_CAMERA_FIT_OPTION_PADDING = 1;
@@ -2296,6 +2510,10 @@ const MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP = 64;
 const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MIN_ZOOM = 1;
 const MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2;
 
+// mln_d3d12_composition_kind
+const MLN_D3D12_COMPOSITION_KIND_VISUAL = 1;
+const MLN_D3D12_COMPOSITION_KIND_SWAP_CHAIN_PANEL = 2;
+
 // mln_depth_stencil_format_flag
 const MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8 = 1;
 const MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH32_FLOAT_STENCIL8 = 2;
@@ -2313,9 +2531,9 @@ const MLN_FEATURE_STATE_SELECTOR_FEATURE_ID = 1;
 const MLN_FRAME_DEMAND_FORCE = 1;
 const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4;
 
-// mln_frame_pacer_option_field
-const MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1;
-const MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND = 2;
+// mln_frame_pacing_option_field
+const MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1;
+const MLN_FRAME_PACING_OPTION_VIEW = 2;
 
 // mln_free_camera_option_field
 const MLN_FREE_CAMERA_OPTION_POSITION = 1;
@@ -2332,12 +2550,53 @@ const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 64;
 const MLN_GEO_JSON_SOURCE_OPTION_LINE_METRICS = 128;
 const MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 256;
 
-// mln_gesture_phase
-const MLN_GESTURE_PHASE_NONE = 0;
-const MLN_GESTURE_PHASE_BEGIN = 1;
-const MLN_GESTURE_PHASE_UPDATE = 2;
-const MLN_GESTURE_PHASE_END = 3;
-const MLN_GESTURE_PHASE_CANCEL = 4;
+// mln_gesture_axis
+const MLN_GESTURE_AXIS_ZOOM = 0;
+const MLN_GESTURE_AXIS_BEARING = 1;
+const MLN_GESTURE_AXIS_PITCH = 2;
+
+// mln_gesture_axis_option_field
+const MLN_GESTURE_AXIS_OPTION_ENABLED = 1;
+const MLN_GESTURE_AXIS_OPTION_GLIDES = 2;
+const MLN_GESTURE_AXIS_OPTION_MOMENTUM = 4;
+const MLN_GESTURE_AXIS_OPTION_SNAPS = 8;
+const MLN_GESTURE_AXIS_OPTION_SNAP = 16;
+const MLN_GESTURE_AXIS_OPTION_NOTCHES = 32;
+
+// mln_gesture_event_type
+const MLN_GESTURE_EVENT_TAP = 1;
+const MLN_GESTURE_EVENT_DOUBLE_TAP = 2;
+const MLN_GESTURE_EVENT_TWO_FINGER_TAP = 3;
+const MLN_GESTURE_EVENT_NOTCH = 4;
+const MLN_GESTURE_EVENT_LONG_PRESS = 5;
+
+// mln_gesture_input_type
+const MLN_GESTURE_INPUT_POINTER_DOWN = 1;
+const MLN_GESTURE_INPUT_POINTER_MOVE = 2;
+const MLN_GESTURE_INPUT_POINTER_UP = 3;
+const MLN_GESTURE_INPUT_POINTER_CANCEL = 4;
+const MLN_GESTURE_INPUT_MODES = 5;
+const MLN_GESTURE_INPUT_DELTA = 6;
+const MLN_GESTURE_INPUT_PINCH = 7;
+
+// mln_gesture_mode
+const MLN_GESTURE_MODE_ROTATE = 1;
+const MLN_GESTURE_MODE_BOX_ZOOM = 2;
+const MLN_GESTURE_MODE_ZOOM_OUT = 4;
+
+// mln_gesture_next_tick
+const MLN_GESTURE_NEXT_TICK_NONE = 0;
+const MLN_GESTURE_NEXT_TICK_FRAME = 1;
+const MLN_GESTURE_NEXT_TICK_AT = 2;
+
+// mln_gesture_option_field
+const MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM = 1;
+const MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM = 2;
+
+// mln_gesture_pan_option_field
+const MLN_GESTURE_PAN_OPTION_ENABLED = 1;
+const MLN_GESTURE_PAN_OPTION_GLIDES = 2;
+const MLN_GESTURE_PAN_OPTION_MOMENTUM = 4;
 
 // mln_gpu_device_option_field
 const MLN_GPU_DEVICE_OPTION_BACKEND = 1;
@@ -2434,6 +2693,7 @@ const MLN_MAP_MODE_TILE = 2;
 const MLN_MAP_OPTION_EVENT_MASK = 1;
 const MLN_MAP_OPTION_TILE_CACHE_ENABLED = 2;
 const MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED = 4;
+const MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED = 8;
 
 // mln_map_tile_option_field
 const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA = 1;
@@ -2453,16 +2713,17 @@ const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8;
 const MLN_MOMENTUM_DECAY_MODEL = 1;
 const MLN_MOMENTUM_DECAY_HALF_LIFE_MS = 2;
 const MLN_MOMENTUM_DECAY_STOP_SPEED = 4;
-const MLN_MOMENTUM_DECAY_DISTANCE = 8;
+const MLN_MOMENTUM_DECAY_REFERENCE_SPEED = 8;
 const MLN_MOMENTUM_DECAY_DURATION_MS = 16;
-const MLN_MOMENTUM_DECAY_EASING = 32;
-const MLN_MOMENTUM_DECAY_MIN_SPEED = 64;
-const MLN_MOMENTUM_DECAY_MAX_SPEED = 128;
-const MLN_MOMENTUM_DECAY_MAX_DISTANCE = 256;
+const MLN_MOMENTUM_DECAY_DURATION_EXPONENT = 32;
+const MLN_MOMENTUM_DECAY_EASING = 64;
+const MLN_MOMENTUM_DECAY_MIN_SPEED = 128;
+const MLN_MOMENTUM_DECAY_MAX_SPEED = 256;
+const MLN_MOMENTUM_DECAY_MAX_DISTANCE = 512;
 
 // mln_momentum_decay_model
 const MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0;
-const MLN_MOMENTUM_DECAY_MODEL_EASE = 1;
+const MLN_MOMENTUM_DECAY_MODEL_CURVE = 1;
 
 // mln_momentum_snap_field
 const MLN_MOMENTUM_SNAP_SPACING = 1;
@@ -2488,6 +2749,10 @@ const MLN_OFFLINE_REGION_DEFINITION_GEOMETRY = 2;
 const MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE = 0;
 const MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1;
 
+// mln_offline_region_expiry_field
+const MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER = 1;
+const MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL = 2;
+
 // mln_open_gl_client_api
 const MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0;
 const MLN_OPEN_GL_CLIENT_API_GL = 1;
@@ -2504,8 +2769,16 @@ const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WGL = 1;
 const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_EGL = 2;
 const MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 4;
 
-// mln_pan_momentum_field
-const MLN_PAN_MOMENTUM_VELOCITY = 1;
+// mln_pinch_phase
+const MLN_PINCH_PHASE_BEGIN = 0;
+const MLN_PINCH_PHASE_UPDATE = 1;
+const MLN_PINCH_PHASE_END = 2;
+const MLN_PINCH_PHASE_CANCEL = 3;
+
+// mln_pointer_kind
+const MLN_POINTER_KIND_MOUSE = 0;
+const MLN_POINTER_KIND_TOUCH = 1;
+const MLN_POINTER_KIND_PEN = 2;
 
 // mln_projection_mode_option_field
 const MLN_PROJECTION_MODE_OPTION_AXONOMETRIC = 1;
@@ -2526,12 +2799,14 @@ const MLN_RENDER_BACKEND_METAL = 1;
 const MLN_RENDER_BACKEND_VULKAN = 2;
 const MLN_RENDER_BACKEND_OPEN_GL = 3;
 const MLN_RENDER_BACKEND_WEB_GPU = 4;
+const MLN_RENDER_BACKEND_D3D12 = 5;
 
 // mln_render_backend_flag
 const MLN_RENDER_BACKEND_FLAG_METAL = 1;
 const MLN_RENDER_BACKEND_FLAG_VULKAN = 2;
 const MLN_RENDER_BACKEND_FLAG_OPEN_GL = 4;
 const MLN_RENDER_BACKEND_FLAG_WEB_GPU = 8;
+const MLN_RENDER_BACKEND_FLAG_D3D12 = 16;
 
 // mln_render_driver_kind
 const MLN_RENDER_DRIVER_CORE_WORKER = 1;
@@ -2577,6 +2852,8 @@ const MLN_RENDER_TARGET_KIND_OPEN_GL_BORROWED_TEXTURES = 14;
 const MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES = 15;
 const MLN_RENDER_TARGET_KIND_EXPORTED_RING = 16;
 const MLN_RENDER_TARGET_KIND_WEB_CANVAS = 17;
+const MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES = 18;
+const MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION = 19;
 
 // mln_render_target_kind_flag
 const MLN_RENDER_TARGET_KIND_FLAG_OFFSCREEN = 1;
@@ -2594,6 +2871,8 @@ const MLN_RENDER_TARGET_KIND_FLAG_OPEN_GL_BORROWED_TEXTURES = 8192;
 const MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES = 16384;
 const MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING = 32768;
 const MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS = 65536;
+const MLN_RENDER_TARGET_KIND_FLAG_D3D12_BORROWED_TEXTURES = 131072;
+const MLN_RENDER_TARGET_KIND_FLAG_D3D12_COMPOSITION = 262144;
 
 // mln_rendered_feature_query_option_field
 const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1;
@@ -2886,6 +3165,19 @@ external int mln_acquired_frame_get_android_hardware_buffer(
 @Native<
   Int32 Function(
     mln_acquired_frame,
+    Pointer<mln_d3d12_texture_frame>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_acquired_frame_get_d3d12_texture(
+  int frame,
+  Pointer<mln_d3d12_texture_frame> out_frame,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_acquired_frame,
     Pointer<mln_dma_buf_frame>,
     Pointer<mln_diagnostic>,
   )
@@ -3115,30 +3407,64 @@ external void mln_delivery_queue_release(int queue);
 
 @Native<
   Int32 Function(
-    Pointer<mln_frame_pacer_options>,
-    Pointer<mln_frame_pacer>,
+    mln_map,
+    Pointer<mln_gesture_options>,
+    Pointer<mln_gesture_recognizer>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_frame_pacer_create(
-  Pointer<mln_frame_pacer_options> options,
-  Pointer<mln_frame_pacer> out_pacer,
+external int mln_gesture_recognizer_create(
+  int map,
+  Pointer<mln_gesture_options> options,
+  Pointer<mln_gesture_recognizer> out_recognizer,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<Void Function(mln_frame_pacer)>()
-external void mln_frame_pacer_release(int pacer);
-
 @Native<
   Int32 Function(
-    mln_frame_pacer,
-    Pointer<mln_frame_pacer_options>,
+    mln_gesture_recognizer,
+    Pointer<mln_gesture_input>,
+    Double,
+    Pointer<mln_gesture_result>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_frame_pacer_set_options(
-  int pacer,
-  Pointer<mln_frame_pacer_options> options,
+external int mln_gesture_recognizer_handle(
+  int recognizer,
+  Pointer<mln_gesture_input> input,
+  double time_ms,
+  Pointer<mln_gesture_result> out_result,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<Void Function(mln_gesture_recognizer)>()
+external void mln_gesture_recognizer_release(int recognizer);
+
+@Native<
+  Int32 Function(
+    mln_gesture_recognizer,
+    Pointer<mln_gesture_options>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_gesture_recognizer_set_options(
+  int recognizer,
+  Pointer<mln_gesture_options> options,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_gesture_recognizer,
+    Double,
+    Pointer<mln_gesture_result>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_gesture_recognizer_tick(
+  int recognizer,
+  double time_ms,
+  Pointer<mln_gesture_result> out_result,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -3171,6 +3497,19 @@ external int mln_gpu_device_get_capabilities(
 @Native<
   Int32 Function(
     mln_gpu_device,
+    Pointer<mln_gpu_device_d3d12_context_result>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_gpu_device_get_d3d12_context(
+  int device,
+  Pointer<mln_gpu_device_d3d12_context_result> out_result,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_gpu_device,
     Pointer<mln_gpu_device_vulkan_context_result>,
     Pointer<mln_diagnostic>,
   )
@@ -3183,6 +3522,19 @@ external int mln_gpu_device_get_vulkan_context(
 
 @Native<Void Function(mln_gpu_device)>()
 external void mln_gpu_device_release(int device);
+
+@Native<
+  Int32 Function(
+    Pointer<mln_d3d12_device_descriptor>,
+    Pointer<mln_gpu_device>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_gpu_device_wrap_d3d12(
+  Pointer<mln_d3d12_device_descriptor> descriptor,
+  Pointer<mln_gpu_device> out_device,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @Native<
   Int32 Function(
@@ -5032,11 +5384,15 @@ external int mln_render_session_service_driver_work(
 );
 
 @Native<
-  Int32 Function(mln_render_session, mln_frame_pacer, Pointer<mln_diagnostic>)
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_frame_pacing_options>,
+    Pointer<mln_diagnostic>,
+  )
 >()
-external int mln_render_session_set_frame_pacer(
+external int mln_render_session_set_frame_pacing(
   int session,
-  int pacer,
+  Pointer<mln_frame_pacing_options> options,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -5245,6 +5601,21 @@ external int mln_runtime_dispose(
   )
 >()
 external int mln_runtime_get_offline_region(
+  int runtime,
+  int region_id,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_runtime,
+    Int64,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_get_offline_region_expiry(
   int runtime,
   int region_id,
   Pointer<mln_completion> completion,

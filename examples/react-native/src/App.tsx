@@ -10,7 +10,7 @@ export default function App() {
   // The view can report its surface before the effect runs, so the controller
   // exists from the first render and starts in the effect.
   const [controller] = useState(() => new MapController(setStatus));
-  const [gestures] = useState(() => mapGestures(() => controller.map));
+  const [gestures] = useState(() => mapGestures(() => controller.recognizer));
 
   useEffect(() => {
     controller.start();
@@ -35,7 +35,7 @@ export default function App() {
         onSurfaceLost={(event) =>
           controller.surfaceLost(event.nativeEvent.surface)
         }
-        {...gestures.panHandlers}
+        {...gestures}
       />
       {status.message === "" ? null : (
         <View

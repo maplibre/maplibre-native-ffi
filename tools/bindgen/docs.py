@@ -459,9 +459,11 @@ def resolver(
 
     Those are the public values, handles, and callbacks, each public
     operation, the constants of each public enum, the public fields of each
-    public record, the flags of a record's mask, and each public constant
-    macro, which `define` spells. Each function spells a declaration as the
-    binding generates it, or returns None for one that it does not generate.
+    public record, the flags of a record's mask, each public constant
+    macro, which `define` spells, and the tag constant of each union member
+    that a private tag enum selects, which names that member. Each function
+    spells a declaration as the binding generates it, or returns None for one
+    that it does not generate.
     `extra` names declarations that a binding's handwritten runtime presents.
     `threads` and `fields` are as `Resolver` describes.
     `parameter` spells a C parameter name as the binding's parameters do;
@@ -484,6 +486,13 @@ def resolver(
             names[plan.name] = operation(plan)
     for item in bound.public_constants:
         names[item.name] = define(item) if define else None
+    # A binding keeps a tag enum that only unions use private, and a union's
+    # member stands for its variant, so a tag constant names that member.
+    for native, value in bound.public_values.items():
+        for member in value.fields:
+            variant = member.presence.variant if member.presence else None
+            if variant and variant not in names:
+                names[variant] = names.get(f"{native}.{member.name}")
     found = {name: spelled for name, spelled in names.items() if spelled}
     found.update(extra or {})
     return Resolver(found, threads or {}, fields or {}, parameter)

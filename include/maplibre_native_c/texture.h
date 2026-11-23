@@ -188,6 +188,35 @@ typedef struct mln_android_hardware_buffer_frame {
   void* buffer MLN_BINDING("lifetime=owner");
 } mln_android_hardware_buffer_frame;
 
+/**
+ * The D3D12 texture of an acquired frame.
+ *
+ * The depth members are set when the frame has a depth texture, as for
+ * mln_metal_texture_frame. Otherwise they are zero.
+ */
+typedef struct mln_d3d12_texture_frame {
+  uint32_t size;
+  uint32_t width;
+  uint32_t height;
+  double scale_factor;
+  /** The texture's index in the descriptor's `textures`, or in the ring. */
+  uint32_t slot;
+  /** The `ID3D12Resource`. */
+  void* resource MLN_BINDING("lifetime=owner");
+  /** The resource's `ID3D12Device`. */
+  void* device MLN_BINDING("lifetime=owner");
+  /** The resource's `DXGI_FORMAT`. */
+  uint32_t format;
+  /** The `D3D12_RESOURCE_STATES` that the frame left the resource in. */
+  uint32_t state;
+  /** The `ID3D12Resource` that holds the frame's depth and stencil. */
+  void* depth_resource MLN_BINDING("lifetime=owner");
+  /** The depth resource's `DXGI_FORMAT`. */
+  uint32_t depth_format;
+  /** The `D3D12_RESOURCE_STATES` that the frame left the depth resource in. */
+  uint32_t depth_state;
+} mln_d3d12_texture_frame;
+
 /** The DXGI shared texture of an exported ring's acquired frame. */
 typedef struct mln_dxgi_shared_texture_frame {
   uint32_t size;
@@ -476,6 +505,32 @@ MLN_BINDING("view_owner=frame;platforms=android")
 MLN_API mln_status mln_acquired_frame_get_android_hardware_buffer(
   mln_acquired_frame frame,
   mln_android_hardware_buffer_frame* out_frame MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Gets the D3D12 texture of an acquired frame.
+ *
+ * It gets a borrowed ring's texture, or an exported ring's on a D3D12 device:
+ * the resource whose memory the ring shares, and the frame's depth resource
+ * with mln_render_session_attach_options.keep_depth. Wait for
+ * mln_acquired_frame_get_producer_sync() before you use them.
+ *
+ * Returns:
+ * - MLN_STATUS_UNSUPPORTED when the frame isn't of a D3D12 device.
+ * - MLN_STATUS_TARGET_LOST when the session failed, or you detached, abandoned,
+ *   or disposed it.
+ *
+ * Lifetimes:
+ * The resources and device in `out_frame` stay valid until you release or
+ * discard the frame, or the session is abandoned or disposed. A view from
+ * mln_acquired_frame_view_begin() keeps them valid until
+ * mln_acquired_frame_view_end().
+ */
+MLN_BINDING("view_owner=frame;platforms=windows")
+MLN_API mln_status mln_acquired_frame_get_d3d12_texture(
+  mln_acquired_frame frame,
+  mln_d3d12_texture_frame* out_frame MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

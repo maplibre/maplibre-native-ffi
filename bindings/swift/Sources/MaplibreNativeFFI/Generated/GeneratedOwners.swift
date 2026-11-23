@@ -55,26 +55,26 @@ public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver,
   }
 }
 
-struct NativeFramePacerHandle: NativeHandle {
+struct NativeGestureRecognizerHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned()
     -> Bool
   {
-    mln_frame_pacer_release(raw); return true
+    mln_gesture_recognizer_release(raw); return true
   }
 }
 
-/// Demands render sessions' frames at a display's refreshes.
+/// A gesture recognizer that moves a map's camera.
 ///
-/// See `mln_frame_pacer` in the
+/// See `mln_gesture_recognizer` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class FramePacerHandle: @unchecked Sendable, NativeReceiver,
+public final class GestureRecognizerHandle: @unchecked Sendable, NativeReceiver,
   Identifiable, Hashable, CustomStringConvertible
 {
-  let handle: NativeHandleState<NativeFramePacerHandle>
-  init(adopting raw: mln_frame_pacer) throws {
+  let handle: NativeHandleState<NativeGestureRecognizerHandle>
+  init(adopting raw: mln_gesture_recognizer) throws {
     handle = try NativeHandleState(
-      typeName: "FramePacerHandle",
-      handle: NativeFramePacerHandle(raw: raw)
+      typeName: "GestureRecognizerHandle",
+      handle: NativeGestureRecognizerHandle(raw: raw)
     )
   }
 
@@ -94,9 +94,10 @@ public final class FramePacerHandle: @unchecked Sendable, NativeReceiver,
     handle.description
   }
 
-  public static func == (lhs: FramePacerHandle,
-                         rhs: FramePacerHandle) -> Bool
-  {
+  public static func == (
+    lhs: GestureRecognizerHandle,
+    rhs: GestureRecognizerHandle
+  ) -> Bool {
     lhs.id == rhs.id
   }
 

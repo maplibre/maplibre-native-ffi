@@ -33,11 +33,11 @@ class Target:
     preset: str
     platform: str
     architecture: str
-    # The render backends that the package carries: vulkan, opengl, metal, or
-    # webgpu.
+    # The render backends that the package carries, by preference: metal,
+    # vulkan, d3d12, opengl, or webgpu.
     backends: tuple[str, ...]
-    # The backend that a suite takes when nothing names one: the platform's
-    # default, or for a browser package, the one it carries.
+    # The backend that a suite takes when nothing names one: the one that the
+    # package prefers.
     default_backend: str
     # egl, wgl, or webgl, for a target that carries OpenGL.
     opengl_provider: str
@@ -273,24 +273,25 @@ def targets(presets: dict) -> list[Target]:
             "MLN_FFI_TARGET_PLATFORM"
         ].rpartition("-")
         backends = tuple(variables["MLN_FFI_RENDER_BACKENDS"].split(";"))
-        default_backend = variables["MLN_FFI_DEFAULT_RENDER_BACKEND"]
-        if default_backend not in backends:
-            # The browser's default backend is WebGPU, which the WebGL
-            # package lacks. Every other package carries its platform's.
-            if not variables["MLN_FFI_TARGET_PLATFORM"].startswith("web-"):
-                raise SystemExit(
-                    f"error: preset {name!r} defaults to {default_backend}, which it "
-                    f"does not carry"
-                )
-            default_backend = backends[0]
+        # OpenGL's contexts come from the platform, as cmake/mln_ffi_options.cmake
+        # says.
+        opengl_provider = ""
+        if "opengl" in backends:
+            opengl_provider = (
+                "webgl"
+                if target_platform.startswith("web")
+                else "wgl"
+                if target_platform.startswith("windows")
+                else "egl"
+            )
         result.append(
             Target(
                 preset=name,
                 platform=target_platform,
                 architecture=architecture,
                 backends=backends,
-                default_backend=default_backend,
-                opengl_provider=variables.get("MLN_FFI_OPENGL_CONTEXT_PROVIDER", ""),
+                default_backend=backends[0],
+                opengl_provider=opengl_provider,
                 unit=vendor["unit"],
                 runner=vendor["runner"],
                 device=device,

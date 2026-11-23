@@ -29,9 +29,10 @@ const (
 	// Deletes the ambient cache's resources and frees the space they used. Offline
 	// regions keep their resources.
 	CacheDatabaseOperationClear CacheDatabaseOperation = CacheDatabaseOperation(C.MLN_CACHE_DATABASE_OPERATION_CLEAR)
-	// Keeps the ambient cache's resources, but makes maps check each one with the
-	// server before they use it again. Offline regions keep their resources as they
-	// are.
+	// Keeps the ambient cache's resources, but makes them stale: maps check each
+	// one with the server when they next use it, and show it meanwhile unless the
+	// server requires checking it first. Offline regions keep their resources as
+	// they are.
 	CacheDatabaseOperationInvalidate CacheDatabaseOperation = CacheDatabaseOperation(C.MLN_CACHE_DATABASE_OPERATION_INVALIDATE)
 	// Compacts the whole database file to free the disk space that it no longer
 	// uses.
@@ -88,9 +89,9 @@ const (
 	// A camera command outside a gesture, or the map itself, as when a resize keeps
 	// the camera within its bounds.
 	CameraChangeSourceCommand CameraChangeSource = CameraChangeSource(C.MLN_CAMERA_CHANGE_SOURCE_COMMAND)
-	// A camera command with a gesture phase.
+	// A gesture that a gesture recognizer recognized.
 	CameraChangeSourceGesture CameraChangeSource = CameraChangeSource(C.MLN_CAMERA_CHANGE_SOURCE_GESTURE)
-	// The momentum and bearing snap that a gesture's end started.
+	// The glide and snap after a gesture recognizer's gesture.
 	CameraChangeSourceMomentum CameraChangeSource = CameraChangeSource(C.MLN_CAMERA_CHANGE_SOURCE_MOMENTUM)
 )
 
@@ -121,10 +122,10 @@ const (
 	// The camera finished the change.
 	CameraTransitionOutcomeCompleted CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED)
 	// MapHandle.CancelCameraTransitions(),
-	// MapHandle.CancelCameraTransitionsWithID(), a gesture's GesturePhaseBegin or
-	// GesturePhaseCancel, MapHandle.SetFreeCameraOptions(), or a resize that moved
-	// the camera back inside its bounds stopped the change. A command that fails
-	// before it moves the camera also reports this.
+	// MapHandle.CancelCameraTransitionsWithID(), a gesture that a gesture
+	// recognizer begins or cancels, MapHandle.SetFreeCameraOptions(), or a resize
+	// that moved the camera back inside its bounds stopped the change. A command
+	// that fails before it moves the camera also reports this.
 	CameraTransitionOutcomeCancelled CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED)
 	// The map closed before the change ended.
 	CameraTransitionOutcomeClosed CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CLOSED)
@@ -236,6 +237,31 @@ func (value ConstrainMode) String() string {
 	return fmt.Sprintf("ConstrainMode(%d)", value)
 }
 
+// D3d12CompositionKind corresponds to mln_d3d12_composition_kind. What shows a
+// D3D12 composition swap chain.
+//
+// See mln_d3d12_composition_kind in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type D3d12CompositionKind uint32
+
+const (
+	// An IDCompositionVisual, whose content the session sets to its swap chain.
+	D3d12CompositionKindVisual D3d12CompositionKind = D3d12CompositionKind(C.MLN_D3D12_COMPOSITION_KIND_VISUAL)
+	// A XAML SwapChainPanel's ISwapChainPanelNative, of WinUI or UWP, whose swap
+	// chain the session sets.
+	D3d12CompositionKindSwapChainPanel D3d12CompositionKind = D3d12CompositionKind(C.MLN_D3D12_COMPOSITION_KIND_SWAP_CHAIN_PANEL)
+)
+
+func (value D3d12CompositionKind) String() string {
+	switch value {
+	case 1:
+		return "D3d12CompositionKindVisual"
+	case 2:
+		return "D3d12CompositionKindSwapChainPanel"
+	}
+	return fmt.Sprintf("D3d12CompositionKind(%d)", value)
+}
+
 // DepthStencilFormatFlag corresponds to mln_depth_stencil_format_flag. A format
 // of depth and stencil textures, as a bit in a set.
 //
@@ -288,45 +314,83 @@ func (value FrameDemandFlag) String() string {
 	return bindingFlagString(uint64(value), []bindingFlag{{1, "FrameDemandFlagForce"}, {4, "FrameDemandFlagWaitForUpdate"}})
 }
 
-// GesturePhase corresponds to mln_gesture_phase. Where a camera change falls in
-// a gesture that the user makes.
+// GestureAxis corresponds to mln_gesture_axis. The part of the camera that a
+// notch is on.
 //
-// GesturePhaseBegin and GesturePhaseUpdate mark a gesture in progress, and
-// GesturePhaseEnd and GesturePhaseCancel end it.
-//
-// See mln_gesture_phase in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type GesturePhase uint32
+// See mln_gesture_axis in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureAxis uint32
 
 const (
-	// The change isn't part of a gesture.
-	GesturePhaseNone GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_NONE)
-	// The gesture starts. This cancels every running camera animation before the
-	// change applies.
-	GesturePhaseBegin GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_BEGIN)
-	// The gesture continues. To start a gesture that keeps the running camera
-	// animations, start it with this phase instead of GesturePhaseBegin.
-	GesturePhaseUpdate GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_UPDATE)
-	GesturePhaseEnd    GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_END)
-	// The platform cancelled the gesture. This also cancels every running camera
-	// animation after the change applies.
-	GesturePhaseCancel GesturePhase = GesturePhase(C.MLN_GESTURE_PHASE_CANCEL)
+	GestureAxisZoom    GestureAxis = GestureAxis(C.MLN_GESTURE_AXIS_ZOOM)
+	GestureAxisBearing GestureAxis = GestureAxis(C.MLN_GESTURE_AXIS_BEARING)
+	GestureAxisPitch   GestureAxis = GestureAxis(C.MLN_GESTURE_AXIS_PITCH)
 )
 
-func (value GesturePhase) String() string {
+func (value GestureAxis) String() string {
 	switch value {
 	case 0:
-		return "GesturePhaseNone"
+		return "GestureAxisZoom"
 	case 1:
-		return "GesturePhaseBegin"
+		return "GestureAxisBearing"
 	case 2:
-		return "GesturePhaseUpdate"
-	case 3:
-		return "GesturePhaseEnd"
-	case 4:
-		return "GesturePhaseCancel"
+		return "GestureAxisPitch"
 	}
-	return fmt.Sprintf("GesturePhase(%d)", value)
+	return fmt.Sprintf("GestureAxis(%d)", value)
+}
+
+// GestureMode corresponds to mln_gesture_mode. What a one-pointer drag or a
+// double tap does instead of its default, from the pointer's held buttons or
+// from held keys. A drag reads its modes when it starts and keeps them until it
+// ends, and a double tap when it lifts; rotating wins over a box zoom.
+//
+// See mln_gesture_mode in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureMode uint32
+
+const (
+	// Sideways turns the map and up and down tilts it.
+	GestureModeRotate GestureMode = GestureMode(C.MLN_GESTURE_MODE_ROTATE)
+	// Draws a box that the map zooms to when the pointer lifts.
+	GestureModeBoxZoom GestureMode = GestureMode(C.MLN_GESTURE_MODE_BOX_ZOOM)
+	// A double tap zooms out instead of in.
+	GestureModeZoomOut GestureMode = GestureMode(C.MLN_GESTURE_MODE_ZOOM_OUT)
+)
+
+func (value GestureMode) Has(flags GestureMode) bool { return value&flags == flags }
+
+func (value GestureMode) String() string {
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "GestureModeRotate"}, {2, "GestureModeBoxZoom"}, {4, "GestureModeZoomOut"}})
+}
+
+// GestureNextTick corresponds to mln_gesture_next_tick. When a gesture
+// recognizer next needs GestureRecognizerHandle.Tick().
+//
+// See mln_gesture_next_tick in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureNextTick uint32
+
+const (
+	// Not until the next input.
+	GestureNextTickNone GestureNextTick = GestureNextTick(C.MLN_GESTURE_NEXT_TICK_NONE)
+	// Every display frame, while a delta eases or a gesture, its glide, or its snap
+	// may reach a notch.
+	GestureNextTickFrame GestureNextTick = GestureNextTick(C.MLN_GESTURE_NEXT_TICK_FRAME)
+	// At next_tick_ms, on the inputs' clock: when a press becomes a long press, or
+	// idle deltas end.
+	GestureNextTickAt GestureNextTick = GestureNextTick(C.MLN_GESTURE_NEXT_TICK_AT)
+)
+
+func (value GestureNextTick) String() string {
+	switch value {
+	case 0:
+		return "GestureNextTickNone"
+	case 1:
+		return "GestureNextTickFrame"
+	case 2:
+		return "GestureNextTickAt"
+	}
+	return fmt.Sprintf("GestureNextTick(%d)", value)
 }
 
 // GPUExportKind corresponds to mln_gpu_export_kind. A way to share a texture's
@@ -657,11 +721,11 @@ func (value MapMode) String() string {
 	return fmt.Sprintf("MapMode(%d)", value)
 }
 
-// MomentumDecayModel corresponds to mln_momentum_decay_model. How a part of a
-// gesture's momentum slows from its release speed.
+// MomentumDecayModel corresponds to mln_momentum_decay_model. How a part's
+// glide unfolds from its release speed.
 //
 // See mln_momentum_decay_model in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
 type MomentumDecayModel uint32
 
 const (
@@ -669,10 +733,12 @@ const (
 	// UIScrollView's normal deceleration is a half-life of 346 ms, and its fast
 	// deceleration 69 ms.
 	MomentumDecayModelFriction MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_FRICTION)
-	// The part eases distance over duration_ms, along easing, as a camera animation
-	// does. The caller plans the glide, for example from the platform's own fling
-	// physics, such as Android's OverScroller.
-	MomentumDecayModelEase MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_EASE)
+	// The glide lasts duration_ms × (speed / reference_speed) to the power of
+	// duration_exponent, and follows easing, starting at the release speed. Its
+	// defaults are Android's OverScroller fling, in its density-independent pixels:
+	// a reference speed of 1000, 555.182 ms, an exponent of 0.7362676, the curve
+	// (0.175, 0.5, 0.35, 1), a minimum speed of 50 and a maximum of 8000.
+	MomentumDecayModelCurve MomentumDecayModel = MomentumDecayModel(C.MLN_MOMENTUM_DECAY_MODEL_CURVE)
 )
 
 func (value MomentumDecayModel) String() string {
@@ -680,7 +746,7 @@ func (value MomentumDecayModel) String() string {
 	case 0:
 		return "MomentumDecayModelFriction"
 	case 1:
-		return "MomentumDecayModelEase"
+		return "MomentumDecayModelCurve"
 	}
 	return fmt.Sprintf("MomentumDecayModel(%d)", value)
 }
@@ -803,6 +869,63 @@ func (value OpenGLContextProviderFlag) String() string {
 	return bindingFlagString(uint64(value), []bindingFlag{{1, "OpenGLContextProviderFlagWGL"}, {2, "OpenGLContextProviderFlagEGL"}, {4, "OpenGLContextProviderFlagWebGL"}})
 }
 
+// PinchPhase corresponds to mln_pinch_phase. Where a platform-recognized pinch
+// is.
+//
+// See mln_pinch_phase in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type PinchPhase uint32
+
+const (
+	PinchPhaseBegin  PinchPhase = PinchPhase(C.MLN_PINCH_PHASE_BEGIN)
+	PinchPhaseUpdate PinchPhase = PinchPhase(C.MLN_PINCH_PHASE_UPDATE)
+	// The fingers lifted: the pinch glides on.
+	PinchPhaseEnd PinchPhase = PinchPhase(C.MLN_PINCH_PHASE_END)
+	// The platform took the pinch away: nothing continues, and the camera's
+	// animations stop.
+	PinchPhaseCancel PinchPhase = PinchPhase(C.MLN_PINCH_PHASE_CANCEL)
+)
+
+func (value PinchPhase) String() string {
+	switch value {
+	case 0:
+		return "PinchPhaseBegin"
+	case 1:
+		return "PinchPhaseUpdate"
+	case 2:
+		return "PinchPhaseEnd"
+	case 3:
+		return "PinchPhaseCancel"
+	}
+	return fmt.Sprintf("PinchPhase(%d)", value)
+}
+
+// PointerKind corresponds to mln_pointer_kind. What kind of device a pointer
+// is.
+//
+// See mln_pointer_kind in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type PointerKind uint32
+
+const (
+	PointerKindMouse PointerKind = PointerKind(C.MLN_POINTER_KIND_MOUSE)
+	// Two touches pinch, twist, and tilt, and a held second tap zooms.
+	PointerKindTouch PointerKind = PointerKind(C.MLN_POINTER_KIND_TOUCH)
+	PointerKindPen   PointerKind = PointerKind(C.MLN_POINTER_KIND_PEN)
+)
+
+func (value PointerKind) String() string {
+	switch value {
+	case 0:
+		return "PointerKindMouse"
+	case 1:
+		return "PointerKindTouch"
+	case 2:
+		return "PointerKindPen"
+	}
+	return fmt.Sprintf("PointerKind(%d)", value)
+}
+
 // ProjectionType corresponds to mln_projection_type. A projection that a
 // style's [projection](https://maplibre.org/maplibre-style-spec/projection/)
 // names.
@@ -867,6 +990,11 @@ const (
 	RenderBackendVulkan RenderBackend = RenderBackend(C.MLN_RENDER_BACKEND_VULKAN)
 	RenderBackendOpenGL RenderBackend = RenderBackend(C.MLN_RENDER_BACKEND_OPEN_GL)
 	RenderBackendWebGPU RenderBackend = RenderBackend(C.MLN_RENDER_BACKEND_WEB_GPU)
+	// D3D12, on Windows. It compiles its shaders at run time with DXC, which your
+	// app ships: dxcompiler.dll, 1.8.2502 or later, beside your app's executable or
+	// in another directory of the DLL search path, which doesn't take the library's
+	// own directory. Without it, the library renders on another backend.
+	RenderBackendD3d12 RenderBackend = RenderBackend(C.MLN_RENDER_BACKEND_D3D12)
 )
 
 func (value RenderBackend) String() string {
@@ -879,6 +1007,8 @@ func (value RenderBackend) String() string {
 		return "RenderBackendOpenGL"
 	case 4:
 		return "RenderBackendWebGPU"
+	case 5:
+		return "RenderBackendD3d12"
 	}
 	return fmt.Sprintf("RenderBackend(%d)", value)
 }
@@ -895,12 +1025,13 @@ const (
 	RenderBackendFlagVulkan RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_VULKAN)
 	RenderBackendFlagOpenGL RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_OPEN_GL)
 	RenderBackendFlagWebGPU RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_WEB_GPU)
+	RenderBackendFlagD3d12  RenderBackendFlag = RenderBackendFlag(C.MLN_RENDER_BACKEND_FLAG_D3D12)
 )
 
 func (value RenderBackendFlag) Has(flags RenderBackendFlag) bool { return value&flags == flags }
 
 func (value RenderBackendFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderBackendFlagMetal"}, {2, "RenderBackendFlagVulkan"}, {4, "RenderBackendFlagOpenGL"}, {8, "RenderBackendFlagWebGPU"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderBackendFlagMetal"}, {2, "RenderBackendFlagVulkan"}, {4, "RenderBackendFlagOpenGL"}, {8, "RenderBackendFlagWebGPU"}, {16, "RenderBackendFlagD3d12"}})
 }
 
 // RenderDriverKind corresponds to mln_render_driver_kind. The thread that runs
@@ -1067,12 +1198,14 @@ const (
 	RenderTargetKindFlagWebGPUBorrowedTextures RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES)
 	RenderTargetKindFlagExportedRing           RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING)
 	RenderTargetKindFlagWebCanvas              RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS)
+	RenderTargetKindFlagD3d12BorrowedTextures  RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_D3D12_BORROWED_TEXTURES)
+	RenderTargetKindFlagD3d12Composition       RenderTargetKindFlag = RenderTargetKindFlag(C.MLN_RENDER_TARGET_KIND_FLAG_D3D12_COMPOSITION)
 )
 
 func (value RenderTargetKindFlag) Has(flags RenderTargetKindFlag) bool { return value&flags == flags }
 
 func (value RenderTargetKindFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderTargetKindFlagOffscreen"}, {2, "RenderTargetKindFlagMetalLayer"}, {4, "RenderTargetKindFlagWin32Window"}, {8, "RenderTargetKindFlagXlibWindow"}, {16, "RenderTargetKindFlagWaylandSurface"}, {32, "RenderTargetKindFlagAndroidWindow"}, {64, "RenderTargetKindFlagOhosWindow"}, {512, "RenderTargetKindFlagVulkanSurface"}, {1024, "RenderTargetKindFlagOpenGLSurface"}, {2048, "RenderTargetKindFlagMetalBorrowedTextures"}, {4096, "RenderTargetKindFlagVulkanBorrowedTextures"}, {8192, "RenderTargetKindFlagOpenGLBorrowedTextures"}, {16384, "RenderTargetKindFlagWebGPUBorrowedTextures"}, {32768, "RenderTargetKindFlagExportedRing"}, {65536, "RenderTargetKindFlagWebCanvas"}})
+	return bindingFlagString(uint64(value), []bindingFlag{{1, "RenderTargetKindFlagOffscreen"}, {2, "RenderTargetKindFlagMetalLayer"}, {4, "RenderTargetKindFlagWin32Window"}, {8, "RenderTargetKindFlagXlibWindow"}, {16, "RenderTargetKindFlagWaylandSurface"}, {32, "RenderTargetKindFlagAndroidWindow"}, {64, "RenderTargetKindFlagOhosWindow"}, {512, "RenderTargetKindFlagVulkanSurface"}, {1024, "RenderTargetKindFlagOpenGLSurface"}, {2048, "RenderTargetKindFlagMetalBorrowedTextures"}, {4096, "RenderTargetKindFlagVulkanBorrowedTextures"}, {8192, "RenderTargetKindFlagOpenGLBorrowedTextures"}, {16384, "RenderTargetKindFlagWebGPUBorrowedTextures"}, {32768, "RenderTargetKindFlagExportedRing"}, {65536, "RenderTargetKindFlagWebCanvas"}, {131072, "RenderTargetKindFlagD3d12BorrowedTextures"}, {262144, "RenderTargetKindFlagD3d12Composition"}})
 }
 
 // ResourceErrorReason corresponds to mln_resource_error_reason. Why a resource
@@ -1943,6 +2076,14 @@ func (CustomLayerPrerenderParametersEncoderWebGPUVariant) bindingTag() uint32 {
 
 func (CustomLayerPrerenderParametersEncoderWebGPUVariant) isCustomLayerPrerenderParametersEncoder() {}
 
+type CustomLayerPrerenderParametersEncoderD3d12Variant struct{ Value D3d12CustomLayerEncoder }
+
+func (CustomLayerPrerenderParametersEncoderD3d12Variant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_BACKEND_D3D12)
+}
+
+func (CustomLayerPrerenderParametersEncoderD3d12Variant) isCustomLayerPrerenderParametersEncoder() {}
+
 // CustomLayerRenderParametersPass corresponds to mln_custom_layer_pass_data.
 // The map's render pass at a custom layer's place in the style, by the backend
 // that the session renders with.
@@ -1984,6 +2125,13 @@ func (CustomLayerRenderParametersPassWebGPUVariant) bindingTag() uint32 {
 }
 func (CustomLayerRenderParametersPassWebGPUVariant) isCustomLayerRenderParametersPass() {}
 
+type CustomLayerRenderParametersPassD3d12Variant struct{ Value D3d12CustomLayerPass }
+
+func (CustomLayerRenderParametersPassD3d12Variant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_BACKEND_D3D12)
+}
+func (CustomLayerRenderParametersPassD3d12Variant) isCustomLayerRenderParametersPass() {}
+
 // FeatureID corresponds to mln_feature_id. The ID of a feature in a source, as
 // the source's data gives it.
 //
@@ -2018,6 +2166,106 @@ type FeatureIDDoubleValueVariant struct{ Value float64 }
 
 func (FeatureIDDoubleValueVariant) bindingTag() uint32 { return uint32(C.MLN_FEATURE_ID_TYPE_DOUBLE) }
 func (FeatureIDDoubleValueVariant) isFeatureID()       {}
+
+// GestureEvent corresponds to mln_gesture_event. What a gesture means beyond
+// moving the camera. Double taps and two-finger taps also zoom, as the options
+// say.
+//
+// See mln_gesture_event in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureEvent interface {
+	bindingTag() uint32
+	isGestureEvent()
+}
+
+func (UnknownVariant) isGestureEvent() {}
+
+type GestureEventTapVariant struct{ Value GestureTap }
+
+func (GestureEventTapVariant) bindingTag() uint32 { return uint32(C.MLN_GESTURE_EVENT_TAP) }
+func (GestureEventTapVariant) isGestureEvent()    {}
+
+type GestureEventDoubleTapVariant struct{ Value GestureTap }
+
+func (GestureEventDoubleTapVariant) bindingTag() uint32 {
+	return uint32(C.MLN_GESTURE_EVENT_DOUBLE_TAP)
+}
+func (GestureEventDoubleTapVariant) isGestureEvent() {}
+
+type GestureEventTwoFingerTapVariant struct{ Value GestureTap }
+
+func (GestureEventTwoFingerTapVariant) bindingTag() uint32 {
+	return uint32(C.MLN_GESTURE_EVENT_TWO_FINGER_TAP)
+}
+func (GestureEventTwoFingerTapVariant) isGestureEvent() {}
+
+type GestureEventNotchVariant struct{ Value GestureNotchEvent }
+
+func (GestureEventNotchVariant) bindingTag() uint32 { return uint32(C.MLN_GESTURE_EVENT_NOTCH) }
+func (GestureEventNotchVariant) isGestureEvent()    {}
+
+type GestureEventLongPressVariant struct{ Value GestureTap }
+
+func (GestureEventLongPressVariant) bindingTag() uint32 {
+	return uint32(C.MLN_GESTURE_EVENT_LONG_PRESS)
+}
+func (GestureEventLongPressVariant) isGestureEvent() {}
+
+// GestureInput corresponds to mln_gesture_input. One input, in logical pixels
+// from the map's top-left corner.
+//
+// When the view loses focus, the host cancels the pointers it sent and sends
+// empty modes.
+//
+// See mln_gesture_input in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureInput interface {
+	bindingTag() uint32
+	isGestureInput()
+}
+
+type GestureInputPointerDownVariant struct{ Value GesturePointerDown }
+
+func (GestureInputPointerDownVariant) bindingTag() uint32 {
+	return uint32(C.MLN_GESTURE_INPUT_POINTER_DOWN)
+}
+func (GestureInputPointerDownVariant) isGestureInput() {}
+
+type GestureInputPointerMoveVariant struct{ Value GesturePointer }
+
+func (GestureInputPointerMoveVariant) bindingTag() uint32 {
+	return uint32(C.MLN_GESTURE_INPUT_POINTER_MOVE)
+}
+func (GestureInputPointerMoveVariant) isGestureInput() {}
+
+type GestureInputPointerUpVariant struct{ Value GesturePointer }
+
+func (GestureInputPointerUpVariant) bindingTag() uint32 {
+	return uint32(C.MLN_GESTURE_INPUT_POINTER_UP)
+}
+func (GestureInputPointerUpVariant) isGestureInput() {}
+
+type GestureInputPointerCancelVariant struct{ Value GesturePointer }
+
+func (GestureInputPointerCancelVariant) bindingTag() uint32 {
+	return uint32(C.MLN_GESTURE_INPUT_POINTER_CANCEL)
+}
+func (GestureInputPointerCancelVariant) isGestureInput() {}
+
+type GestureInputModesVariant struct{ Value GestureMode }
+
+func (GestureInputModesVariant) bindingTag() uint32 { return uint32(C.MLN_GESTURE_INPUT_MODES) }
+func (GestureInputModesVariant) isGestureInput()    {}
+
+type GestureInputDeltaVariant struct{ Value GestureDelta }
+
+func (GestureInputDeltaVariant) bindingTag() uint32 { return uint32(C.MLN_GESTURE_INPUT_DELTA) }
+func (GestureInputDeltaVariant) isGestureInput()    {}
+
+type GestureInputPinchVariant struct{ Value GesturePinch }
+
+func (GestureInputPinchVariant) bindingTag() uint32 { return uint32(C.MLN_GESTURE_INPUT_PINCH) }
+func (GestureInputPinchVariant) isGestureInput()    {}
 
 // OfflineRegionDefinition corresponds to mln_offline_region_definition. The
 // area, zoom range, and style that an offline region covers.
@@ -2207,6 +2455,20 @@ func (RenderTargetWebCanvasVariant) bindingTag() uint32 {
 }
 func (RenderTargetWebCanvasVariant) isRenderTarget() {}
 
+type RenderTargetD3d12BorrowedTexturesVariant struct{ Value D3d12BorrowedTexturesTarget }
+
+func (RenderTargetD3d12BorrowedTexturesVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES)
+}
+func (RenderTargetD3d12BorrowedTexturesVariant) isRenderTarget() {}
+
+type RenderTargetD3d12CompositionVariant struct{ Value D3d12CompositionTarget }
+
+func (RenderTargetD3d12CompositionVariant) bindingTag() uint32 {
+	return uint32(C.MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION)
+}
+func (RenderTargetD3d12CompositionVariant) isRenderTarget() {}
+
 // RenderedQueryGeometry corresponds to mln_rendered_query_geometry. The screen
 // area that a rendered feature query covers.
 //
@@ -2323,35 +2585,6 @@ func (RuntimeEventPayloadSpriteVariant) bindingTag() uint32 {
 	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_SPRITE)
 }
 func (RuntimeEventPayloadSpriteVariant) isRuntimeEventPayload() {}
-
-// AnchoredMomentum corresponds to mln_anchored_momentum. How a gesture's zoom,
-// bearing, or pitch keeps changing after release.
-//
-// See mln_anchored_momentum in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type AnchoredMomentum struct {
-	// How fast the value changed at release: zoom levels per second for zoom, and
-	// degrees per second for bearing and pitch. The part moves only when this is
-	// set.
-	Velocity *float64
-	// The screen point that the change keeps in place. Without one, the change
-	// keeps the center of the view in place.
-	Anchor *ScreenPoint
-	Decay  MomentumDecay
-	// Where the part settles. Without this, it stays where the gesture and its
-	// glide leave it.
-	Snap *MomentumSnap
-}
-
-func nativeAnchoredMomentum(input AnchoredMomentum, arena *bindingArena) C.mln_anchored_momentum {
-	raw := C.mln_anchored_momentum{}
-	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_ANCHORED_MOMENTUM_VELOCITY, &raw.velocity, input.Velocity, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_ANCHORED_MOMENTUM_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
-	raw.decay = nativeMomentumDecay(input.Decay, arena)
-	bindingMasked(&raw.fields, C.MLN_ANCHORED_MOMENTUM_SNAP, &raw.snap, input.Snap, arena, nativeMomentumSnap)
-	return raw
-}
 
 // AndroidHardwareBufferFrame corresponds to mln_android_hardware_buffer_frame.
 // The Android hardware buffer of an exported ring's acquired frame.
@@ -2560,7 +2793,7 @@ func copyCameraBounds(raw C.mln_camera_bounds) CameraBounds {
 }
 
 // CameraDelta corresponds to mln_camera_delta. A change to the camera from
-// where it is now, for gestures.
+// where it is now.
 //
 // See mln_camera_delta in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -2575,12 +2808,8 @@ type CameraDelta struct {
 	Pitch *float64
 	// The screen point that scale, bearing, and pitch keep in place. It needs one
 	// of them, and it combines with offset only in a delta without a duration.
-	Anchor *ScreenPoint
-	// How the gesture keeps moving after this delta. Only a delta in the
-	// GesturePhaseEnd phase carries it.
-	Momentum     *GestureMomentum
-	Animation    AnimationOptions
-	GesturePhase GesturePhase
+	Anchor    *ScreenPoint
+	Animation AnimationOptions
 }
 
 func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delta {
@@ -2592,9 +2821,7 @@ func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delt
 	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_BEARING, &raw.bearing, input.Bearing, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_PITCH, &raw.pitch, input.Pitch, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
-	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_MOMENTUM, &raw.momentum, input.Momentum, arena, nativeGestureMomentum)
 	raw.animation = nativeAnimationOptions(input.Animation, arena)
-	raw.gesture_phase = C.mln_gesture_phase(input.GesturePhase)
 	return raw
 }
 
@@ -2729,16 +2956,12 @@ type CameraTransitionEnd struct {
 	// The generation of the first map snapshot that shows where the change left the
 	// camera, or 0 when the map closed first.
 	Generation uint64
-	// How fast a gesture's momentum still moved when it was cancelled, which the
-	// next gesture can add to its own release velocities. Zero for every other end.
-	Velocity CameraVelocity
 }
 
 func copyCameraTransitionEnd(raw C.mln_camera_transition_end) CameraTransitionEnd {
 	var result CameraTransitionEnd
 	result.Outcome = CameraTransitionOutcome(raw.outcome)
 	result.Generation = uint64(raw.generation)
-	result.Velocity = copyCameraVelocity(raw.velocity)
 	return result
 }
 
@@ -2773,10 +2996,9 @@ func nativeCameraTransitionHandler(input CameraTransitionHandler, arena *binding
 // See mln_camera_update in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type CameraUpdate struct {
-	Mode         CameraUpdateMode
-	Camera       CameraOptions
-	Animation    AnimationOptions
-	GesturePhase GesturePhase
+	Mode      CameraUpdateMode
+	Camera    CameraOptions
+	Animation AnimationOptions
 }
 
 func nativeCameraUpdate(input CameraUpdate, arena *bindingArena) C.mln_camera_update {
@@ -2785,33 +3007,7 @@ func nativeCameraUpdate(input CameraUpdate, arena *bindingArena) C.mln_camera_up
 	raw.mode = C.mln_camera_update_mode(input.Mode)
 	raw.camera = nativeCameraOptions(input.Camera, arena)
 	raw.animation = nativeAnimationOptions(input.Animation, arena)
-	raw.gesture_phase = C.mln_gesture_phase(input.GesturePhase)
 	return raw
-}
-
-// CameraVelocity corresponds to mln_camera_velocity. How fast each part of a
-// camera change moves.
-//
-// See mln_camera_velocity in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type CameraVelocity struct {
-	// How fast the map's content moves on the screen, in logical pixels per second.
-	Pan ScreenPoint
-	// In zoom levels per second.
-	Zoom float64
-	// In degrees per second.
-	Bearing float64
-	// In degrees per second.
-	Pitch float64
-}
-
-func copyCameraVelocity(raw C.mln_camera_velocity) CameraVelocity {
-	var result CameraVelocity
-	result.Pan = copyScreenPoint(raw.pan)
-	result.Zoom = float64(raw.zoom)
-	result.Bearing = float64(raw.bearing)
-	result.Pitch = float64(raw.pitch)
-	return result
 }
 
 // CanonicalTileID corresponds to mln_canonical_tile_id. A tile's zoom level z,
@@ -3009,6 +3205,8 @@ func copyCustomLayerPrerenderParameters(raw C.mln_custom_layer_prerender_paramet
 			return CustomLayerPrerenderParametersEncoderVulkanVariant{Value: copyVulkanCustomLayerEncoder(bindingUnionLoad[C.mln_vulkan_custom_layer_encoder](raw.encoder[:]))}
 		case C.MLN_RENDER_BACKEND_WEB_GPU:
 			return CustomLayerPrerenderParametersEncoderWebGPUVariant{Value: copyWebGPUCustomLayerEncoder(bindingUnionLoad[C.mln_web_gpu_custom_layer_encoder](raw.encoder[:]))}
+		case C.MLN_RENDER_BACKEND_D3D12:
+			return CustomLayerPrerenderParametersEncoderD3d12Variant{Value: copyD3d12CustomLayerEncoder(bindingUnionLoad[C.mln_d3d12_custom_layer_encoder](raw.encoder[:]))}
 		case C.MLN_RENDER_BACKEND_OPEN_GL:
 			return nil
 		}
@@ -3049,6 +3247,8 @@ func copyCustomLayerRenderParameters(raw C.mln_custom_layer_render_parameters) C
 			return CustomLayerRenderParametersPassOpenGLVariant{Value: copyOpenGLCustomLayerPass(bindingUnionLoad[C.mln_open_gl_custom_layer_pass](raw.pass[:]))}
 		case C.MLN_RENDER_BACKEND_WEB_GPU:
 			return CustomLayerRenderParametersPassWebGPUVariant{Value: copyWebGPUCustomLayerPass(bindingUnionLoad[C.mln_web_gpu_custom_layer_pass](raw.pass[:]))}
+		case C.MLN_RENDER_BACKEND_D3D12:
+			return CustomLayerRenderParametersPassD3d12Variant{Value: copyD3d12CustomLayerPass(bindingUnionLoad[C.mln_d3d12_custom_layer_pass](raw.pass[:]))}
 		}
 		return UnknownVariant{Tag: uint32(raw.backend)}
 	}()
@@ -3088,6 +3288,250 @@ func nativeCustomVectorSourceOptions(input CustomVectorSourceOptions, arena *bin
 		}
 	}
 	return raw
+}
+
+// D3d12BorrowedTexture corresponds to mln_d3d12_borrowed_texture. A D3D12
+// texture of a borrowed ring.
+//
+// See mln_d3d12_borrowed_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type D3d12BorrowedTexture struct {
+	// Your ID3D12Resource.
+	Resource uintptr
+}
+
+func nativeD3d12BorrowedTexture(input D3d12BorrowedTexture, arena *bindingArena) C.mln_d3d12_borrowed_texture {
+	raw := C.mln_d3d12_borrowed_texture{}
+	raw.resource = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Resource)))
+	return raw
+}
+
+// D3d12BorrowedTexturesTarget corresponds to
+// mln_d3d12_borrowed_textures_target. A ring of your D3D12 textures to render
+// into, on the D3D12 device that you attach on.
+//
+// physical_width and physical_height give the textures' size in pixels, which
+// is usually logical_size times the map's scale factor. Each texture must be a
+// 2D resource of the device with that size, one mip level, one array slice, one
+// sample, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET, and one typed color format
+// that the device renders into, such as DXGI_FORMAT_R8G8B8A8_UNORM or
+// DXGI_FORMAT_B8G8R8A8_UNORM. The ring holds up to TextureRingMaxDepth distinct
+// textures, and references each.
+//
+// Each texture is in state when the session has it, and each frame leaves it
+// there.
+//
+// Give the ring depth_textures to draw into each frame depth-tested against the
+// map, as FrameProjection says: one for each of textures, at the same index, or
+// none. Each frame clears the one at its slot, renders the map's depth and
+// stencil into it, stores them, and leaves it in depth_state. They must have
+// the size of textures, one format of GPUDeviceCapabilities.DepthStencilFormats
+// (DXGI_FORMAT_D24_UNORM_S8_UINT or DXGI_FORMAT_D32_FLOAT_S8X24_UINT), one
+// sample, and D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL.
+//
+// See mln_d3d12_borrowed_textures_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type D3d12BorrowedTexturesTarget struct {
+	LogicalSize    LogicalSize
+	PhysicalWidth  uint32
+	PhysicalHeight uint32
+	Textures       []D3d12BorrowedTexture
+	// The textures' D3D12_RESOURCE_STATES.
+	State         uint32
+	DepthTextures []D3d12BorrowedTexture
+	// The depth textures' D3D12_RESOURCE_STATES.
+	DepthState uint32
+}
+
+func nativeD3d12BorrowedTexturesTarget(input D3d12BorrowedTexturesTarget, arena *bindingArena) C.mln_d3d12_borrowed_textures_target {
+	raw := C.mln_d3d12_borrowed_textures_target{}
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.physical_width = C.uint32_t(input.PhysicalWidth)
+	raw.physical_height = C.uint32_t(input.PhysicalHeight)
+	{
+		raw.textures = (*C.mln_d3d12_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
+		items := unsafe.Slice(raw.textures, len(input.Textures))
+		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
+		for i, item := range input.Textures {
+			items[i] = nativeD3d12BorrowedTexture(item, arena)
+		}
+	}
+	raw.state = C.uint32_t(input.State)
+	{
+		raw.depth_textures = (*C.mln_d3d12_borrowed_texture)(arena.array(len(input.DepthTextures), unsafe.Sizeof(*raw.depth_textures)))
+		items := unsafe.Slice(raw.depth_textures, len(input.DepthTextures))
+		raw.depth_texture_count = bindingCountLike(raw.depth_texture_count, len(input.DepthTextures))
+		for i, item := range input.DepthTextures {
+			items[i] = nativeD3d12BorrowedTexture(item, arena)
+		}
+	}
+	raw.depth_state = C.uint32_t(input.DepthState)
+	return raw
+}
+
+// D3d12CompositionTarget corresponds to mln_d3d12_composition_target. A
+// composition swap chain to present to, which your DirectComposition visual or
+// XAML SwapChainPanel shows.
+//
+// The session renders on D3D12: on the D3D12 device that you attach on, or on
+// one that it makes without a device. It makes a flip-model swap chain for
+// composition of logical_size at the map's scale factor, with premultiplied
+// alpha, and sets it as the visual's content or the panel's swap chain. Commit
+// your DirectComposition device once the attach completes. A panel takes its
+// swap chain only on its UI thread: attach it there with
+// RenderDriverKindCallerGraphicsThread, and service the session there. Scale
+// the visual or the panel to show the swap chain at the display's scale. The
+// session references object until a replacement or release of the target
+// completes, or the session ends.
+//
+// See mln_d3d12_composition_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+type D3d12CompositionTarget struct {
+	LogicalSize LogicalSize
+	Kind        D3d12CompositionKind
+	// Your IDCompositionVisual* or ISwapChainPanelNative*.
+	Object uintptr
+}
+
+func nativeD3d12CompositionTarget(input D3d12CompositionTarget, arena *bindingArena) C.mln_d3d12_composition_target {
+	raw := C.mln_d3d12_composition_target{}
+	raw.logical_size = nativeLogicalSize(input.LogicalSize, arena)
+	raw.kind = C.mln_d3d12_composition_kind(input.Kind)
+	raw.object = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Object)))
+	return raw
+}
+
+// D3d12CustomLayerEncoder corresponds to mln_d3d12_custom_layer_encoder. The
+// frame's D3D12 command list, outside the map's render pass.
+//
+// Record work such as copies and render passes of your own, with the barriers
+// that it needs, and leave the resources that you use in the states that you
+// found them in. Don't close or execute command_list. After the callback
+// returns, the map sets its own descriptor heaps and root signature again.
+//
+// See mln_d3d12_custom_layer_encoder in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type D3d12CustomLayerEncoder struct {
+	// The ID3D12Device that the session renders on, to make objects with.
+	Device uintptr
+	// The frame's ID3D12GraphicsCommandList, outside a render pass.
+	CommandList uintptr
+}
+
+func copyD3d12CustomLayerEncoder(raw C.mln_d3d12_custom_layer_encoder) D3d12CustomLayerEncoder {
+	var result D3d12CustomLayerEncoder
+	result.Device = uintptr(unsafe.Pointer(raw.device))
+	result.CommandList = uintptr(unsafe.Pointer(raw.command_list))
+	return result
+}
+
+// D3d12CustomLayerPass corresponds to mln_d3d12_custom_layer_pass. The map's
+// D3D12 render pass, at a custom layer's place in the style.
+//
+// Set your own pipeline state, root signature, descriptor heaps, vertex and
+// index buffers, primitive topology, viewport, scissor rectangle, and stencil
+// reference, with pipeline states for color_format and depth_stencil_format,
+// and draw. After the callback returns, the map sets again what its own draws
+// need. Record nothing that a render pass can't hold, such as barriers, copies,
+// or other render targets, and don't end the pass.
+//
+// See mln_d3d12_custom_layer_pass in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type D3d12CustomLayerPass struct {
+	// The ID3D12Device that the session renders on, to make objects with.
+	Device uintptr
+	// The frame's ID3D12GraphicsCommandList, in the render pass that
+	// BeginRenderPass began.
+	CommandList uintptr
+	// The D3D12_CPU_DESCRIPTOR_HANDLE of the pass's render target view.
+	RenderTargetView uint64
+	// The DXGI_FORMAT of the pass's color attachment.
+	ColorFormat uint32
+	// The D3D12_CPU_DESCRIPTOR_HANDLE of the pass's depth-stencil view, or 0 when
+	// it has none.
+	DepthStencilView uint64
+	// The DXGI_FORMAT of the pass's depth-stencil attachment, or
+	// DXGI_FORMAT_UNKNOWN when it has none.
+	DepthStencilFormat uint32
+}
+
+func copyD3d12CustomLayerPass(raw C.mln_d3d12_custom_layer_pass) D3d12CustomLayerPass {
+	var result D3d12CustomLayerPass
+	result.Device = uintptr(unsafe.Pointer(raw.device))
+	result.CommandList = uintptr(unsafe.Pointer(raw.command_list))
+	result.RenderTargetView = uint64(raw.render_target_view)
+	result.ColorFormat = uint32(raw.color_format)
+	result.DepthStencilView = uint64(raw.depth_stencil_view)
+	result.DepthStencilFormat = uint32(raw.depth_stencil_format)
+	return result
+}
+
+// D3d12DeviceDescriptor corresponds to mln_d3d12_device_descriptor. Your D3D12
+// device and direct command queue, for WrapD3d12GPUDevice().
+//
+// See mln_d3d12_device_descriptor in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+type D3d12DeviceDescriptor struct {
+	// Your ID3D12Device.
+	Device uintptr
+	// Your ID3D12CommandQueue of D3D12_COMMAND_LIST_TYPE_DIRECT on device, which
+	// sessions on the device submit to. Submit your reads of a borrowed ring's
+	// textures to it for GPUSyncKindQueueOrder.
+	CommandQueue uintptr
+}
+
+func nativeD3d12DeviceDescriptor(input D3d12DeviceDescriptor, arena *bindingArena) C.mln_d3d12_device_descriptor {
+	raw := C.mln_d3d12_device_descriptor{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Device)))
+	raw.command_queue = unsafe.Pointer(C.binding_address(C.uintptr_t(input.CommandQueue)))
+	return raw
+}
+
+// D3d12TextureFrame corresponds to mln_d3d12_texture_frame. The D3D12 texture
+// of an acquired frame.
+//
+// The depth members are set when the frame has a depth texture, as for
+// MetalTextureFrame. Otherwise they are zero.
+//
+// See mln_d3d12_texture_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type D3d12TextureFrame struct {
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+	// The texture's index in the descriptor's textures, or in the ring.
+	Slot uint32
+	// The ID3D12Resource.
+	Resource uintptr
+	// The resource's ID3D12Device.
+	Device uintptr
+	// The resource's DXGI_FORMAT.
+	Format uint32
+	// The D3D12_RESOURCE_STATES that the frame left the resource in.
+	State uint32
+	// The ID3D12Resource that holds the frame's depth and stencil.
+	DepthResource uintptr
+	// The depth resource's DXGI_FORMAT.
+	DepthFormat uint32
+	// The D3D12_RESOURCE_STATES that the frame left the depth resource in.
+	DepthState uint32
+}
+
+func copyD3d12TextureFrame(raw C.mln_d3d12_texture_frame) D3d12TextureFrame {
+	var result D3d12TextureFrame
+	result.Width = uint32(raw.width)
+	result.Height = uint32(raw.height)
+	result.ScaleFactor = float64(raw.scale_factor)
+	result.Slot = uint32(raw.slot)
+	result.Resource = uintptr(unsafe.Pointer(raw.resource))
+	result.Device = uintptr(unsafe.Pointer(raw.device))
+	result.Format = uint32(raw.format)
+	result.State = uint32(raw.state)
+	result.DepthResource = uintptr(unsafe.Pointer(raw.depth_resource))
+	result.DepthFormat = uint32(raw.depth_format)
+	result.DepthState = uint32(raw.depth_state)
+	return result
 }
 
 // DmaBufFormat corresponds to mln_dma_buf_format. A DRM format and modifier
@@ -3279,11 +3723,15 @@ func nativeEGLContextDescriptor(input EGLContextDescriptor, arena *bindingArena)
 //     AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
 //     android_hardware_buffer_usage. Get each frame's buffer with
 //     AcquiredFrameHandle.WithAndroidHardwareBuffer().
-//   - GPUExportKindDxgiSharedHandle: D3D11 textures of the format
+//   - GPUExportKindDxgiSharedHandle: textures of the format
 //     DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
-//     resources and render targets. Open them on a D3D11 or D3D12 device of the
-//     same adapter, which you pick with GPUDeviceOptions.AdapterLuid. Get each
-//     frame's texture with AcquiredFrameHandle.WithDxgiSharedTexture().
+//     resources and render targets: D3D11 textures on a Vulkan device, and
+//     committed D3D12 resources in a shared heap on a D3D12 device, which each
+//     frame leaves in D3D12_RESOURCE_STATE_COMMON. Open them on a D3D11 or
+//     D3D12 device of the same adapter, which you pick with
+//     GPUDeviceOptions.AdapterLuid. Get each frame's texture with
+//     AcquiredFrameHandle.WithDxgiSharedTexture(), and on a D3D12 device its
+//     resource with AcquiredFrameHandle.WithD3d12Texture().
 //   - GPUExportKindDmaBuf: dmabufs of a format and modifier from
 //     dma_buf_formats. Get each frame's buffer with
 //     AcquiredFrameHandle.WithDmaBuf().
@@ -3300,9 +3748,10 @@ func nativeEGLContextDescriptor(input EGLContextDescriptor, arena *bindingArena)
 //
 // Each frame hands over with GPUSyncKindCPUComplete or with the sync kind that
 // crosses APIs on its platform: GPUSyncKindMetalSharedEvent for an IOSurface,
-// and GPUSyncKindSyncFd for the others, where the device has them. For a reader
-// that waits on neither, such as a Wayland compositor without explicit
-// synchronization or Flutter's copyPixelBuffer, leave them out of
+// GPUSyncKindD3d12Fence for a DXGI shared texture, and GPUSyncKindSyncFd for
+// the others, where the device has them. For a reader that waits on neither,
+// such as a Wayland compositor without explicit synchronization or Flutter's
+// copyPixelBuffer, leave them out of
 // RenderSessionAttachOptions.ProducerSyncKinds, so that each frame finishes
 // before you acquire it, and release each frame only once the reader is done
 // with its texture. Give the ring 3 textures, so the session can render while
@@ -3417,28 +3866,31 @@ func nativeFrameDemand(input FrameDemand, arena *bindingArena) C.mln_frame_deman
 	return raw
 }
 
-// FramePacerOptions corresponds to mln_frame_pacer_options. Options for
-// creating a frame pacer, or for FramePacerHandle.SetOptions().
+// FramePacingOptions corresponds to mln_frame_pacing_options. Options for
+// RenderSessionHandle.SetFramePacing().
 //
-// See mln_frame_pacer_options in the C API reference:
+// See mln_frame_pacing_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-type FramePacerOptions struct {
-	// The most frames per second that the pacer demands, greater than zero. The
-	// pacer skips display refreshes to stay within it. By default, it can demand
-	// frames at every refresh.
+type FramePacingOptions struct {
+	// The most frames per second that the library demands, greater than zero. It
+	// skips display refreshes to stay within it. By default, it can demand a frame
+	// at every refresh.
 	MaximumFramesPerSecond *uint32
-	// Removes the frame rate limit, so the pacer can demand frames at every display
-	// refresh, as it does by default.
-	UnlimitedFramesPerSecond bool
+	// The NSView* on macOS, or the UIView* on iOS and tvOS, that shows the
+	// session's frames, to pace them to its window's display rather than the main
+	// one. On iOS and tvOS, set the pacing again when the scene moves to another
+	// screen, as windowScene:didUpdateEffectiveGeometry: reports.
+	View *uintptr
 }
 
-func nativeFramePacerOptions(input FramePacerOptions, arena *bindingArena) C.mln_frame_pacer_options {
-	raw := C.mln_frame_pacer_options{}
+func nativeFramePacingOptions(input FramePacingOptions, arena *bindingArena) C.mln_frame_pacing_options {
+	raw := C.mln_frame_pacing_options{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND, &raw.maximum_frames_per_second, input.MaximumFramesPerSecond, arena, bindingNumber[uint32, C.uint32_t])
-	if input.UnlimitedFramesPerSecond {
-		raw.fields |= C.MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND
+	bindingMasked(&raw.fields, C.MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND, &raw.maximum_frames_per_second, input.MaximumFramesPerSecond, arena, bindingNumber[uint32, C.uint32_t])
+	if input.View != nil {
+		raw.view = unsafe.Pointer(C.binding_address(C.uintptr_t((*input.View))))
+		raw.fields |= C.MLN_FRAME_PACING_OPTION_VIEW
 	}
 	return raw
 }
@@ -3607,38 +4059,360 @@ func nativeGeoJSONSourceOptions(input GeoJSONSourceOptions, arena *bindingArena)
 	return raw
 }
 
-// GestureMomentum corresponds to mln_gesture_momentum. How a gesture keeps
-// moving the camera after the user lets go.
+// GestureAxisOptions corresponds to mln_gesture_axis_options. How gestures move
+// the zoom, the bearing, or the pitch.
 //
-// A part moves only when its velocity is set, and each part slows on its own.
-// Every part defaults to MomentumDecayModelFriction with a half-life of 140 ms,
-// and these other defaults:
+// See mln_gesture_axis_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureAxisOptions struct {
+	// Whether gestures move the part.
+	Enabled *bool
+	// Whether a release glides on.
+	Glides   *bool
+	Momentum *MomentumDecay
+	// Whether the part settles once its glide ends.
+	Snaps *bool
+	Snap  *MomentumSnap
+	// Where the part reports notches while gestures, their glides, and their snaps
+	// move it, replacing the ones it had. Several notches at one value report one
+	// event, with the kind of the first in the list.
+	Notches []GestureNotch
+}
+
+func nativeGestureAxisOptions(input GestureAxisOptions, arena *bindingArena) C.mln_gesture_axis_options {
+	raw := C.mln_gesture_axis_options{}
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_GESTURE_AXIS_OPTION_ENABLED, &raw.enabled, input.Enabled, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_GESTURE_AXIS_OPTION_GLIDES, &raw.glides, input.Glides, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_GESTURE_AXIS_OPTION_MOMENTUM, &raw.momentum, input.Momentum, arena, nativeMomentumDecay)
+	bindingMasked(&raw.fields, C.MLN_GESTURE_AXIS_OPTION_SNAPS, &raw.snaps, input.Snaps, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_GESTURE_AXIS_OPTION_SNAP, &raw.snap, input.Snap, arena, nativeMomentumSnap)
+	if input.Notches != nil {
+		{
+			raw.notches = (*C.mln_gesture_notch)(arena.array(len(input.Notches), unsafe.Sizeof(*raw.notches)))
+			items := unsafe.Slice(raw.notches, len(input.Notches))
+			raw.notch_count = bindingCountLike(raw.notch_count, len(input.Notches))
+			for i, item := range input.Notches {
+				items[i] = nativeGestureNotch(item, arena)
+			}
+		}
+		raw.fields |= C.MLN_GESTURE_AXIS_OPTION_NOTCHES
+	}
+	return raw
+}
+
+// GestureDelta corresponds to mln_gesture_delta. Camera movement from anything
+// but a pointer, such as a wheel, a trackpad scroll, a dial, a crown, keys, or
+// buttons, which the host converts into camera units. Zooms and turns hold
+// position in place.
+//
+// A continuous delta, such as a trackpad scroll, applies at once. A discrete
+// one, such as a wheel detent or a key press, eases, and a quick run of them
+// merges into one ease that speeds up. Deltas are one gesture until they idle.
+// The recommended amounts are a third of a level per wheel detent, 1/300 of a
+// level per pixel of trackpad scrolling, and, for keys, 100 logical pixels of
+// pan, a level of zoom, 15 degrees of bearing, and 10 of pitch.
+//
+// See mln_gesture_delta in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureDelta struct {
+	Position ScreenPoint
+	Discrete bool
+	// How far the map's content moves on the screen, in logical pixels.
+	Pan ScreenPoint
+	// Zoom levels to add.
+	Zoom float64
+	// Degrees to turn clockwise.
+	Bearing float64
+	// Degrees to tilt.
+	Pitch float64
+}
+
+func nativeGestureDelta(input GestureDelta, arena *bindingArena) C.mln_gesture_delta {
+	raw := C.mln_gesture_delta{}
+	raw.position = nativeScreenPoint(input.Position, arena)
+	raw.discrete = C.bool(input.Discrete)
+	raw.pan = nativeScreenPoint(input.Pan, arena)
+	raw.zoom = C.double(input.Zoom)
+	raw.bearing = C.double(input.Bearing)
+	raw.pitch = C.double(input.Pitch)
+	return raw
+}
+
+func copyGestureEvent(raw C.mln_gesture_event) GestureEvent {
+	switch raw._type {
+	case C.MLN_GESTURE_EVENT_TAP:
+		return GestureEventTapVariant{Value: copyGestureTap(bindingUnionLoad[C.mln_gesture_tap](raw.data[:]))}
+	case C.MLN_GESTURE_EVENT_DOUBLE_TAP:
+		return GestureEventDoubleTapVariant{Value: copyGestureTap(bindingUnionLoad[C.mln_gesture_tap](raw.data[:]))}
+	case C.MLN_GESTURE_EVENT_TWO_FINGER_TAP:
+		return GestureEventTwoFingerTapVariant{Value: copyGestureTap(bindingUnionLoad[C.mln_gesture_tap](raw.data[:]))}
+	case C.MLN_GESTURE_EVENT_NOTCH:
+		return GestureEventNotchVariant{Value: copyGestureNotchEvent(bindingUnionLoad[C.mln_gesture_notch_event](raw.data[:]))}
+	case C.MLN_GESTURE_EVENT_LONG_PRESS:
+		return GestureEventLongPressVariant{Value: copyGestureTap(bindingUnionLoad[C.mln_gesture_tap](raw.data[:]))}
+	}
+	return UnknownVariant{Tag: uint32(raw._type)}
+}
+
+func nativeGestureInput(input GestureInput, arena *bindingArena) C.mln_gesture_input {
+	raw := C.mln_gesture_input{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	if input == nil {
+		arena.fail("missing union variant")
+	}
+	raw._type = C.mln_gesture_input_type(input.bindingTag())
+	switch variant := input.(type) {
+	case GestureInputPointerDownVariant:
+		bindingUnionStore(raw.data[:], nativeGesturePointerDown(variant.Value, arena))
+	case GestureInputPointerMoveVariant:
+		bindingUnionStore(raw.data[:], nativeGesturePointer(variant.Value, arena))
+	case GestureInputPointerUpVariant:
+		bindingUnionStore(raw.data[:], nativeGesturePointer(variant.Value, arena))
+	case GestureInputPointerCancelVariant:
+		bindingUnionStore(raw.data[:], nativeGesturePointer(variant.Value, arena))
+	case GestureInputModesVariant:
+		bindingUnionStore(raw.data[:], bindingNumber[GestureMode, C.mln_gesture_modes](variant.Value, arena))
+	case GestureInputDeltaVariant:
+		bindingUnionStore(raw.data[:], nativeGestureDelta(variant.Value, arena))
+	case GestureInputPinchVariant:
+		bindingUnionStore(raw.data[:], nativeGesturePinch(variant.Value, arena))
+	default:
+		arena.fail("unknown input union variant")
+	}
+	return raw
+}
+
+// GestureNotch corresponds to mln_gesture_notch. Values every spacing from
+// offset, in the part's unit, that report an GestureEventNotchVariant as a
+// gesture moves the part to or across one, for the host to play as haptic
+// feedback. Bearing notches lie within one turn from the offset.
+//
+// See mln_gesture_notch in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureNotch struct {
+	// Positive.
+	Spacing float64
+	// Finite.
+	Offset float64
+	// The host's name for the feedback, which the notch's events carry.
+	Kind uint32
+}
+
+func nativeGestureNotch(input GestureNotch, arena *bindingArena) C.mln_gesture_notch {
+	raw := C.mln_gesture_notch{}
+	raw.spacing = C.double(input.Spacing)
+	raw.offset = C.double(input.Offset)
+	raw.kind = C.uint32_t(input.Kind)
+	return raw
+}
+
+// GestureNotchEvent corresponds to mln_gesture_notch_event. A notch that a part
+// reached.
+//
+// See mln_gesture_notch_event in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureNotchEvent struct {
+	Axis GestureAxis
+	// The notch's kind, from the options.
+	Kind uint32
+	// In the part's unit; a bearing from 0 up to 360 degrees.
+	Value float64
+}
+
+func copyGestureNotchEvent(raw C.mln_gesture_notch_event) GestureNotchEvent {
+	var result GestureNotchEvent
+	result.Axis = GestureAxis(raw.axis)
+	result.Kind = uint32(raw.kind)
+	result.Value = float64(raw.value)
+	return result
+}
+
+// GestureOptions corresponds to mln_gesture_options. How a gesture recognizer
+// moves each part of the camera.
+//
+// Settings whose bits aren't set keep their values. A new recognizer moves
+// every part, and glides each by friction with a half-life of 140 ms, a minimum
+// speed of 0, and no maximum speed or distance, with these exceptions:
 //
 //   - Pan stops at 10 logical pixels per second, needs a release of at least
 //     200, and counts a release faster than 10000 as 10000.
-//   - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
-//     snap settles on the nearest whole level.
+//   - Zoom stops at 0.01 levels per second and glides at most 2.5 levels. Its
+//     snap, when on, settles on the nearest whole level within half a level.
 //   - Bearing stops at 1 degree per second and needs a release of at least 60.
-//     Its snap settles on north within 7 degrees.
+//     It snaps to north within 7 degrees, and has a notch of kind 0 at north.
 //   - Pitch stops at 1 degree per second and needs a release of at least 5. Its
-//     snap settles flat within 7 degrees.
+//     snap, when on, settles flat within 7 degrees.
 //
-// See mln_gesture_momentum in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type GestureMomentum struct {
-	Pan     PanMomentum
-	Zoom    AnchoredMomentum
-	Bearing AnchoredMomentum
-	Pitch   AnchoredMomentum
+// Snaps take 300 ms. A double tap zooms in a level and a two-finger tap out.
+//
+// See mln_gesture_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureOptions struct {
+	// Zoom levels that a double tap zooms in, eased; with GestureModeZoomOut it
+	// zooms out instead. 0 leaves double taps to the host. Finite.
+	DoubleTapZoom *float64
+	// Zoom levels that a two-finger tap zooms, eased; negative zooms out. 0 leaves
+	// two-finger taps to the host. Finite.
+	TwoFingerTapZoom *float64
+	Pan              GesturePanOptions
+	Zoom             GestureAxisOptions
+	Bearing          GestureAxisOptions
+	Pitch            GestureAxisOptions
 }
 
-func nativeGestureMomentum(input GestureMomentum, arena *bindingArena) C.mln_gesture_momentum {
-	raw := C.mln_gesture_momentum{}
-	raw.pan = nativePanMomentum(input.Pan, arena)
-	raw.zoom = nativeAnchoredMomentum(input.Zoom, arena)
-	raw.bearing = nativeAnchoredMomentum(input.Bearing, arena)
-	raw.pitch = nativeAnchoredMomentum(input.Pitch, arena)
+func nativeGestureOptions(input GestureOptions, arena *bindingArena) C.mln_gesture_options {
+	raw := C.mln_gesture_options{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM, &raw.double_tap_zoom, input.DoubleTapZoom, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM, &raw.two_finger_tap_zoom, input.TwoFingerTapZoom, arena, bindingNumber[float64, C.double])
+	raw.pan = nativeGesturePanOptions(input.Pan, arena)
+	raw.zoom = nativeGestureAxisOptions(input.Zoom, arena)
+	raw.bearing = nativeGestureAxisOptions(input.Bearing, arena)
+	raw.pitch = nativeGestureAxisOptions(input.Pitch, arena)
 	return raw
+}
+
+// GesturePanOptions corresponds to mln_gesture_pan_options. How gestures move
+// the map's content.
+//
+// See mln_gesture_pan_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GesturePanOptions struct {
+	// Whether drags, two fingers moving together, and deltas pan.
+	Enabled *bool
+	// Whether a release glides on.
+	Glides   *bool
+	Momentum *MomentumDecay
+}
+
+func nativeGesturePanOptions(input GesturePanOptions, arena *bindingArena) C.mln_gesture_pan_options {
+	raw := C.mln_gesture_pan_options{}
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_GESTURE_PAN_OPTION_ENABLED, &raw.enabled, input.Enabled, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_GESTURE_PAN_OPTION_GLIDES, &raw.glides, input.Glides, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_GESTURE_PAN_OPTION_MOMENTUM, &raw.momentum, input.Momentum, arena, nativeMomentumDecay)
+	return raw
+}
+
+// GesturePinch corresponds to mln_gesture_pinch. A pinch the platform
+// recognized, such as a macOS trackpad's magnify and rotate or a browser's
+// Ctrl+wheel. Each update zooms by scale (above 1 zooms in) and turns rotation
+// degrees clockwise on the screen since the last, around center. It glides on
+// when it ends, as a touch pinch does.
+//
+// See mln_gesture_pinch in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GesturePinch struct {
+	Center   ScreenPoint
+	Scale    float64
+	Rotation float64
+	Phase    PinchPhase
+}
+
+func nativeGesturePinch(input GesturePinch, arena *bindingArena) C.mln_gesture_pinch {
+	raw := C.mln_gesture_pinch{}
+	raw.center = nativeScreenPoint(input.Center, arena)
+	raw.scale = C.double(input.Scale)
+	raw.rotation = C.double(input.Rotation)
+	raw.phase = C.mln_pinch_phase(input.Phase)
+	return raw
+}
+
+// GesturePointer corresponds to mln_gesture_pointer. A pointer moved, went up,
+// or was taken away.
+//
+// See mln_gesture_pointer in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GesturePointer struct {
+	ID uint32
+	// Unused for GestureInputPointerCancelVariant.
+	Position ScreenPoint
+}
+
+func nativeGesturePointer(input GesturePointer, arena *bindingArena) C.mln_gesture_pointer {
+	raw := C.mln_gesture_pointer{}
+	raw.id = C.uint32_t(input.ID)
+	raw.position = nativeScreenPoint(input.Position, arena)
+	return raw
+}
+
+// GesturePointerDown corresponds to mln_gesture_pointer_down. A pointer went
+// down. The host sends no pointer whose buttons mean nothing, such as a mouse's
+// middle button.
+//
+// See mln_gesture_pointer_down in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GesturePointerDown struct {
+	ID       uint32
+	Kind     PointerKind
+	Position ScreenPoint
+	// The modes of the pointer's held buttons.
+	Modes GestureMode
+}
+
+func nativeGesturePointerDown(input GesturePointerDown, arena *bindingArena) C.mln_gesture_pointer_down {
+	raw := C.mln_gesture_pointer_down{}
+	raw.id = C.uint32_t(input.ID)
+	raw.kind = C.mln_pointer_kind(input.Kind)
+	raw.position = nativeScreenPoint(input.Position, arena)
+	raw.modes = C.mln_gesture_modes(input.Modes)
+	return raw
+}
+
+// GestureResult corresponds to mln_gesture_result. What an input or a tick did.
+//
+// See mln_gesture_result in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureResult struct {
+	// Whether the recognizer used the input, so the host stops the platform's
+	// default for it. Ticks report false.
+	Handled  bool
+	NextTick GestureNextTick
+	// For GestureNextTickAt.
+	NextTickMs float64
+	// Whether a box-zoom drag is drawing box_zoom, which the host shows, in logical
+	// pixels corner to corner.
+	BoxZoomActive bool
+	BoxZoom       ScreenBox
+	Events        []GestureEvent
+}
+
+func copyGestureResult(raw C.mln_gesture_result) GestureResult {
+	var result GestureResult
+	result.Handled = bool(raw.handled)
+	result.NextTick = GestureNextTick(raw.next_tick)
+	result.NextTickMs = float64(raw.next_tick_ms)
+	result.BoxZoomActive = bool(raw.box_zoom_active)
+	result.BoxZoom = copyScreenBox(raw.box_zoom)
+	result.Events = func() []GestureEvent {
+		items := raw.events[:bindingLength(uint64(raw.event_count))]
+		result := make([]GestureEvent, len(items))
+		for i, item := range items {
+			result[i] = copyGestureEvent(item)
+		}
+		return result
+	}()
+	return result
+}
+
+// GestureTap corresponds to mln_gesture_tap. A tap, at position, by the pointer
+// id.
+//
+// See mln_gesture_tap in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+type GestureTap struct {
+	// Unused for GestureEventTwoFingerTapVariant.
+	ID       uint32
+	Position ScreenPoint
+}
+
+func copyGestureTap(raw C.mln_gesture_tap) GestureTap {
+	var result GestureTap
+	result.ID = uint32(raw.id)
+	result.Position = copyScreenPoint(raw.position)
+	return result
 }
 
 // GPUDeviceCapabilities corresponds to mln_gpu_device_capabilities. What a GPU
@@ -3675,6 +4449,26 @@ func copyGPUDeviceCapabilities(raw C.mln_gpu_device_capabilities) GPUDeviceCapab
 	return result
 }
 
+// GPUDeviceD3d12ContextResult corresponds to
+// mln_gpu_device_d3d12_context_result. The D3D12 objects of a device, as
+// GPUDeviceHandle.D3d12Context() reports them.
+//
+// See mln_gpu_device_d3d12_context_result in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
+type GPUDeviceD3d12ContextResult struct {
+	// The ID3D12Device.
+	Device uintptr
+	// The direct ID3D12CommandQueue that sessions on the device submit to.
+	CommandQueue uintptr
+}
+
+func copyGPUDeviceD3d12ContextResult(raw C.mln_gpu_device_d3d12_context_result) GPUDeviceD3d12ContextResult {
+	var result GPUDeviceD3d12ContextResult
+	result.Device = uintptr(unsafe.Pointer(raw.device))
+	result.CommandQueue = uintptr(unsafe.Pointer(raw.command_queue))
+	return result
+}
+
 // GPUDeviceOptions corresponds to mln_gpu_device_options. Options for
 // NewGPUDevice().
 //
@@ -3686,9 +4480,9 @@ func copyGPUDeviceCapabilities(raw C.mln_gpu_device_capabilities) GPUDeviceCapab
 // https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html
 type GPUDeviceOptions struct {
 	// The backend that the device renders with. By default, the platform's own:
-	// Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has no
-	// Vulkan driver, and in a browser the build's one backend: WebGPU or OpenGL
-	// (WebGL2).
+	// Metal on Apple platforms, Vulkan elsewhere, then D3D12 on Windows, or OpenGL
+	// where the system has neither, and in a browser the build's one backend:
+	// WebGPU or OpenGL (WebGL2).
 	Backend *RenderBackend
 	// The GPU to use, as an index into the backend's list of GPUs. OpenGL's list
 	// holds one GPU: the one that its display renders on.
@@ -3697,8 +4491,8 @@ type GPUDeviceOptions struct {
 	// VkPhysicalDeviceIDProperties.deviceUUID. Only a Vulkan device takes one.
 	AdapterUuid *[]byte
 	// The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID, which
-	// Vulkan reports as VkPhysicalDeviceIDProperties.deviceLUID. Only a Vulkan
-	// device takes one.
+	// Vulkan reports as VkPhysicalDeviceIDProperties.deviceLUID and D3D12 as
+	// ID3D12Device::GetAdapterLuid. Only a Vulkan or D3D12 device takes one.
 	AdapterLuid *[]byte
 	// The OpenGL API that an OpenGL device renders with. An EGL device defaults to
 	// OpenGLClientAPIGLES, and takes OpenGLClientAPIGL too on Linux and FreeBSD. A
@@ -4095,19 +4889,27 @@ type MapOptions struct {
 	// Whether the map keeps tiles in memory after they leave the view, so they show
 	// again without loading. Without it, the map keeps them.
 	TileCacheEnabled *bool
-	// Fonts for the text that a style's own fonts don't draw, such as scripts that
-	// need complex shaping, like Myanmar or Devanagari. A JSON array of font files,
-	// each an object with a url and an optional unicode-range, as in a font face of
-	// a style's font-faces, which every font stack uses after the style's own font
-	// faces. Empty for the system's fonts, unless system_fonts_enabled is false.
+	// Fonts for the text that a style's own fonts don't draw. A JSON array of font
+	// files, each an object with a url and an optional unicode-range, as in a font
+	// face of a style's font-faces. They shape, in order, the text that glyph PBFs
+	// can't shape, such as Myanmar or Devanagari, or all the text of a style
+	// without glyph PBFs, and draw the glyphs that come from local fonts: those a
+	// style's PBFs lack, and CJK with local_ideographs_enabled. Empty for the
+	// system's fonts alone.
 	FallbackFontFaces string
-	// Whether the map falls back to the system's fonts for CJK and the scripts that
-	// need complex shaping when fallback_font_faces is empty: fonts that the
-	// platform's font matcher picks for the user's preferred languages. Without it,
-	// the map does. The first map that uses them waits for them to be found. In the
-	// browser, the browser draws CJK glyphs in its sans-serif font instead, where
-	// fallback_font_faces doesn't cover them.
+	// Whether the map draws from the system's fonts what the style's fonts and
+	// fallback_font_faces don't: fonts that the platform's font matcher picks for
+	// the font stack's names, or for the character and the user's preferred
+	// languages. It shapes with them the text that glyph PBFs can't shape, and all
+	// the text of a style without glyph PBFs. Without it, the map does. The first
+	// map that uses them waits for the matcher to load. In the browser, the browser
+	// draws those glyphs in the font stack's families, then its sans-serif font,
+	// one at a time.
 	SystemFontsEnabled *bool
+	// Whether CJK ideographs, kana and hangul come from local fonts
+	// (fallback_font_faces, then the system's) before glyph PBFs, rather than from
+	// a glyph PBF downloaded for every few characters. Without it, they do.
+	LocalIdeographsEnabled *bool
 }
 
 func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
@@ -4121,6 +4923,7 @@ func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
 	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_TILE_CACHE_ENABLED, &raw.tile_cache_enabled, input.TileCacheEnabled, arena, bindingBool[bool, C.bool])
 	raw.fallback_font_faces = C.mln_buffer_view{data: arena.bytes([]byte(input.FallbackFontFaces)), size: C.size_t(len(input.FallbackFontFaces))}
 	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED, &raw.system_fonts_enabled, input.SystemFontsEnabled, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED, &raw.local_ideographs_enabled, input.LocalIdeographsEnabled, arena, bindingBool[bool, C.bool])
 	return raw
 }
 
@@ -4149,9 +4952,11 @@ type MapSnapshot struct {
 	// Whether the style and every resource that the view needs have loaded.
 	FullyLoaded               bool
 	RenderingStatsViewEnabled bool
-	GestureInProgress         bool
-	TransitionInProgress      bool
-	EventMask                 RuntimeEventFlag
+	// Whether a gesture recognizer's gesture, or the glide and snap after it, moves
+	// the camera.
+	GestureInProgress    bool
+	TransitionInProgress bool
+	EventMask            RuntimeEventFlag
 	// Counts the render updates that the map has made for its render session.
 	LatestRenderUpdateGeneration uint64
 	Tile                         MapTileSettings
@@ -4567,42 +5372,42 @@ func copyMetalTextureFrame(raw C.mln_metal_texture_frame) MetalTextureFrame {
 	return result
 }
 
-// MomentumDecay corresponds to mln_momentum_decay. How one part of a gesture's
-// momentum slows from its release speed.
+// MomentumDecay corresponds to mln_momentum_decay. How one part of a gesture
+// glides after release.
 //
 // Speeds and distances are in the part's unit: logical pixels for pan, zoom
-// levels for zoom, and degrees for bearing and pitch. A setting whose bit isn't
-// set takes the part's default, which GestureMomentum lists. min_speed is
-// finite and not negative, and every other number is finite and positive. A
-// friction decay can serve every release, as a preset that matches a platform's
-// scrolling. An eased glide takes its direction from the part's velocity, and
-// its distance and duration from the caller's plan.
+// levels for zoom, and degrees for bearing and pitch, with speeds per second. A
+// setting whose bit isn't set keeps its current value. A new model starts from
+// its defaults: friction from the part's, which
+// MapHandle.GestureRecognizerCreate() lists, and a curve from Android's fling.
+// Settings of the other model are an error. min_speed is finite and not
+// negative, duration_exponent finite and above -1, and every other number
+// positive; the maximums may be infinite.
 //
 // See mln_momentum_decay in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
 type MomentumDecay struct {
 	Model *MomentumDecayModel
-	// For MomentumDecayModelFriction, how long the speed takes to halve.
+	// For MomentumDecayModelFriction.
 	HalfLifeMs *float64
 	// For MomentumDecayModelFriction, the speed at which it ends.
 	StopSpeed *float64
-	// Required for MomentumDecayModelEase.
-	Distance *float64
-	// Required for MomentumDecayModelEase.
+	// For MomentumDecayModelCurve, the speed that lasts duration_ms.
+	ReferenceSpeed *float64
+	// For MomentumDecayModelCurve.
 	DurationMs *float64
-	// For MomentumDecayModelEase, the share of distance covered over the share of
-	// duration_ms. Its control points are between 0 and 1, so the glide never
-	// passes its distance. Defaults to (0, 0, 0.25, 1), the curve that camera
-	// animations ease along by default. Android's scroll fling follows (0.175, 0.5,
-	// 0.35, 1).
+	// For MomentumDecayModelCurve, how the duration grows with the speed.
+	DurationExponent *float64
+	// For MomentumDecayModelCurve, the share of the glide covered over the share of
+	// its duration. Its control points are between 0 and 1, and x1 and y1 above 0,
+	// so the glide starts moving and never passes its end.
 	Easing *UnitBezier
-	// A slower release starts no momentum.
+	// A slower release doesn't glide.
 	MinSpeed *float64
-	// For MomentumDecayModelFriction, a faster release counts as this.
+	// A faster release counts as this.
 	MaxSpeed *float64
-	// The farthest the part moves. A friction release that would move farther
-	// starts slower, so it ends sooner, and a planned glide moves at most this far
-	// over its duration.
+	// The farthest the part glides. A release that would glide farther counts as
+	// the speed that glides this far.
 	MaxDistance *float64
 }
 
@@ -4612,8 +5417,9 @@ func nativeMomentumDecay(input MomentumDecay, arena *bindingArena) C.mln_momentu
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MODEL, &raw.model, input.Model, arena, bindingNumber[MomentumDecayModel, C.mln_momentum_decay_model])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_HALF_LIFE_MS, &raw.half_life_ms, input.HalfLifeMs, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_STOP_SPEED, &raw.stop_speed, input.StopSpeed, arena, bindingNumber[float64, C.double])
-	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_DISTANCE, &raw.distance, input.Distance, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_REFERENCE_SPEED, &raw.reference_speed, input.ReferenceSpeed, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_DURATION_MS, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_DURATION_EXPONENT, &raw.duration_exponent, input.DurationExponent, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_EASING, &raw.easing, input.Easing, arena, nativeUnitBezier)
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MIN_SPEED, &raw.min_speed, input.MinSpeed, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_MOMENTUM_DECAY_MAX_SPEED, &raw.max_speed, input.MaxSpeed, arena, bindingNumber[float64, C.double])
@@ -4625,21 +5431,22 @@ func nativeMomentumDecay(input MomentumDecay, arena *bindingArena) C.mln_momentu
 // gesture that changed it.
 //
 // The targets are every spacing from offset, in the part's unit. Bearing
-// targets wrap around the circle. Once the part's glide ends, or right away
-// when it doesn't move, the part eases to the nearest target if it is within
-// tolerance of it, and otherwise stays where it is. A setting whose bit isn't
-// set takes the part's default, which GestureMomentum lists.
+// targets lie within one turn from offset, and the bearing takes the shorter
+// way around to the nearest. Once the part's glide ends, or right away when it
+// has none, the part eases to the nearest target if it is within tolerance of
+// it, and otherwise stays where it is. A setting whose bit isn't set keeps its
+// current value.
 //
 // See mln_momentum_snap in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
 type MomentumSnap struct {
 	// Positive.
 	Spacing *float64
-	// Defaults to 0.
+	// Finite.
 	Offset *float64
 	// Not negative.
 	Tolerance *float64
-	// Zero settles without easing. Defaults to 300.
+	// Zero settles without easing.
 	DurationMs *float64
 }
 
@@ -4719,6 +5526,37 @@ func nativeOfflineRegionDefinition(input OfflineRegionDefinition, arena *binding
 		arena.fail("unknown input union variant")
 	}
 	return raw
+}
+
+// OfflineRegionExpiry corresponds to mln_offline_region_expiry. How long the
+// resources that an offline region holds stay usable.
+//
+// See mln_offline_region_expiry in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type OfflineRegionExpiry struct {
+	// When the first of the region's resources goes stale, which may have passed.
+	// Maps show a stale resource while they check it with the server, unless it
+	// must be checked first, and the region's download refreshes it. Without it, no
+	// resource ever goes stale.
+	StaleAfterUnixMs *int64
+	// When the first of the region's resources that the server requires checking
+	// once stale stops being usable without the server, which may have passed.
+	// Refresh the region before then to keep all of it usable offline. Without it,
+	// every resource stays usable offline.
+	UsableOfflineUntilUnixMs *int64
+	// The resources that are stale now, tiles included.
+	StaleResourceCount uint64
+	// The stale resources that maps can't use now without the server.
+	UnusableResourceCount uint64
+}
+
+func copyOfflineRegionExpiry(raw C.mln_offline_region_expiry) OfflineRegionExpiry {
+	var result OfflineRegionExpiry
+	result.StaleAfterUnixMs = bindingPresent(raw.fields&C.MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER != 0, func() int64 { return int64(raw.stale_after_unix_ms) })
+	result.UsableOfflineUntilUnixMs = bindingPresent(raw.fields&C.MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL != 0, func() int64 { return int64(raw.usable_offline_until_unix_ms) })
+	result.StaleResourceCount = uint64(raw.stale_resource_count)
+	result.UnusableResourceCount = uint64(raw.unusable_resource_count)
+	return result
 }
 
 // OfflineRegionInfo corresponds to mln_offline_region_info. An offline region
@@ -5098,26 +5936,6 @@ func copyOpenGLTextureFrame(raw C.mln_open_gl_texture_frame) OpenGLTextureFrame 
 	return result
 }
 
-// PanMomentum corresponds to mln_pan_momentum. How a gesture's pan keeps moving
-// the map's content after release.
-//
-// See mln_pan_momentum in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type PanMomentum struct {
-	// How fast the map's content moved on the screen at release, in logical pixels
-	// per second. The pan moves only when this is set.
-	Velocity *ScreenPoint
-	Decay    MomentumDecay
-}
-
-func nativePanMomentum(input PanMomentum, arena *bindingArena) C.mln_pan_momentum {
-	raw := C.mln_pan_momentum{}
-	raw.fields = 0
-	bindingMasked(&raw.fields, C.MLN_PAN_MOMENTUM_VELOCITY, &raw.velocity, input.Velocity, arena, nativeScreenPoint)
-	raw.decay = nativeMomentumDecay(input.Decay, arena)
-	return raw
-}
-
 // PremultipliedRgba8Image corresponds to mln_premultiplied_rgba8_image. An
 // image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
 //
@@ -5398,15 +6216,17 @@ type RenderSessionAttachOptions struct {
 	//
 	//   - RenderDriverKindCallerGraphicsThread for a borrowed ring of WebGPU
 	//     textures.
-	//   - RenderDriverKindCoreWorker for an offscreen target, a window, or an
-	//     exported ring.
+	//   - RenderDriverKindCoreWorker for an offscreen target, a window, a
+	//     DirectComposition visual, or an exported ring.
+	//   - RenderDriverKindCallerGraphicsThread for a XAML SwapChainPanel, on the
+	//     panel's UI thread.
 	//   - Either one for a web canvas. In a browser both run on the thread that
 	//     loaded the library: RenderDriverKindCoreWorker in the library's own
 	//     tasks, and RenderDriverKindCallerGraphicsThread when you service the
 	//     session.
 	//   - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
-	//     borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
-	//     these on RenderDriverKindCoreWorker only, and fails an attach with
+	//     borrowed ring of Metal, Vulkan, D3D12, or OpenGL textures. A build may
+	//     drive these on RenderDriverKindCoreWorker only, and fails an attach with
 	//     RenderDriverKindCallerGraphicsThread then.
 	//
 	// An attach with another driver fails with StatusUnsupported.
@@ -5556,6 +6376,10 @@ func nativeRenderTarget(input RenderTarget, arena *bindingArena) C.mln_render_ta
 		bindingUnionStore(raw.data[:], nativeExportedRingTarget(variant.Value, arena))
 	case RenderTargetWebCanvasVariant:
 		bindingUnionStore(raw.data[:], nativeWebCanvasTarget(variant.Value, arena))
+	case RenderTargetD3d12BorrowedTexturesVariant:
+		bindingUnionStore(raw.data[:], nativeD3d12BorrowedTexturesTarget(variant.Value, arena))
+	case RenderTargetD3d12CompositionVariant:
+		bindingUnionStore(raw.data[:], nativeD3d12CompositionTarget(variant.Value, arena))
 	default:
 		arena.fail("unknown input union variant")
 	}
@@ -5798,15 +6622,20 @@ type ResourceResponse struct {
 	Bytes []byte
 	// A description of the error, for ResourceResponseStatusError.
 	ErrorMessage string
-	// Whether the library must request the resource again before it reuses this
-	// copy.
+	// Whether the library must not use this copy once it expires until it requests
+	// the resource again, not even while the server can't be reached, as
+	// Cache-Control: must-revalidate or no-cache says.
 	MustRevalidate bool
 	ModifiedUnixMs *int64
-	ExpiresUnixMs  *int64
+	// When this copy stops being fresh. Without it, the copy never expires.
+	ExpiresUnixMs *int64
 	// Empty when the resource has no ETag.
 	Etag string
 	// When to retry, for ResourceResponseStatusError.
 	RetryAfterUnixMs *int64
+	// Whether the library must not store this copy, as Cache-Control: no-store
+	// says.
+	NoStore bool
 }
 
 func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_resource_response {
@@ -5823,6 +6652,7 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_EXPIRES, &raw.expires_unix_ms, input.ExpiresUnixMs, arena, bindingNumber[int64, C.int64_t])
 	raw.etag = C.mln_buffer_view{data: arena.bytes([]byte(input.Etag)), size: C.size_t(len(input.Etag))}
 	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_RETRY_AFTER, &raw.retry_after_unix_ms, input.RetryAfterUnixMs, arena, bindingNumber[int64, C.int64_t])
+	raw.no_store = C.bool(input.NoStore)
 	return raw
 }
 
@@ -6228,6 +7058,13 @@ func nativeRuntimeOptions(input RuntimeOptions, arena *bindingArena) C.mln_runti
 type ScreenBox struct {
 	Min ScreenPoint
 	Max ScreenPoint
+}
+
+func copyScreenBox(raw C.mln_screen_box) ScreenBox {
+	var result ScreenBox
+	result.Min = copyScreenPoint(raw.min)
+	result.Max = copyScreenPoint(raw.max)
+	return result
 }
 
 func nativeScreenBox(input ScreenBox, arena *bindingArena) C.mln_screen_box {
@@ -7479,6 +8316,54 @@ func (view AndroidHardwareBufferFrameView) UnsafeBuffer() (uintptr, error) {
 	})
 }
 
+type D3d12TextureFrameView struct {
+	value D3d12TextureFrame
+	scope *bindingScope
+}
+
+func (view D3d12TextureFrameView) Width() uint32 { return view.value.Width }
+
+func (view D3d12TextureFrameView) Height() uint32 { return view.value.Height }
+
+func (view D3d12TextureFrameView) ScaleFactor() float64 { return view.value.ScaleFactor }
+
+func (view D3d12TextureFrameView) Slot() uint32 { return view.value.Slot }
+
+func (view D3d12TextureFrameView) UnsafeResource() (uintptr, error) {
+	return bindingCall(func() uintptr {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.Resource
+	})
+}
+
+func (view D3d12TextureFrameView) UnsafeDevice() (uintptr, error) {
+	return bindingCall(func() uintptr {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.Device
+	})
+}
+
+func (view D3d12TextureFrameView) Format() uint32 { return view.value.Format }
+
+func (view D3d12TextureFrameView) State() uint32 { return view.value.State }
+
+func (view D3d12TextureFrameView) UnsafeDepthResource() (uintptr, error) {
+	return bindingCall(func() uintptr {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.DepthResource
+	})
+}
+
+func (view D3d12TextureFrameView) DepthFormat() uint32 { return view.value.DepthFormat }
+
+func (view D3d12TextureFrameView) DepthState() uint32 { return view.value.DepthState }
+
 type DmaBufFrameView struct {
 	value DmaBufFrame
 	scope *bindingScope
@@ -7774,6 +8659,12 @@ const (
 	// See MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE in the C API reference:
 	// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 	FrameDemandTokenStillImage uint64 = 18446744073709551615
+	// GestureResultEventCapacity corresponds to MLN_GESTURE_RESULT_EVENT_CAPACITY.
+	// The most events that one input or tick reports.
+	//
+	// See MLN_GESTURE_RESULT_EVENT_CAPACITY in the C API reference:
+	// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+	GestureResultEventCapacity int32 = 4
 	// TextureRingMaxDepth corresponds to MLN_TEXTURE_RING_MAX_DEPTH. The most
 	// textures that a render session's texture ring can have.
 	//
@@ -7821,19 +8712,19 @@ func (handle *AcquiredFrameHandle) String() string {
 	return bindingDescribe("AcquiredFrameHandle", handle.owner())
 }
 
-// FramePacerHandle corresponds to mln_frame_pacer. Demands render sessions'
-// frames at a display's refreshes.
+// GestureRecognizerHandle corresponds to mln_gesture_recognizer. A gesture
+// recognizer that moves a map's camera.
 //
-// See mln_frame_pacer in the C API reference:
+// See mln_gesture_recognizer in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type FramePacerHandle struct{ *bindingOwner }
+type GestureRecognizerHandle struct{ *bindingOwner }
 
-func adoptFramePacerHandle(raw uint64, parent any) *FramePacerHandle {
-	owner := &FramePacerHandle{bindingAdopt(raw, parent, "FramePacerHandle", func(raw uint64) { C.mln_frame_pacer_release(C.mln_frame_pacer(raw)) })}
+func adoptGestureRecognizerHandle(raw uint64, parent any) *GestureRecognizerHandle {
+	owner := &GestureRecognizerHandle{bindingAdopt(raw, parent, "GestureRecognizerHandle", func(raw uint64) { C.mln_gesture_recognizer_release(C.mln_gesture_recognizer(raw)) })}
 	return owner
 }
 
-func (handle *FramePacerHandle) owner() *bindingOwner {
+func (handle *GestureRecognizerHandle) owner() *bindingOwner {
 	if handle == nil {
 		return nil
 	}
@@ -7842,15 +8733,15 @@ func (handle *FramePacerHandle) owner() *bindingOwner {
 
 // ID returns the native handle value. It stays readable after the handle
 // is released.
-func (handle *FramePacerHandle) ID() uint64 { return handle.owner().id() }
+func (handle *GestureRecognizerHandle) ID() uint64 { return handle.owner().id() }
 
 // IsClosed reports whether the binding has accepted a release, dispose, or
 // discard of the handle. A nil handle is closed.
-func (handle *FramePacerHandle) IsClosed() bool { return handle.owner().isClosed() }
+func (handle *GestureRecognizerHandle) IsClosed() bool { return handle.owner().isClosed() }
 
-// String formats the handle as FramePacerHandle(id=0x<hex>, closed=<true|false>).
-func (handle *FramePacerHandle) String() string {
-	return bindingDescribe("FramePacerHandle", handle.owner())
+// String formats the handle as GestureRecognizerHandle(id=0x<hex>, closed=<true|false>).
+func (handle *GestureRecognizerHandle) String() string {
+	return bindingDescribe("GestureRecognizerHandle", handle.owner())
 }
 
 // GPUDeviceHandle corresponds to mln_gpu_device. A GPU, and the queue that
@@ -8288,83 +9179,86 @@ func CameraForTile(tile CanonicalTileID, logicalSize LogicalSize) (CameraOptions
 	})
 }
 
-// NewFramePacer creates a frame pacer that follows the platform's display.
+// GestureRecognizerCreate creates a gesture recognizer that moves map_'s
+// camera.
 //
-// On iOS, macOS, and tvOS, the pacer follows the display through a
-// CADisplayLink. You can call it on any thread, and the pacer needs no run loop
-// of yours. On macOS, it follows the main display, the one with the menu bar.
-// With FramePacerOptions.MaximumFramesPerSecond, the pacer also asks the system
-// for that refresh rate. On iPhone, a rate above 60 needs
-// CADisableMinimumFrameDurationOnPhone in the app's Info.plist.
+// Its moves go to the map as camera commands, which apply asynchronously, and
+// the map's snapshot and camera events report them as gestures. After the map
+// is released, its moves do nothing. options may be null for every default.
 //
-// On Android, the pacer follows the display through the calling thread's
-// AChoreographer. Call it on a thread with an ALooper, such as the app's main
-// thread, and keep that thread running its looper while sessions use the pacer.
-// AChoreographer can stop while the phone's display is off, even while a
-// Surface on another display, such as an Android Auto projection, still shows
-// the map. The pacer then keeps demanding frames from a timer on the looper,
-// within the frame rate limit, until vsyncs arrive again.
-//
-// On OpenHarmony, the pacer follows the display through OH_NativeVSync. You can
-// call it on any thread, and the pacer needs no event loop of yours.
-//
-// See mln_frame_pacer_create in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+// See mln_gesture_recognizer_create in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
 //
 // Errors:
-//   - StatusUnsupported on the other platforms, such as visionOS, Linux, and
-//     Windows, where the library has no source of display refreshes.
-//   - StatusInvalidState on Android when the calling thread has no ALooper.
-//   - StatusNativeError on iOS, macOS, and tvOS when the system has no display
-//     to follow, and on OpenHarmony when the system can't report the display's
-//     refreshes to the process.
-func NewFramePacer(options *FramePacerOptions) (*FramePacerHandle, error) {
-	var outPacer C.mln_frame_pacer
-	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_frame_pacer_create(bindingStoreOptional(options, arena, nativeFramePacerOptions), &outPacer, diagnostic))
-	}, func(arena *bindingArena) *FramePacerHandle {
-		adopted := adoptFramePacerHandle(uint64(outPacer), nil)
+//   - StatusInvalidArgument when an option is out of range.
+func (receiver *MapHandle) GestureRecognizerCreate(options *GestureOptions) (*GestureRecognizerHandle, error) {
+	var outRecognizer C.mln_gesture_recognizer
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_gesture_recognizer_create(C.mln_map(raw), bindingStoreOptional(options, arena, nativeGestureOptions), &outRecognizer, diagnostic))
+	}, func(arena *bindingArena) *GestureRecognizerHandle {
+		adopted := adoptGestureRecognizerHandle(uint64(outRecognizer), nil)
 		return adopted
 	})
 }
 
-// Release releases a frame pacer.
+// Handle handles one input at timeMs, in milliseconds on any clock that only
+// goes forward, the same for every input and frame.
 //
-// Render sessions that use the pacer stay paced until you release them or set
-// another pacer.
+// See mln_gesture_recognizer_handle in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
 //
-// See mln_frame_pacer_release in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *FramePacerHandle) Release() error {
+// Errors:
+//   - StatusInvalidArgument when input isn't a valid input.
+func (receiver *GestureRecognizerHandle) Handle(input GestureInput, timeMs float64) (GestureResult, error) {
+	var outResult C.mln_gesture_result
+	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_gesture_recognizer_handle(C.mln_gesture_recognizer(raw), bindingStore(nativeGestureInput(input, arena), arena), C.double(timeMs), &outResult, diagnostic))
+	}, func(arena *bindingArena) GestureResult {
+		return copyGestureResult(outResult)
+	})
+}
+
+// Release releases a gesture recognizer. A glide it started keeps going.
+//
+// See mln_gesture_recognizer_release in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+func (receiver *GestureRecognizerHandle) Release() error {
 	_, err := bindingDirect(bindingClosing(receiver.owner()), func(arena *bindingArena, raw uint64) struct{} {
-		C.mln_frame_pacer_release(C.mln_frame_pacer(raw))
+		C.mln_gesture_recognizer_release(C.mln_gesture_recognizer(raw))
 		return struct{}{}
 	})
 	return err
 }
 
-// SetOptions changes a frame pacer's settings.
+// SetOptions changes the settings whose bits are set, from the next input on.
 //
-// Settings that options doesn't set keep their current values. To remove the
-// frame rate limit, set FramePacerOptions.UnlimitedFramesPerSecond. You can
-// call it on any thread.
-//
-// The sessions that the pacer serves follow the new settings from the next
-// display refresh, including a refresh that they already wait for. The pacer
-// counts a new limit from the last frames it demanded, so a higher limit can
-// demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
-// the system for the new limit's refresh rate, or for the display's own rate
-// once the limit is removed.
-//
-// See mln_frame_pacer_set_options in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+// See mln_gesture_recognizer_set_options in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
 //
 // Errors:
-//   - StatusInvalidState when you released pacer, even while sessions still use
-//     it.
-func (receiver *FramePacerHandle) SetOptions(options FramePacerOptions) error {
+//   - StatusInvalidArgument when an option is out of range.
+func (receiver *GestureRecognizerHandle) SetOptions(options GestureOptions) error {
 	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_frame_pacer_set_options(C.mln_frame_pacer(raw), bindingStore(nativeFramePacerOptions(options, arena), arena), diagnostic))
+		return int32(C.mln_gesture_recognizer_set_options(C.mln_gesture_recognizer(raw), bindingStore(nativeGestureOptions(options, arena), arena), diagnostic))
+	})
+}
+
+// Tick times long presses, steps the eases of discrete deltas, ends deltas once
+// they idle, and samples the camera for notches, at timeMs on the inputs'
+// clock. Call it when the last result's next_tick says: on the next display
+// frame, or at its time with a frame or a timer. A tick at any other time does
+// no harm.
+//
+// See mln_gesture_recognizer_tick in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html
+func (receiver *GestureRecognizerHandle) Tick(timeMs float64) (GestureResult, error) {
+	var outResult C.mln_gesture_result
+	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_gesture_recognizer_tick(C.mln_gesture_recognizer(raw), C.double(timeMs), &outResult, diagnostic))
+	}, func(arena *bindingArena) GestureResult {
+		return copyGestureResult(outResult)
 	})
 }
 
@@ -8385,12 +9279,12 @@ func (receiver *FramePacerHandle) SetOptions(options FramePacerOptions) error {
 //   - StatusUnsupported when this build or platform lacks backend, when the
 //     device can't render with open_gl_client_api, when options name a GPU that
 //     the backend can't select (an OpenGL device takes no adapter_index,
-//     adapter_uuid, or adapter_luid, and only a Vulkan device takes
-//     adapter_uuid or adapter_luid), when a device that doesn't render with
-//     Vulkan gets a queue_lock, or in a browser for every backend: WebGPU makes
-//     devices asynchronously, and a WebGL2 context needs a canvas. Attach
-//     without a device, which the session makes itself, or wrap your WebGL2
-//     context.
+//     adapter_uuid, or adapter_luid, only a Vulkan device takes adapter_uuid,
+//     and only a Vulkan or D3D12 device adapter_luid), when a device that
+//     doesn't render with Vulkan gets a queue_lock, or in a browser for every
+//     backend: WebGPU makes devices asynchronously, and a WebGL2 context needs
+//     a canvas. Attach without a device, which the session makes itself, or
+//     wrap your WebGL2 context.
 //   - StatusNotFound when no GPU matches adapter_index, adapter_uuid, or
 //     adapter_luid.
 //   - StatusNativeError when the platform can't create the device.
@@ -8749,7 +9643,7 @@ func (receiver *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON string
 	}, completionCommand)
 }
 
-// ApplyCameraDelta moves the camera relative to where it is, as a gesture does.
+// ApplyCameraDelta moves the camera relative to where it is.
 //
 // delta can pan the map's content by an offset on the screen, scale the zoom,
 // and add to the bearing and pitch. An anchor keeps one screen point in place
@@ -8761,19 +9655,6 @@ func (receiver *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON string
 // A delta that replaces an animated one starts from where that animation left
 // the camera, so the rest of the replaced change never happens. To reach an
 // exact camera, use MapHandle.UpdateCamera().
-//
-// A delta in the end phase can carry momentum, which keeps the camera moving
-// from the gesture's release velocities and slows it on each rendered frame.
-// The gesture lasts until the momentum ends: the snapshot keeps
-// gesture_in_progress set, and camera events report CameraChangeSourceMomentum.
-// With momentum, animation sets only transition_id and the end handler, which
-// runs when the gesture ends.
-//
-// A delta in the begin phase, MapHandle.CancelCameraTransitions(), or a
-// cancellation by that ID stops the momentum. A later command that sets a field
-// stops only the parts of the momentum that move that field. On a tilted map,
-// the pan moves the map's content the same distance on the screen in every
-// direction.
 //
 // See mln_map_apply_camera_delta in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
@@ -9665,6 +10546,11 @@ func (receiver *MapHandle) Resize(extent LogicalExtent) (*Future[CommandCompleti
 //
 // See mln_map_set_bounds in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+//
+// Errors:
+//   - StatusInvalidArgument, changing nothing, when the minimum zoom would be
+//     above the maximum zoom, the minimum pitch above the maximum pitch, or the
+//     maximum zoom below the lowest zoom the map can show at its size.
 func (receiver *MapHandle) SetBounds(options BoundOptions) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_bounds(C.mln_map(raw), bindingStore(nativeBoundOptions(options, arena), arena), completion, diagnostic))
@@ -10313,7 +11199,10 @@ func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 // DemandFrame asks the session to render a frame.
 //
 // The frame shows the map commands that you sent before the call, except the
-// changes that an open command group holds back.
+// changes that an open command group holds back, and the map's camera
+// animations as they are at the time of the call. Demand each frame when the
+// display is ready for it, so that animations move evenly.
+// RenderSessionHandle.SetFramePacing() does that for you.
 //
 // You can call it once the attach call returns. While the attach runs, the
 // demand waits for it to complete. Every demand finishes with one frame result
@@ -10609,18 +11498,21 @@ func (receiver *RenderSessionHandle) Release() (*Future[struct{}], error) {
 // Use it when the platform takes a surface away, such as when your app goes to
 // the background. Release every acquired frame first. Frame demands that are
 // still pending, and later ones until you give the session a new target, finish
-// with RenderResultTargetNotReady. Once the release completes, you can destroy
-// the old target. An Android or OpenHarmony window can go away sooner, as
-// AndroidWindowTarget and OhosWindowTarget say.
+// with RenderResultTargetNotReady. Once the release of a window or surface
+// completes, you can destroy it. An Android or OpenHarmony window can go away
+// sooner, as AndroidWindowTarget and OhosWindowTarget say.
 //
-// For a borrowed ring, a completed release also means that the session has
-// stopped waiting on the consumer sync that you released its frames with, so
-// you can reuse or destroy the textures. The session waits about a second at
-// most for that sync, and logs a warning when the wait runs out. It checks the
-// sync without blocking a thread: keep servicing a session driven by
-// RenderDriverKindCallerGraphicsThread until the release completes. The session
-// keeps nothing of the released textures: a texture that a later target gives
-// it again is a new one, even one that you discarded a frame of.
+// For a borrowed ring, the release completes with an GPUSync of
+// RenderSessionCapabilities.ProducerSyncKind, or GPUSyncKindCPUComplete when
+// the session has no textures since an earlier release. Wait for it before you
+// reuse or destroy the textures, as you wait for an acquired frame's producer
+// sync: for GPUSyncKindQueueOrder, destroy them once work that you submit to
+// the queue after the completion has finished. The session's GPU work on the
+// textures, and its waits for the consumer syncs that you released its frames
+// with, end there, so keep those syncs until then too. The session keeps
+// nothing of the released textures: a texture that a later target gives it
+// again is a new one, even one that you discarded a frame of. For another
+// target, the completion has no value.
 //
 // See mln_render_session_release_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -10630,10 +11522,12 @@ func (receiver *RenderSessionHandle) Release() (*Future[struct{}], error) {
 //     ring.
 //   - StatusTargetLost when the session loses its target before the release
 //     runs.
-func (receiver *RenderSessionHandle) ReleaseTarget() (*Future[struct{}], error) {
+//   - StatusNativeError when the session can't submit its work on a borrowed
+//     ring's textures. It keeps them then.
+func (receiver *RenderSessionHandle) ReleaseTarget() (*Future[*GPUSync], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_release_target(C.mln_render_session(raw), completion, diagnostic))
-	}, completionUnit)
+	}, completionNullable(completionOf(copyGPUSync)))
 }
 
 // Resize resizes the session's target and its map, and sets the map's scale
@@ -10687,24 +11581,50 @@ func (receiver *RenderSessionHandle) ServiceDriverWork() error {
 	})
 }
 
-// SetFramePacer sets the frame pacer that demands the session's frames.
+// SetFramePacing paces the session's frames to the display.
 //
-// At the first display refresh after the session has something new to draw,
-// pacer demands a frame without flags and with token 0. One pacer can serve
-// many sessions. A null pacer stops pacing the session. You can call it once
-// the attach call returns.
+// At the first display refresh after the session has something new to draw, the
+// library demands a frame without flags and with token 0, unless you demanded
+// one first. Each call replaces the session's pacing, and a null options stops
+// it. You can call it once the attach call returns.
 //
-// See mln_render_session_set_frame_pacer in the C API reference:
+// On iOS, macOS, and tvOS, the library uses a CADisplayLink on a thread of its
+// own. With FramePacingOptions.View, call it on the main thread. The library
+// asks the system for the frame rate limit's refresh rate. On iPhone, a rate
+// above 60 needs CADisableMinimumFrameDurationOnPhone in the app's Info.plist.
+//
+// On Android, the library follows the display through the calling thread's
+// AChoreographer. Call it on a thread with an ALooper, such as the app's main
+// thread, and keep that thread running its looper while the session is paced.
+// AChoreographer can stop while the phone's display is off, even while a
+// Surface on another display, such as an Android Auto projection, still shows
+// the map. The library then keeps demanding frames from a timer on the looper,
+// within the frame rate limit, until vsyncs arrive again.
+//
+// On OpenHarmony, the library uses OH_NativeVSync, from any thread.
+//
+// See mln_render_session_set_frame_pacing in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 //
 // Errors:
+//   - StatusInvalidArgument when options sets maximum_frames_per_second to 0,
+//     or sets view to null.
+//   - StatusUnsupported on the other platforms, such as visionOS, Linux, and
+//     Windows, where the library has no source of display refreshes, on macOS
+//     before 14, and when options sets view on a platform other than macOS,
+//     iOS, and tvOS.
 //   - StatusTargetLost or StatusNativeError, as
 //     RenderSessionSnapshot.FailureStatus reports, when the session has failed.
 //   - StatusInvalidState when you attached the session with a redraw wake, or
-//     detached, abandoned, released, or disposed it.
-func (receiver *RenderSessionHandle) SetFramePacer(pacer *FramePacerHandle) error {
+//     detached, abandoned, released, or disposed it, on Android when the
+//     calling thread has no ALooper, and when options sets view off the main
+//     thread or, on iOS and tvOS, to a view in no window.
+//   - StatusNativeError on iOS, macOS, and tvOS when the system has no display
+//     to follow, and on OpenHarmony when the system can't report the display's
+//     refreshes to the process.
+func (receiver *RenderSessionHandle) SetFramePacing(options *FramePacingOptions) error {
 	return bindingDo(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_set_frame_pacer(C.mln_render_session(raw), C.mln_frame_pacer(arena.leaseOptional(pacer.owner())), diagnostic))
+		return int32(C.mln_render_session_set_frame_pacing(C.mln_render_session(raw), bindingStoreOptional(options, arena, nativeFramePacingOptions), diagnostic))
 	})
 }
 
@@ -10719,9 +11639,11 @@ func (receiver *RenderSessionHandle) SetFramePacer(pacer *FramePacerHandle) erro
 // only a ring of the kind it attached with, with as many textures, with depth
 // textures only when it attached with them, and with the same formats, final
 // layouts, and owner. Release every acquired frame of a borrowed ring first.
-// Once the replacement completes, the session has also stopped waiting on the
-// consumer sync of the textures that the new ring doesn't have, as
-// RenderSessionHandle.ReleaseTarget() says, so you can reuse or destroy them.
+// For a borrowed ring, the replacement completes with an GPUSync: wait for it
+// before you reuse or destroy the textures that the new ring doesn't have, as
+// RenderSessionHandle.ReleaseTarget() says. When it lets go of no textures,
+// such as after a release, the sync is GPUSyncKindCPUComplete. For another
+// target, the completion has no value.
 //
 // See mln_render_session_set_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -10744,10 +11666,10 @@ func (receiver *RenderSessionHandle) SetFramePacer(pacer *FramePacerHandle) erro
 //     in their formats, final layouts, or owner, or in having depth textures.
 //     Attach a new session instead.
 //   - StatusNativeError when the library can't render to the new target.
-func (receiver *RenderSessionHandle) SetTarget(target RenderTarget) (*Future[struct{}], error) {
+func (receiver *RenderSessionHandle) SetTarget(target RenderTarget) (*Future[*GPUSync], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_target(C.mln_render_session(raw), bindingStore(nativeRenderTarget(target, arena), arena), completion, diagnostic))
-	}, completionUnit)
+	}, completionNullable(completionOf(copyGPUSync)))
 }
 
 // Complete answers a resource request.
@@ -11014,6 +11936,20 @@ func (receiver *RuntimeHandle) GetOfflineRegion(regionID int64) (*Future[*Offlin
 	}, completionNullable(completionOf(copyOfflineRegionInfo)))
 }
 
+// GetOfflineRegionExpiry reads how long the resources of the offline region
+// regionID stay usable.
+//
+// See mln_runtime_get_offline_region_expiry in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+//
+// Errors:
+//   - StatusNotFound when the cache file has no region regionID.
+func (receiver *RuntimeHandle) GetOfflineRegionExpiry(regionID int64) (*Future[OfflineRegionExpiry], error) {
+	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_get_offline_region_expiry(C.mln_runtime(raw), C.mln_offline_region_id(regionID), completion, diagnostic))
+	}, completionOf(copyOfflineRegionExpiry))
+}
+
 // GetOfflineRegionStatus reads the download progress of the offline region
 // regionID.
 //
@@ -11033,14 +11969,15 @@ func (receiver *RuntimeHandle) GetOfflineRegionStatus(regionID int64) (*Future[O
 	}, completionOf(copyOfflineRegionStatus))
 }
 
-// InvalidateOfflineRegion makes maps check each resource of the offline region
-// regionID with the server before they use it.
+// InvalidateOfflineRegion makes each resource of the offline region regionID
+// stale, so maps check it with the server when they next use it.
 //
-// The region keeps its resources. Starting its download again fetches the
-// invalidated resources for offline use. If the style or a TileJSON document is
-// then missing or invalid, the download reports an offline region response
-// error and goes on from the stored copy. Resources that the current style no
-// longer lists stay in the region until it's deleted.
+// The region keeps its resources, and maps show them while they check them,
+// except those that the server requires checking first. Starting the region's
+// download again checks every resource with the server. If the style or a
+// TileJSON document is then missing or invalid, the download reports an offline
+// region response error and goes on from the stored copy. Resources that the
+// current style no longer lists stay in the region until it's deleted.
 //
 // See mln_runtime_invalidate_offline_region in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -11152,8 +12089,10 @@ func (receiver *RuntimeHandle) SetMaximumAmbientCacheSize(size uint64) (*Future[
 // SetOfflineRegionDownloadState starts or pauses the download of the offline
 // region regionID.
 //
-// Setting the state that the download already has does nothing. A download
-// stops when the runtime closes.
+// A download fetches the resources that the region lacks, and checks those that
+// are stale with the server, keeping each stored copy until its refresh
+// arrives. Setting the state that the download already has does nothing. A
+// download stops when the runtime closes.
 //
 // See mln_runtime_set_offline_region_download_state in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html

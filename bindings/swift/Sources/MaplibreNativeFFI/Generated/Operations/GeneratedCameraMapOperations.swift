@@ -4,7 +4,7 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Moves the camera relative to where it is, as a gesture does.
+  /// Moves the camera relative to where it is.
   ///
   /// `delta` can pan the map's content by an offset on the screen, scale the
   /// zoom, and add to the bearing and pitch. An anchor keeps one screen point
@@ -16,19 +16,6 @@ public extension MapHandle {
   /// A delta that replaces an animated one starts from where that animation
   /// left the camera, so the rest of the replaced change never happens. To
   /// reach an exact camera, use `MapHandle.updateCamera()`.
-  ///
-  /// A delta in the end phase can carry momentum, which keeps the camera moving
-  /// from the gesture's release velocities and slows it on each rendered frame.
-  /// The gesture lasts until the momentum ends: the snapshot keeps
-  /// `gesture_in_progress` set, and camera events report
-  /// `CameraChangeSource.momentum`. With momentum, `animation` sets only
-  /// `transition_id` and the end handler, which runs when the gesture ends.
-  ///
-  /// A delta in the begin phase, `MapHandle.cancelCameraTransitions()`, or a
-  /// cancellation by that ID stops the momentum. A later command that sets a
-  /// field stops only the parts of the momentum that move that field. On a
-  /// tilted map, the pan moves the map's content the same distance on the
-  /// screen in every direction.
   ///
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -333,6 +320,12 @@ public extension MapHandle {
   ///
   /// See `mln_map_set_bounds` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument`, changing nothing, when the minimum zoom would
+  ///   be above the maximum zoom, the minimum pitch above the maximum pitch, or
+  ///   the maximum zoom below the lowest zoom the map can show at its size.
   @discardableResult
   func setBounds(options bindingArg0: BoundOptions) async throws
     -> CommandCompletion

@@ -1,14 +1,13 @@
 // The map's window: a Win32 child window in the WPF window, which the session
 // presents to. WPF can't draw over it, so the status shows in a StatusOverlay.
 //
-// Its mouse, touch, and key input turn into camera changes. A drag pans, a right
-// or Ctrl drag rotates and pitches, and two fingers also pinch and rotate. A
-// flick keeps the map moving after release, and a press stops it. The wheel
-// zooms about the pointer, and a double click zooms in, or out with Shift. The
-// arrow keys pan, and plus and minus zoom.
+// It passes its mouse, touch, pen, wheel, and key input to the map's gesture
+// recognizer, which moves the camera. A drag pans, a right or Ctrl drag rotates
+// and pitches, and two fingers also pinch and rotate. A flick glides on, and a
+// double click zooms in, or out with Shift. The wheel zooms about the pointer,
+// the arrow keys pan, and plus and minus zoom.
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using System.Windows.Input.Manipulations;
 using System.Windows.Interop;
 
 namespace Maplibre.NativeFfi.Example.Wpf;
@@ -16,31 +15,22 @@ namespace Maplibre.NativeFfi.Example.Wpf;
 internal sealed unsafe partial class MapView : HwndHost
 {
     private const string ClassName = "MaplibreWpfExampleMap";
-    private const int MouseId = -1;
+    private const uint MouseId = 0;
     private static bool registered;
 
-    // Input to the hosted window skips WPF's input system, so the window feeds
-    // its mouse and touch points to a manipulation processor itself.
-    private readonly ManipulationProcessor2D manipulation = new(Manipulations2D.All);
-    private readonly Dictionary<int, Manipulator2D> pointers = [];
-    private bool rotating;
-    private bool cancelled;
+    // The pointers that went down on the map and haven't lifted yet.
+    private readonly HashSet<uint> pointers = [];
 
-    // The average distance of the touches from their center, at the last pinch.
-    private double radius;
+    // The release of the button that started the mouse's drag.
+    private int dragButtonUp;
+
+    // The modes that held keys select, as the recognizer last got them.
+    private GestureMode keyModes;
+
+    // The client size in pixels.
+    private (int Width, int Height) size;
 
     public MapController? Controller { get; set; }
-
-    public MapView()
-    {
-        manipulation.Started += (_, _) =>
-        {
-            radius = 0;
-            Apply(new CameraDelta { GesturePhase = GesturePhase.Begin });
-        };
-        manipulation.Delta += OnManipulationDelta;
-        manipulation.Completed += OnManipulationCompleted;
-    }
 
     protected override HandleRef BuildWindowCore(HandleRef parent)
     {
@@ -82,220 +72,172 @@ internal sealed unsafe partial class MapView : HwndHost
         switch (message)
         {
             case WM_SIZE:
-                Controller?.WindowResized((int)(lParam & 0xFFFF), (int)((lParam >> 16) & 0xFFFF));
+                size = ((int)(lParam & 0xFFFF), (int)((lParam >> 16) & 0xFFFF));
+                Controller?.WindowResized(size.Width, size.Height);
                 break;
-            case WM_LBUTTONDOWN:
-            case WM_RBUTTONDOWN:
+            // The left button drags, and the right one rotates and pitches.
+            // The others mean nothing to the map.
+            case WM_LBUTTONDOWN or WM_RBUTTONDOWN when !pointers.Contains(MouseId):
                 SetFocus(window);
                 SetCapture(window);
-                rotating = message == WM_RBUTTONDOWN || (wParam & MK_CONTROL) != 0;
-                Move(MouseId, Point(lParam));
-                handled = true;
+                dragButtonUp = message == WM_RBUTTONDOWN ? WM_RBUTTONUP : WM_LBUTTONUP;
+                handled = Down(
+                    MouseId,
+                    PointerKind.Mouse,
+                    Point(lParam),
+                    message == WM_RBUTTONDOWN ? GestureMode.Rotate : default
+                );
                 break;
-            case WM_MOUSEMOVE when pointers.ContainsKey(MouseId):
-                Move(MouseId, Point(lParam));
-                handled = true;
+            case WM_MOUSEMOVE when pointers.Contains(MouseId):
+                handled = Move(MouseId, Point(lParam));
                 break;
-            case WM_LBUTTONUP:
-            case WM_RBUTTONUP:
-                if (pointers.ContainsKey(MouseId))
-                {
-                    Release(MouseId, Point(lParam));
-                    ReleaseCapture();
-                }
-                handled = true;
+            case WM_LBUTTONUP or WM_RBUTTONUP:
+                if (message != dragButtonUp || !pointers.Contains(MouseId))
+                    break;
+                handled = Up(MouseId, Point(lParam));
+                // The mouse is up, so the WM_CAPTURECHANGED that follows does
+                // nothing.
+                ReleaseCapture();
                 break;
             // Another window took the mouse during a drag.
-            case WM_CAPTURECHANGED when pointers.ContainsKey(MouseId):
-                Cancel();
+            case WM_CAPTURECHANGED when pointers.Contains(MouseId):
+                Cancel(MouseId);
                 break;
             // Touch and pen input. Handling it keeps Windows from turning it into
             // mouse input.
             case WM_POINTERDOWN:
                 SetFocus(window);
-                rotating = false;
-                Move(PointerId(wParam), FromScreen(window, lParam));
-                handled = true;
-                break;
-            case WM_POINTERUPDATE when pointers.ContainsKey(PointerId(wParam)):
-                Move(PointerId(wParam), FromScreen(window, lParam));
-                handled = true;
-                break;
-            case WM_POINTERUP when pointers.ContainsKey(PointerId(wParam)):
-                Release(PointerId(wParam), FromScreen(window, lParam));
-                handled = true;
-                break;
-            case WM_POINTERCAPTURECHANGED when pointers.ContainsKey(PointerId(wParam)):
-                Cancel();
-                break;
-            case WM_LBUTTONDBLCLK:
-                ZoomBy((wParam & MK_SHIFT) != 0 ? 0.5 : 2, Point(lParam));
-                handled = true;
-                break;
-            case WM_MOUSEWHEEL:
-                var notches = (short)((wParam >> 16) & 0xFFFF) / 120.0;
-                // A wheel zooms about the pointer, by steps of 40 pixels.
-                Apply(
-                    new CameraDelta
-                    {
-                        Scale = Math.Pow(2, notches * 40 / 300),
-                        Anchor = FromScreen(window, lParam),
-                    }
+                handled = Down(
+                    PointerId(wParam),
+                    KindOf(wParam),
+                    FromScreen(window, lParam),
+                    default
                 );
-                handled = true;
+                break;
+            case WM_POINTERUPDATE when pointers.Contains(PointerId(wParam)):
+                handled = Move(PointerId(wParam), FromScreen(window, lParam));
+                break;
+            case WM_POINTERUP when pointers.Contains(PointerId(wParam)):
+                handled = Up(PointerId(wParam), FromScreen(window, lParam));
+                break;
+            case WM_POINTERCAPTURECHANGED when pointers.Contains(PointerId(wParam)):
+                Cancel(PointerId(wParam));
+                break;
+            // A wheel's detent zooms a third of a level, eased. A precise wheel
+            // or a touchpad scrolls by less, which zooms at once.
+            case WM_MOUSEWHEEL:
+                var wheel = (short)((wParam >> 16) & 0xFFFF);
+                handled = Input(
+                    new GestureInput.Delta(
+                        new GestureDelta
+                        {
+                            Position = FromScreen(window, lParam),
+                            Discrete = wheel % WHEEL_DELTA == 0,
+                            Zoom = wheel / (3.0 * WHEEL_DELTA),
+                        }
+                    )
+                );
                 break;
             case WM_KEYDOWN:
+                UpdateKeyModes();
                 handled = Key((int)wParam);
+                break;
+            case WM_KEYUP:
+                UpdateKeyModes();
+                break;
+            // Once the window loses the focus, it can't see drags and held keys
+            // end.
+            case WM_KILLFOCUS:
+                var dragging = pointers.Contains(MouseId);
+                foreach (var id in pointers.ToArray())
+                    Cancel(id);
+                if (dragging)
+                    ReleaseCapture();
+                SetKeyModes(default);
                 break;
         }
         return base.WndProc(window, message, wParam, lParam, ref handled);
     }
 
-    private void Move(int id, ScreenPoint point)
+    private bool Down(uint id, PointerKind kind, ScreenPoint position, GestureMode modes)
     {
-        pointers[id] = new Manipulator2D(id, (float)point.X, (float)point.Y);
-        Process();
-    }
-
-    // The pointer's last sample is where it let go, so a pause before the
-    // release slows the release velocity.
-    private void Release(int id, ScreenPoint point)
-    {
-        Move(id, point);
-        pointers.Remove(id);
-        Process();
-    }
-
-    private void Cancel()
-    {
-        cancelled = true;
-        pointers.Clear();
-        manipulation.CompleteManipulation(Timestamp());
-    }
-
-    private void Process() => manipulation.ProcessManipulators(Timestamp(), pointers.Values);
-
-    private void OnManipulationDelta(object? sender, Manipulation2DDeltaEventArgs e)
-    {
-        var delta = e.Delta;
-        if (rotating)
-        {
-            Apply(
-                new CameraDelta
-                {
-                    Bearing = delta.TranslationX * DegreesPerPixel,
-                    Pitch = -delta.TranslationY * DegreesPerPixel,
-                    GesturePhase = GesturePhase.Update,
-                }
-            );
-            return;
-        }
-        if (pointers.Count > 1)
-            radius = pointers.Values.Average(p => double.Hypot(p.X - e.OriginX, p.Y - e.OriginY));
-        // The rotation is in radians, clockwise, which turns the bearing the
-        // other way.
-        Apply(
-            new CameraDelta
-            {
-                Offset = new ScreenPoint(delta.TranslationX, delta.TranslationY),
-                Scale = delta.ScaleX,
-                Bearing = -double.RadiansToDegrees(delta.Rotation),
-                Anchor = new ScreenPoint(e.OriginX, e.OriginY),
-                GesturePhase = GesturePhase.Update,
-            }
+        UpdateKeyModes();
+        pointers.Add(id);
+        return Input(
+            new GestureInput.PointerDown(new GesturePointerDown(id, kind, position, modes))
         );
     }
 
-    // The processor's velocities are per millisecond, and the map's are per
-    // second.
-    private void OnManipulationCompleted(object? sender, Manipulation2DCompletedEventArgs e)
+    private bool Move(uint id, ScreenPoint position) =>
+        Input(new GestureInput.PointerMove(new GesturePointer(id, position)));
+
+    private bool Up(uint id, ScreenPoint position)
     {
-        if (cancelled)
-        {
-            cancelled = false;
-            Apply(new CameraDelta { GesturePhase = GesturePhase.Cancel });
-            return;
-        }
-        var velocity = e.Velocities;
-        var origin = new ScreenPoint(e.OriginX, e.OriginY);
-        var momentum = rotating
-            ? new GestureMomentum
-            {
-                Bearing = new AnchoredMomentum
-                {
-                    Velocity = velocity.LinearVelocityX * DegreesPerPixel * 1000,
-                    Snap = new(),
-                },
-                Pitch = new AnchoredMomentum
-                {
-                    Velocity = -velocity.LinearVelocityY * DegreesPerPixel * 1000,
-                    Snap = new(),
-                },
-            }
-            : new GestureMomentum
-            {
-                Pan = new PanMomentum
-                {
-                    Velocity = new ScreenPoint(
-                        velocity.LinearVelocityX * 1000,
-                        velocity.LinearVelocityY * 1000
-                    ),
-                },
-                // A pinch's radius grows by its expansion, and each doubling
-                // zooms in one level.
-                Zoom = new AnchoredMomentum
-                {
-                    Velocity =
-                        radius > 0 ? velocity.ExpansionVelocityX * 1000 / radius / Math.Log(2) : 0,
-                    Anchor = origin,
-                },
-                Bearing = new AnchoredMomentum
-                {
-                    Velocity = -double.RadiansToDegrees(velocity.AngularVelocity) * 1000,
-                    Anchor = origin,
-                    Snap = radius > 0 ? new() : null,
-                },
-            };
-        Apply(new CameraDelta { Momentum = momentum, GesturePhase = GesturePhase.End });
+        pointers.Remove(id);
+        return Input(new GestureInput.PointerUp(new GesturePointer(id, position)));
     }
 
+    private void Cancel(uint id)
+    {
+        pointers.Remove(id);
+        Input(new GestureInput.PointerCancel(new GesturePointer(id, default)));
+    }
+
+    private bool Input(GestureInput input) => Controller?.Input(input) ?? false;
+
+    // Ctrl makes a drag rotate and pitch, and Shift makes a double click zoom
+    // out. The view can't draw over the map, so it has no box zoom to show.
+    private void UpdateKeyModes() =>
+        SetKeyModes(
+            (GetKeyState(VK_CONTROL) < 0 ? GestureMode.Rotate : default)
+                | (GetKeyState(VK_SHIFT) < 0 ? GestureMode.ZoomOut : default)
+        );
+
+    private void SetKeyModes(GestureMode modes)
+    {
+        if (modes == keyModes)
+            return;
+        keyModes = modes;
+        Input(new GestureInput.Modes(modes));
+    }
+
+    // The arrow keys pan 100 pixels, and plus and minus zoom a level, eased.
     private bool Key(int key)
     {
-        const double Step = 100;
         var delta = key switch
         {
-            VK_LEFT => new CameraDelta { Offset = new ScreenPoint(Step, 0) },
-            VK_RIGHT => new CameraDelta { Offset = new ScreenPoint(-Step, 0) },
-            VK_UP => new CameraDelta { Offset = new ScreenPoint(0, Step) },
-            VK_DOWN => new CameraDelta { Offset = new ScreenPoint(0, -Step) },
-            VK_OEM_PLUS or VK_ADD => new CameraDelta { Scale = 2 },
-            VK_OEM_MINUS or VK_SUBTRACT => new CameraDelta { Scale = 0.5 },
-            _ => (CameraDelta?)null,
+            VK_LEFT => new GestureDelta { Pan = new ScreenPoint(100, 0) },
+            VK_RIGHT => new GestureDelta { Pan = new ScreenPoint(-100, 0) },
+            VK_UP => new GestureDelta { Pan = new ScreenPoint(0, 100) },
+            VK_DOWN => new GestureDelta { Pan = new ScreenPoint(0, -100) },
+            VK_OEM_PLUS or VK_ADD => new GestureDelta { Zoom = 1 },
+            VK_OEM_MINUS or VK_SUBTRACT => new GestureDelta { Zoom = -1 },
+            _ => (GestureDelta?)null,
         };
         if (delta is null)
             return false;
-        Apply(delta with { Animation = Animation() });
-        return true;
+        return Input(
+            new GestureInput.Delta(
+                delta.Value with
+                {
+                    Position = Logical(size.Width / 2, size.Height / 2),
+                    Discrete = true,
+                }
+            )
+        );
     }
 
-    private void ZoomBy(double scale, ScreenPoint anchor) =>
-        Apply(
-            new CameraDelta
-            {
-                Scale = scale,
-                Anchor = anchor,
-                Animation = Animation(),
-            }
-        );
+    // The recognizer's ID for a touch or a pen: its Win32 pointer ID plus one,
+    // which keeps it apart from the mouse's.
+    private static uint PointerId(nint wParam) => (uint)(wParam & 0xFFFF) + 1;
 
-    private void Apply(CameraDelta delta) => Controller?.Map?.Discarding.ApplyCameraDelta(delta);
-
-    private static AnimationOptions Animation() => new() { DurationMs = 300 };
-
-    // The processor takes timestamps in 100-nanosecond ticks.
-    private static long Timestamp() => Environment.TickCount64 * TimeSpan.TicksPerMillisecond;
-
-    private static int PointerId(nint wParam) => (int)(wParam & 0xFFFF);
+    private static PointerKind KindOf(nint wParam)
+    {
+        int type;
+        return GetPointerType((uint)(wParam & 0xFFFF), &type) && type == PT_PEN
+            ? PointerKind.Pen
+            : PointerKind.Touch;
+    }
 
     // The map takes points in logical pixels, and Win32 reports them in pixels.
     private ScreenPoint Point(nint lParam) =>
@@ -328,7 +270,6 @@ internal sealed unsafe partial class MapView : HwndHost
             var windowClass = new WNDCLASSEXW
             {
                 cbSize = (uint)sizeof(WNDCLASSEXW),
-                style = CS_DBLCLKS,
                 lpfnWndProc = &DefaultWindowProc,
                 hInstance = GetModuleHandleW(null),
                 hCursor = LoadCursorW(0, IDC_ARROW),
@@ -345,17 +286,16 @@ internal sealed unsafe partial class MapView : HwndHost
     private static nint DefaultWindowProc(nint window, uint message, nint wParam, nint lParam) =>
         DefWindowProcW(window, message, wParam, lParam);
 
-    private const double DegreesPerPixel = 0.5;
     private const int WS_CHILD = 0x40000000;
     private const int WS_VISIBLE = 0x10000000;
-    private const uint CS_DBLCLKS = 0x0008;
     private const int IDC_ARROW = 32512;
     private const int WM_SIZE = 0x0005;
+    private const int WM_KILLFOCUS = 0x0008;
     private const int WM_KEYDOWN = 0x0100;
+    private const int WM_KEYUP = 0x0101;
     private const int WM_MOUSEMOVE = 0x0200;
     private const int WM_LBUTTONDOWN = 0x0201;
     private const int WM_LBUTTONUP = 0x0202;
-    private const int WM_LBUTTONDBLCLK = 0x0203;
     private const int WM_RBUTTONDOWN = 0x0204;
     private const int WM_RBUTTONUP = 0x0205;
     private const int WM_MOUSEWHEEL = 0x020A;
@@ -364,8 +304,10 @@ internal sealed unsafe partial class MapView : HwndHost
     private const int WM_POINTERDOWN = 0x0246;
     private const int WM_POINTERUP = 0x0247;
     private const int WM_POINTERCAPTURECHANGED = 0x024C;
-    private const nint MK_SHIFT = 0x0004;
-    private const nint MK_CONTROL = 0x0008;
+    private const int WHEEL_DELTA = 120;
+    private const int PT_PEN = 3;
+    private const int VK_SHIFT = 0x10;
+    private const int VK_CONTROL = 0x11;
     private const int VK_LEFT = 0x25;
     private const int VK_UP = 0x26;
     private const int VK_RIGHT = 0x27;
@@ -435,6 +377,13 @@ internal sealed unsafe partial class MapView : HwndHost
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool ReleaseCapture();
+
+    [LibraryImport("user32.dll")]
+    private static partial short GetKeyState(int key);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetPointerType(uint pointerId, int* pointerType);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

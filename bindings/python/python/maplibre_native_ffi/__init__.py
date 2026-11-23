@@ -2,8 +2,8 @@
 
 The ``maplibre-native-ffi`` distribution holds this package, and the
 ``maplibre-native-ffi-runtime`` distribution holds the native extension, which
-draws with every render backend of its platform: Vulkan and OpenGL on Linux,
-Windows, and Android, and Metal on macOS. Windows also offers the MinGW build
+draws with every render backend of its platform: Vulkan and OpenGL on Linux
+and Android, Vulkan, D3D12, and OpenGL on Windows, and Metal on macOS. Windows also offers the MinGW build
 as ``maplibre-native-ffi-runtime-mingw``. Importing the package raises
 ``ImportError`` unless exactly one runtime is installed.
 

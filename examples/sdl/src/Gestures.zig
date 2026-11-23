@@ -1,11 +1,11 @@
-//! Gestures, as camera deltas. A drag pans, a right or Ctrl drag rotates and
-//! pitches, and two fingers or a touchpad pinch pan, zoom, and rotate. The
-//! wheel zooms about the pointer, and a double click zooms in, or out with
-//! Shift. The arrow keys pan, and plus and minus zoom. A drag or a pinch keeps
-//! moving after release, until a press stops it.
+//! Input for the library's gesture recognizer, which moves the camera. A drag
+//! pans, a right or Ctrl drag rotates and pitches, two fingers on a touch
+//! screen pan, zoom, rotate, and pitch, and a touchpad pinch zooms. The wheel
+//! zooms about the pointer, a double click zooms in, or out with Shift, the
+//! arrow keys pan, and plus and minus zoom. The recognizer keeps a release
+//! gliding, and reports taps and notches, which the example doesn't use.
 //!
-//! SDL turns the first touch into mouse events, so one finger drags as the
-//! mouse does, and a second finger turns the drag into a pinch.
+//! Every method runs on the main thread.
 
 const Gestures = @This();
 
@@ -14,253 +14,232 @@ const maplibre = @import("maplibre_native_ffi");
 const c = @import("sdl");
 const MapView = @import("MapView.zig");
 
-const degrees_per_pixel = 0.5;
+const allocator = std.heap.smp_allocator;
+/// The mouse's pointer. A touch's is its finger's, from 1 on.
+const mouse = 0;
 
 view: *MapView,
-drag: ?Drag = null,
-pinch: ?Pinch = null,
-touchpad_pinch: ?TouchpadPinch = null,
-/// The touches on the window, by finger, in the map's logical pixels.
-touches: [2]?Touch = .{ null, null },
+recognizer: maplibre.GestureRecognizer,
+/// The button that holds the mouse down.
+button: ?u8 = null,
+/// The touches that are down.
+touches: [10]?u32 = @splat(null),
+modes: maplibre.GestureMode = .{},
+/// The scale that Wayland last reported for the pinch, since it began.
+pinch_scale: f32 = 1,
+/// When the recognizer next needs a tick, on SDL's clock in nanoseconds, and
+/// the timer that wakes the event loop for it.
+tick_at: ?u64 = null,
+timer: c.SDL_TimerID = 0,
 
-const Drag = struct {
-    rotating: bool,
-    x_rate: Rate,
-    y_rate: Rate,
-};
+/// Creates the recognizer for the view's map. The view's wake wakes the event
+/// loop for each tick, which then calls `update`.
+pub fn init(view: *MapView) !Gestures {
+    var diagnostic: maplibre.Diagnostic = .{};
+    errdefer std.log.err("couldn't create the gesture recognizer: {s}", .{diagnostic.message()});
+    return .{ .view = view, .recognizer = try view.map.gestureRecognizerCreate(allocator, null, &diagnostic) };
+}
 
-/// Two touches, whose span scales and turns about their midpoint, which pans as
-/// it moves.
-const Pinch = struct {
-    center: maplibre.ScreenPoint,
-    span: f64,
-    angle: f64,
-    x_rate: Rate,
-    y_rate: Rate,
-    zoom_rate: Rate,
-    bearing_rate: Rate,
-};
+pub fn deinit(self: *Gestures) void {
+    if (self.timer != 0) _ = c.SDL_RemoveTimer(self.timer);
+    self.recognizer.release();
+}
 
-const TouchpadPinch = struct {
-    anchor: maplibre.ScreenPoint,
-    zoom_rate: Rate,
-};
-
-const Touch = struct {
-    finger: c.SDL_FingerID,
-    point: maplibre.ScreenPoint,
-};
+/// Ticks the recognizer once it asked for a tick.
+pub fn update(self: *Gestures) void {
+    const at = self.tick_at orelse return;
+    const now = c.SDL_GetTicksNS();
+    if (now < at) return;
+    // The tick consumes its deadline, so the next frame tick waits a refresh.
+    self.tick_at = null;
+    var diagnostic: maplibre.Diagnostic = .{};
+    var result = self.recognizer.tick(allocator, milliseconds(now), &diagnostic) catch
+        return self.view.fail(diagnostic.message());
+    defer result.deinit();
+    self.schedule(result.value);
+}
 
 pub fn handle(self: *Gestures, event: *const c.SDL_Event) void {
     switch (event.type) {
-        c.SDL_EVENT_MOUSE_BUTTON_DOWN => self.press(&event.button),
-        c.SDL_EVENT_MOUSE_MOTION => self.move(&event.motion),
-        c.SDL_EVENT_MOUSE_BUTTON_UP => self.release(&event.button),
+        c.SDL_EVENT_MOUSE_BUTTON_DOWN, c.SDL_EVENT_MOUSE_BUTTON_UP => self.click(&event.button),
+        c.SDL_EVENT_MOUSE_MOTION => if (event.motion.which != c.SDL_TOUCH_MOUSEID and self.button != null)
+            self.input(event.motion.timestamp, .{ .pointer_move = .{
+                .id = mouse,
+                .position = self.point(event.motion.x, event.motion.y),
+            } }),
         c.SDL_EVENT_MOUSE_WHEEL => self.scroll(&event.wheel),
-        c.SDL_EVENT_FINGER_DOWN, c.SDL_EVENT_FINGER_MOTION => self.touch(&event.tfinger),
-        c.SDL_EVENT_FINGER_UP, c.SDL_EVENT_FINGER_CANCELED => self.lift(&event.tfinger),
-        c.SDL_EVENT_PINCH_BEGIN, c.SDL_EVENT_PINCH_UPDATE, c.SDL_EVENT_PINCH_END => self.pinchTouchpad(&event.pinch),
-        c.SDL_EVENT_KEY_DOWN => self.key(&event.key),
-        // Another window took the input during a gesture.
-        c.SDL_EVENT_WINDOW_FOCUS_LOST, c.SDL_EVENT_WINDOW_MOUSE_LEAVE => if (self.drag != null and !mouseHeld()) self.cancel(),
+        c.SDL_EVENT_FINGER_DOWN, c.SDL_EVENT_FINGER_MOTION, c.SDL_EVENT_FINGER_UP, c.SDL_EVENT_FINGER_CANCELED => self.touch(&event.tfinger),
+        c.SDL_EVENT_PINCH_BEGIN, c.SDL_EVENT_PINCH_UPDATE, c.SDL_EVENT_PINCH_END => self.pinch(&event.pinch),
+        c.SDL_EVENT_KEY_DOWN, c.SDL_EVENT_KEY_UP => self.key(&event.key),
+        // The window can't see the end of a gesture or a held key from here.
+        c.SDL_EVENT_WINDOW_FOCUS_LOST => self.cancel(event.window.timestamp),
         else => {},
     }
 }
 
-fn press(self: *Gestures, button: *const c.SDL_MouseButtonEvent) void {
+/// The left button drags, and the right one rotates and pitches. The others
+/// mean nothing to the map. SDL turns touches into clicks too, which `touch`
+/// handles instead.
+fn click(self: *Gestures, button: *const c.SDL_MouseButtonEvent) void {
+    if (button.which == c.SDL_TOUCH_MOUSEID) return;
     if (button.button != c.SDL_BUTTON_LEFT and button.button != c.SDL_BUTTON_RIGHT) return;
-    if (self.pinch != null) return;
-    if (button.clicks == 2 and button.button == c.SDL_BUTTON_LEFT) {
-        const zoom_out = c.SDL_GetModState() & c.SDL_KMOD_SHIFT != 0;
-        self.apply(.{
-            .scale = if (zoom_out) 0.5 else 2,
-            .anchor = self.point(button.x, button.y),
-            .animation = animation(),
-        });
-        return;
+    const position = self.point(button.x, button.y);
+    if (button.down and self.button == null) {
+        self.button = button.button;
+        self.input(button.timestamp, .{ .pointer_down = .{
+            .id = mouse,
+            .kind = .mouse,
+            .position = position,
+            .modes = .{ .rotate = button.button == c.SDL_BUTTON_RIGHT },
+        } });
+    } else if (!button.down and self.button == button.button) {
+        self.button = null;
+        self.input(button.timestamp, .{ .pointer_up = .{ .id = mouse, .position = position } });
     }
-    self.drag = .{
-        .rotating = button.button == c.SDL_BUTTON_RIGHT or c.SDL_GetModState() & c.SDL_KMOD_CTRL != 0,
-        .x_rate = .init(button.timestamp),
-        .y_rate = .init(button.timestamp),
-    };
-    self.apply(.{ .gesture_phase = .begin });
 }
 
-fn move(self: *Gestures, motion: *const c.SDL_MouseMotionEvent) void {
-    const drag = &(self.drag orelse return);
-    const dx = motion.xrel * self.view.logicalPerPoint();
-    const dy = motion.yrel * self.view.logicalPerPoint();
-    drag.x_rate.add(dx, motion.timestamp);
-    drag.y_rate.add(dy, motion.timestamp);
-    self.apply(if (drag.rotating) .{
-        .bearing = dx * degrees_per_pixel,
-        .pitch = -dy * degrees_per_pixel,
-        .gesture_phase = .update,
-    } else .{
-        .offset = .{ .x = dx, .y = dy },
-        .gesture_phase = .update,
-    });
-}
-
-fn release(self: *Gestures, button: *const c.SDL_MouseButtonEvent) void {
-    const drag = self.drag orelse return;
-    self.drag = null;
-    const vx = drag.x_rate.at(button.timestamp);
-    const vy = drag.y_rate.at(button.timestamp);
-    self.apply(.{
-        .momentum = if (drag.rotating) .{
-            .bearing = .{ .velocity = vx * degrees_per_pixel },
-            .pitch = .{ .velocity = -vy * degrees_per_pixel },
-        } else .{
-            .pan = .{ .velocity = .{ .x = vx, .y = vy } },
-        },
-        .gesture_phase = .end,
-    });
-}
-
-fn cancel(self: *Gestures) void {
-    self.drag = null;
-    self.pinch = null;
-    self.apply(.{ .gesture_phase = .cancel });
-}
-
+/// A wheel's detent zooms a third of a level about the pointer. SDL can't
+/// tell a touchpad's scrolling from a wheel's, so both zoom.
 fn scroll(self: *Gestures, wheel: *const c.SDL_MouseWheelEvent) void {
-    const notches = if (wheel.direction == c.SDL_MOUSEWHEEL_FLIPPED) -wheel.y else wheel.y;
-    // A wheel zooms about the pointer, by steps of 40 pixels.
-    self.apply(.{
-        .scale = std.math.pow(f64, 2, notches * 40 / 300),
-        .anchor = self.point(wheel.mouse_x, wheel.mouse_y),
-    });
+    const detents = if (wheel.direction == c.SDL_MOUSEWHEEL_FLIPPED) -wheel.y else wheel.y;
+    self.input(wheel.timestamp, .{ .delta = .{
+        .position = self.point(wheel.mouse_x, wheel.mouse_y),
+        .discrete = true,
+        .zoom = detents / 3,
+    } });
 }
 
+/// A touch screen's touches. A touchpad's are on the touchpad rather than the
+/// window, and its pinches come from `pinch`.
 fn touch(self: *Gestures, finger: *const c.SDL_TouchFingerEvent) void {
+    if (c.SDL_GetTouchDeviceType(finger.touchID) != c.SDL_TOUCH_DEVICE_DIRECT) return;
+    const id: u32 = @intCast(finger.fingerID % std.math.maxInt(u32) + 1);
+    const slot = for (&self.touches) |*held| {
+        if (held.* == id) break held;
+    } else null;
     const position = self.touchPoint(finger);
-    for (&self.touches) |*slot| {
-        if (slot.*) |*existing| if (existing.finger == finger.fingerID) {
-            existing.point = position;
-            break;
-        };
-    } else for (&self.touches) |*slot| {
-        if (slot.* == null) {
-            slot.* = .{ .finger = finger.fingerID, .point = position };
-            break;
+    switch (finger.type) {
+        c.SDL_EVENT_FINGER_DOWN => {
+            const free = for (&self.touches) |*free| {
+                if (free.* == null) break free;
+            } else return;
+            free.* = id;
+            self.input(finger.timestamp, .{ .pointer_down = .{ .id = id, .kind = .touch, .position = position } });
+        },
+        c.SDL_EVENT_FINGER_MOTION => if (slot != null)
+            self.input(finger.timestamp, .{ .pointer_move = .{ .id = id, .position = position } }),
+        c.SDL_EVENT_FINGER_UP => if (slot) |down| {
+            down.* = null;
+            self.input(finger.timestamp, .{ .pointer_up = .{ .id = id, .position = position } });
+        },
+        else => if (slot) |down| {
+            down.* = null;
+            self.input(finger.timestamp, .{ .pointer_cancel = .{ .id = id } });
+        },
+    }
+}
+
+/// A touchpad's pinch zooms about the pointer.
+fn pinch(self: *Gestures, event: *const c.SDL_PinchFingerEvent) void {
+    var x: f32 = 0;
+    var y: f32 = 0;
+    _ = c.SDL_GetMouseState(&x, &y);
+    // SDL passes on Wayland's scale since the pinch began, where other
+    // platforms report the change since the last update.
+    var scale: f32 = 1;
+    if (event.type == c.SDL_EVENT_PINCH_BEGIN) self.pinch_scale = 1;
+    if (event.type == c.SDL_EVENT_PINCH_UPDATE) {
+        scale = event.scale;
+        const driver = c.SDL_GetCurrentVideoDriver();
+        if (driver != null and std.mem.eql(u8, std.mem.span(driver), "wayland")) {
+            scale = event.scale / self.pinch_scale;
+            self.pinch_scale = event.scale;
         }
-    } else return;
-    const first = self.touches[0] orelse return;
-    const second = self.touches[1] orelse return;
-    const center: maplibre.ScreenPoint = .{
-        .x = (first.point.x + second.point.x) / 2,
-        .y = (first.point.y + second.point.y) / 2,
-    };
-    const span = @max(1, std.math.hypot(second.point.x - first.point.x, second.point.y - first.point.y));
-    const angle = std.math.radiansToDegrees(std.math.atan2(second.point.y - first.point.y, second.point.x - first.point.x));
-    const pinch = &(self.pinch orelse {
-        // The second touch turns a drag into a pinch.
-        if (self.drag != null) self.cancel();
-        self.pinch = .{
-            .center = center,
-            .span = span,
-            .angle = angle,
-            .x_rate = .init(finger.timestamp),
-            .y_rate = .init(finger.timestamp),
-            .zoom_rate = .init(finger.timestamp),
-            .bearing_rate = .init(finger.timestamp),
-        };
-        self.apply(.{ .gesture_phase = .begin });
-        return;
-    });
-    const dx = center.x - pinch.center.x;
-    const dy = center.y - pinch.center.y;
-    const scale = span / pinch.span;
-    // Screen angles turn clockwise, which turns the bearing the other way.
-    const bearing = -wrapDegrees(angle - pinch.angle);
-    pinch.x_rate.add(dx, finger.timestamp);
-    pinch.y_rate.add(dy, finger.timestamp);
-    pinch.zoom_rate.add(std.math.log2(scale), finger.timestamp);
-    pinch.bearing_rate.add(bearing, finger.timestamp);
-    pinch.center = center;
-    pinch.span = span;
-    pinch.angle = angle;
-    self.apply(.{
-        .offset = .{ .x = dx, .y = dy },
+    }
+    self.input(event.timestamp, .{ .pinch = .{
+        .center = self.point(x, y),
         .scale = scale,
-        .bearing = bearing,
-        .anchor = center,
-        .gesture_phase = .update,
-    });
+        .phase = switch (event.type) {
+            c.SDL_EVENT_PINCH_BEGIN => .begin,
+            c.SDL_EVENT_PINCH_UPDATE => .update,
+            else => .end,
+        },
+    } });
 }
 
-fn lift(self: *Gestures, finger: *const c.SDL_TouchFingerEvent) void {
-    for (&self.touches) |*slot| {
-        if (slot.*) |existing| if (existing.finger == finger.fingerID) {
-            slot.* = null;
-        };
-    }
-    const pinch = self.pinch orelse return;
-    self.pinch = null;
-    if (finger.type == c.SDL_EVENT_FINGER_CANCELED) {
-        self.apply(.{ .gesture_phase = .cancel });
-        return;
-    }
-    const time = finger.timestamp;
-    self.apply(.{
-        .momentum = .{
-            .pan = .{ .velocity = .{ .x = pinch.x_rate.at(time), .y = pinch.y_rate.at(time) } },
-            .zoom = .{ .velocity = pinch.zoom_rate.at(time), .anchor = pinch.center },
-            .bearing = .{ .velocity = pinch.bearing_rate.at(time), .anchor = pinch.center },
-        },
-        .gesture_phase = .end,
-    });
-}
-
-/// A touchpad pinch zooms about the pointer.
-fn pinchTouchpad(self: *Gestures, event: *const c.SDL_PinchFingerEvent) void {
-    switch (event.type) {
-        c.SDL_EVENT_PINCH_BEGIN => {
-            var x: f32 = 0;
-            var y: f32 = 0;
-            _ = c.SDL_GetMouseState(&x, &y);
-            self.touchpad_pinch = .{ .anchor = self.point(x, y), .zoom_rate = .init(event.timestamp) };
-            self.apply(.{ .gesture_phase = .begin });
-        },
-        c.SDL_EVENT_PINCH_UPDATE => {
-            const pinch = &(self.touchpad_pinch orelse return);
-            pinch.zoom_rate.add(std.math.log2(event.scale), event.timestamp);
-            self.apply(.{ .scale = event.scale, .anchor = pinch.anchor, .gesture_phase = .update });
-        },
-        else => {
-            const pinch = self.touchpad_pinch orelse return;
-            self.touchpad_pinch = null;
-            self.apply(.{
-                .momentum = .{ .zoom = .{ .velocity = pinch.zoom_rate.at(event.timestamp), .anchor = pinch.anchor } },
-                .gesture_phase = .end,
-            });
-        },
-    }
-}
-
+/// Held Ctrl rotates and pitches on a drag, and held Shift zooms out on a
+/// double click. The arrow keys pan, and plus and minus zoom.
 fn key(self: *Gestures, event: *const c.SDL_KeyboardEvent) void {
-    const step = 100;
-    var delta: maplibre.CameraDelta = switch (event.key) {
-        c.SDLK_LEFT => .{ .offset = .{ .x = step } },
-        c.SDLK_RIGHT => .{ .offset = .{ .x = -step } },
-        c.SDLK_UP => .{ .offset = .{ .y = step } },
-        c.SDLK_DOWN => .{ .offset = .{ .y = -step } },
-        c.SDLK_PLUS, c.SDLK_EQUALS, c.SDLK_KP_PLUS => .{ .scale = 2 },
-        c.SDLK_MINUS, c.SDLK_KP_MINUS => .{ .scale = 0.5 },
-        else => return,
+    const modes: maplibre.GestureMode = .{
+        .rotate = event.mod & c.SDL_KMOD_CTRL != 0,
+        .zoom_out = event.mod & c.SDL_KMOD_SHIFT != 0,
     };
-    delta.animation = animation();
-    self.apply(delta);
+    if (!std.meta.eql(modes, self.modes)) {
+        self.modes = modes;
+        self.input(event.timestamp, .{ .modes = modes });
+    }
+    if (!event.down) return;
+    const step = 100;
+    var delta: maplibre.GestureDelta = .{
+        .position = .{ .x = @as(f64, @floatFromInt(self.view.extent.width)) / 2, .y = @as(f64, @floatFromInt(self.view.extent.height)) / 2 },
+        .discrete = true,
+    };
+    switch (event.key) {
+        c.SDLK_LEFT => delta.pan.x = step,
+        c.SDLK_RIGHT => delta.pan.x = -step,
+        c.SDLK_UP => delta.pan.y = step,
+        c.SDLK_DOWN => delta.pan.y = -step,
+        c.SDLK_PLUS, c.SDLK_EQUALS, c.SDLK_KP_PLUS => delta.zoom = 1,
+        c.SDLK_MINUS, c.SDLK_KP_MINUS => delta.zoom = -1,
+        else => return,
+    }
+    self.input(event.timestamp, .{ .delta = delta });
 }
 
-fn apply(self: *Gestures, delta: maplibre.CameraDelta) void {
-    self.view.applyCameraDelta(delta);
+/// Cancels the pointers that are down and lets go of the held keys.
+fn cancel(self: *Gestures, timestamp: u64) void {
+    if (self.button != null) {
+        self.button = null;
+        self.input(timestamp, .{ .pointer_cancel = .{ .id = mouse } });
+    }
+    for (&self.touches) |*slot| if (slot.*) |id| {
+        slot.* = null;
+        self.input(timestamp, .{ .pointer_cancel = .{ .id = id } });
+    };
+    self.modes = .{};
+    self.input(timestamp, .{ .modes = .{} });
 }
 
-fn animation() maplibre.AnimationOptions {
-    return .{ .duration_ms = 300 };
+fn input(self: *Gestures, timestamp: u64, gesture_input: maplibre.GestureInput) void {
+    var diagnostic: maplibre.Diagnostic = .{};
+    var result = self.recognizer.handle(allocator, gesture_input, milliseconds(timestamp), &diagnostic) catch
+        return self.view.fail(diagnostic.message());
+    defer result.deinit();
+    self.schedule(result.value);
+}
+
+/// Wakes the event loop when the recognizer next needs a tick: at the next
+/// refresh of the window's display, or at the time it asks for. A frame tick
+/// that is already due by then stays, so input faster than the display can't
+/// put it off.
+fn schedule(self: *Gestures, result: maplibre.GestureResult) void {
+    const now = c.SDL_GetTicksNS();
+    self.tick_at = switch (result.next_tick) {
+        .frame => @min(self.tick_at orelse std.math.maxInt(u64), now + refreshPeriod(self.view.window)),
+        .at => @intFromFloat(@max(0, result.next_tick_ms) * std.time.ns_per_ms),
+        else => null,
+    };
+    if (self.timer != 0) _ = c.SDL_RemoveTimer(self.timer);
+    self.timer = 0;
+    const at = self.tick_at orelse return;
+    self.timer = c.SDL_AddTimerNS(at -| now, onTimer, self);
+}
+
+/// Runs on SDL's timer thread, and reads only what never changes.
+fn onTimer(data: ?*anyopaque, _: c.SDL_TimerID, _: u64) callconv(.c) u64 {
+    const self: *Gestures = @ptrCast(@alignCast(data.?));
+    self.view.wake();
+    return 0;
 }
 
 /// A point in window coordinates, in the map's logical pixels.
@@ -277,34 +256,14 @@ fn touchPoint(self: *const Gestures, finger: *const c.SDL_TouchFingerEvent) mapl
     return self.point(finger.x * @as(f32, @floatFromInt(width)), finger.y * @as(f32, @floatFromInt(height)));
 }
 
-fn mouseHeld() bool {
-    return c.SDL_GetMouseState(null, null) != 0;
+/// SDL's timestamps and ticks, in nanoseconds, in the recognizer's
+/// milliseconds.
+fn milliseconds(nanoseconds: u64) f64 {
+    return @as(f64, @floatFromInt(nanoseconds)) / std.time.ns_per_ms;
 }
 
-/// An angle in degrees, wrapped to [-180, 180).
-fn wrapDegrees(degrees: f64) f64 {
-    return @mod(degrees + 180, 360) - 180;
+fn refreshPeriod(window: *c.SDL_Window) u64 {
+    const mode = c.SDL_GetCurrentDisplayMode(c.SDL_GetDisplayForWindow(window));
+    const refresh_rate: f32 = if (mode != null and mode.*.refresh_rate > 0) mode.*.refresh_rate else 60;
+    return @intFromFloat(std.time.ns_per_s / refresh_rate);
 }
-
-/// How fast a gesture changes, per second. Each change's rate averages with
-/// the earlier ones, and a pause before the release stops it.
-const Rate = struct {
-    per_second: f64 = 0,
-    /// SDL's timestamp of the last change, in nanoseconds.
-    time: u64,
-
-    fn init(time: u64) Rate {
-        return .{ .time = time };
-    }
-
-    fn add(self: *Rate, change: f64, time: u64) void {
-        if (time <= self.time) return;
-        const seconds = @as(f64, @floatFromInt(time - self.time)) / std.time.ns_per_s;
-        self.per_second = (self.per_second + change / seconds) / 2;
-        self.time = time;
-    }
-
-    fn at(self: Rate, time: u64) f64 {
-        return if (time -| self.time < 50 * std.time.ns_per_ms) self.per_second else 0;
-    }
-};

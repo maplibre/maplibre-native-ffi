@@ -1,11 +1,14 @@
 //! Snippets for the docs site's Camera page. They compile with the tests,
 //! which never run them.
 
+const std = @import("std");
 const maplibre = @import("maplibre_native_ffi");
 
 comptime {
     _ = &camera;
 }
+
+const allocator = std.heap.smp_allocator;
 
 fn useCamera(_: maplibre.Camera) void {}
 
@@ -22,40 +25,53 @@ fn onFlyEnd(
 // #endregion animate
 
 // #region gesture
-fn beginGesture(map: maplibre.Map) !void {
-    try map.discarding().applyCameraDelta(
-        .{ .gesture_phase = .begin },
-        null,
-    );
+fn createRecognizer(map: maplibre.Map) !maplibre.GestureRecognizer {
+    return map.gestureRecognizerCreate(allocator, null, null);
 }
 
-fn applyDrag(
-    map: maplibre.Map,
-    movement: maplibre.ScreenPoint,
+fn scheduleTick(result: maplibre.GestureResult) void {
+    _ = result; // On the next frame, or at result.next_tick_ms.
+}
+
+fn handleInput(
+    recognizer: maplibre.GestureRecognizer,
+    input: maplibre.GestureInput,
+    time_ms: f64,
 ) !void {
-    try map.discarding().applyCameraDelta(.{
-        .offset = movement,
-        .gesture_phase = .update,
-    }, null);
+    var result = try recognizer.handle(allocator, input, time_ms, null);
+    defer result.deinit();
+    scheduleTick(result.value);
 }
 
-fn applyPinch(
-    map: maplibre.Map,
-    scale: f64,
-    center: maplibre.ScreenPoint,
+fn pointerDown(
+    recognizer: maplibre.GestureRecognizer,
+    id: u32,
+    position: maplibre.ScreenPoint,
+    time_ms: f64,
 ) !void {
-    try map.discarding().applyCameraDelta(.{
-        .scale = scale,
-        .anchor = center,
-        .gesture_phase = .update,
-    }, null);
+    try handleInput(recognizer, .{ .pointer_down = .{
+        .id = id,
+        .kind = .touch,
+        .position = position,
+    } }, time_ms);
 }
 
-fn endGesture(map: maplibre.Map) !void {
-    try map.discarding().applyCameraDelta(
-        .{ .gesture_phase = .end },
-        null,
-    );
+fn pointerMove(
+    recognizer: maplibre.GestureRecognizer,
+    id: u32,
+    position: maplibre.ScreenPoint,
+    time_ms: f64,
+) !void {
+    try handleInput(recognizer, .{ .pointer_move = .{
+        .id = id,
+        .position = position,
+    } }, time_ms);
+}
+
+fn tick(recognizer: maplibre.GestureRecognizer, time_ms: f64) !void {
+    var result = try recognizer.tick(allocator, time_ms, null);
+    defer result.deinit();
+    scheduleTick(result.value);
 }
 // #endregion gesture
 
@@ -111,10 +127,11 @@ fn camera(map: maplibre.Map) !void {
     }, null);
     // #endregion limit
 
-    try beginGesture(map);
-    try applyDrag(map, .{ .x = 12, .y = -4 });
-    try applyPinch(map, 1.1, .{ .x = 200, .y = 150 });
-    try endGesture(map);
+    var recognizer = try createRecognizer(map);
+    defer recognizer.release();
+    try pointerDown(recognizer, 1, .{ .x = 100, .y = 100 }, 0);
+    try pointerMove(recognizer, 1, .{ .x = 112, .y = 96 }, 16);
+    try tick(recognizer, 32);
 
     // #region convert
     const view = (try map.getSnapshot(null)).view;

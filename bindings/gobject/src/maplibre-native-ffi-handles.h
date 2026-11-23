@@ -309,119 +309,103 @@ gboolean maplibre_native_ffi_acquired_frame_release(
 );
 
 /**
- * MaplibreNativeFfiFramePacer:
+ * MaplibreNativeFfiGestureRecognizer:
  *
- * Demands render sessions' frames at a display's refreshes.
+ * A gesture recognizer that moves a map's camera.
  *
- * See `mln_frame_pacer` in the
+ * See `mln_gesture_recognizer` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
  */
-#define MAPLIBRE_NATIVE_FFI_TYPE_FRAME_PACER \
-  (maplibre_native_ffi_frame_pacer_get_type())
+#define MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_RECOGNIZER \
+  (maplibre_native_ffi_gesture_recognizer_get_type())
 G_DECLARE_FINAL_TYPE(
-  MaplibreNativeFfiFramePacer, maplibre_native_ffi_frame_pacer,
-  MAPLIBRE_NATIVE_FFI, FRAME_PACER, GObject
+  MaplibreNativeFfiGestureRecognizer, maplibre_native_ffi_gesture_recognizer,
+  MAPLIBRE_NATIVE_FFI, GESTURE_RECOGNIZER, GObject
 )
 
 /**
- * maplibre_native_ffi_frame_pacer_get_id:
+ * maplibre_native_ffi_gesture_recognizer_get_id:
  *
  * The handle's ID, which runtime events name as their source.
  *
  * Returns: the ID
  */
-guint64 maplibre_native_ffi_frame_pacer_get_id(
-  MaplibreNativeFfiFramePacer* self
+guint64 maplibre_native_ffi_gesture_recognizer_get_id(
+  MaplibreNativeFfiGestureRecognizer* self
 );
 
 /**
- * maplibre_native_ffi_frame_pacer_create: (constructor)
- * @options: (nullable): the value, or %NULL
+ * maplibre_native_ffi_gesture_recognizer_handle:
  *
- * Creates a frame pacer that follows the platform's display.
+ * Handles one input at `time_ms`, in milliseconds on any clock that only goes
+ * forward, the same for every input and frame.
  *
- * On iOS, macOS, and tvOS, the pacer follows the display through a
- * `CADisplayLink`. You can call it on any thread, and the pacer needs no run
- * loop of yours. On macOS, it follows the main display, the one with the menu
- * bar. With `MaplibreNativeFfiFramePacerOptions:maximum-frames-per-second`, the
- * pacer also asks the system for that refresh rate. On iPhone, a rate above 60
- * needs `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
- *
- * On Android, the pacer follows the display through the calling thread's
- * `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
- * main thread, and keep that thread running its looper while sessions use the
- * pacer. `AChoreographer` can stop while the phone's display is off, even while
- * a Surface on another display, such as an Android Auto projection, still shows
- * the map. The pacer then keeps demanding frames from a timer on the looper,
- * within the frame rate limit, until vsyncs arrive again.
- *
- * On OpenHarmony, the pacer follows the display through `OH_NativeVSync`. You
- * can call it on any thread, and the pacer needs no event loop of yours.
- *
- * See `mln_frame_pacer_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ * See `mln_gesture_recognizer_handle` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  *
  * It fails with these errors:
  *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` on the other platforms, such as
- *   visionOS, Linux, and Windows, where the library has no source of display
- *   refreshes.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` on Android when the calling
- *   thread has no `ALooper`.
- * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` on iOS, macOS, and tvOS when the
- *   system has no display to follow, and on OpenHarmony when the system can't
- *   report the display's refreshes to the process.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when `input` isn't a valid
+ *   input.
  *
- * Returns: (transfer full): the object
+ * Returns: (transfer full): the value
  */
-MaplibreNativeFfiFramePacer* maplibre_native_ffi_frame_pacer_create(
-  MaplibreNativeFfiFramePacerOptions* options, GError** error
+MaplibreNativeFfiGestureResult* maplibre_native_ffi_gesture_recognizer_handle(
+  MaplibreNativeFfiGestureRecognizer* self,
+  const MaplibreNativeFfiGestureInput* input, gdouble time_ms, GError** error
 );
 
 /**
- * maplibre_native_ffi_frame_pacer_release:
+ * maplibre_native_ffi_gesture_recognizer_release:
  *
- * Releases a frame pacer.
- *
- * Render sessions that use the pacer stay paced until you release them or set
- * another pacer.
+ * Releases a gesture recognizer. A glide it started keeps going.
  *
  * The object calls this when it is disposed, unless it was released. Later
  * calls fail as on any released handle.
  *
- * See `mln_frame_pacer_release` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ * See `mln_gesture_recognizer_release` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  */
-void maplibre_native_ffi_frame_pacer_release(MaplibreNativeFfiFramePacer* self);
+void maplibre_native_ffi_gesture_recognizer_release(
+  MaplibreNativeFfiGestureRecognizer* self
+);
 
 /**
- * maplibre_native_ffi_frame_pacer_set_options:
+ * maplibre_native_ffi_gesture_recognizer_set_options:
  *
- * Changes a frame pacer's settings.
+ * Changes the settings whose bits are set, from the next input on.
  *
- * Settings that `options` doesn't set keep their current values. You can call
- * it on any thread.
- *
- * The sessions that the pacer serves follow the new settings from the next
- * display refresh, including a refresh that they already wait for. The pacer
- * counts a new limit from the last frames it demanded, so a higher limit can
- * demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
- * the system for the new limit's refresh rate, or for the display's own rate
- * once the limit is removed.
- *
- * See `mln_frame_pacer_set_options` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ * See `mln_gesture_recognizer_set_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
  *
  * It fails with these errors:
  *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when you released `pacer`, even
- *   while sessions still use it.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when an option is out of
+ *   range.
  *
  * Returns: %TRUE on success, or %FALSE with `error` set
  */
-gboolean maplibre_native_ffi_frame_pacer_set_options(
-  MaplibreNativeFfiFramePacer* self,
-  MaplibreNativeFfiFramePacerOptions* options, GError** error
+gboolean maplibre_native_ffi_gesture_recognizer_set_options(
+  MaplibreNativeFfiGestureRecognizer* self,
+  MaplibreNativeFfiGestureOptions* options, GError** error
+);
+
+/**
+ * maplibre_native_ffi_gesture_recognizer_tick:
+ *
+ * Times long presses, steps the eases of discrete deltas, ends deltas once they
+ * idle, and samples the camera for notches, at `time_ms` on the inputs' clock.
+ * Call it when the last result's `next_tick` says: on the next display frame,
+ * or at its time with a frame or a timer. A tick at any other time does no
+ * harm.
+ *
+ * See `mln_gesture_recognizer_tick` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ *
+ * Returns: (transfer full): the value
+ */
+MaplibreNativeFfiGestureResult* maplibre_native_ffi_gesture_recognizer_tick(
+  MaplibreNativeFfiGestureRecognizer* self, gdouble time_ms, GError** error
 );
 
 /**
@@ -470,12 +454,12 @@ guint64 maplibre_native_ffi_gpu_device_get_id(MaplibreNativeFfiGpuDevice* self);
  * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when this build or platform lacks
  *   `backend`, when the device can't render with `open_gl_client_api`, when
  *   options name a GPU that the backend can't select (an OpenGL device takes no
- *   `adapter_index`, `adapter_uuid`, or `adapter_luid`, and only a Vulkan
- *   device takes `adapter_uuid` or `adapter_luid`), when a device that doesn't
- *   render with Vulkan gets a `queue_lock`, or in a browser for every backend:
- *   WebGPU makes devices asynchronously, and a WebGL2 context needs a canvas.
- *   Attach without a device, which the session makes itself, or wrap your
- *   WebGL2 context.
+ *   `adapter_index`, `adapter_uuid`, or `adapter_luid`, only a Vulkan device
+ *   takes `adapter_uuid`, and only a Vulkan or D3D12 device `adapter_luid`),
+ *   when a device that doesn't render with Vulkan gets a `queue_lock`, or in a
+ *   browser for every backend: WebGPU makes devices asynchronously, and a
+ *   WebGL2 context needs a canvas. Attach without a device, which the session
+ *   makes itself, or wrap your WebGL2 context.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_NOT_FOUND` when no GPU matches `adapter_index`,
  *   `adapter_uuid`, or `adapter_luid`.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the platform can't create the
@@ -647,6 +631,32 @@ G_DECLARE_FINAL_TYPE(
  * Returns: the ID
  */
 guint64 maplibre_native_ffi_map_get_id(MaplibreNativeFfiMap* self);
+
+/**
+ * maplibre_native_ffi_map_gesture_recognizer_create:
+ * @options: (nullable): the value, or %NULL
+ *
+ * Creates a gesture recognizer that moves `map`'s camera.
+ *
+ * Its moves go to the map as camera commands, which apply asynchronously, and
+ * the map's snapshot and camera events report them as gestures. After the map
+ * is released, its moves do nothing. `options` may be null for every default.
+ *
+ * See `mln_gesture_recognizer_create` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when an option is out of
+ *   range.
+ *
+ * Returns: (transfer full): the object
+ */
+MaplibreNativeFfiGestureRecognizer*
+maplibre_native_ffi_map_gesture_recognizer_create(
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiGestureOptions* options,
+  GError** error
+);
 
 /**
  * maplibre_native_ffi_map_add_custom_geometry_source_async:
@@ -967,7 +977,7 @@ maplibre_native_ffi_map_add_style_source_json_finish(
  * @callback: (scope async) (nullable): the callback to call when the call finishes
  * @user_data: the data to pass to `callback`
  *
- * Moves the camera relative to where it is, as a gesture does.
+ * Moves the camera relative to where it is.
  *
  * `delta` can pan the map's content by an offset on the screen, scale the zoom,
  * and add to the bearing and pitch. An anchor keeps one screen point in place
@@ -979,21 +989,6 @@ maplibre_native_ffi_map_add_style_source_json_finish(
  * A delta that replaces an animated one starts from where that animation left
  * the camera, so the rest of the replaced change never happens. To reach an
  * exact camera, use `maplibre_native_ffi_map_update_camera_async()`.
- *
- * A delta in the end phase can carry momentum, which keeps the camera moving
- * from the gesture's release velocities and slows it on each rendered frame.
- * The gesture lasts until the momentum ends: the snapshot keeps
- * `gesture_in_progress` set, and camera events report
- * `MAPLIBRE_NATIVE_FFI_CAMERA_CHANGE_SOURCE_MOMENTUM`. With momentum,
- * `animation` sets only `transition_id` and the end handler, which runs when
- * the gesture ends.
- *
- * A delta in the begin phase,
- * `maplibre_native_ffi_map_cancel_camera_transitions_async()`, or a
- * cancellation by that ID stops the momentum. A later command that sets a field
- * stops only the parts of the momentum that move that field. On a tilted map,
- * the pan moves the map's content the same distance on the screen in every
- * direction.
  *
  * See `mln_map_apply_camera_delta` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -2534,6 +2529,13 @@ MaplibreNativeFfiCommandCompletion* maplibre_native_ffi_map_resize_finish(
  *
  * See `mln_map_set_bounds` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT`, changing nothing, when the
+ *   minimum zoom would be above the maximum zoom, the minimum pitch above the
+ *   maximum pitch, or the maximum zoom below the lowest zoom the map can show
+ *   at its size.
  *
  * Without `callback`, nothing reports whether the call succeeds.
  */
@@ -4144,7 +4146,10 @@ gboolean maplibre_native_ffi_render_session_clear_data_finish(
  * Asks the session to render a frame.
  *
  * The frame shows the map commands that you sent before the call, except the
- * changes that an open command group holds back.
+ * changes that an open command group holds back, and the map's camera
+ * animations as they are at the time of the call. Demand each frame when the
+ * display is ready for it, so that animations move evenly.
+ * `maplibre_native_ffi_render_session_set_frame_pacing()` does that for you.
  *
  * You can call it once the attach call returns. While the attach runs, the
  * demand waits for it to complete. Every demand finishes with one frame result
@@ -4660,19 +4665,23 @@ gboolean maplibre_native_ffi_render_session_release_finish(
  * the background. Release every acquired frame first. Frame demands that are
  * still pending, and later ones until you give the session a new target, finish
  * with `MAPLIBRE_NATIVE_FFI_RENDER_RESULT_TARGET_NOT_READY`. Once the release
- * completes, you can destroy the old target. An Android or OpenHarmony window
- * can go away sooner, as `MaplibreNativeFfiAndroidWindowTarget` and
+ * of a window or surface completes, you can destroy it. An Android or
+ * OpenHarmony window can go away sooner, as
+ * `MaplibreNativeFfiAndroidWindowTarget` and
  * `MaplibreNativeFfiOhosWindowTarget` say.
  *
- * For a borrowed ring, a completed release also means that the session has
- * stopped waiting on the consumer sync that you released its frames with, so
- * you can reuse or destroy the textures. The session waits about a second at
- * most for that sync, and logs a warning when the wait runs out. It checks the
- * sync without blocking a thread: keep servicing a session driven by
- * `MAPLIBRE_NATIVE_FFI_RENDER_DRIVER_CALLER_GRAPHICS_THREAD` until the release
- * completes. The session keeps nothing of the released textures: a texture that
- * a later target gives it again is a new one, even one that you discarded a
- * frame of.
+ * For a borrowed ring, the release completes with an `MaplibreNativeFfiGpuSync`
+ * of `MaplibreNativeFfiRenderSessionCapabilities.producer_sync_kind`, or
+ * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE` when the session has no textures
+ * since an earlier release. Wait for it before you reuse or destroy the
+ * textures, as you wait for an acquired frame's producer sync: for
+ * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_QUEUE_ORDER`, destroy them once work that you
+ * submit to the queue after the completion has finished. The session's GPU work
+ * on the textures, and its waits for the consumer syncs that you released its
+ * frames with, end there, so keep those syncs until then too. The session keeps
+ * nothing of the released textures: a texture that a later target gives it
+ * again is a new one, even one that you discarded a frame of. For another
+ * target, the completion has no value.
  *
  * See `mln_render_session_release_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4683,6 +4692,8 @@ gboolean maplibre_native_ffi_render_session_release_finish(
  *   or into an exported ring.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_TARGET_LOST` when the session loses its target
  *   before the release runs.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the session can't submit its
+ *   work on a borrowed ring's textures. It keeps them then.
  */
 void maplibre_native_ffi_render_session_release_target_async(
   MaplibreNativeFfiRenderSession* self, GAsyncReadyCallback callback,
@@ -4695,9 +4706,10 @@ void maplibre_native_ffi_render_session_release_target_async(
  *
  * Finishes a call that `maplibre_native_ffi_render_session_release_target_async` started.
  *
- * Returns: %TRUE when the call finished, or %FALSE with `error` set
+ * Returns: (transfer full) (nullable): the value
  */
-gboolean maplibre_native_ffi_render_session_release_target_finish(
+MaplibreNativeFfiGpuSync*
+maplibre_native_ffi_render_session_release_target_finish(
   MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
 );
 
@@ -4778,33 +4790,60 @@ gboolean maplibre_native_ffi_render_session_service_driver_work(
 );
 
 /**
- * maplibre_native_ffi_render_session_set_frame_pacer:
- * @pacer: (nullable): the handle, or %NULL
+ * maplibre_native_ffi_render_session_set_frame_pacing:
+ * @options: (nullable): the value, or %NULL
  *
- * Sets the frame pacer that demands the session's frames.
+ * Paces the session's frames to the display.
  *
- * At the first display refresh after the session has something new to draw,
- * `pacer` demands a frame without flags and with token 0. One pacer can serve
- * many sessions. A null `pacer` stops pacing the session. You can call it once
- * the attach call returns.
+ * At the first display refresh after the session has something new to draw, the
+ * library demands a frame without flags and with token 0, unless you demanded
+ * one first. Each call replaces the session's pacing, and a null `options`
+ * stops it. You can call it once the attach call returns.
  *
- * See `mln_render_session_set_frame_pacer` in the
+ * On iOS, macOS, and tvOS, the library uses a `CADisplayLink` on a thread of
+ * its own. With `MaplibreNativeFfiFramePacingOptions:view`, call it on the main
+ * thread. The library asks the system for the frame rate limit's refresh rate.
+ * On iPhone, a rate above 60 needs `CADisableMinimumFrameDurationOnPhone` in
+ * the app's `Info.plist`.
+ *
+ * On Android, the library follows the display through the calling thread's
+ * `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
+ * main thread, and keep that thread running its looper while the session is
+ * paced. `AChoreographer` can stop while the phone's display is off, even while
+ * a Surface on another display, such as an Android Auto projection, still shows
+ * the map. The library then keeps demanding frames from a timer on the looper,
+ * within the frame rate limit, until vsyncs arrive again.
+ *
+ * On OpenHarmony, the library uses `OH_NativeVSync`, from any thread.
+ *
+ * See `mln_render_session_set_frame_pacing` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  *
  * It fails with these errors:
  *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT` when `options` sets
+ *   `maximum_frames_per_second` to 0, or sets `view` to null.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` on the other platforms, such as
+ *   visionOS, Linux, and Windows, where the library has no source of display
+ *   refreshes, on macOS before 14, and when `options` sets `view` on a platform
+ *   other than macOS, iOS, and tvOS.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_TARGET_LOST` or
  *   `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR`, as
  *   `MaplibreNativeFfiRenderSessionSnapshot.failure_status` reports, when the
  *   session has failed.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` when you attached the session
- *   with a redraw wake, or detached, abandoned, released, or disposed it.
+ *   with a redraw wake, or detached, abandoned, released, or disposed it, on
+ *   Android when the calling thread has no `ALooper`, and when `options` sets
+ *   `view` off the main thread or, on iOS and tvOS, to a view in no window.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` on iOS, macOS, and tvOS when the
+ *   system has no display to follow, and on OpenHarmony when the system can't
+ *   report the display's refreshes to the process.
  *
  * Returns: %TRUE on success, or %FALSE with `error` set
  */
-gboolean maplibre_native_ffi_render_session_set_frame_pacer(
-  MaplibreNativeFfiRenderSession* self, MaplibreNativeFfiFramePacer* pacer,
-  GError** error
+gboolean maplibre_native_ffi_render_session_set_frame_pacing(
+  MaplibreNativeFfiRenderSession* self,
+  MaplibreNativeFfiFramePacingOptions* options, GError** error
 );
 
 /**
@@ -4823,11 +4862,13 @@ gboolean maplibre_native_ffi_render_session_set_frame_pacer(
  * old target. A borrowed ring takes only a ring of the kind it attached with,
  * with as many textures, with depth textures only when it attached with them,
  * and with the same formats, final layouts, and owner. Release every acquired
- * frame of a borrowed ring first. Once the replacement completes, the session
- * has also stopped waiting on the consumer sync of the textures that the new
- * ring doesn't have, as
- * `maplibre_native_ffi_render_session_release_target_async()` says, so you can
- * reuse or destroy them.
+ * frame of a borrowed ring first. For a borrowed ring, the replacement
+ * completes with an `MaplibreNativeFfiGpuSync`: wait for it before you reuse or
+ * destroy the textures that the new ring doesn't have, as
+ * `maplibre_native_ffi_render_session_release_target_async()` says. When it
+ * lets go of no textures, such as after a release, the sync is
+ * `MAPLIBRE_NATIVE_FFI_GPU_SYNC_CPU_COMPLETE`. For another target, the
+ * completion has no value.
  *
  * See `mln_render_session_set_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4867,9 +4908,9 @@ void maplibre_native_ffi_render_session_set_target_async(
  *
  * Finishes a call that `maplibre_native_ffi_render_session_set_target_async` started.
  *
- * Returns: %TRUE when the call finished, or %FALSE with `error` set
+ * Returns: (transfer full) (nullable): the value
  */
-gboolean maplibre_native_ffi_render_session_set_target_finish(
+MaplibreNativeFfiGpuSync* maplibre_native_ffi_render_session_set_target_finish(
   MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
 );
 
@@ -5427,6 +5468,39 @@ maplibre_native_ffi_runtime_get_offline_region_finish(
 );
 
 /**
+ * maplibre_native_ffi_runtime_get_offline_region_expiry_async:
+ * @callback: (scope async) (nullable): the callback to call when the call finishes
+ * @user_data: the data to pass to `callback`
+ *
+ * Reads how long the resources of the offline region `region_id` stay usable.
+ *
+ * See `mln_runtime_get_offline_region_expiry` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_NOT_FOUND` when the cache file has no region
+ *   `region_id`.
+ */
+void maplibre_native_ffi_runtime_get_offline_region_expiry_async(
+  MaplibreNativeFfiRuntime* self, gint64 region_id,
+  GAsyncReadyCallback callback, gpointer user_data
+);
+
+/**
+ * maplibre_native_ffi_runtime_get_offline_region_expiry_finish:
+ * @result: the result that the callback received
+ *
+ * Finishes a call that `maplibre_native_ffi_runtime_get_offline_region_expiry_async` started.
+ *
+ * Returns: (transfer full): the value
+ */
+MaplibreNativeFfiOfflineRegionExpiry*
+maplibre_native_ffi_runtime_get_offline_region_expiry_finish(
+  MaplibreNativeFfiRuntime* self, GAsyncResult* result, GError** error
+);
+
+/**
  * maplibre_native_ffi_runtime_get_offline_region_status_async:
  * @callback: (scope async) (nullable): the callback to call when the call finishes
  * @user_data: the data to pass to `callback`
@@ -5469,14 +5543,15 @@ maplibre_native_ffi_runtime_get_offline_region_status_finish(
  * @callback: (scope async) (nullable): the callback to call when the call finishes
  * @user_data: the data to pass to `callback`
  *
- * Makes maps check each resource of the offline region `region_id` with the
- * server before they use it.
+ * Makes each resource of the offline region `region_id` stale, so maps check it
+ * with the server when they next use it.
  *
- * The region keeps its resources. Starting its download again fetches the
- * invalidated resources for offline use. If the style or a TileJSON document is
- * then missing or invalid, the download reports an offline region response
- * error and goes on from the stored copy. Resources that the current style no
- * longer lists stay in the region until it's deleted.
+ * The region keeps its resources, and maps show them while they check them,
+ * except those that the server requires checking first. Starting the region's
+ * download again checks every resource with the server. If the style or a
+ * TileJSON document is then missing or invalid, the download reports an offline
+ * region response error and goes on from the stored copy. Resources that the
+ * current style no longer lists stay in the region until it's deleted.
  *
  * See `mln_runtime_invalidate_offline_region` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -5734,8 +5809,10 @@ gboolean maplibre_native_ffi_runtime_set_maximum_ambient_cache_size_finish(
  *
  * Starts or pauses the download of the offline region `region_id`.
  *
- * Setting the state that the download already has does nothing. A download
- * stops when the runtime closes.
+ * A download fetches the resources that the region lacks, and checks those that
+ * are stale with the server, keeping each stored copy until its refresh
+ * arrives. Setting the state that the download already has does nothing. A
+ * download stops when the runtime closes.
  *
  * See `mln_runtime_set_offline_region_download_state` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

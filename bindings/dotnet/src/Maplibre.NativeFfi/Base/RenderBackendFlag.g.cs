@@ -15,4 +15,5 @@ public enum RenderBackendFlag : uint
     Vulkan = 2,
     OpenGl = 4,
     WebGpu = 8,
+    D3d12 = 16,
 }

@@ -6,6 +6,9 @@
 import {
   CameraUpdateMode,
   FrameDemandFlag,
+  GestureNextTick,
+  type GestureRecognizerHandle,
+  type GestureResult,
   loadModule,
   type MapHandle,
   MapMode,
@@ -42,6 +45,7 @@ function beforeNextFrame(callback: () => void): void {
 
 let map: MapHandle | undefined;
 let session: RenderSessionHandle | undefined;
+let recognizer: GestureRecognizerHandle | undefined;
 let scaleFactor = 1;
 // The input that arrives while the map loads, which it takes once it's ready.
 const pending: ToWorker[] = [];
@@ -70,13 +74,49 @@ function handle(message: ToWorker): void {
     case "resize":
       session?.discarding.resize({ ...message.size, scaleFactor });
       break;
-    case "cameraDelta":
-      map?.discarding.applyCameraDelta(message.delta);
+    case "gesture": {
+      // The page's clock starts at its own time origin.
+      const time = clock(message.time - performance.timeOrigin);
+      for (const input of message.inputs) {
+        scheduleTick(recognizer!.handle(input, time));
+      }
       break;
+    }
     case "setStyle":
       setStyle(message.styleId);
       break;
   }
+}
+
+// The recognizer's next tick: each frame while the camera glides or eases,
+// or at a time, such as when a press becomes a long press.
+let tickTimer: ReturnType<typeof setTimeout> | undefined;
+let tickOnFrame = false;
+
+function scheduleTick({ nextTick, nextTickMs }: GestureResult): void {
+  clearTimeout(tickTimer);
+  if (nextTick === GestureNextTick.frame && !tickOnFrame) {
+    tickOnFrame = true;
+    beforeNextFrame(() => {
+      tickOnFrame = false;
+      tick();
+    });
+  } else if (nextTick === GestureNextTick.at) {
+    tickTimer = setTimeout(tick, nextTickMs - performance.now());
+  }
+}
+
+function tick(): void {
+  scheduleTick(recognizer!.tick(clock(performance.now())));
+}
+
+// The recognizer's clock only goes forward, but an input can arrive after a
+// tick at a later time than its own.
+let lastTime = 0;
+
+function clock(time: number): number {
+  lastTime = Math.max(lastTime, time);
+  return lastTime;
 }
 
 function view(): View {
@@ -164,6 +204,8 @@ async function start(
     camera: message.camera,
   });
   setStyle(message.styleId);
+  // The recognizer moves the camera with the page's input.
+  recognizer = map.gestureRecognizerCreate();
 
   const demandFrame = () =>
     session?.demandFrame({ flags: FrameDemandFlag.waitForUpdate });

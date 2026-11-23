@@ -22,9 +22,10 @@ public struct CacheDatabaseOperation: RawRepresentable, CustomStringConvertible,
   /// Deletes the ambient cache's resources and frees the space they used.
   /// Offline regions keep their resources.
   public static let clear: CacheDatabaseOperation = .init(rawValue: 1)
-  /// Keeps the ambient cache's resources, but makes maps check each one with
-  /// the server before they use it again. Offline regions keep their resources
-  /// as they are.
+  /// Keeps the ambient cache's resources, but makes them stale: maps check each
+  /// one with the server when they next use it, and show it meanwhile unless
+  /// the server requires checking it first. Offline regions keep their
+  /// resources as they are.
   public static let invalidate: CacheDatabaseOperation = .init(rawValue: 2)
   /// Compacts the whole database file to free the disk space that it no longer
   /// uses.
@@ -81,9 +82,9 @@ public struct CameraChangeSource: RawRepresentable, CustomStringConvertible,
   /// A camera command outside a gesture, or the map itself, as when a resize
   /// keeps the camera within its bounds.
   public static let command: CameraChangeSource = .init(rawValue: 0)
-  /// A camera command with a gesture phase.
+  /// A gesture that a gesture recognizer recognized.
   public static let gesture: CameraChangeSource = .init(rawValue: 1)
-  /// The momentum and bearing snap that a gesture's end started.
+  /// The glide and snap after a gesture recognizer's gesture.
   public static let momentum: CameraChangeSource = .init(rawValue: 2)
   public var description: String {
     switch rawValue {
@@ -804,15 +805,20 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
   public var bytes: Data
   /// A description of the error, for `ResourceResponseStatus.error`.
   public var errorMessage: String
-  /// Whether the library must request the resource again before it reuses this
-  /// copy.
+  /// Whether the library must not use this copy once it expires until it
+  /// requests the resource again, not even while the server can't be reached,
+  /// as `Cache-Control: must-revalidate` or `no-cache` says.
   public var mustRevalidate: Bool
   public var modifiedUnixMs: Int64?
+  /// When this copy stops being fresh. Without it, the copy never expires.
   public var expiresUnixMs: Int64?
   /// Empty when the resource has no ETag.
   public var etag: String
   /// When to retry, for `ResourceResponseStatus.error`.
   public var retryAfterUnixMs: Int64?
+  /// Whether the library must not store this copy, as `Cache-Control: no-store`
+  /// says.
+  public var noStore: Bool
   public init(
     status: ResourceResponseStatus = .init(rawValue: 0),
     errorReason: ResourceErrorReason = .init(rawValue: 0),
@@ -822,7 +828,8 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     modifiedUnixMs: Int64? = nil,
     expiresUnixMs: Int64? = nil,
     etag: String = "",
-    retryAfterUnixMs: Int64? = nil
+    retryAfterUnixMs: Int64? = nil,
+    noStore: Bool = false
   ) {
     self.status = status
     self.errorReason = errorReason
@@ -833,6 +840,7 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     self.expiresUnixMs = expiresUnixMs
     self.etag = etag
     self.retryAfterUnixMs = retryAfterUnixMs
+    self.noStore = noStore
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_response {
@@ -858,6 +866,7 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
       raw.fields |= MLN_RESOURCE_RESPONSE_RETRY_AFTER.rawValue; raw
         .retry_after_unix_ms = item
     }
+    raw.no_store = noStore
     return raw
   }
 }

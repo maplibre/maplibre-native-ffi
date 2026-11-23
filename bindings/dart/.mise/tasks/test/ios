@@ -9,7 +9,7 @@ if [[ "$usage_preset" != ios-simulator-arm64 ]]; then
   echo "The Dart iOS suite runs in an arm64 simulator; test ios-simulator-arm64 instead of $usage_preset." >&2
   exit 2
 fi
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" dart
 
 device=$(devices-cli get ios)
 app=.dart_tool/flutter_ios_test

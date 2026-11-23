@@ -8,28 +8,6 @@ namespace Maplibre.NativeFfi.Internal.Struct;
 
 internal static unsafe class GeneratedValues
 {
-    internal static mln_anchored_momentum NativeAnchoredMomentum(AnchoredMomentum value)
-    {
-        Required(value.Decay, "AnchoredMomentum.Decay must not be null.");
-        var native = new mln_anchored_momentum();
-        native.fields = 0;
-        native.fields |= Put(value.Velocity, ref native.velocity, MLN_ANCHORED_MOMENTUM_VELOCITY);
-        native.fields |= Put(
-            value.Anchor,
-            ref native.anchor,
-            MLN_ANCHORED_MOMENTUM_ANCHOR,
-            NativeScreenPoint
-        );
-        native.decay = NativeMomentumDecay(value.Decay);
-        native.fields |= Put(
-            value.Snap,
-            ref native.snap,
-            MLN_ANCHORED_MOMENTUM_SNAP,
-            NativeMomentumSnap
-        );
-        return native;
-    }
-
     internal static AndroidHardwareBufferFrame CopyAndroidHardwareBufferFrame(
         mln_android_hardware_buffer_frame value
     ) =>
@@ -160,14 +138,7 @@ internal static unsafe class GeneratedValues
             MLN_CAMERA_DELTA_ANCHOR,
             NativeScreenPoint
         );
-        native.fields |= Put(
-            value.Momentum,
-            ref native.momentum,
-            MLN_CAMERA_DELTA_MOMENTUM,
-            NativeGestureMomentum
-        );
         native.animation = NativeAnimationOptions(value.Animation, scope);
-        native.gesture_phase = (mln_gesture_phase)value.GesturePhase;
         return native;
     }
 
@@ -264,11 +235,7 @@ internal static unsafe class GeneratedValues
         new(value.generation, CopyCamera(value.camera));
 
     internal static CameraTransitionEnd CopyCameraTransitionEnd(mln_camera_transition_end value) =>
-        new(
-            (global::Maplibre.NativeFfi.CameraTransitionOutcome)value.outcome,
-            value.generation,
-            CopyCameraVelocity(value.velocity)
-        );
+        new((global::Maplibre.NativeFfi.CameraTransitionOutcome)value.outcome, value.generation);
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeCameraTransitionHandlerCallback(
@@ -314,12 +281,8 @@ internal static unsafe class GeneratedValues
         native.mode = (mln_camera_update_mode)value.Mode;
         native.camera = NativeCameraOptions(value.Camera);
         native.animation = NativeAnimationOptions(value.Animation, scope);
-        native.gesture_phase = (mln_gesture_phase)value.GesturePhase;
         return native;
     }
-
-    internal static CameraVelocity CopyCameraVelocity(mln_camera_velocity value) =>
-        new(CopyScreenPoint(value.pan), value.zoom, value.bearing, value.pitch);
 
     internal static CanonicalTileId CopyCanonicalTileId(mln_canonical_tile_id value) =>
         new(value.z, value.x, value.y);
@@ -581,6 +544,10 @@ internal static unsafe class GeneratedValues
                     new CustomLayerPrerenderParameters.EncoderValue.WebGpu(
                         CopyWebGpuCustomLayerEncoder(value.encoder.web_gpu)
                     ),
+                mln_render_backend.MLN_RENDER_BACKEND_D3D12 =>
+                    new CustomLayerPrerenderParameters.EncoderValue.D3d12(
+                        CopyD3d12CustomLayerEncoder(value.encoder.d3d12)
+                    ),
                 mln_render_backend.MLN_RENDER_BACKEND_OPEN_GL =>
                     new CustomLayerPrerenderParameters.EncoderValue.None(),
                 _ => new CustomLayerPrerenderParameters.EncoderValue.Unknown(
@@ -613,6 +580,10 @@ internal static unsafe class GeneratedValues
                 mln_render_backend.MLN_RENDER_BACKEND_WEB_GPU =>
                     new CustomLayerRenderParameters.PassValue.WebGpu(
                         CopyWebGpuCustomLayerPass(value.pass.web_gpu)
+                    ),
+                mln_render_backend.MLN_RENDER_BACKEND_D3D12 =>
+                    new CustomLayerRenderParameters.PassValue.D3d12(
+                        CopyD3d12CustomLayerPass(value.pass.d3d12)
                     ),
                 _ => new CustomLayerRenderParameters.PassValue.Unknown(
                     (uint)value.backend,
@@ -698,6 +669,96 @@ internal static unsafe class GeneratedValues
         );
         return native;
     }
+
+    internal static mln_d3d12_borrowed_texture NativeD3d12BorrowedTexture(
+        D3d12BorrowedTexture value
+    )
+    {
+        var native = new mln_d3d12_borrowed_texture();
+        native.resource = (void*)value.Resource.Address;
+        return native;
+    }
+
+    internal static mln_d3d12_borrowed_textures_target NativeD3d12BorrowedTexturesTarget(
+        D3d12BorrowedTexturesTarget value,
+        NativeCallScope scope
+    )
+    {
+        var native = new mln_d3d12_borrowed_textures_target();
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.physical_width = value.PhysicalWidth;
+        native.physical_height = value.PhysicalHeight;
+        native.textures = scope.Array<mln_d3d12_borrowed_texture, D3d12BorrowedTexture>(
+            value.TexturesStorage.Items,
+            static (item, scope) => NativeD3d12BorrowedTexture(item)
+        );
+        native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
+        native.state = value.State;
+        native.depth_textures = scope.Array<mln_d3d12_borrowed_texture, D3d12BorrowedTexture>(
+            value.DepthTexturesStorage.Items,
+            static (item, scope) => NativeD3d12BorrowedTexture(item)
+        );
+        native.depth_texture_count = checked((nuint)value.DepthTexturesStorage.Items.Length);
+        native.depth_state = value.DepthState;
+        return native;
+    }
+
+    internal static mln_d3d12_composition_target NativeD3d12CompositionTarget(
+        D3d12CompositionTarget value
+    )
+    {
+        var native = new mln_d3d12_composition_target();
+        native.logical_size = NativeLogicalSize(value.LogicalSize);
+        native.kind = (mln_d3d12_composition_kind)value.Kind;
+        native.@object = (void*)value.Object.Address;
+        return native;
+    }
+
+    internal static D3d12CustomLayerEncoder CopyD3d12CustomLayerEncoder(
+        mln_d3d12_custom_layer_encoder value
+    ) =>
+        new(
+            NativePointer.FromNativeAddress((nint)value.device),
+            NativePointer.FromNativeAddress((nint)value.command_list)
+        );
+
+    internal static D3d12CustomLayerPass CopyD3d12CustomLayerPass(
+        mln_d3d12_custom_layer_pass value
+    ) =>
+        new(
+            NativePointer.FromNativeAddress((nint)value.device),
+            NativePointer.FromNativeAddress((nint)value.command_list),
+            value.render_target_view,
+            value.color_format,
+            value.depth_stencil_view,
+            value.depth_stencil_format
+        );
+
+    internal static mln_d3d12_device_descriptor NativeD3d12DeviceDescriptor(
+        D3d12DeviceDescriptor value
+    )
+    {
+        var native = new mln_d3d12_device_descriptor();
+        native.size = (uint)sizeof(mln_d3d12_device_descriptor);
+        native.device = (void*)value.Device.Address;
+        native.command_queue = (void*)value.CommandQueue.Address;
+        return native;
+    }
+
+    internal static D3d12TextureFrame CopyD3d12TextureFrame(mln_d3d12_texture_frame value) =>
+        new(
+            value.width,
+            value.height,
+            value.scale_factor,
+            value.slot,
+            NativePointer.FromNativeAddress((nint)value.resource),
+            NativePointer.FromNativeAddress((nint)value.device),
+            value.format,
+            value.state,
+            NativePointer.FromNativeAddress((nint)value.depth_resource),
+            value.depth_format,
+            value.depth_state
+        );
 
     internal static mln_dma_buf_format NativeDmaBufFormat(DmaBufFormat value)
     {
@@ -858,18 +919,21 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_frame_pacer_options NativeFramePacerOptions(FramePacerOptions value)
+    internal static mln_frame_pacing_options NativeFramePacingOptions(FramePacingOptions value)
     {
-        var native = new mln_frame_pacer_options();
+        var native = new mln_frame_pacing_options();
         native.fields = 0;
-        native.size = (uint)sizeof(mln_frame_pacer_options);
+        native.size = (uint)sizeof(mln_frame_pacing_options);
         native.fields |= Put(
             value.MaximumFramesPerSecond,
             ref native.maximum_frames_per_second,
-            MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND
+            MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND
         );
-        if (value.UnlimitedFramesPerSecond)
-            native.fields |= MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
+        if (value.View is { } fieldView)
+        {
+            native.fields |= MLN_FRAME_PACING_OPTION_VIEW;
+            native.view = (void*)fieldView.Address;
+        }
         return native;
     }
 
@@ -1001,19 +1065,247 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static mln_gesture_momentum NativeGestureMomentum(GestureMomentum value)
+    internal static mln_gesture_axis_options NativeGestureAxisOptions(
+        GestureAxisOptions value,
+        NativeCallScope scope
+    )
     {
-        Required(value.Pan, "GestureMomentum.Pan must not be null.");
-        Required(value.Zoom, "GestureMomentum.Zoom must not be null.");
-        Required(value.Bearing, "GestureMomentum.Bearing must not be null.");
-        Required(value.Pitch, "GestureMomentum.Pitch must not be null.");
-        var native = new mln_gesture_momentum();
-        native.pan = NativePanMomentum(value.Pan);
-        native.zoom = NativeAnchoredMomentum(value.Zoom);
-        native.bearing = NativeAnchoredMomentum(value.Bearing);
-        native.pitch = NativeAnchoredMomentum(value.Pitch);
+        var native = new mln_gesture_axis_options();
+        native.fields = 0;
+        native.fields |= Put(
+            value.Enabled,
+            ref native.enabled,
+            MLN_GESTURE_AXIS_OPTION_ENABLED,
+            static present => (byte)(present ? 1 : 0)
+        );
+        native.fields |= Put(
+            value.Glides,
+            ref native.glides,
+            MLN_GESTURE_AXIS_OPTION_GLIDES,
+            static present => (byte)(present ? 1 : 0)
+        );
+        native.fields |= Put(
+            value.Momentum,
+            ref native.momentum,
+            MLN_GESTURE_AXIS_OPTION_MOMENTUM,
+            NativeMomentumDecay
+        );
+        native.fields |= Put(
+            value.Snaps,
+            ref native.snaps,
+            MLN_GESTURE_AXIS_OPTION_SNAPS,
+            static present => (byte)(present ? 1 : 0)
+        );
+        native.fields |= Put(
+            value.Snap,
+            ref native.snap,
+            MLN_GESTURE_AXIS_OPTION_SNAP,
+            NativeMomentumSnap
+        );
+        if (value.NotchesStorage?.Items is { } fieldNotches)
+        {
+            native.fields |= MLN_GESTURE_AXIS_OPTION_NOTCHES;
+            native.notches = scope.Array<mln_gesture_notch, GestureNotch>(
+                fieldNotches,
+                static (item, scope) => NativeGestureNotch(item)
+            );
+            native.notch_count = checked((nuint)fieldNotches.Length);
+        }
         return native;
     }
+
+    internal static mln_gesture_delta NativeGestureDelta(GestureDelta value)
+    {
+        var native = new mln_gesture_delta();
+        native.position = NativeScreenPoint(value.Position);
+        native.discrete = (byte)(value.Discrete ? 1 : 0);
+        native.pan = NativeScreenPoint(value.Pan);
+        native.zoom = value.Zoom;
+        native.bearing = value.Bearing;
+        native.pitch = value.Pitch;
+        return native;
+    }
+
+    internal static GestureEvent CopyGestureEvent(mln_gesture_event value) =>
+        value.type switch
+        {
+            mln_gesture_event_type.MLN_GESTURE_EVENT_TAP => new GestureEvent.Tap(
+                CopyGestureTap(value.data.tap)
+            ),
+            mln_gesture_event_type.MLN_GESTURE_EVENT_DOUBLE_TAP => new GestureEvent.DoubleTap(
+                CopyGestureTap(value.data.double_tap)
+            ),
+            mln_gesture_event_type.MLN_GESTURE_EVENT_TWO_FINGER_TAP =>
+                new GestureEvent.TwoFingerTap(CopyGestureTap(value.data.two_finger_tap)),
+            mln_gesture_event_type.MLN_GESTURE_EVENT_NOTCH => new GestureEvent.Notch(
+                CopyGestureNotchEvent(value.data.notch)
+            ),
+            mln_gesture_event_type.MLN_GESTURE_EVENT_LONG_PRESS => new GestureEvent.LongPress(
+                CopyGestureTap(value.data.long_press)
+            ),
+            _ => new GestureEvent.Unknown(
+                (uint)value.type,
+                NativeCallScope.CopyValueBytes(value.data)
+            ),
+        };
+
+    internal static mln_gesture_input NativeGestureInput(GestureInput value)
+    {
+        var native = new mln_gesture_input();
+        native.size = (uint)sizeof(mln_gesture_input);
+        switch (value)
+        {
+            case GestureInput.PointerDown selected:
+                native.type = mln_gesture_input_type.MLN_GESTURE_INPUT_POINTER_DOWN;
+                native.data.pointer_down = NativeGesturePointerDown(selected.Value);
+                break;
+            case GestureInput.PointerMove selected:
+                native.type = mln_gesture_input_type.MLN_GESTURE_INPUT_POINTER_MOVE;
+                native.data.pointer_move = NativeGesturePointer(selected.Value);
+                break;
+            case GestureInput.PointerUp selected:
+                native.type = mln_gesture_input_type.MLN_GESTURE_INPUT_POINTER_UP;
+                native.data.pointer_up = NativeGesturePointer(selected.Value);
+                break;
+            case GestureInput.PointerCancel selected:
+                native.type = mln_gesture_input_type.MLN_GESTURE_INPUT_POINTER_CANCEL;
+                native.data.pointer_cancel = NativeGesturePointer(selected.Value);
+                break;
+            case GestureInput.Modes selected:
+                native.type = mln_gesture_input_type.MLN_GESTURE_INPUT_MODES;
+                native.data.modes = (uint)selected.Value;
+                break;
+            case GestureInput.Delta selected:
+                native.type = mln_gesture_input_type.MLN_GESTURE_INPUT_DELTA;
+                native.data.delta = NativeGestureDelta(selected.Value);
+                break;
+            case GestureInput.Pinch selected:
+                native.type = mln_gesture_input_type.MLN_GESTURE_INPUT_PINCH;
+                native.data.pinch = NativeGesturePinch(selected.Value);
+                break;
+            default:
+                throw new ArgumentException("A union variant is required.", nameof(value));
+        }
+        return native;
+    }
+
+    internal static mln_gesture_notch NativeGestureNotch(GestureNotch value)
+    {
+        var native = new mln_gesture_notch();
+        native.spacing = value.Spacing;
+        native.offset = value.Offset;
+        native.kind = value.Kind;
+        return native;
+    }
+
+    internal static GestureNotchEvent CopyGestureNotchEvent(mln_gesture_notch_event value) =>
+        new((global::Maplibre.NativeFfi.GestureAxis)value.axis, value.kind, value.value);
+
+    internal static mln_gesture_options NativeGestureOptions(
+        GestureOptions value,
+        NativeCallScope scope
+    )
+    {
+        Required(value.Pan, "GestureOptions.Pan must not be null.");
+        Required(value.Zoom, "GestureOptions.Zoom must not be null.");
+        Required(value.Bearing, "GestureOptions.Bearing must not be null.");
+        Required(value.Pitch, "GestureOptions.Pitch must not be null.");
+        var native = new mln_gesture_options();
+        native.fields = 0;
+        native.size = (uint)sizeof(mln_gesture_options);
+        native.fields |= Put(
+            value.DoubleTapZoom,
+            ref native.double_tap_zoom,
+            MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM
+        );
+        native.fields |= Put(
+            value.TwoFingerTapZoom,
+            ref native.two_finger_tap_zoom,
+            MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM
+        );
+        native.pan = NativeGesturePanOptions(value.Pan);
+        native.zoom = NativeGestureAxisOptions(value.Zoom, scope);
+        native.bearing = NativeGestureAxisOptions(value.Bearing, scope);
+        native.pitch = NativeGestureAxisOptions(value.Pitch, scope);
+        return native;
+    }
+
+    internal static mln_gesture_pan_options NativeGesturePanOptions(GesturePanOptions value)
+    {
+        var native = new mln_gesture_pan_options();
+        native.fields = 0;
+        native.fields |= Put(
+            value.Enabled,
+            ref native.enabled,
+            MLN_GESTURE_PAN_OPTION_ENABLED,
+            static present => (byte)(present ? 1 : 0)
+        );
+        native.fields |= Put(
+            value.Glides,
+            ref native.glides,
+            MLN_GESTURE_PAN_OPTION_GLIDES,
+            static present => (byte)(present ? 1 : 0)
+        );
+        native.fields |= Put(
+            value.Momentum,
+            ref native.momentum,
+            MLN_GESTURE_PAN_OPTION_MOMENTUM,
+            NativeMomentumDecay
+        );
+        return native;
+    }
+
+    internal static mln_gesture_pinch NativeGesturePinch(GesturePinch value)
+    {
+        var native = new mln_gesture_pinch();
+        native.center = NativeScreenPoint(value.Center);
+        native.scale = value.Scale;
+        native.rotation = value.Rotation;
+        native.phase = (mln_pinch_phase)value.Phase;
+        return native;
+    }
+
+    internal static mln_gesture_pointer NativeGesturePointer(GesturePointer value)
+    {
+        var native = new mln_gesture_pointer();
+        native.id = value.Id;
+        native.position = NativeScreenPoint(value.Position);
+        return native;
+    }
+
+    internal static mln_gesture_pointer_down NativeGesturePointerDown(GesturePointerDown value)
+    {
+        var native = new mln_gesture_pointer_down();
+        native.id = value.Id;
+        native.kind = (mln_pointer_kind)value.Kind;
+        native.position = NativeScreenPoint(value.Position);
+        native.modes = (uint)value.Modes;
+        return native;
+    }
+
+    internal static GestureResult CopyGestureResult(mln_gesture_result value) =>
+        default(GestureResult) with
+        {
+            Handled = value.handled != 0,
+            NextTick = (global::Maplibre.NativeFfi.GestureNextTick)value.next_tick,
+            NextTickMs = value.next_tick_ms,
+            BoxZoomActive = value.box_zoom_active != 0,
+            BoxZoom = CopyScreenBox(value.box_zoom),
+            EventsStorage = new(
+                NativeCallScope.CopyArray<mln_gesture_event, GestureEvent>(
+                    (mln_gesture_event*)&value.events,
+                    (nuint)(
+                        (nuint)(value.event_count) <= 4
+                            ? value.event_count
+                            : throw new InvalidOperationException("Native count exceeds its array.")
+                    ),
+                    static item => CopyGestureEvent(item)
+                )
+            ),
+        };
+
+    internal static GestureTap CopyGestureTap(mln_gesture_tap value) =>
+        new(value.id, CopyScreenPoint(value.position));
 
     internal static GpuDeviceCapabilities CopyGpuDeviceCapabilities(
         mln_gpu_device_capabilities value
@@ -1025,6 +1317,14 @@ internal static unsafe class GeneratedValues
             (global::Maplibre.NativeFfi.GpuSyncKindFlag)value.sync_kinds,
             (global::Maplibre.NativeFfi.DepthStencilFormatFlag)value.depth_stencil_formats,
             (global::Maplibre.NativeFfi.GpuExportKindFlag)value.depth_export_kinds
+        );
+
+    internal static GpuDeviceD3d12ContextResult CopyGpuDeviceD3d12ContextResult(
+        mln_gpu_device_d3d12_context_result value
+    ) =>
+        new(
+            NativePointer.FromNativeAddress((nint)value.device),
+            NativePointer.FromNativeAddress((nint)value.command_queue)
         );
 
     internal static mln_gpu_device_options NativeGpuDeviceOptions(
@@ -1323,6 +1623,12 @@ internal static unsafe class GeneratedValues
             MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED,
             static present => (byte)(present ? 1 : 0)
         );
+        native.fields |= Put(
+            value.LocalIdeographsEnabled,
+            ref native.local_ideographs_enabled,
+            MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED,
+            static present => (byte)(present ? 1 : 0)
+        );
         return native;
     }
 
@@ -1562,11 +1868,20 @@ internal static unsafe class GeneratedValues
             MLN_MOMENTUM_DECAY_HALF_LIFE_MS
         );
         native.fields |= Put(value.StopSpeed, ref native.stop_speed, MLN_MOMENTUM_DECAY_STOP_SPEED);
-        native.fields |= Put(value.Distance, ref native.distance, MLN_MOMENTUM_DECAY_DISTANCE);
+        native.fields |= Put(
+            value.ReferenceSpeed,
+            ref native.reference_speed,
+            MLN_MOMENTUM_DECAY_REFERENCE_SPEED
+        );
         native.fields |= Put(
             value.DurationMs,
             ref native.duration_ms,
             MLN_MOMENTUM_DECAY_DURATION_MS
+        );
+        native.fields |= Put(
+            value.DurationExponent,
+            ref native.duration_exponent,
+            MLN_MOMENTUM_DECAY_DURATION_EXPONENT
         );
         native.fields |= Put(
             value.Easing,
@@ -1675,6 +1990,21 @@ internal static unsafe class GeneratedValues
         }
         return native;
     }
+
+    internal static OfflineRegionExpiry CopyOfflineRegionExpiry(mln_offline_region_expiry value) =>
+        new()
+        {
+            StaleAfterUnixMs = value.fields.HasFlag(MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER)
+                ? value.stale_after_unix_ms
+                : null,
+            UsableOfflineUntilUnixMs = value.fields.HasFlag(
+                MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL
+            )
+                ? value.usable_offline_until_unix_ms
+                : null,
+            StaleResourceCount = value.stale_resource_count,
+            UnusableResourceCount = value.unusable_resource_count,
+        };
 
     internal static OfflineRegionInfo CopyOfflineRegionInfo(mln_offline_region_info value) =>
         default(OfflineRegionInfo) with
@@ -1838,21 +2168,6 @@ internal static unsafe class GeneratedValues
             value.depth_texture,
             value.depth_internal_format
         );
-
-    internal static mln_pan_momentum NativePanMomentum(PanMomentum value)
-    {
-        Required(value.Decay, "PanMomentum.Decay must not be null.");
-        var native = new mln_pan_momentum();
-        native.fields = 0;
-        native.fields |= Put(
-            value.Velocity,
-            ref native.velocity,
-            MLN_PAN_MOMENTUM_VELOCITY,
-            NativeScreenPoint
-        );
-        native.decay = NativeMomentumDecay(value.Decay);
-        return native;
-    }
 
     internal static mln_premultiplied_rgba8_image NativePremultipliedRgba8Image(
         PremultipliedRgba8Image value,
@@ -2160,6 +2475,17 @@ internal static unsafe class GeneratedValues
                 native.kind = mln_render_target_kind.MLN_RENDER_TARGET_KIND_WEB_CANVAS;
                 native.data.web_canvas = NativeWebCanvasTarget(selected.Value, scope);
                 break;
+            case RenderTarget.D3d12BorrowedTextures selected:
+                native.kind = mln_render_target_kind.MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES;
+                native.data.d3d12_borrowed_textures = NativeD3d12BorrowedTexturesTarget(
+                    selected.Value,
+                    scope
+                );
+                break;
+            case RenderTarget.D3d12Composition selected:
+                native.kind = mln_render_target_kind.MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION;
+                native.data.d3d12_composition = NativeD3d12CompositionTarget(selected.Value);
+                break;
             default:
                 throw new ArgumentException("A union variant is required.", nameof(value));
         }
@@ -2386,6 +2712,7 @@ internal static unsafe class GeneratedValues
             ref native.retry_after_unix_ms,
             MLN_RESOURCE_RESPONSE_RETRY_AFTER
         );
+        native.no_store = (byte)(value.NoStore ? 1 : 0);
         return native;
     }
 
@@ -2679,6 +3006,9 @@ internal static unsafe class GeneratedValues
         native.cache_path = scope.Utf8(value.CachePath);
         return native;
     }
+
+    internal static ScreenBox CopyScreenBox(mln_screen_box value) =>
+        new(CopyScreenPoint(value.min), CopyScreenPoint(value.max));
 
     internal static mln_screen_box NativeScreenBox(ScreenBox value)
     {

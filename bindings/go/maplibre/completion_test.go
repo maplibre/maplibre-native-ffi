@@ -69,7 +69,7 @@ func TestArrayCompletionIsReadAtItsValueSize(t *testing.T) {
 }
 
 // A failed command's Await returns an *Error with its status, diagnostic, and
-// the generation it published.
+// the map's generation when it failed.
 func TestFailedCommandReturnsItsError(t *testing.T) {
 	f := newFixture(t)
 	committed := await(t, submitted(f.m.SetStyleJSON(emptyStyle)))
@@ -77,8 +77,8 @@ func TestFailedCommandReturnsItsError(t *testing.T) {
 	if !errors.Is(failure, StatusNotFound) || failure.Diagnostic == "" {
 		t.Fatalf("RemoveStyleSource(missing) = %v, want NOT_FOUND with a diagnostic", failure)
 	}
-	if failure.Generation <= committed.Generation {
-		t.Fatalf("failed command generation = %d, want past %d", failure.Generation, committed.Generation)
+	if failure.Generation < committed.Generation {
+		t.Fatalf("failed command generation = %d, want at least %d", failure.Generation, committed.Generation)
 	}
 }
 

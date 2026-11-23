@@ -38,17 +38,21 @@ public readonly partial record struct RenderSessionAttachOptions
     /// <item><description><c>RenderDriverKind.CallerGraphicsThread</c> for a
     /// borrowed ring of WebGPU textures.</description></item>
     /// <item><description><c>RenderDriverKind.CoreWorker</c> for an offscreen
-    /// target, a window, or an exported ring.</description></item>
+    /// target, a window, a DirectComposition visual, or an exported
+    /// ring.</description></item>
+    /// <item><description><c>RenderDriverKind.CallerGraphicsThread</c> for a
+    /// XAML <c>SwapChainPanel</c>, on the panel's UI
+    /// thread.</description></item>
     /// <item><description>Either one for a web canvas. In a browser both run on
     /// the thread that loaded the library: <c>RenderDriverKind.CoreWorker</c>
     /// in the library's own tasks, and
     /// <c>RenderDriverKind.CallerGraphicsThread</c> when you service the
     /// session.</description></item>
     /// <item><description>Either one for a Metal layer, a Vulkan surface, an
-    /// OpenGL surface, or a borrowed ring of Metal, Vulkan, or OpenGL textures.
-    /// A build may drive these on <c>RenderDriverKind.CoreWorker</c> only, and
-    /// fails an attach with <c>RenderDriverKind.CallerGraphicsThread</c>
-    /// then.</description></item>
+    /// OpenGL surface, or a borrowed ring of Metal, Vulkan, D3D12, or OpenGL
+    /// textures. A build may drive these on <c>RenderDriverKind.CoreWorker</c>
+    /// only, and fails an attach with
+    /// <c>RenderDriverKind.CallerGraphicsThread</c> then.</description></item>
     /// </list>
     /// <para>An attach with another driver fails with
     /// <c>Status.Unsupported</c>.</para>

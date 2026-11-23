@@ -406,10 +406,10 @@ ci:
           then: apply
     windows-x64:
       covers: >-
-        Windows x64 with OpenGL (WGL) and Vulkan, built with MSVC. Runs the C
-        tests and the desktop binding suites. Catches MSVC, Windows API, path,
-        shell, and toolchain installation problems. Platform-independent code
-        that Linux x64 tests doesn't need it.
+        Windows x64 with Vulkan, D3D12, and OpenGL (WGL), built with MSVC. Runs
+        the desktop binding suites. Catches MSVC, Windows API, path, shell, and
+        toolchain installation problems. Platform-independent code that Linux
+        x64 tests doesn't need it.
       rules:
         - if:
             files:
@@ -418,11 +418,11 @@ ci:
           then: apply
     mingw:
       covers: >-
-        Windows x64 with OpenGL (WGL) and Vulkan, built with Clang in MSYS2's
-        MINGW64 environment. Runs the C, C#, Dart, Go, and TypeScript suites and
-        verifies shared and static C package consumers. Catches MinGW headers,
-        libstdc++, GNU archive and import library handling, and MSYS2 toolchain
-        setup.
+        Windows x64 with Vulkan, D3D12, and OpenGL (WGL), built with Clang in
+        MSYS2's MINGW64 environment. Runs the C#, Dart, Go, and TypeScript
+        suites and verifies shared and static C package consumers. Catches MinGW
+        headers, libstdc++, GNU archive and import library handling, and MSYS2
+        toolchain setup.
       rules:
         - if:
             files:
@@ -433,14 +433,14 @@ ci:
           then: apply
     mingw-arm64:
       covers: >-
-        Windows ARM64 with OpenGL (WGL) and Vulkan, built with Clang in MSYS2's
-        CLANGARM64 environment and running MinGW x64's suites, except Zig, on
-        GitHub-hosted ARM runners whose setup alone takes about 16 minutes.
-        Catches only what differs by CPU architecture on MinGW: architecture
-        conditionals in code or build logic, a tool or dependency fetched per
-        architecture, such as the CLANGARM64 packages, and the ARM runner setup.
-        MinGW, Windows platform, renderer, and binding changes that MinGW x64
-        already builds and tests don't need it.
+        Windows ARM64 with Vulkan, D3D12, and OpenGL (WGL), built with Clang in
+        MSYS2's CLANGARM64 environment and running MinGW x64's suites, except
+        Zig, on GitHub-hosted ARM runners whose setup alone takes about 16
+        minutes. Catches only what differs by CPU architecture on MinGW:
+        architecture conditionals in code or build logic, a tool or dependency
+        fetched per architecture, such as the CLANGARM64 packages, and the ARM
+        runner setup. MinGW, Windows platform, renderer, and binding changes
+        that MinGW x64 already builds and tests don't need it.
       rules:
         - if:
             files:
@@ -449,12 +449,12 @@ ci:
           then: apply
     windows-arm64:
       covers: >-
-        Windows ARM64 with OpenGL (WGL) and Vulkan, running Windows x64's suites
-        on ARM runners. Catches only what differs by CPU architecture on
-        Windows: architecture conditionals in code or build logic, a tool or
-        dependency fetched per architecture, and the ARM runner setup. Windows
-        platform, renderer, and binding changes that Windows x64 already builds
-        and tests don't need it.
+        Windows ARM64 with Vulkan, D3D12, and OpenGL (WGL), running Windows
+        x64's suites on ARM runners. Catches only what differs by CPU
+        architecture on Windows: architecture conditionals in code or build
+        logic, a tool or dependency fetched per architecture, and the ARM runner
+        setup. Windows platform, renderer, and binding changes that Windows x64
+        already builds and tests don't need it.
       rules:
         - if:
             files:

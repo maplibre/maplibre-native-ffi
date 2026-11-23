@@ -17,9 +17,9 @@ public sealed record GpuDeviceOptions
 {
     /// <summary>
     /// The backend that the device renders with. By default, the platform's
-    /// own: Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the
-    /// system has no Vulkan driver, and in a browser the build's one backend:
-    /// WebGPU or OpenGL (WebGL2).
+    /// own: Metal on Apple platforms, Vulkan elsewhere, then D3D12 on Windows,
+    /// or OpenGL where the system has neither, and in a browser the build's one
+    /// backend: WebGPU or OpenGL (WebGL2).
     /// </summary>
     public RenderBackend? Backend { get; init; }
 
@@ -43,8 +43,9 @@ public sealed record GpuDeviceOptions
 
     /// <summary>
     /// The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
-    /// which Vulkan reports as <c>VkPhysicalDeviceIDProperties.deviceLUID</c>.
-    /// Only a Vulkan device takes one.
+    /// which Vulkan reports as <c>VkPhysicalDeviceIDProperties.deviceLUID</c>
+    /// and D3D12 as <c>ID3D12Device::GetAdapterLuid</c>. Only a Vulkan or D3D12
+    /// device takes one.
     /// </summary>
     public ImmutableArray<byte>? AdapterLuid
     {

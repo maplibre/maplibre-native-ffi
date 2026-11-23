@@ -7,7 +7,7 @@ internal readonly record struct MlnAcquiredFrame(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnDeliveryQueue(ulong Value) : IMlnHandle;
 
-internal readonly record struct MlnFramePacer(ulong Value) : IMlnHandle;
+internal readonly record struct MlnGestureRecognizer(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnGpuDevice(ulong Value) : IMlnHandle;
 
@@ -26,15 +26,6 @@ internal readonly record struct MlnResourceTransformRequest(ulong Value) : IMlnH
 internal readonly record struct MlnRuntime(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnStyleExpression(ulong Value) : IMlnHandle;
-
-internal unsafe struct mln_anchored_momentum
-{
-    public mln_anchored_momentum_field fields;
-    public double velocity;
-    public mln_screen_point anchor;
-    public mln_momentum_decay decay;
-    public mln_momentum_snap snap;
-}
 
 internal unsafe struct mln_android_hardware_buffer_frame
 {
@@ -112,10 +103,7 @@ internal unsafe struct mln_camera_delta
     public double bearing;
     public double pitch;
     public mln_screen_point anchor;
-    public mln_gesture_momentum momentum;
     public mln_animation_options animation;
-    public mln_gesture_phase gesture_phase;
-    public uint reserved;
 }
 
 internal unsafe struct mln_camera_fit_options
@@ -161,7 +149,6 @@ internal unsafe struct mln_camera_transition_end
     public uint size;
     public mln_camera_transition_outcome outcome;
     public ulong generation;
-    public mln_camera_velocity velocity;
 }
 
 internal unsafe struct mln_camera_transition_handler
@@ -178,16 +165,6 @@ internal unsafe struct mln_camera_update
     public mln_camera_update_mode mode;
     public mln_camera_options camera;
     public mln_animation_options animation;
-    public mln_gesture_phase gesture_phase;
-    public uint reserved;
-}
-
-internal unsafe struct mln_camera_velocity
-{
-    public mln_screen_point pan;
-    public double zoom;
-    public double bearing;
-    public double pitch;
 }
 
 internal unsafe struct mln_canonical_tile_id
@@ -257,6 +234,9 @@ internal unsafe struct mln_custom_layer_encoder_data
 
     [FieldOffset(0)]
     public mln_web_gpu_custom_layer_encoder web_gpu;
+
+    [FieldOffset(0)]
+    public mln_d3d12_custom_layer_encoder d3d12;
 }
 
 internal unsafe struct mln_custom_layer_frame
@@ -295,6 +275,9 @@ internal unsafe struct mln_custom_layer_pass_data
 
     [FieldOffset(0)]
     public mln_web_gpu_custom_layer_pass web_gpu;
+
+    [FieldOffset(0)]
+    public mln_d3d12_custom_layer_pass d3d12;
 }
 
 internal unsafe struct mln_custom_layer_prerender_parameters
@@ -335,6 +318,70 @@ internal unsafe struct mln_custom_vector_source_options
     public double max_zoom;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
     public MlnDeliveryQueue queue;
+}
+
+internal unsafe struct mln_d3d12_borrowed_texture
+{
+    public void* resource;
+}
+
+internal unsafe struct mln_d3d12_borrowed_textures_target
+{
+    public mln_logical_size logical_size;
+    public uint physical_width;
+    public uint physical_height;
+    public mln_d3d12_borrowed_texture* textures;
+    public nuint texture_count;
+    public uint state;
+    public mln_d3d12_borrowed_texture* depth_textures;
+    public nuint depth_texture_count;
+    public uint depth_state;
+}
+
+internal unsafe struct mln_d3d12_composition_target
+{
+    public mln_logical_size logical_size;
+    public mln_d3d12_composition_kind kind;
+    public void* @object;
+}
+
+internal unsafe struct mln_d3d12_custom_layer_encoder
+{
+    public void* device;
+    public void* command_list;
+}
+
+internal unsafe struct mln_d3d12_custom_layer_pass
+{
+    public void* device;
+    public void* command_list;
+    public ulong render_target_view;
+    public uint color_format;
+    public ulong depth_stencil_view;
+    public uint depth_stencil_format;
+}
+
+internal unsafe struct mln_d3d12_device_descriptor
+{
+    public uint size;
+    public void* device;
+    public void* command_queue;
+}
+
+internal unsafe struct mln_d3d12_texture_frame
+{
+    public uint size;
+    public uint width;
+    public uint height;
+    public double scale_factor;
+    public uint slot;
+    public void* resource;
+    public void* device;
+    public uint format;
+    public uint state;
+    public void* depth_resource;
+    public uint depth_format;
+    public uint depth_state;
 }
 
 internal unsafe struct mln_diagnostic
@@ -459,11 +506,12 @@ internal unsafe struct mln_frame_demand
     public ulong token;
 }
 
-internal unsafe struct mln_frame_pacer_options
+internal unsafe struct mln_frame_pacing_options
 {
     public uint size;
-    public mln_frame_pacer_option_field fields;
+    public mln_frame_pacing_option_field fields;
     public uint maximum_frames_per_second;
+    public void* view;
 }
 
 internal unsafe struct mln_frame_projection
@@ -506,12 +554,163 @@ internal unsafe struct mln_geo_json_source_options
     public byte cluster;
 }
 
-internal unsafe struct mln_gesture_momentum
+internal unsafe struct mln_gesture_axis_options
 {
-    public mln_pan_momentum pan;
-    public mln_anchored_momentum zoom;
-    public mln_anchored_momentum bearing;
-    public mln_anchored_momentum pitch;
+    public mln_gesture_axis_option_field fields;
+    public byte enabled;
+    public byte glides;
+    public mln_momentum_decay momentum;
+    public byte snaps;
+    public mln_momentum_snap snap;
+    public mln_gesture_notch* notches;
+    public nuint notch_count;
+}
+
+internal unsafe struct mln_gesture_delta
+{
+    public mln_screen_point position;
+    public byte discrete;
+    public mln_screen_point pan;
+    public double zoom;
+    public double bearing;
+    public double pitch;
+}
+
+internal unsafe struct mln_gesture_event
+{
+    public mln_gesture_event_type type;
+    public mln_gesture_event_data data;
+}
+
+[StructLayout(LayoutKind.Explicit)]
+internal unsafe struct mln_gesture_event_data
+{
+    [FieldOffset(0)]
+    public mln_gesture_tap tap;
+
+    [FieldOffset(0)]
+    public mln_gesture_tap double_tap;
+
+    [FieldOffset(0)]
+    public mln_gesture_tap two_finger_tap;
+
+    [FieldOffset(0)]
+    public mln_gesture_notch_event notch;
+
+    [FieldOffset(0)]
+    public mln_gesture_tap long_press;
+}
+
+internal unsafe struct mln_gesture_input
+{
+    public uint size;
+    public mln_gesture_input_type type;
+    public mln_gesture_input_data data;
+}
+
+[StructLayout(LayoutKind.Explicit)]
+internal unsafe struct mln_gesture_input_data
+{
+    [FieldOffset(0)]
+    public mln_gesture_pointer_down pointer_down;
+
+    [FieldOffset(0)]
+    public mln_gesture_pointer pointer_move;
+
+    [FieldOffset(0)]
+    public mln_gesture_pointer pointer_up;
+
+    [FieldOffset(0)]
+    public mln_gesture_pointer pointer_cancel;
+
+    [FieldOffset(0)]
+    public uint modes;
+
+    [FieldOffset(0)]
+    public mln_gesture_delta delta;
+
+    [FieldOffset(0)]
+    public mln_gesture_pinch pinch;
+}
+
+internal unsafe struct mln_gesture_notch
+{
+    public double spacing;
+    public double offset;
+    public uint kind;
+}
+
+internal unsafe struct mln_gesture_notch_event
+{
+    public mln_gesture_axis axis;
+    public uint kind;
+    public double value;
+}
+
+internal unsafe struct mln_gesture_options
+{
+    public uint size;
+    public mln_gesture_option_field fields;
+    public double double_tap_zoom;
+    public double two_finger_tap_zoom;
+    public mln_gesture_pan_options pan;
+    public mln_gesture_axis_options zoom;
+    public mln_gesture_axis_options bearing;
+    public mln_gesture_axis_options pitch;
+}
+
+internal unsafe struct mln_gesture_pan_options
+{
+    public mln_gesture_pan_option_field fields;
+    public byte enabled;
+    public byte glides;
+    public mln_momentum_decay momentum;
+}
+
+internal unsafe struct mln_gesture_pinch
+{
+    public mln_screen_point center;
+    public double scale;
+    public double rotation;
+    public mln_pinch_phase phase;
+}
+
+internal unsafe struct mln_gesture_pointer
+{
+    public uint id;
+    public mln_screen_point position;
+}
+
+internal unsafe struct mln_gesture_pointer_down
+{
+    public uint id;
+    public mln_pointer_kind kind;
+    public mln_screen_point position;
+    public uint modes;
+}
+
+internal unsafe struct mln_gesture_result
+{
+    public uint size;
+    public byte handled;
+    public mln_gesture_next_tick next_tick;
+    public double next_tick_ms;
+    public byte box_zoom_active;
+    public mln_screen_box box_zoom;
+    public nuint event_count;
+    public EventsArray events;
+
+    [System.Runtime.CompilerServices.InlineArray(4)]
+    public struct EventsArray
+    {
+        private mln_gesture_event element;
+    }
+}
+
+internal unsafe struct mln_gesture_tap
+{
+    public uint id;
+    public mln_screen_point position;
 }
 
 internal unsafe struct mln_gpu_device_capabilities
@@ -523,6 +722,13 @@ internal unsafe struct mln_gpu_device_capabilities
     public uint sync_kinds;
     public uint depth_stencil_formats;
     public uint depth_export_kinds;
+}
+
+internal unsafe struct mln_gpu_device_d3d12_context_result
+{
+    public uint size;
+    public void* device;
+    public void* command_queue;
 }
 
 internal unsafe struct mln_gpu_device_options
@@ -665,6 +871,7 @@ internal unsafe struct mln_map_options
     public byte tile_cache_enabled;
     public mln_buffer_view fallback_font_faces;
     public byte system_fonts_enabled;
+    public byte local_ideographs_enabled;
 }
 
 internal unsafe struct mln_map_projection_camera_result
@@ -819,8 +1026,9 @@ internal unsafe struct mln_momentum_decay
     public mln_momentum_decay_model model;
     public double half_life_ms;
     public double stop_speed;
-    public double distance;
+    public double reference_speed;
     public double duration_ms;
+    public double duration_exponent;
     public mln_unit_bezier easing;
     public double min_speed;
     public double max_speed;
@@ -861,6 +1069,15 @@ internal unsafe struct mln_offline_region_definition_data
 
     [FieldOffset(0)]
     public mln_offline_geometry_region_definition geometry;
+}
+
+internal unsafe struct mln_offline_region_expiry
+{
+    public mln_offline_region_expiry_field fields;
+    public long stale_after_unix_ms;
+    public long usable_offline_until_unix_ms;
+    public ulong stale_resource_count;
+    public ulong unusable_resource_count;
 }
 
 internal unsafe struct mln_offline_region_info
@@ -980,13 +1197,6 @@ internal unsafe struct mln_open_gl_texture_frame
     public uint target;
     public uint depth_texture;
     public uint depth_internal_format;
-}
-
-internal unsafe struct mln_pan_momentum
-{
-    public mln_pan_momentum_field fields;
-    public mln_screen_point velocity;
-    public mln_momentum_decay decay;
 }
 
 internal unsafe struct mln_premultiplied_rgba8_image
@@ -1162,6 +1372,12 @@ internal unsafe struct mln_render_target_data
 
     [FieldOffset(0)]
     public mln_web_canvas_target web_canvas;
+
+    [FieldOffset(0)]
+    public mln_d3d12_borrowed_textures_target d3d12_borrowed_textures;
+
+    [FieldOffset(0)]
+    public mln_d3d12_composition_target d3d12_composition;
 }
 
 internal unsafe struct mln_rendered_feature
@@ -1274,6 +1490,7 @@ internal unsafe struct mln_resource_response
     public long expires_unix_ms;
     public mln_buffer_view etag;
     public long retry_after_unix_ms;
+    public byte no_store;
 }
 
 internal unsafe struct mln_resource_route
@@ -1824,13 +2041,6 @@ internal unsafe struct mln_xlib_window_target
     public ulong window;
 }
 
-internal enum mln_anchored_momentum_field : uint
-{
-    MLN_ANCHORED_MOMENTUM_VELOCITY = 1,
-    MLN_ANCHORED_MOMENTUM_ANCHOR = 2,
-    MLN_ANCHORED_MOMENTUM_SNAP = 4,
-}
-
 internal enum mln_animation_option_field : uint
 {
     MLN_ANIMATION_OPTION_DURATION = 1,
@@ -1879,7 +2089,6 @@ internal enum mln_camera_delta_field : uint
     MLN_CAMERA_DELTA_BEARING = 4,
     MLN_CAMERA_DELTA_PITCH = 8,
     MLN_CAMERA_DELTA_ANCHOR = 16,
-    MLN_CAMERA_DELTA_MOMENTUM = 32,
 }
 
 internal enum mln_camera_fit_option_field : uint
@@ -1948,6 +2157,12 @@ internal enum mln_custom_vector_source_option_field : uint
     MLN_CUSTOM_VECTOR_SOURCE_OPTION_MAX_ZOOM = 2,
 }
 
+internal enum mln_d3d12_composition_kind : uint
+{
+    MLN_D3D12_COMPOSITION_KIND_VISUAL = 1,
+    MLN_D3D12_COMPOSITION_KIND_SWAP_CHAIN_PANEL = 2,
+}
+
 internal enum mln_depth_stencil_format_flag : uint
 {
     MLN_DEPTH_STENCIL_FORMAT_FLAG_DEPTH24_STENCIL8 = 1,
@@ -1973,10 +2188,10 @@ internal enum mln_frame_demand_flag : uint
     MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4,
 }
 
-internal enum mln_frame_pacer_option_field : uint
+internal enum mln_frame_pacing_option_field : uint
 {
-    MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1,
-    MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND = 2,
+    MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1,
+    MLN_FRAME_PACING_OPTION_VIEW = 2,
 }
 
 internal enum mln_free_camera_option_field : uint
@@ -1998,13 +2213,68 @@ internal enum mln_geo_json_source_option_field : uint
     MLN_GEO_JSON_SOURCE_OPTION_CLUSTER = 256,
 }
 
-internal enum mln_gesture_phase : uint
+internal enum mln_gesture_axis : uint
 {
-    MLN_GESTURE_PHASE_NONE = 0,
-    MLN_GESTURE_PHASE_BEGIN = 1,
-    MLN_GESTURE_PHASE_UPDATE = 2,
-    MLN_GESTURE_PHASE_END = 3,
-    MLN_GESTURE_PHASE_CANCEL = 4,
+    MLN_GESTURE_AXIS_ZOOM = 0,
+    MLN_GESTURE_AXIS_BEARING = 1,
+    MLN_GESTURE_AXIS_PITCH = 2,
+}
+
+internal enum mln_gesture_axis_option_field : uint
+{
+    MLN_GESTURE_AXIS_OPTION_ENABLED = 1,
+    MLN_GESTURE_AXIS_OPTION_GLIDES = 2,
+    MLN_GESTURE_AXIS_OPTION_MOMENTUM = 4,
+    MLN_GESTURE_AXIS_OPTION_SNAPS = 8,
+    MLN_GESTURE_AXIS_OPTION_SNAP = 16,
+    MLN_GESTURE_AXIS_OPTION_NOTCHES = 32,
+}
+
+internal enum mln_gesture_event_type : uint
+{
+    MLN_GESTURE_EVENT_TAP = 1,
+    MLN_GESTURE_EVENT_DOUBLE_TAP = 2,
+    MLN_GESTURE_EVENT_TWO_FINGER_TAP = 3,
+    MLN_GESTURE_EVENT_NOTCH = 4,
+    MLN_GESTURE_EVENT_LONG_PRESS = 5,
+}
+
+internal enum mln_gesture_input_type : uint
+{
+    MLN_GESTURE_INPUT_POINTER_DOWN = 1,
+    MLN_GESTURE_INPUT_POINTER_MOVE = 2,
+    MLN_GESTURE_INPUT_POINTER_UP = 3,
+    MLN_GESTURE_INPUT_POINTER_CANCEL = 4,
+    MLN_GESTURE_INPUT_MODES = 5,
+    MLN_GESTURE_INPUT_DELTA = 6,
+    MLN_GESTURE_INPUT_PINCH = 7,
+}
+
+internal enum mln_gesture_mode : uint
+{
+    MLN_GESTURE_MODE_ROTATE = 1,
+    MLN_GESTURE_MODE_BOX_ZOOM = 2,
+    MLN_GESTURE_MODE_ZOOM_OUT = 4,
+}
+
+internal enum mln_gesture_next_tick : uint
+{
+    MLN_GESTURE_NEXT_TICK_NONE = 0,
+    MLN_GESTURE_NEXT_TICK_FRAME = 1,
+    MLN_GESTURE_NEXT_TICK_AT = 2,
+}
+
+internal enum mln_gesture_option_field : uint
+{
+    MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM = 1,
+    MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM = 2,
+}
+
+internal enum mln_gesture_pan_option_field : uint
+{
+    MLN_GESTURE_PAN_OPTION_ENABLED = 1,
+    MLN_GESTURE_PAN_OPTION_GLIDES = 2,
+    MLN_GESTURE_PAN_OPTION_MOMENTUM = 4,
 }
 
 internal enum mln_gpu_device_option_field : uint
@@ -2125,6 +2395,7 @@ internal enum mln_map_option_field : uint
     MLN_MAP_OPTION_EVENT_MASK = 1,
     MLN_MAP_OPTION_TILE_CACHE_ENABLED = 2,
     MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED = 4,
+    MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED = 8,
 }
 
 internal enum mln_map_tile_option_field : uint
@@ -2150,18 +2421,19 @@ internal enum mln_momentum_decay_field : uint
     MLN_MOMENTUM_DECAY_MODEL = 1,
     MLN_MOMENTUM_DECAY_HALF_LIFE_MS = 2,
     MLN_MOMENTUM_DECAY_STOP_SPEED = 4,
-    MLN_MOMENTUM_DECAY_DISTANCE = 8,
+    MLN_MOMENTUM_DECAY_REFERENCE_SPEED = 8,
     MLN_MOMENTUM_DECAY_DURATION_MS = 16,
-    MLN_MOMENTUM_DECAY_EASING = 32,
-    MLN_MOMENTUM_DECAY_MIN_SPEED = 64,
-    MLN_MOMENTUM_DECAY_MAX_SPEED = 128,
-    MLN_MOMENTUM_DECAY_MAX_DISTANCE = 256,
+    MLN_MOMENTUM_DECAY_DURATION_EXPONENT = 32,
+    MLN_MOMENTUM_DECAY_EASING = 64,
+    MLN_MOMENTUM_DECAY_MIN_SPEED = 128,
+    MLN_MOMENTUM_DECAY_MAX_SPEED = 256,
+    MLN_MOMENTUM_DECAY_MAX_DISTANCE = 512,
 }
 
 internal enum mln_momentum_decay_model : uint
 {
     MLN_MOMENTUM_DECAY_MODEL_FRICTION = 0,
-    MLN_MOMENTUM_DECAY_MODEL_EASE = 1,
+    MLN_MOMENTUM_DECAY_MODEL_CURVE = 1,
 }
 
 internal enum mln_momentum_snap_field : uint
@@ -2198,6 +2470,12 @@ internal enum mln_offline_region_download_state : uint
     MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1,
 }
 
+internal enum mln_offline_region_expiry_field : uint
+{
+    MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER = 1,
+    MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL = 2,
+}
+
 internal enum mln_open_gl_client_api : uint
 {
     MLN_OPEN_GL_CLIENT_API_UNSPECIFIED = 0,
@@ -2220,9 +2498,19 @@ internal enum mln_open_gl_context_provider_flag : uint
     MLN_OPEN_GL_CONTEXT_PROVIDER_FLAG_WEB_GL = 4,
 }
 
-internal enum mln_pan_momentum_field : uint
+internal enum mln_pinch_phase : uint
 {
-    MLN_PAN_MOMENTUM_VELOCITY = 1,
+    MLN_PINCH_PHASE_BEGIN = 0,
+    MLN_PINCH_PHASE_UPDATE = 1,
+    MLN_PINCH_PHASE_END = 2,
+    MLN_PINCH_PHASE_CANCEL = 3,
+}
+
+internal enum mln_pointer_kind : uint
+{
+    MLN_POINTER_KIND_MOUSE = 0,
+    MLN_POINTER_KIND_TOUCH = 1,
+    MLN_POINTER_KIND_PEN = 2,
 }
 
 internal enum mln_projection_mode_option_field : uint
@@ -2251,6 +2539,7 @@ internal enum mln_render_backend : uint
     MLN_RENDER_BACKEND_VULKAN = 2,
     MLN_RENDER_BACKEND_OPEN_GL = 3,
     MLN_RENDER_BACKEND_WEB_GPU = 4,
+    MLN_RENDER_BACKEND_D3D12 = 5,
 }
 
 internal enum mln_render_backend_flag : uint
@@ -2259,6 +2548,7 @@ internal enum mln_render_backend_flag : uint
     MLN_RENDER_BACKEND_FLAG_VULKAN = 2,
     MLN_RENDER_BACKEND_FLAG_OPEN_GL = 4,
     MLN_RENDER_BACKEND_FLAG_WEB_GPU = 8,
+    MLN_RENDER_BACKEND_FLAG_D3D12 = 16,
 }
 
 internal enum mln_render_driver_kind : uint
@@ -2316,6 +2606,8 @@ internal enum mln_render_target_kind : uint
     MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES = 15,
     MLN_RENDER_TARGET_KIND_EXPORTED_RING = 16,
     MLN_RENDER_TARGET_KIND_WEB_CANVAS = 17,
+    MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES = 18,
+    MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION = 19,
 }
 
 internal enum mln_render_target_kind_flag : uint
@@ -2335,6 +2627,8 @@ internal enum mln_render_target_kind_flag : uint
     MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES = 16384,
     MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING = 32768,
     MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS = 65536,
+    MLN_RENDER_TARGET_KIND_FLAG_D3D12_BORROWED_TEXTURES = 131072,
+    MLN_RENDER_TARGET_KIND_FLAG_D3D12_COMPOSITION = 262144,
 }
 
 internal enum mln_rendered_feature_query_option_field : uint

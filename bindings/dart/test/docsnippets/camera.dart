@@ -10,32 +10,49 @@ void useCamera(Camera camera) {}
 void flyEnded(bool completed) {}
 
 // #region gesture
-void beginGesture(MapHandle map) {
-  map.discarding.applyCameraDelta(
-    const CameraDelta(gesturePhase: GesturePhase.begin),
-  );
+GestureRecognizerHandle createRecognizer(MapHandle map) =>
+    map.gestureRecognizerCreate();
+
+void scheduleTick(GestureResult result) {
+  // On the next frame, or at result.nextTickMs.
 }
 
-void applyDrag(MapHandle map, ScreenPoint movement) {
-  map.discarding.applyCameraDelta(
-    CameraDelta(offset: movement, gesturePhase: GesturePhase.update),
-  );
-}
-
-void applyPinch(MapHandle map, double scale, ScreenPoint center) {
-  map.discarding.applyCameraDelta(
-    CameraDelta(
-      scale: scale,
-      anchor: center,
-      gesturePhase: GesturePhase.update,
+void pointerDown(
+  GestureRecognizerHandle recognizer,
+  int id,
+  ScreenPoint position,
+  double timeMs,
+) {
+  final result = recognizer.handle(
+    GestureInput.pointerDown(
+      GesturePointerDown(
+        id: id,
+        kind: PointerKind.touch,
+        position: position,
+      ),
     ),
+    timeMs,
   );
+  scheduleTick(result);
 }
 
-void endGesture(MapHandle map) {
-  map.discarding.applyCameraDelta(
-    const CameraDelta(gesturePhase: GesturePhase.end),
+void pointerMove(
+  GestureRecognizerHandle recognizer,
+  int id,
+  ScreenPoint position,
+  double timeMs,
+) {
+  final result = recognizer.handle(
+    GestureInput.pointerMove(
+      GesturePointer(id: id, position: position),
+    ),
+    timeMs,
   );
+  scheduleTick(result);
+}
+
+void tick(GestureRecognizerHandle recognizer, double timeMs) {
+  scheduleTick(recognizer.tick(timeMs));
 }
 // #endregion gesture
 
@@ -103,10 +120,11 @@ Future<void> camera(MapHandle map) async {
   );
   // #endregion limit
 
-  beginGesture(map);
-  applyDrag(map, const ScreenPoint(x: 12, y: -4));
-  applyPinch(map, 1.1, const ScreenPoint(x: 200, y: 150));
-  endGesture(map);
+  final recognizer = createRecognizer(map);
+  pointerDown(recognizer, 1, const ScreenPoint(x: 100, y: 100), 0);
+  pointerMove(recognizer, 1, const ScreenPoint(x: 112, y: 96), 16);
+  tick(recognizer, 32);
+  recognizer.release();
 
   // #region convert
   final projection = MapProjectionHandle.create(

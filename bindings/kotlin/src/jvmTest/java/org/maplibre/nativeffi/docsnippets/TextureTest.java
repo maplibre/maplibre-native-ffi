@@ -32,6 +32,10 @@ public class TextureTest {
   // The host's draw, which samples the image view.
   private void drawMap(long imageView) {}
 
+  // The host's wait for a GPU sync, as for an acquired frame's
+  // producer sync.
+  private void waitForSync(GpuSync sync) {}
+
   private void destroyTextures(List<Long> images, List<Long> views) {}
 
   private void drawFrame() {
@@ -128,9 +132,15 @@ public class TextureTest {
             37,
             5);
 
-    session
-        .setTarget(new RenderTarget.VulkanBorrowedTextures(resized))
-        .join();
+    GpuSync sync =
+        session
+            .setTarget(
+                new RenderTarget.VulkanBorrowedTextures(resized))
+            .join();
+    // Wait for its sync before you destroy the old textures.
+    if (sync != null) {
+      waitForSync(sync);
+    }
     // vkDestroyImageView and vkDestroyImage
     destroyTextures(images, views);
     // #endregion resize-borrowed

@@ -5,7 +5,7 @@
 #MISE shell="bash"
 set -euo pipefail
 
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" kotlin-jvm
 case "$usage_preset" in
   macos-x64)
     MISE_DATA_DIR="$MISE_MONOREPO_ROOT/build/toolchains/mise-macos-x64" \

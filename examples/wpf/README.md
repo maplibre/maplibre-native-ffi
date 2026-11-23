@@ -31,13 +31,15 @@ copies beside it. An app outside this repository references the
 
 `MapView.cs` is an `HwndHost` that holds the map's window, a Win32 child window.
 `MapController.cs` attaches a render session to it with `Attach` and a Win32
-window target. The session renders on a library thread with a Vulkan device that
-the library creates, and presents to the window itself. A redraw wake asks for a
-frame, and the controller demands it at WPF's next frame, from
-`CompositionTarget.Rendering`, which the desktop compositor paces to the
-display. WPF renders frames only while something subscribes to that event, so an
-idle map costs nothing. A frame wake drains the frame results. While the window
-is minimized, the frames finish without presenting.
+window target. The session renders on a library thread with a device that the
+library creates on the platform's default backend, Vulkan, then D3D12, or
+OpenGL, and presents to the window itself. The session can't pace its own frames
+on Windows, so a redraw wake asks for a frame, and the controller demands it at
+WPF's next frame, from `CompositionTarget.Rendering`, which the desktop
+compositor paces to the display. WPF renders frames only while something
+subscribes to that event, so an idle map costs nothing. A frame wake drains the
+frame results. While the window is minimized, the frames finish without
+presenting.
 
 The child window's client size, in pixels, sets the session's size, which the
 map's scale factor turns into logical pixels. The map keeps the scale factor of
@@ -48,8 +50,9 @@ closes, it releases the session, the map, and the runtime.
 
 WPF can't draw over a hosted window, so the status shows in `StatusOverlay.cs`,
 a window of its own that the main window owns and that follows the map's corner.
-`MapView.cs` turns mouse, touch, and key input into camera changes. Input to a
-hosted window skips WPF's input system, so it feeds its mouse and touch points
-to WPF's `ManipulationProcessor2D`. When a gesture ends, it passes the
-processor's release velocities to the map, which keeps the camera moving after a
-flick. Everything else matches the Compose example in `examples/compose`.
+Input to a hosted window skips WPF's input system, so `MapView.cs` reads the
+window's mouse, touch, pen, wheel, and key messages, and passes them to the
+map's gesture recognizer, which moves the camera and keeps it gliding after a
+flick. The controller ticks the recognizer when it asks: at WPF's next frame, or
+at a time with a `DispatcherTimer`. Everything else matches the Compose example
+in `examples/compose`.

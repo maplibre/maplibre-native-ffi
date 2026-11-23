@@ -40,9 +40,9 @@ The library is [mln-rs](https://github.com/louwers/mln-rs), the Rust port of
 MapLibre Native, which the `third_party/mln-rs` submodule vendors. A preset's
 build runs Cargo on mln-rs's `mln-rs-c` package for the preset's Rust target,
 into `build/cargo`, which every preset shares, with the Cargo features of every
-render backend that the platform's package carries: Vulkan and OpenGL off Apple
-platforms, and Metal on them. A release build takes a few minutes, most of it in
-link-time optimization.
+render backend that the platform's package carries: Metal on Apple platforms;
+Vulkan, D3D12, and OpenGL on Windows; and Vulkan and OpenGL elsewhere. A release
+build takes a few minutes, most of it in link-time optimization.
 
 mln-rs defines the C API in `crates/mln_c/include`, and `include/` is a copy.
 After the submodule or its patches change the headers, run
@@ -67,7 +67,7 @@ for each Android preset.
 The `web-wasm32-webgpu` and `web-wasm32-webgl` presets each build mln-rs's
 browser package with one backend, so that a page downloads only the one it draws
 with: a wasm-bindgen module for `wasm32-unknown-unknown`, built with mln-rs's
-own `just c-web` recipe. Their tools come with `-E web`:
+own `c-web:build` task script. Their tools come with `-E web`:
 `mise -E web run build web-wasm32-webgpu` installs the package under
 `share/maplibre-native-c/web`, and
 `mise -E web run //bindings/kotlin:test:wasm <preset>` runs the Kotlin/Wasm

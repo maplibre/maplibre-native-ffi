@@ -1,161 +1,158 @@
-// Gestures. A drag pans, two fingers pinch, rotate, and pan, and a double tap zooms in. On release,
-// the map keeps moving at the gesture's speed and slows down, and a touch stops it.
+// Gestures. The map's gesture recognizer turns raw touches, pens, and a mouse into camera moves:
+// a drag pans, two fingers pinch, twist, and tilt, a double tap zooms in, a two-finger tap zooms
+// out, and a release glides on. This file only translates Compose's pointer events and ticks the
+// recognizer when it asks.
 package org.maplibre.nativeffi.example.compose
 
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import android.os.SystemClock
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.input.pointer.util.VelocityTracker1D
-import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.PI
-import kotlin.math.atan2
-import kotlin.math.log2
-import org.maplibre.nativeffi.AnchoredMomentum
-import org.maplibre.nativeffi.AnimationOptions
-import org.maplibre.nativeffi.CameraDelta
-import org.maplibre.nativeffi.GestureMomentum
-import org.maplibre.nativeffi.GesturePhase
-import org.maplibre.nativeffi.MapHandle
-import org.maplibre.nativeffi.PanMomentum
+import androidx.compose.ui.input.pointer.positionChanged
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.maplibre.nativeffi.GestureDelta
+import org.maplibre.nativeffi.GestureEvent
+import org.maplibre.nativeffi.GestureInput
+import org.maplibre.nativeffi.GestureMode
+import org.maplibre.nativeffi.GestureNextTick
+import org.maplibre.nativeffi.GesturePointer
+import org.maplibre.nativeffi.GesturePointerDown
+import org.maplibre.nativeffi.GestureRecognizerHandle
+import org.maplibre.nativeffi.GestureResult
+import org.maplibre.nativeffi.PointerKind
 import org.maplibre.nativeffi.ScreenPoint
 
-fun Modifier.mapGestures(map: () -> MapHandle?): Modifier =
+/** Feeds the pointer input to [recognizer], and calls [onNotch] where the map has a notch. */
+fun Modifier.mapGestures(
+  recognizer: () -> GestureRecognizerHandle?,
+  onNotch: () -> Unit,
+): Modifier =
   pointerInput(Unit) {
-    // The map takes points in logical pixels, and Compose reports them in pixels.
+    // The recognizer takes points in logical pixels, and Compose reports them in pixels.
     fun point(offset: Offset) =
       ScreenPoint(offset.x / density.toDouble(), offset.y / density.toDouble())
-    fun apply(delta: CameraDelta) = map()?.discarding?.applyCameraDelta(delta)
 
-    var lastTap: Pair<Offset, Long>? = null
+    coroutineScope {
+      var ticks: Job? = null
+      // The recognizer's clock only goes forward, but an event's samples can be older than the
+      // last frame that ticked it.
+      var clock = 0L
 
-    awaitEachGesture {
-      val down = awaitFirstDown(requireUnconsumed = false)
-      var moved = false
-      var lastPosition = down.position
-      var anchor = down.position
-      // How far the gesture has panned, zoomed, and turned the map, for the release velocities.
-      var panned = Offset.Zero
-      var zoomed = 0.0
-      var turned = 0.0
-      val pan = VelocityTracker()
-      val zoom = VelocityTracker1D(isDataDifferential = false)
-      val turn = VelocityTracker1D(isDataDifferential = false)
-      fun track(timeMillis: Long) {
-        pan.addPosition(timeMillis, panned)
-        zoom.addDataPoint(timeMillis, zoomed.toFloat())
-        turn.addDataPoint(timeMillis, turned.toFloat())
+      fun time(timeMillis: Long): Double {
+        clock = maxOf(clock, timeMillis)
+        return clock.toDouble()
       }
-      track(down.uptimeMillis)
-      // A touch stops the momentum of the last gesture.
-      apply(CameraDelta(gesturePhase = GesturePhase.BEGIN))
 
-      // Compose cancels this when the view leaves, as on a rotation, but the map lives on.
+      fun tick(timeMillis: Long): GestureResult? = recognizer()?.tick(time(timeMillis))
+
+      // Answers the result's events, and ticks the recognizer when the result asks: every frame
+      // while the map glides or eases, or once at a time, as when a press may become a long press.
+      // Input times and frame times both count from boot, as SystemClock.uptimeMillis() does.
+      fun follow(result: GestureResult) {
+        if (result.events.any { it is GestureEvent.Notch }) onNotch()
+        ticks?.cancel()
+        ticks =
+          when (result.nextTick) {
+            GestureNextTick.FRAME -> launch { tick(withFrameMillis { it })?.let(::follow) }
+            GestureNextTick.AT ->
+              launch {
+                delay((result.nextTickMs - SystemClock.uptimeMillis()).toLong())
+                tick(SystemClock.uptimeMillis())?.let(::follow)
+              }
+            else -> null
+          }
+      }
+
+      fun handle(input: GestureInput, change: PointerInputChange, timeMillis: Long) {
+        val result = recognizer()?.handle(input, time(timeMillis)) ?: return
+        if (result.handled) change.consume()
+        follow(result)
+      }
+
+      val pressed = mutableSetOf<PointerId>()
       try {
-        do {
-          val event = awaitPointerEvent()
-          // The touches that were down at the last event too, with where they were then.
-          val touches = event.changes.filter { it.pressed && it.previousPressed }
-          event.changes.forEach { it.consume() }
-          val first = touches.getOrNull(0)
-          if (first == null) {
-            // A touch that holds still sends no events, so the release adds the last sample, and a
-            // pause before it leaves no velocity.
-            track(event.changes.maxOf { it.uptimeMillis })
-            continue
+        awaitPointerEventScope {
+          while (true) {
+            val event = awaitPointerEvent()
+            // The samples that the event batched for the pointers that moved, in time order
+            // across pointers, so the recognizer measures the release speed from each.
+            val moves =
+              event.changes
+                .filter {
+                  it.pressed &&
+                    !it.changedToDownIgnoreConsumed() &&
+                    !it.isConsumed &&
+                    (it.positionChanged() || it.historical.isNotEmpty())
+                }
+                .flatMap { change ->
+                  change.historical.map { Triple(change, it.position, it.uptimeMillis) } +
+                    Triple(change, change.position, change.uptimeMillis)
+                }
+                .sortedBy { it.third }
+            for ((change, position, timeMillis) in moves) {
+              val moved = GesturePointer(change.id.value.toUInt(), point(position))
+              handle(GestureInput.PointerMove(moved), change, timeMillis)
+            }
+            for (change in event.changes) {
+              val pointer = GesturePointer(change.id.value.toUInt(), point(change.position))
+              when {
+                // A wheel detent zooms a third of a level, and eases.
+                event.type == PointerEventType.Scroll -> {
+                  val delta =
+                    GestureDelta(
+                      position = pointer.position,
+                      discrete = true,
+                      zoom = -change.scrollDelta.y / 3.0,
+                    )
+                  handle(GestureInput.Delta(delta), change, change.uptimeMillis)
+                }
+                change.changedToDownIgnoreConsumed() -> {
+                  pressed += change.id
+                  val modes =
+                    if (event.buttons.isSecondaryPressed) GestureMode.ROTATE else GestureMode.NONE
+                  val down =
+                    GesturePointerDown(pointer.id, kind(change.type), pointer.position, modes)
+                  handle(GestureInput.PointerDown(down), change, change.uptimeMillis)
+                }
+                // Compose cancels a gesture, as when a parent takes the pointers, with releases
+                // that are already consumed.
+                change.changedToUpIgnoreConsumed() && change.id in pressed -> {
+                  pressed -= change.id
+                  val input =
+                    if (change.isConsumed) GestureInput.PointerCancel(pointer)
+                    else GestureInput.PointerUp(pointer)
+                  handle(input, change, change.uptimeMillis)
+                }
+              }
+            }
           }
-          lastPosition = first.position
-          if ((first.position - down.position).getDistance() > viewConfiguration.touchSlop) {
-            moved = true
-          }
-          val second = touches.getOrNull(1)
-          if (second == null) {
-            val offset = first.position - first.previousPosition
-            panned += offset
-            track(first.uptimeMillis)
-            apply(CameraDelta(offset = point(offset), gesturePhase = GesturePhase.UPDATE))
-            continue
-          }
-          // The span between the touches scales and turns about their midpoint, which moves with
-          // them.
-          moved = true
-          val midBefore = (first.previousPosition + second.previousPosition) / 2f
-          val midAfter = (first.position + second.position) / 2f
-          val spanBefore = second.previousPosition - first.previousPosition
-          val spanAfter = second.position - first.position
-          val scale =
-            (spanAfter.getDistance() / spanBefore.getDistance()).toDouble().takeIf {
-              it.isFinite() && it > 0
-            } ?: 1.0
-          val bearing =
-            -wrapDegrees(
-              (atan2(spanAfter.y, spanAfter.x) - atan2(spanBefore.y, spanBefore.x)) * (180 / PI),
-            )
-          anchor = midAfter
-          panned += midAfter - midBefore
-          zoomed += log2(scale)
-          turned += bearing
-          track(maxOf(first.uptimeMillis, second.uptimeMillis))
-          apply(
-            CameraDelta(
-              offset = point(midAfter - midBefore),
-              scale = scale,
-              bearing = bearing,
-              anchor = point(midAfter),
-              gesturePhase = GesturePhase.UPDATE,
-            ),
-          )
-        } while (event.changes.any { it.pressed })
-      } catch (cancelled: CancellationException) {
-        apply(CameraDelta(gesturePhase = GesturePhase.CANCEL))
-        throw cancelled
-      }
-
-      // The map glides each part on from its release velocity, and slows it with its default
-      // friction.
-      val panVelocity = pan.calculateVelocity()
-      apply(
-        CameraDelta(
-          momentum =
-            GestureMomentum(
-              pan = PanMomentum(velocity = point(Offset(panVelocity.x, panVelocity.y))),
-              zoom =
-                AnchoredMomentum(
-                  velocity = zoom.calculateVelocity().toDouble(),
-                  anchor = point(anchor),
-                ),
-              bearing =
-                AnchoredMomentum(
-                  velocity = turn.calculateVelocity().toDouble(),
-                  anchor = point(anchor),
-                ),
-            ),
-          gesturePhase = GesturePhase.END,
-        ),
-      )
-      if (moved) return@awaitEachGesture
-      val now = System.currentTimeMillis()
-      val previous = lastTap
-      if (
-        previous != null &&
-          now - previous.second < viewConfiguration.doubleTapTimeoutMillis &&
-          (previous.first - lastPosition).getDistance() < viewConfiguration.touchSlop * 3
-      ) {
-        lastTap = null
-        apply(
-          CameraDelta(
-            scale = 2.0,
-            anchor = point(lastPosition),
-            animation = AnimationOptions(durationMs = 300.0),
-          ),
-        )
-      } else {
-        lastTap = lastPosition to now
+        }
+      } finally {
+        // Compose cancels this when the view leaves, as on a rotation, but the map and its
+        // recognizer live on, so the pointers that are still down end without a tap or a glide.
+        val now = time(SystemClock.uptimeMillis())
+        for (id in pressed) {
+          recognizer()?.handle(GestureInput.PointerCancel(GesturePointer(id.value.toUInt())), now)
+        }
       }
     }
   }
 
-/** An angle in degrees, wrapped to [-180, 180). */
-private fun wrapDegrees(degrees: Double): Double = ((degrees + 180) % 360 + 360) % 360 - 180
+private fun kind(type: PointerType): PointerKind =
+  when (type) {
+    PointerType.Mouse -> PointerKind.MOUSE
+    PointerType.Stylus,
+    PointerType.Eraser -> PointerKind.PEN
+    else -> PointerKind.TOUCH
+  }

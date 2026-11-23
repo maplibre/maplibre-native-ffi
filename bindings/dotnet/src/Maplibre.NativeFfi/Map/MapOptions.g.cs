@@ -38,23 +38,34 @@ public sealed record MapOptions
     public bool? TileCacheEnabled { get; init; }
 
     /// <summary>
-    /// Fonts for the text that a style's own fonts don't draw, such as scripts
-    /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
+    /// Fonts for the text that a style's own fonts don't draw. A JSON array of
     /// font files, each an object with a <c>url</c> and an optional
-    /// <c>unicode-range</c>, as in a font face of a style's <c>font-faces</c>,
-    /// which every font stack uses after the style's own font faces. Empty for
-    /// the system's fonts, unless <c>system_fonts_enabled</c> is false.
+    /// <c>unicode-range</c>, as in a font face of a style's <c>font-faces</c>.
+    /// They shape, in order, the text that glyph PBFs can't shape, such as
+    /// Myanmar or Devanagari, or all the text of a style without glyph PBFs,
+    /// and draw the glyphs that come from local fonts: those a style's PBFs
+    /// lack, and CJK with <c>local_ideographs_enabled</c>. Empty for the
+    /// system's fonts alone.
     /// </summary>
     public string FallbackFontFaces { get; init; } = "";
 
     /// <summary>
-    /// Whether the map falls back to the system's fonts for CJK and the scripts
-    /// that need complex shaping when <c>fallback_font_faces</c> is empty:
-    /// fonts that the platform's font matcher picks for the user's preferred
-    /// languages. Without it, the map does. The first map that uses them waits
-    /// for them to be found. In the browser, the browser draws CJK glyphs in
-    /// its sans-serif font instead, where <c>fallback_font_faces</c> doesn't
-    /// cover them.
+    /// Whether the map draws from the system's fonts what the style's fonts and
+    /// <c>fallback_font_faces</c> don't: fonts that the platform's font matcher
+    /// picks for the font stack's names, or for the character and the user's
+    /// preferred languages. It shapes with them the text that glyph PBFs can't
+    /// shape, and all the text of a style without glyph PBFs. Without it, the
+    /// map does. The first map that uses them waits for the matcher to load. In
+    /// the browser, the browser draws those glyphs in the font stack's
+    /// families, then its sans-serif font, one at a time.
     /// </summary>
     public bool? SystemFontsEnabled { get; init; }
+
+    /// <summary>
+    /// Whether CJK ideographs, kana and hangul come from local fonts
+    /// (<c>fallback_font_faces</c>, then the system's) before glyph PBFs,
+    /// rather than from a glyph PBF downloaded for every few characters.
+    /// Without it, they do.
+    /// </summary>
+    public bool? LocalIdeographsEnabled { get; init; }
 }

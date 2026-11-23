@@ -18,10 +18,10 @@ struct _MaplibreNativeFfiAcquiredFrame {
   MaplibreNativeFfiReady* ready;
 };
 
-struct _MaplibreNativeFfiFramePacer {
+struct _MaplibreNativeFfiGestureRecognizer {
   GObject parent_instance;
-  mln_frame_pacer handle;
-  mln_frame_pacer released_handle;
+  mln_gesture_recognizer handle;
+  mln_gesture_recognizer released_handle;
   // The object of the handle's parent, which outlives it.
   GObject* parent;
   gboolean borrowed;
@@ -360,6 +360,20 @@ static gpointer mln_render_session_read_texture_decode(
   return maplibre_native_ffi_texture_readback_result_from_native(result->value);
 }
 
+static gpointer mln_render_session_release_target_decode(
+  const mln_completion_result* result
+) {
+  if (result->value == NULL) return NULL;
+  return maplibre_native_ffi_gpu_sync_from_native(result->value);
+}
+
+static gpointer mln_render_session_set_target_decode(
+  const mln_completion_result* result
+) {
+  if (result->value == NULL) return NULL;
+  return maplibre_native_ffi_gpu_sync_from_native(result->value);
+}
+
 static gpointer mln_runtime_create_offline_region_decode(
   const mln_completion_result* result
 ) {
@@ -372,6 +386,13 @@ static gpointer mln_runtime_get_offline_region_decode(
 ) {
   if (result->value == NULL) return NULL;
   return maplibre_native_ffi_offline_region_info_from_native(result->value);
+}
+
+static gpointer mln_runtime_get_offline_region_expiry_decode(
+  const mln_completion_result* result
+) {
+  if (result->value == NULL) return NULL;
+  return maplibre_native_ffi_offline_region_expiry_from_native(result->value);
 }
 
 static gpointer mln_runtime_get_offline_region_status_decode(
@@ -750,40 +771,45 @@ gboolean maplibre_native_ffi_acquired_frame_release(
 }
 
 G_DEFINE_FINAL_TYPE(
-  MaplibreNativeFfiFramePacer, maplibre_native_ffi_frame_pacer, G_TYPE_OBJECT
+  MaplibreNativeFfiGestureRecognizer, maplibre_native_ffi_gesture_recognizer,
+  G_TYPE_OBJECT
 )
 
-static void maplibre_native_ffi_frame_pacer_object_dispose(GObject* object) {
-  MaplibreNativeFfiFramePacer* self = MAPLIBRE_NATIVE_FFI_FRAME_PACER(object);
+static void maplibre_native_ffi_gesture_recognizer_object_dispose(
+  GObject* object
+) {
+  MaplibreNativeFfiGestureRecognizer* self =
+    MAPLIBRE_NATIVE_FFI_GESTURE_RECOGNIZER(object);
   if (self->handle != MLN_HANDLE_NULL) {
-    (void)mln_frame_pacer_release(self->handle);
+    (void)mln_gesture_recognizer_release(self->handle);
     self->handle = MLN_HANDLE_NULL;
   }
   g_clear_object(&self->parent);
   g_clear_pointer(&self->ready, maplibre_native_ffi_ready_unref);
-  G_OBJECT_CLASS(maplibre_native_ffi_frame_pacer_parent_class)->dispose(object);
+  G_OBJECT_CLASS(maplibre_native_ffi_gesture_recognizer_parent_class)
+    ->dispose(object);
 }
 
-static void maplibre_native_ffi_frame_pacer_class_init(
-  MaplibreNativeFfiFramePacerClass* klass
+static void maplibre_native_ffi_gesture_recognizer_class_init(
+  MaplibreNativeFfiGestureRecognizerClass* klass
 ) {
   G_OBJECT_CLASS(klass)->dispose =
-    maplibre_native_ffi_frame_pacer_object_dispose;
+    maplibre_native_ffi_gesture_recognizer_object_dispose;
 }
 
-static void maplibre_native_ffi_frame_pacer_init(
-  MaplibreNativeFfiFramePacer* self
+static void maplibre_native_ffi_gesture_recognizer_init(
+  MaplibreNativeFfiGestureRecognizer* self
 ) {
   self->handle = MLN_HANDLE_NULL;
   self->released_handle = MLN_HANDLE_NULL;
 }
 
-MaplibreNativeFfiFramePacer* maplibre_native_ffi_frame_pacer_wrap(
-  mln_frame_pacer handle, gpointer parent, gboolean borrowed,
+MaplibreNativeFfiGestureRecognizer* maplibre_native_ffi_gesture_recognizer_wrap(
+  mln_gesture_recognizer handle, gpointer parent, gboolean borrowed,
   MaplibreNativeFfiReady* ready
 ) {
-  MaplibreNativeFfiFramePacer* self =
-    g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_FRAME_PACER, NULL);
+  MaplibreNativeFfiGestureRecognizer* self =
+    g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_RECOGNIZER, NULL);
   self->handle = handle;
   self->parent = parent != NULL ? g_object_ref(G_OBJECT(parent)) : NULL;
   self->borrowed = borrowed;
@@ -794,65 +820,86 @@ MaplibreNativeFfiFramePacer* maplibre_native_ffi_frame_pacer_wrap(
   return self;
 }
 
-guint64 maplibre_native_ffi_frame_pacer_get_id(
-  MaplibreNativeFfiFramePacer* self
+guint64 maplibre_native_ffi_gesture_recognizer_get_id(
+  MaplibreNativeFfiGestureRecognizer* self
 ) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACER(self), 0);
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_RECOGNIZER(self), 0);
   return (guint64)(self->handle != MLN_HANDLE_NULL ? self->handle
                                                    : self->released_handle);
 }
 
-MaplibreNativeFfiFramePacer* maplibre_native_ffi_frame_pacer_create(
-  MaplibreNativeFfiFramePacerOptions* options, GError** error
+MaplibreNativeFfiGestureResult* maplibre_native_ffi_gesture_recognizer_handle(
+  MaplibreNativeFfiGestureRecognizer* self,
+  const MaplibreNativeFfiGestureInput* input, gdouble time_ms, GError** error
 ) {
-  g_return_val_if_fail(
-    options == NULL || MAPLIBRE_NATIVE_FFI_IS_FRAME_PACER_OPTIONS(options), NULL
-  );
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_RECOGNIZER(self), NULL);
+  g_return_val_if_fail(input != NULL, NULL);
   g_return_val_if_fail(error == NULL || *error == NULL, NULL);
-  mln_frame_pacer_options options_native_;
-  if (options != NULL)
-    maplibre_native_ffi_frame_pacer_options_to_native(
-      options, &options_native_, NULL
-    );
-  mln_frame_pacer out_pacer_ = MLN_HANDLE_NULL;
+  mln_gesture_input input_native_;
+  maplibre_native_ffi_gesture_input_to_native(input, &input_native_, NULL);
+  mln_gesture_result out_result_;
+  memset(&out_result_, 0, sizeof out_result_);
+  (&out_result_)->size = sizeof *(&out_result_);
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_frame_pacer_create(
-    (options != NULL ? &options_native_ : NULL), &out_pacer_, &diagnostic_
+  mln_status status_ = mln_gesture_recognizer_handle(
+    self->handle, &input_native_, (double)(time_ms), &out_result_, &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
     return NULL;
   }
-  return maplibre_native_ffi_frame_pacer_wrap(out_pacer_, NULL, FALSE, NULL);
+  return maplibre_native_ffi_gesture_result_from_native(&out_result_);
 }
 
-void maplibre_native_ffi_frame_pacer_release(
-  MaplibreNativeFfiFramePacer* self
+void maplibre_native_ffi_gesture_recognizer_release(
+  MaplibreNativeFfiGestureRecognizer* self
 ) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACER(self));
-  mln_frame_pacer_release(self->handle);
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_RECOGNIZER(self));
+  mln_gesture_recognizer_release(self->handle);
   self->handle = MLN_HANDLE_NULL;
 }
 
-gboolean maplibre_native_ffi_frame_pacer_set_options(
-  MaplibreNativeFfiFramePacer* self,
-  MaplibreNativeFfiFramePacerOptions* options, GError** error
+gboolean maplibre_native_ffi_gesture_recognizer_set_options(
+  MaplibreNativeFfiGestureRecognizer* self,
+  MaplibreNativeFfiGestureOptions* options, GError** error
 ) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACER(self), FALSE);
-  g_return_val_if_fail(
-    MAPLIBRE_NATIVE_FFI_IS_FRAME_PACER_OPTIONS(options), FALSE
-  );
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_RECOGNIZER(self), FALSE);
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(options), FALSE);
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
-  mln_frame_pacer_options options_native_;
-  maplibre_native_ffi_frame_pacer_options_to_native(
-    options, &options_native_, NULL
+  MaplibreNativeFfiCall call_;
+  maplibre_native_ffi_call_init(&call_);
+  mln_gesture_options options_native_;
+  maplibre_native_ffi_gesture_options_to_native(
+    options, &options_native_, &call_
   );
+  if (!maplibre_native_ffi_call_check(&call_, error)) return FALSE;
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ =
-    mln_frame_pacer_set_options(self->handle, &options_native_, &diagnostic_);
+  mln_status status_ = mln_gesture_recognizer_set_options(
+    self->handle, &options_native_, &diagnostic_
+  );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
     return FALSE;
   }
+  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
   return TRUE;
+}
+
+MaplibreNativeFfiGestureResult* maplibre_native_ffi_gesture_recognizer_tick(
+  MaplibreNativeFfiGestureRecognizer* self, gdouble time_ms, GError** error
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_RECOGNIZER(self), NULL);
+  g_return_val_if_fail(error == NULL || *error == NULL, NULL);
+  mln_gesture_result out_result_;
+  memset(&out_result_, 0, sizeof out_result_);
+  (&out_result_)->size = sizeof *(&out_result_);
+  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  mln_status status_ = mln_gesture_recognizer_tick(
+    self->handle, (double)(time_ms), &out_result_, &diagnostic_
+  );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    return NULL;
+  }
+  return maplibre_native_ffi_gesture_result_from_native(&out_result_);
 }
 
 G_DEFINE_FINAL_TYPE(
@@ -1096,6 +1143,40 @@ guint64 maplibre_native_ffi_map_get_id(MaplibreNativeFfiMap* self) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), 0);
   return (guint64)(self->handle != MLN_HANDLE_NULL ? self->handle
                                                    : self->released_handle);
+}
+
+MaplibreNativeFfiGestureRecognizer*
+maplibre_native_ffi_map_gesture_recognizer_create(
+  MaplibreNativeFfiMap* self, MaplibreNativeFfiGestureOptions* options,
+  GError** error
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP(self), NULL);
+  g_return_val_if_fail(
+    options == NULL || MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(options), NULL
+  );
+  g_return_val_if_fail(error == NULL || *error == NULL, NULL);
+  MaplibreNativeFfiCall call_;
+  maplibre_native_ffi_call_init(&call_);
+  mln_gesture_options options_native_;
+  if (options != NULL)
+    maplibre_native_ffi_gesture_options_to_native(
+      options, &options_native_, &call_
+    );
+  mln_gesture_recognizer out_recognizer_ = MLN_HANDLE_NULL;
+  if (!maplibre_native_ffi_call_check(&call_, error)) return NULL;
+  mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
+  mln_status status_ = mln_gesture_recognizer_create(
+    self->handle, (options != NULL ? &options_native_ : NULL), &out_recognizer_,
+    &diagnostic_
+  );
+  if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
+    maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+    return NULL;
+  }
+  maplibre_native_ffi_call_end(&call_, status_ == MLN_STATUS_OK);
+  return maplibre_native_ffi_gesture_recognizer_wrap(
+    out_recognizer_, NULL, FALSE, NULL
+  );
 }
 
 void maplibre_native_ffi_map_add_custom_geometry_source_async(
@@ -4714,18 +4795,23 @@ void maplibre_native_ffi_render_session_release_target_async(
     &async_, self, maplibre_native_ffi_render_session_release_target_async,
     callback, user_data, FALSE
   );
-  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_render_session_release_target_decode,
+        (GDestroyNotify)maplibre_native_ffi_gpu_sync_free
+      ))
+    return;
   mln_status status_ = mln_render_session_release_target(
     self->handle, async_.completion_argument, &async_.diagnostic
   );
   maplibre_native_ffi_async_end(&async_, status_);
 }
 
-gboolean maplibre_native_ffi_render_session_release_target_finish(
+MaplibreNativeFfiGpuSync*
+maplibre_native_ffi_render_session_release_target_finish(
   MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
 ) {
-  g_return_val_if_fail(g_task_is_valid(result, self), FALSE);
-  return g_task_propagate_boolean(G_TASK(result), error);
+  g_return_val_if_fail(g_task_is_valid(result, self), NULL);
+  return g_task_propagate_pointer(G_TASK(result), error);
 }
 
 void maplibre_native_ffi_render_session_resize_async(
@@ -4779,16 +4865,24 @@ gboolean maplibre_native_ffi_render_session_service_driver_work(
   return TRUE;
 }
 
-gboolean maplibre_native_ffi_render_session_set_frame_pacer(
-  MaplibreNativeFfiRenderSession* self, MaplibreNativeFfiFramePacer* pacer,
-  GError** error
+gboolean maplibre_native_ffi_render_session_set_frame_pacing(
+  MaplibreNativeFfiRenderSession* self,
+  MaplibreNativeFfiFramePacingOptions* options, GError** error
 ) {
   g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RENDER_SESSION(self), FALSE);
+  g_return_val_if_fail(
+    options == NULL || MAPLIBRE_NATIVE_FFI_IS_FRAME_PACING_OPTIONS(options),
+    FALSE
+  );
   g_return_val_if_fail(error == NULL || *error == NULL, FALSE);
+  mln_frame_pacing_options options_native_;
+  if (options != NULL)
+    maplibre_native_ffi_frame_pacing_options_to_native(
+      options, &options_native_, NULL
+    );
   mln_diagnostic diagnostic_ = {.size = sizeof diagnostic_};
-  mln_status status_ = mln_render_session_set_frame_pacer(
-    self->handle, (pacer != NULL ? pacer->handle : MLN_HANDLE_NULL),
-    &diagnostic_
+  mln_status status_ = mln_render_session_set_frame_pacing(
+    self->handle, (options != NULL ? &options_native_ : NULL), &diagnostic_
   );
   if (!maplibre_native_ffi_check(status_, &diagnostic_, error)) {
     return FALSE;
@@ -4812,7 +4906,11 @@ void maplibre_native_ffi_render_session_set_target_async(
   maplibre_native_ffi_render_target_to_native(
     target, &target_native_, &async_.call
   );
-  if (!maplibre_native_ffi_async_begin(&async_, NULL, NULL)) return;
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_render_session_set_target_decode,
+        (GDestroyNotify)maplibre_native_ffi_gpu_sync_free
+      ))
+    return;
   mln_status status_ = mln_render_session_set_target(
     self->handle, &target_native_, async_.completion_argument,
     &async_.diagnostic
@@ -4820,11 +4918,11 @@ void maplibre_native_ffi_render_session_set_target_async(
   maplibre_native_ffi_async_end(&async_, status_);
 }
 
-gboolean maplibre_native_ffi_render_session_set_target_finish(
+MaplibreNativeFfiGpuSync* maplibre_native_ffi_render_session_set_target_finish(
   MaplibreNativeFfiRenderSession* self, GAsyncResult* result, GError** error
 ) {
-  g_return_val_if_fail(g_task_is_valid(result, self), FALSE);
-  return g_task_propagate_boolean(G_TASK(result), error);
+  g_return_val_if_fail(g_task_is_valid(result, self), NULL);
+  return g_task_propagate_pointer(G_TASK(result), error);
 }
 
 void maplibre_native_ffi_render_session_ready_async(
@@ -5448,6 +5546,36 @@ void maplibre_native_ffi_runtime_get_offline_region_async(
 
 MaplibreNativeFfiOfflineRegionInfo*
 maplibre_native_ffi_runtime_get_offline_region_finish(
+  MaplibreNativeFfiRuntime* self, GAsyncResult* result, GError** error
+) {
+  g_return_val_if_fail(g_task_is_valid(result, self), NULL);
+  return g_task_propagate_pointer(G_TASK(result), error);
+}
+
+void maplibre_native_ffi_runtime_get_offline_region_expiry_async(
+  MaplibreNativeFfiRuntime* self, gint64 region_id,
+  GAsyncReadyCallback callback, gpointer user_data
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RUNTIME(self));
+  MaplibreNativeFfiAsync async_;
+  maplibre_native_ffi_async_init(
+    &async_, self, maplibre_native_ffi_runtime_get_offline_region_expiry_async,
+    callback, user_data, FALSE
+  );
+  if (!maplibre_native_ffi_async_begin(
+        &async_, mln_runtime_get_offline_region_expiry_decode,
+        (GDestroyNotify)maplibre_native_ffi_offline_region_expiry_free
+      ))
+    return;
+  mln_status status_ = mln_runtime_get_offline_region_expiry(
+    self->handle, (mln_offline_region_id)(region_id),
+    async_.completion_argument, &async_.diagnostic
+  );
+  maplibre_native_ffi_async_end(&async_, status_);
+}
+
+MaplibreNativeFfiOfflineRegionExpiry*
+maplibre_native_ffi_runtime_get_offline_region_expiry_finish(
   MaplibreNativeFfiRuntime* self, GAsyncResult* result, GError** error
 ) {
   g_return_val_if_fail(g_task_is_valid(result, self), NULL);

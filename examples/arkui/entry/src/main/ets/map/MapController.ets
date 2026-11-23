@@ -1,11 +1,12 @@
 // A continuous map on an XComponent's surface. The component reports its
 // surface when the platform creates one, and the controller attaches a session
-// to the surface's window, or gives an attached session the new window.
-// Everything else matches the browser example in examples/browser.
+// to the surface's window, or gives an attached session the new window. The
+// session paces its frames to the display. Everything else matches the React
+// Native example in examples/react-native.
 
 import {
   CameraUpdateMode,
-  FramePacerHandle,
+  GestureRecognizerHandle,
   LogicalSize,
   MapHandle,
   MapMode,
@@ -35,7 +36,7 @@ export class MapController {
 
   private runtime: RuntimeHandle | undefined = undefined;
   private map: MapHandle | undefined = undefined;
-  private pacer: FramePacerHandle | undefined = undefined;
+  private recognizer: GestureRecognizerHandle | undefined = undefined;
   private session: RenderSessionHandle | undefined = undefined;
 
   // The component's latest size, its latest surface, and the surface that the
@@ -51,8 +52,8 @@ export class MapController {
     this.onStatus = onStatus;
   }
 
-  get currentMap(): MapHandle | undefined {
-    return this.map;
+  get currentRecognizer(): GestureRecognizerHandle | undefined {
+    return this.recognizer;
   }
 
   start(): void {
@@ -62,11 +63,11 @@ export class MapController {
   dispose(): void {
     this.disposed = true;
     const session = this.session;
-    const pacer = this.pacer;
+    const recognizer = this.recognizer;
     const map = this.map;
     const runtime = this.runtime;
     this.session = undefined;
-    this.pacer = undefined;
+    this.recognizer = undefined;
     this.map = undefined;
     this.runtime = undefined;
     this.target = undefined;
@@ -74,7 +75,7 @@ export class MapController {
     // the objects it used.
     this.targets = this.targets.then(async () => {
       await session?.release();
-      pacer?.release();
+      recognizer?.release();
       map?.dispose();
       runtime?.dispose();
     }).catch((error: Error) => console.error(`MapLibre: ${error.message}`));
@@ -144,9 +145,6 @@ export class MapController {
         }
       },
     });
-    // The pacer demands each frame at the display's next refresh after the map
-    // changes, so the session needs no redraw wake.
-    this.pacer = FramePacerHandle.create();
     await map.ready;
     if (this.disposed) {
       return;
@@ -161,6 +159,7 @@ export class MapController {
       },
     });
     map.discarding.setStyleUrl(styleUrl);
+    this.recognizer = map.gestureRecognizerCreate();
     this.showStatus('Loading the style…');
     this.retarget();
   }
@@ -194,10 +193,13 @@ export class MapController {
             frameWake: { callback: () => this.drainFrameResults() },
           });
           this.session = session;
-          session.setFramePacer(this.pacer);
+          // The session demands each frame at the display's next refresh after
+          // the map changes.
+          session.setFramePacing({});
           done = session.ready;
         } else {
-          done = this.session.setTarget(target);
+          // A window's replacement completes without a value.
+          done = this.session.setTarget(target).then((): void => {});
         }
       } finally {
         releaseWindow(window);
@@ -212,7 +214,7 @@ export class MapController {
       .catch((error: Error) => this.fail(error));
   }
 
-  // The pacer demands the frames, and the frame wake reports how they went.
+  // The session demands the frames, and the frame wake reports how they went.
   private drainFrameResults(): void {
     const session = this.session;
     if (session === undefined) {

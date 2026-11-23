@@ -15,6 +15,8 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_acquired_frame_get_d3d12_texture(frame: Long, outFrame: Long, outDiagnostic: Long): Int
+
   fun mln_acquired_frame_get_dma_buf(frame: Long, outFrame: Long, outDiagnostic: Long): Int
 
   fun mln_acquired_frame_get_dxgi_shared_texture(
@@ -57,19 +59,43 @@ internal expect object C {
 
   fun mln_delivery_queue_release(queue: Long): Unit
 
-  fun mln_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int
+  fun mln_gesture_recognizer_create(
+    map: Long,
+    options: Long,
+    outRecognizer: Long,
+    outDiagnostic: Long,
+  ): Int
 
-  fun mln_frame_pacer_release(pacer: Long): Unit
+  fun mln_gesture_recognizer_handle(
+    recognizer: Long,
+    input: Long,
+    timeMs: Double,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int
 
-  fun mln_frame_pacer_set_options(pacer: Long, options: Long, outDiagnostic: Long): Int
+  fun mln_gesture_recognizer_release(recognizer: Long): Unit
+
+  fun mln_gesture_recognizer_set_options(recognizer: Long, options: Long, outDiagnostic: Long): Int
+
+  fun mln_gesture_recognizer_tick(
+    recognizer: Long,
+    timeMs: Double,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int
 
   fun mln_gpu_device_create(options: Long, outDevice: Long, outDiagnostic: Long): Int
 
   fun mln_gpu_device_get_capabilities(device: Long, outCapabilities: Long, outDiagnostic: Long): Int
 
+  fun mln_gpu_device_get_d3d12_context(device: Long, outResult: Long, outDiagnostic: Long): Int
+
   fun mln_gpu_device_get_vulkan_context(device: Long, outResult: Long, outDiagnostic: Long): Int
 
   fun mln_gpu_device_release(device: Long): Unit
+
+  fun mln_gpu_device_wrap_d3d12(descriptor: Long, outDevice: Long, outDiagnostic: Long): Int
 
   fun mln_gpu_device_wrap_metal(descriptor: Long, outDevice: Long, outDiagnostic: Long): Int
 
@@ -772,7 +798,7 @@ internal expect object C {
 
   fun mln_render_session_service_driver_work(session: Long, outDiagnostic: Long): Int
 
-  fun mln_render_session_set_frame_pacer(session: Long, pacer: Long, outDiagnostic: Long): Int
+  fun mln_render_session_set_frame_pacing(session: Long, options: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_set_target(
     session: Long,
@@ -847,6 +873,13 @@ internal expect object C {
   fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int
 
   fun mln_runtime_get_offline_region(
+    runtime: Long,
+    regionId: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_runtime_get_offline_region_expiry(
     runtime: Long,
     regionId: Long,
     completion: Long,

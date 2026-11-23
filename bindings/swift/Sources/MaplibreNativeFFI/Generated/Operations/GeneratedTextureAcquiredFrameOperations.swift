@@ -53,6 +53,48 @@ public extension AcquiredFrameHandle {
     }
   #endif
 
+  #if os(Windows)
+    /// Gets the D3D12 texture of an acquired frame.
+    ///
+    /// It gets a borrowed ring's texture, or an exported ring's on a D3D12
+    /// device: the resource whose memory the ring shares, and the frame's depth
+    /// resource with `RenderSessionAttachOptions.keepDepth`. Wait for
+    /// `AcquiredFrameHandle.withProducerSync()` before you use them.
+    ///
+    /// See `mln_acquired_frame_get_d3d12_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `Status.unsupported` when the frame isn't of a D3D12 device.
+    /// - `Status.targetLost` when the session failed, or you detached,
+    /// abandoned,
+    ///   or disposed it.
+    func withD3d12Texture<Result>(_ body: (D3d12TextureFrameView) throws
+      -> Result) throws -> Result
+    {
+      var raw = mln_d3d12_texture_frame()
+      raw.size = UInt32(MemoryLayout<mln_d3d12_texture_frame>.size)
+      return try nativeView(
+        reading: raw,
+        begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
+          raw,
+          token,
+          diagnostic
+        ) },
+        end: { mln_acquired_frame_view_end($0) },
+        get: { raw, value, diagnostic in mln_acquired_frame_get_d3d12_texture(
+          raw,
+          value,
+          diagnostic
+        ) }
+      ) { raw, scope in try body(D3d12TextureFrameView(
+        D3d12TextureFrame(raw: raw),
+        scope: scope
+      )) }
+    }
+  #endif
+
   #if os(Linux)
     /// Gets the dmabuf of an exported ring's acquired frame.
     ///

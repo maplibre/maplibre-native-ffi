@@ -12,46 +12,56 @@ internal static class Camera
     private static void FlyEnded(bool completed) { }
 
     // #region gesture
-    private static void BeginGesture(MapHandle map)
+    private static GestureRecognizerHandle CreateRecognizer(
+        MapHandle map
+    ) => map.GestureRecognizerCreate();
+
+    private static void ScheduleTick(GestureResult result)
     {
-        map.Discarding.ApplyCameraDelta(
-            new CameraDelta { GesturePhase = GesturePhase.Begin }
-        );
+        // On the next frame, or at result.NextTickMs.
     }
 
-    private static void ApplyDrag(MapHandle map, ScreenPoint movement)
-    {
-        map.Discarding.ApplyCameraDelta(
-            new CameraDelta
-            {
-                Offset = movement,
-                GesturePhase = GesturePhase.Update,
-            }
-        );
-    }
-
-    private static void ApplyPinch(
-        MapHandle map,
-        double scale,
-        ScreenPoint center
+    private static void PointerDown(
+        GestureRecognizerHandle recognizer,
+        uint id,
+        ScreenPoint position,
+        double timeMs
     )
     {
-        map.Discarding.ApplyCameraDelta(
-            new CameraDelta
-            {
-                Scale = scale,
-                Anchor = center,
-                GesturePhase = GesturePhase.Update,
-            }
+        var result = recognizer.Handle(
+            new GestureInput.PointerDown(
+                new GesturePointerDown(
+                    id,
+                    PointerKind.Touch,
+                    position,
+                    default
+                )
+            ),
+            timeMs
         );
+        ScheduleTick(result);
     }
 
-    private static void EndGesture(MapHandle map)
+    private static void PointerMove(
+        GestureRecognizerHandle recognizer,
+        uint id,
+        ScreenPoint position,
+        double timeMs
+    )
     {
-        map.Discarding.ApplyCameraDelta(
-            new CameraDelta { GesturePhase = GesturePhase.End }
+        var result = recognizer.Handle(
+            new GestureInput.PointerMove(
+                new GesturePointer(id, position)
+            ),
+            timeMs
         );
+        ScheduleTick(result);
     }
+
+    private static void Tick(
+        GestureRecognizerHandle recognizer,
+        double timeMs
+    ) => ScheduleTick(recognizer.Tick(timeMs));
 
     // #endregion gesture
 
@@ -130,10 +140,11 @@ internal static class Camera
         );
         // #endregion limit
 
-        BeginGesture(map);
-        ApplyDrag(map, new ScreenPoint(12, -4));
-        ApplyPinch(map, 1.1, new ScreenPoint(200, 150));
-        EndGesture(map);
+        var recognizer = CreateRecognizer(map);
+        PointerDown(recognizer, 1, new ScreenPoint(100, 100), 0);
+        PointerMove(recognizer, 1, new ScreenPoint(112, 96), 16);
+        Tick(recognizer, 32);
+        recognizer.Release();
 
         // #region convert
         using (

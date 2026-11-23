@@ -37,7 +37,7 @@ public sealed unsafe partial class ResourceRequestHandle
     }
 
     NativeHandleState<MlnResourceRequest> INativeOwner<MlnResourceRequest>.State => state;
-    internal MlnResourceRequest Handle => state.Handle;
+    internal MlnResourceRequest NativeHandle => state.Handle;
 
     /// <summary>
     /// The native handle value. It stays readable after release.
@@ -103,7 +103,9 @@ public sealed unsafe partial class ResourceRequestHandle
     {
         using var call = Enter(this);
         bool outCancelled = default;
-        Check(NativeMethods.mln_resource_request_is_cancelled(Handle, &outCancelled, Diagnostic));
+        Check(
+            NativeMethods.mln_resource_request_is_cancelled(NativeHandle, &outCancelled, Diagnostic)
+        );
         return outCancelled;
     }
 
@@ -171,7 +173,7 @@ public sealed unsafe partial class ResourceRequestHandle
         bool outCancelled = default;
         Check(
             NativeMethods.mln_resource_request_set_cancel_callback(
-                Handle,
+                NativeHandle,
                 &nativeHandler,
                 &outCancelled,
                 Diagnostic

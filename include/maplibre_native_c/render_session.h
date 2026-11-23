@@ -211,10 +211,11 @@ MLN_API mln_status mln_map_attach(
  * borrowed ring takes only a ring of the kind it attached with, with as many
  * textures, with depth textures only when it attached with them, and with the
  * same formats, final layouts, and owner. Release every acquired frame of a
- * borrowed ring first. Once the replacement completes, the session has also
- * stopped waiting on the consumer sync of the textures that the new ring
- * doesn't have, as mln_render_session_release_target() says, so you can reuse
- * or destroy them.
+ * borrowed ring first. For a borrowed ring, the replacement completes with an
+ * mln_gpu_sync: wait for it before you reuse or destroy the textures that the
+ * new ring doesn't have, as mln_render_session_release_target() says. When it
+ * lets go of no textures, such as after a release, the sync is
+ * MLN_GPU_SYNC_CPU_COMPLETE. For another target, the completion has no value.
  *
  * Returns:
  * - MLN_STATUS_INVALID_ARGUMENT when a borrowed ring gets more or fewer
@@ -238,8 +239,12 @@ MLN_API mln_status mln_map_attach(
  *   the old ones in their formats, final layouts, or owner, or in having
  *   depth textures. Attach a new session instead.
  * - MLN_STATUS_NATIVE_ERROR when the library can't render to the new target.
+ *
+ * Lifetimes:
+ * The object that the sync names belongs to the session, as
+ * mln_render_session_release_target() says.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=operation;result=mln_gpu_sync;nullable=true")
 MLN_API mln_status mln_render_session_set_target(
   mln_render_session session, const mln_render_target* target,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -287,7 +292,10 @@ MLN_API mln_status mln_render_session_get_failure(
  * Asks the session to render a frame.
  *
  * The frame shows the map commands that you sent before the call, except the
- * changes that an open command group holds back.
+ * changes that an open command group holds back, and the map's camera
+ * animations as they are at the time of the call. Demand each frame when the
+ * display is ready for it, so that animations move evenly.
+ * mln_render_session_set_frame_pacing() does that for you.
  *
  * You can call it once the attach call returns. While the attach runs, the
  * demand waits for it to complete. Every demand finishes with one frame result
@@ -309,130 +317,85 @@ MLN_API mln_status mln_render_session_demand_frame(
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** The optional settings of a frame pacer. */
+/** The optional settings of a render session's frame pacing. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
-) mln_frame_pacer_option_field : uint32_t {
-  MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1U << 0U,
-  /**
-   * Removes the frame rate limit, so the pacer can demand frames at every
-   * display refresh, as it does by default. It can't be combined with
-   * MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND.
-   */
-  MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND = 1U << 1U,
-} mln_frame_pacer_option_field;
+) mln_frame_pacing_option_field : uint32_t {
+  MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND = 1U << 0U,
+  MLN_FRAME_PACING_OPTION_VIEW = 1U << 1U,
+} mln_frame_pacing_option_field;
 
-/** A set of mln_frame_pacer_option_field bits. */
-typedef uint32_t mln_frame_pacer_option_fields;
+/** A set of mln_frame_pacing_option_field bits. */
+typedef uint32_t mln_frame_pacing_option_fields;
 
-/**
- * Options for creating a frame pacer, or for mln_frame_pacer_set_options().
- */
-typedef struct mln_frame_pacer_options {
+/** Options for mln_render_session_set_frame_pacing(). */
+typedef struct mln_frame_pacing_options {
   uint32_t size;
-  mln_frame_pacer_option_fields fields;
+  mln_frame_pacing_option_fields fields;
   /**
-   * The most frames per second that the pacer demands, greater than zero. The
-   * pacer skips display refreshes to stay within it. By default, it can demand
-   * frames at every refresh.
+   * The most frames per second that the library demands, greater than zero.
+   * It skips display refreshes to stay within it. By default, it can demand a
+   * frame at every refresh.
    */
   uint32_t maximum_frames_per_second MLN_BINDING(
-    "mask=fields;bit=MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND"
+    "mask=fields;bit=MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND"
   );
-} mln_frame_pacer_options;
+  /**
+   * The `NSView*` on macOS, or the `UIView*` on iOS and tvOS, that shows the
+   * session's frames, to pace them to its window's display rather than the
+   * main one. On iOS and tvOS, set the pacing again when the scene moves to
+   * another screen, as `windowScene:didUpdateEffectiveGeometry:` reports.
+   */
+  void* view MLN_BINDING("mask=fields;bit=MLN_FRAME_PACING_OPTION_VIEW");
+} mln_frame_pacing_options;
 
 /**
- * Creates a frame pacer that follows the platform's display.
- *
- * On iOS, macOS, and tvOS, the pacer follows the display through a
- * `CADisplayLink`. You can call it on any thread, and the pacer needs no run
- * loop of yours. On macOS, it follows the main display, the one with the menu
- * bar. With mln_frame_pacer_options.maximum_frames_per_second, the pacer also
- * asks the system for that refresh rate. On iPhone, a rate above 60 needs
- * `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
- *
- * On Android, the pacer follows the display through the calling thread's
- * `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
- * main thread, and keep that thread running its looper while sessions use the
- * pacer. `AChoreographer` can stop while the phone's display is off, even while
- * a Surface on another display, such as an Android Auto projection, still shows
- * the map. The pacer then keeps demanding frames from a timer on the looper,
- * within the frame rate limit, until vsyncs arrive again.
- *
- * On OpenHarmony, the pacer follows the display through `OH_NativeVSync`. You
- * can call it on any thread, and the pacer needs no event loop of yours.
- *
- * Returns:
- * - MLN_STATUS_UNSUPPORTED on the other platforms, such as visionOS, Linux, and
- *   Windows, where the library has no source of display refreshes.
- * - MLN_STATUS_INVALID_STATE on Android when the calling thread has no
- *   `ALooper`.
- * - MLN_STATUS_NATIVE_ERROR on iOS, macOS, and tvOS when the system has no
- *   display to follow, and on OpenHarmony when the system can't report the
- *   display's refreshes to the process.
- */
-MLN_API mln_status mln_frame_pacer_create(
-  const mln_frame_pacer_options* options MLN_BINDING("nullable=true"),
-  mln_frame_pacer* out_pacer MLN_BINDING("direction=out"),
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Changes a frame pacer's settings.
- *
- * Settings that `options` doesn't set keep their current values. To remove the
- * frame rate limit, set MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND. You
- * can call it on any thread.
- *
- * The sessions that the pacer serves follow the new settings from the next
- * display refresh, including a refresh that they already wait for. The pacer
- * counts a new limit from the last frames it demanded, so a higher limit can
- * demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
- * the system for the new limit's refresh rate, or for the display's own rate
- * once the limit is removed.
- *
- * Returns:
- * - MLN_STATUS_INVALID_ARGUMENT when `pacer` is the null handle or names no
- *   frame pacer, or when `options` sets `maximum_frames_per_second` to 0 or
- *   sets both MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND and
- *   MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND. The pacer keeps its
- *   settings.
- * - MLN_STATUS_INVALID_STATE when you released `pacer`, even while sessions
- *   still use it.
- */
-MLN_API mln_status mln_frame_pacer_set_options(
-  mln_frame_pacer pacer, const mln_frame_pacer_options* options,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Sets the frame pacer that demands the session's frames.
+ * Paces the session's frames to the display.
  *
  * At the first display refresh after the session has something new to draw,
- * `pacer` demands a frame without flags and with token 0. One pacer can serve
- * many sessions. A null `pacer` stops pacing the session. You can call it once
- * the attach call returns.
+ * the library demands a frame without flags and with token 0, unless you
+ * demanded one first. Each call replaces the session's pacing, and a null
+ * `options` stops it. You can call it once the attach call returns.
+ *
+ * On iOS, macOS, and tvOS, the library uses a `CADisplayLink` on a thread of
+ * its own. With mln_frame_pacing_options.view, call it on the main thread.
+ * The library asks the system for the frame rate limit's refresh rate. On
+ * iPhone, a rate above 60 needs `CADisableMinimumFrameDurationOnPhone` in the
+ * app's `Info.plist`.
+ *
+ * On Android, the library follows the display through the calling thread's
+ * `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
+ * main thread, and keep that thread running its looper while the session is
+ * paced. `AChoreographer` can stop while the phone's display is off, even
+ * while a Surface on another display, such as an Android Auto projection,
+ * still shows the map. The library then keeps demanding frames from a timer
+ * on the looper, within the frame rate limit, until vsyncs arrive again.
+ *
+ * On OpenHarmony, the library uses `OH_NativeVSync`, from any thread.
  *
  * Returns:
+ * - MLN_STATUS_INVALID_ARGUMENT when `options` sets `maximum_frames_per_second`
+ *   to 0, or sets `view` to null.
+ * - MLN_STATUS_UNSUPPORTED on the other platforms, such as visionOS, Linux, and
+ *   Windows, where the library has no source of display refreshes, on macOS
+ *   before 14, and when `options` sets `view` on a platform other than macOS,
+ *   iOS, and tvOS.
  * - MLN_STATUS_TARGET_LOST or MLN_STATUS_NATIVE_ERROR, as
  *   mln_render_session_snapshot.failure_status reports, when the session has
  *   failed.
  * - MLN_STATUS_INVALID_STATE when you attached the session with a redraw
- *   wake, or detached, abandoned, released, or disposed it.
+ *   wake, or detached, abandoned, released, or disposed it, on Android when
+ *   the calling thread has no `ALooper`, and when `options` sets `view` off
+ *   the main thread or, on iOS and tvOS, to a view in no window.
+ * - MLN_STATUS_NATIVE_ERROR on iOS, macOS, and tvOS when the system has no
+ *   display to follow, and on OpenHarmony when the system can't report the
+ *   display's refreshes to the process.
  */
-MLN_API mln_status mln_render_session_set_frame_pacer(
+MLN_API mln_status mln_render_session_set_frame_pacing(
   mln_render_session session,
-  mln_frame_pacer pacer MLN_BINDING("nullable=true"),
+  const mln_frame_pacing_options* options MLN_BINDING("nullable=true"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
-
-/**
- * Releases a frame pacer.
- *
- * Render sessions that use the pacer stay paced until you release them or set
- * another pacer.
- */
-MLN_API void mln_frame_pacer_release(mln_frame_pacer pacer) MLN_NOEXCEPT;
 
 /**
  * Takes the frame results that the session has queued.
@@ -595,18 +558,22 @@ MLN_API mln_status mln_render_session_resize(
  * Use it when the platform takes a surface away, such as when your app goes to
  * the background. Release every acquired frame first. Frame demands that are
  * still pending, and later ones until you give the session a new target,
- * finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once the release completes,
- * you can destroy the old target. An Android or OpenHarmony window can go away
- * sooner, as mln_android_window_target and mln_ohos_window_target say.
+ * finish with MLN_RENDER_RESULT_TARGET_NOT_READY. Once the release of a window
+ * or surface completes, you can destroy it. An Android or OpenHarmony window
+ * can go away sooner, as mln_android_window_target and mln_ohos_window_target
+ * say.
  *
- * For a borrowed ring, a completed release also means that the session has
- * stopped waiting on the consumer sync that you released its frames with, so
- * you can reuse or destroy the textures. The session waits about a second at
- * most for that sync, and logs a warning when the wait runs out. It checks the
- * sync without blocking a thread: keep servicing a session driven by
- * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD until the release completes. The
- * session keeps nothing of the released textures: a texture that a later target
- * gives it again is a new one, even one that you discarded a frame of.
+ * For a borrowed ring, the release completes with an mln_gpu_sync of
+ * mln_render_session_capabilities.producer_sync_kind, or
+ * MLN_GPU_SYNC_CPU_COMPLETE when the session has no textures since an earlier
+ * release. Wait for it before you reuse or destroy the textures, as you wait
+ * for an acquired frame's producer sync: for MLN_GPU_SYNC_QUEUE_ORDER, destroy
+ * them once work that you submit to the queue after the completion has
+ * finished. The session's GPU work on the textures, and its waits for the
+ * consumer syncs that you released its frames with, end there, so keep those
+ * syncs until then too. The session keeps nothing of the released textures: a
+ * texture that a later target gives it again is a new one, even one that you
+ * discarded a frame of. For another target, the completion has no value.
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED when the session renders offscreen or into an
@@ -615,8 +582,16 @@ MLN_API mln_status mln_render_session_resize(
  * Completes with:
  * - MLN_STATUS_TARGET_LOST when the session loses its target before the
  *   release runs.
+ * - MLN_STATUS_NATIVE_ERROR when the session can't submit its work on a
+ *   borrowed ring's textures. It keeps them then.
+ *
+ * Lifetimes:
+ * The object that the sync names belongs to the session. It stays valid until
+ * the session's next release or replacement of its target completes, until a
+ * detach or release of the session completes, or until an abandon of it
+ * returns.
  */
-MLN_BINDING("execution=operation")
+MLN_BINDING("execution=operation;result=mln_gpu_sync;nullable=true")
 MLN_API mln_status mln_render_session_release_target(
   mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic

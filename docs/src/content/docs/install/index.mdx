@@ -20,13 +20,21 @@ architectures, and backends each language supports.
 ## Choose a backend
 
 A native package carries every graphics backend of its platform: Metal on Apple
-platforms, and Vulkan and OpenGL elsewhere. A render session draws with the
-backend of the GPU device that it attaches with. Create a device to choose one,
-or attach without a device, and the session creates one on the platform's
-default: Metal on Apple platforms, and elsewhere Vulkan, or OpenGL where the
-system has no Vulkan driver. Choose OpenGL in emulators and virtual machines,
-whose Vulkan drivers are often missing or broken, and choose the backend your
-application already uses if it draws its own graphics.
+platforms; Vulkan, D3D12, and OpenGL on Windows; and Vulkan and OpenGL
+elsewhere. You choose one at run time, not when you install. A render session
+draws with the backend of the GPU device that it attaches with. Create a device
+to choose one, or attach without a device, and the session creates one on the
+platform's default: Metal on Apple platforms, and elsewhere Vulkan, then D3D12
+on Windows, or OpenGL where the system has neither. Choose OpenGL in emulators
+and virtual machines, whose Vulkan drivers are often missing or broken, and
+choose the backend your application already uses if it draws its own graphics.
+
+On Windows, D3D12 compiles its shaders at run time with
+[DXC](https://github.com/microsoft/DirectXShaderCompiler/releases), which your
+app ships: `dxcompiler.dll`, 1.8.2502 or later, beside your app's executable or
+in another directory of the DLL search path. The library doesn't look in its own
+directory. Without DXC, a device on the platform's default takes another
+backend, and a device that you create or wrap for D3D12 fails as unsupported.
 
 In a browser, a package carries one backend, so that a page downloads only the
 one it draws with: WebGPU, the default, or WebGL 2.

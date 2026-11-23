@@ -170,7 +170,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smoothutf8",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -259,15 +259,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cobs"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
-dependencies = [
- "thiserror",
-]
-
-[[package]]
 name = "codespan-reporting"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -339,18 +330,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
-name = "csscolorparser"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3c89b58e3eb25afa9d30ccc8ab8ca2b9b1d3158659b061af1d58ec9bd57feab"
-dependencies = [
- "num-traits",
- "phf",
- "serde",
- "uncased",
-]
-
-[[package]]
 name = "der"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -415,18 +394,6 @@ name = "either"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be"
-
-[[package]]
-name = "embedded-io"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef1a6892d9eef45c8fa6b9e0086428a2cca8491aca8f787c534a3d6d0bcb3ced"
-
-[[package]]
-name = "embedded-io"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 
 [[package]]
 name = "enum_dispatch"
@@ -497,7 +464,7 @@ dependencies = [
  "geo-types",
  "serde",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.21",
  "usize_cast",
 ]
 
@@ -516,7 +483,7 @@ dependencies = [
  "bytemuck",
  "bytes",
  "num-traits",
- "thiserror",
+ "thiserror 2.0.21",
  "wide 0.7.33",
 ]
 
@@ -566,6 +533,12 @@ dependencies = [
 
 [[package]]
 name = "float_next_after"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bf7cc16383c4b8d58b9905a8509f02926ce3058053c056376248d958c9df1e8"
+
+[[package]]
+name = "float_next_after"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37007738a80ea34f969af54a3390dd72cacdef654974cfd449c9f6f72dbaac10"
@@ -589,18 +562,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "835ae9d781464a79026cde387f9cbc650c9a4909d7cf7e658b127e3c35d2f35d"
 dependencies = [
  "bytemuck",
-]
-
-[[package]]
-name = "fontdb"
-version = "0.24.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2660c5e9157bf76d2db1294e4a9feba604ef610819a3b591088d0d8392a3290f"
-dependencies = [
- "log",
- "memmap2",
- "slotmap",
- "tinyvec",
 ]
 
 [[package]]
@@ -692,7 +653,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30eb1fdc57c1e5cfd11826fe0caec4b9dc7901f3758263bb506228d88c8d9e9a"
 dependencies = [
  "earcut",
- "float_next_after",
+ "float_next_after 2.0.0",
  "geo-types",
  "geographiclib-rs",
  "i_overlay",
@@ -703,6 +664,20 @@ dependencies = [
  "robust",
  "rstar 0.12.2",
  "sif-itree",
+]
+
+[[package]]
+name = "geo-index"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfff90b0f9cfdb74b7a1e381d0349b641b2b78c5798d281bc9c8c7cef8ce47d3"
+dependencies = [
+ "bytemuck",
+ "float_next_after 1.0.0",
+ "geo-traits",
+ "num-traits",
+ "thiserror 1.0.69",
+ "tinyvec",
 ]
 
 [[package]]
@@ -729,7 +704,7 @@ dependencies = [
  "rstar 0.8.4",
  "rstar 0.9.3",
  "serde",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -751,7 +726,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.21",
  "tinyvec",
 ]
 
@@ -782,9 +757,6 @@ name = "glam"
 version = "0.34.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "627003914c6057c9c8f0832ee4f870b5a4f599d0cfa83f4072675114860cd0ff"
-dependencies = [
- "serde_core",
-]
 
 [[package]]
 name = "glow"
@@ -808,7 +780,7 @@ dependencies = [
  "hashbrown 0.16.1",
  "log",
  "presser",
- "thiserror",
+ "thiserror 2.0.21",
  "windows",
 ]
 
@@ -1375,7 +1347,7 @@ dependencies = [
  "jni-sys",
  "log",
  "simd_cesu8",
- "thiserror",
+ "thiserror 2.0.21",
  "walkdir",
  "windows-link",
 ]
@@ -1491,7 +1463,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "224399e74b87b5f3557511d98dff8b14089b3dadafcab6bb93eab67d3aace965"
 dependencies = [
  "scopeguard",
- "serde",
 ]
 
 [[package]]
@@ -1547,24 +1518,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "mln-rs-actor"
-version = "0.0.11"
-dependencies = [
- "mln-rs-util",
- "parking_lot",
-]
-
-[[package]]
 name = "mln-rs-c"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "geo-types",
  "geojson",
+ "glam",
  "js-sys",
  "libc",
  "mln-rs-conversion",
  "mln-rs-expression",
  "mln-rs-feature",
+ "mln-rs-frame-pacer",
+ "mln-rs-gestures",
  "mln-rs-gl",
  "mln-rs-map",
  "mln-rs-map-types",
@@ -1581,19 +1547,17 @@ dependencies = [
  "mln-rs-vec-map",
  "mln-rs-web-host",
  "objc2",
- "objc2-core-foundation",
- "objc2-foundation",
- "objc2-quartz-core",
  "parking_lot",
  "raw-window-handle",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.21",
  "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
 name = "mln-rs-conversion"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "foldhash 0.2.0",
  "geojson",
@@ -1601,12 +1565,12 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_json_borrow",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "mln-rs-expression"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "cheap-ruler",
  "fixed_decimal",
@@ -1616,7 +1580,9 @@ dependencies = [
  "icu_decimal",
  "icu_experimental",
  "icu_locale",
+ "icu_plurals",
  "icu_provider",
+ "jni",
  "js-sys",
  "mln-rs-conversion",
  "mln-rs-feature",
@@ -1628,64 +1594,89 @@ dependencies = [
  "mln-rs-tile-id",
  "mln-rs-util",
  "mln-rs-vec-map",
+ "mln-rs-wire",
  "objc2",
- "objc2-core-foundation",
  "objc2-foundation",
+ "parking_lot",
  "serde",
  "serde_json",
  "smallvec",
- "thiserror",
+ "thiserror 2.0.21",
  "wasm-bindgen",
  "writeable",
 ]
 
 [[package]]
 name = "mln-rs-feature"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "geo-types",
  "geojson",
  "mln-rs-vec-map",
- "serde",
+ "mln-rs-wire",
  "serde_json",
 ]
 
 [[package]]
-name = "mln-rs-geojson-vt"
-version = "0.0.11"
+name = "mln-rs-frame-pacer"
+version = "0.0.15"
+dependencies = [
+ "libc",
+ "mln-rs-util",
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-foundation",
+ "objc2-quartz-core",
+ "parking_lot",
+]
+
+[[package]]
+name = "mln-rs-geojson"
+version = "0.0.15"
 dependencies = [
  "foldhash 0.2.0",
- "geo-traits",
+ "geo-index",
  "geo-types",
  "mln-rs-feature",
- "mln-rs-geometry",
+ "parking_lot",
+ "smallvec",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "mln-rs-geometry"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "geo-types",
- "serde",
+ "mln-rs-wire",
+]
+
+[[package]]
+name = "mln-rs-gestures"
+version = "0.0.15"
+dependencies = [
+ "mln-rs-map",
+ "mln-rs-util",
+ "parking_lot",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "mln-rs-gfx"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "bytemuck",
- "mln-rs-geometry",
- "mln-rs-style-types",
- "mln-rs-tile-id",
  "mln-rs-util",
  "mln-rs-vec-map",
+ "mln-rs-wire",
  "raw-window-handle",
- "serde",
+ "slotmap",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "mln-rs-gl"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "bytemuck",
  "glow",
@@ -1705,7 +1696,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-image"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "flate2",
  "image-webp",
@@ -1719,50 +1710,51 @@ dependencies = [
 ]
 
 [[package]]
-name = "mln-rs-kdbush"
-version = "0.0.11"
-
-[[package]]
 name = "mln-rs-map"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "geo-types",
  "geojson",
- "mln-rs-actor",
+ "glam",
  "mln-rs-feature",
  "mln-rs-geometry",
  "mln-rs-map-types",
  "mln-rs-math",
  "mln-rs-renderer",
+ "mln-rs-sprite",
  "mln-rs-storage",
  "mln-rs-style",
  "mln-rs-style-types",
+ "mln-rs-text",
  "mln-rs-tile-id",
  "mln-rs-util",
  "parking_lot",
+ "serde_json",
 ]
 
 [[package]]
 name = "mln-rs-map-types"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
+ "glam",
  "mln-rs-geometry",
  "mln-rs-math",
  "mln-rs-style-types",
  "mln-rs-tile-id",
  "mln-rs-util",
- "serde",
- "thiserror",
+ "mln-rs-wire",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "mln-rs-math"
-version = "0.0.11"
+version = "0.0.15"
 
 [[package]]
 name = "mln-rs-mtl"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
+ "block2",
  "bytemuck",
  "mln-rs-gfx",
  "mln-rs-tile-id",
@@ -1773,25 +1765,27 @@ dependencies = [
  "objc2-io-surface",
  "objc2-metal",
  "objc2-quartz-core",
+ "parking_lot",
+ "raw-window-metal",
 ]
 
 [[package]]
 name = "mln-rs-polylabel"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "mln-rs-geometry",
 ]
 
 [[package]]
 name = "mln-rs-renderer"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "bytemuck",
  "earcut",
  "etagere",
+ "geo-index",
  "geo-types",
  "glam",
- "mln-rs-actor",
  "mln-rs-expression",
  "mln-rs-feature",
  "mln-rs-geometry",
@@ -1808,21 +1802,22 @@ dependencies = [
  "mln-rs-tile-id",
  "mln-rs-util",
  "mln-rs-vec-map",
+ "mln-rs-wire",
  "parking_lot",
- "postcard",
- "serde",
+ "smallvec",
 ]
 
 [[package]]
 name = "mln-rs-runtime"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "geo-types",
  "geojson",
  "js-sys",
- "mln-rs-actor",
  "mln-rs-conversion",
  "mln-rs-feature",
+ "mln-rs-frame-pacer",
+ "mln-rs-gestures",
  "mln-rs-gfx",
  "mln-rs-gl",
  "mln-rs-map",
@@ -1848,21 +1843,19 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-sprite"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
- "mln-rs-actor",
  "mln-rs-geometry",
  "mln-rs-image",
  "mln-rs-storage",
  "mln-rs-style-types",
  "mln-rs-util",
- "mln-rs-vec-map",
  "serde_json",
 ]
 
 [[package]]
 name = "mln-rs-storage"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "block2",
  "bytes",
@@ -1870,7 +1863,6 @@ dependencies = [
  "geojson",
  "jni",
  "js-sys",
- "mln-rs-actor",
  "mln-rs-feature",
  "mln-rs-util",
  "mln-rs-vec-map",
@@ -1882,7 +1874,7 @@ dependencies = [
  "rusqlite",
  "rustls",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.21",
  "ureq",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -1891,9 +1883,8 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-storage-offline"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
- "mln-rs-actor",
  "mln-rs-feature",
  "mln-rs-renderer",
  "mln-rs-storage",
@@ -1907,59 +1898,44 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-style"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "geo-types",
  "geojson",
- "mln-rs-actor",
  "mln-rs-conversion",
  "mln-rs-expression",
  "mln-rs-feature",
- "mln-rs-geojson-vt",
+ "mln-rs-geojson",
  "mln-rs-image",
  "mln-rs-map-types",
  "mln-rs-math",
- "mln-rs-sprite",
  "mln-rs-storage",
  "mln-rs-style-types",
- "mln-rs-supercluster",
  "mln-rs-text",
  "mln-rs-tile-id",
  "mln-rs-util",
  "mln-rs-vec-map",
+ "mln-rs-wire",
  "parking_lot",
- "serde",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "mln-rs-style-types"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "mln-rs-feature",
  "mln-rs-math",
  "mln-rs-util",
  "mln-rs-vec-map",
- "serde",
-]
-
-[[package]]
-name = "mln-rs-supercluster"
-version = "0.0.11"
-dependencies = [
- "foldhash 0.2.0",
- "geo-types",
- "mln-rs-feature",
- "mln-rs-geometry",
- "mln-rs-kdbush",
+ "mln-rs-wire",
 ]
 
 [[package]]
 name = "mln-rs-system-fonts"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
- "fontdb",
  "jni",
  "libloading",
  "memmap2",
@@ -1967,6 +1943,7 @@ dependencies = [
  "mln-rs-util",
  "objc2-core-foundation",
  "objc2-core-text",
+ "parking_lot",
  "skrifa",
  "sys-locale",
  "windows",
@@ -1975,22 +1952,24 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-text"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "ab_glyph_rasterizer",
  "buffa",
  "flate2",
+ "glam",
  "harfrust",
  "js-sys",
  "mln-rs-math",
  "mln-rs-style-types",
  "mln-rs-util",
  "mln-rs-vec-map",
+ "mln-rs-wire",
  "parking_lot",
- "serde",
  "skrifa",
- "thiserror",
+ "thiserror 2.0.21",
  "unicode-bidi",
+ "unicode-linebreak",
  "unicode-properties",
  "wasm-bindgen",
  "web-sys",
@@ -1999,7 +1978,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-tile"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "fast-mvt",
  "geo-types",
@@ -2009,56 +1988,56 @@ dependencies = [
  "mln-rs-math",
  "mln-rs-tile-id",
  "mln-rs-util",
+ "mln-rs-wire",
  "mlt-core",
  "parking_lot",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "mln-rs-tile-id"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "mln-rs-feature",
  "mln-rs-geometry",
  "mln-rs-math",
  "mln-rs-util",
- "serde",
+ "mln-rs-wire",
 ]
 
 [[package]]
 name = "mln-rs-util"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "bytemuck",
- "csscolorparser",
  "flate2",
  "foldhash 0.2.0",
  "geo-types",
+ "glam",
  "httpdate",
  "js-sys",
  "mln-rs-feature",
  "mln-rs-geometry",
  "mln-rs-math",
+ "mln-rs-wire",
  "parking_lot",
- "serde",
- "thiserror",
+ "thiserror 2.0.21",
  "unicode-properties",
  "web-time",
 ]
 
 [[package]]
 name = "mln-rs-vec-map"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
- "serde",
+ "mln-rs-wire",
 ]
 
 [[package]]
 name = "mln-rs-web-host"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
  "js-sys",
- "mln-rs-actor",
  "mln-rs-renderer",
  "mln-rs-text",
  "mln-rs-util",
@@ -2070,16 +2049,33 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-webgpu"
-version = "0.0.11"
+version = "0.0.15"
 dependencies = [
- "bytemuck",
  "mln-rs-gfx",
- "mln-rs-tile-id",
  "mln-rs-util",
  "mln-rs-vec-map",
  "parking_lot",
  "pollster",
  "wgpu",
+]
+
+[[package]]
+name = "mln-rs-wire"
+version = "0.0.15"
+dependencies = [
+ "geo-types",
+ "glam",
+ "mln-rs-wire-derive",
+ "parking_lot",
+]
+
+[[package]]
+name = "mln-rs-wire-derive"
+version = "0.0.15"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -2108,7 +2104,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum",
- "thiserror",
+ "thiserror 2.0.21",
  "union-find",
  "usize_cast",
  "wide 1.7.1",
@@ -2138,7 +2134,7 @@ dependencies = [
  "once_cell",
  "rustc-hash 1.1.0",
  "spirv",
- "thiserror",
+ "thiserror 2.0.21",
  "unicode-ident",
 ]
 
@@ -2151,7 +2147,7 @@ dependencies = [
  "hashbrown 0.17.1",
  "indexmap",
  "rustc-hash 1.1.0",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -2436,51 +2432,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
 
 [[package]]
-name = "phf"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "010378780309880b08997fae13be7834dba947d36393bd372f2b1556deb2a2f6"
-dependencies = [
- "phf_macros",
- "phf_shared",
- "serde",
-]
-
-[[package]]
-name = "phf_generator"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aeb62e0959d5a1bebc965f4d15d9e2b7cea002b6b0f5ba8cde6cc26738467100"
-dependencies = [
- "fastrand",
- "phf_shared",
-]
-
-[[package]]
-name = "phf_macros"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fa8d0ca26d424d27630da600c6624696e7dec8bf7b3b492b383c5dc49e5e085"
-dependencies = [
- "phf_generator",
- "phf_shared",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
- "uncased",
-]
-
-[[package]]
-name = "phf_shared"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6fd9027e2d9319be6349febd1db4e8d02aa544921200c9b777720ac34a3aa89"
-dependencies = [
- "siphasher",
- "uncased",
-]
-
-[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2502,7 +2453,7 @@ dependencies = [
  "fast_hilbert",
  "flate2",
  "integer-encoding",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -2537,18 +2488,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10ab3eb7f3becc3a1cbc4f2c6f20267996cfc1a6467a873763411b136a122715"
 dependencies = [
  "portable-atomic",
-]
-
-[[package]]
-name = "postcard"
-version = "1.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6764c3b5dd454e283a30e6dfe78e9b31096d9e32036b5d1eaac7a6119ccb9a24"
-dependencies = [
- "cobs",
- "embedded-io 0.4.0",
- "embedded-io 0.6.1",
- "serde",
 ]
 
 [[package]]
@@ -2728,7 +2667,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "353b74f9810d5b085b6c42c9d86a5f0fdb795553235cdd48753b32e3809d18a7"
 dependencies = [
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -3100,12 +3039,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 
 [[package]]
-name = "siphasher"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
-
-[[package]]
 name = "skrifa"
 version = "0.49.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3298,11 +3231,31 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
+dependencies = [
+ "thiserror-impl 1.0.69",
+]
+
+[[package]]
+name = "thiserror"
 version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 2.0.21",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -3382,15 +3335,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
-name = "uncased"
-version = "0.9.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1b88fcfe09e89d3866a5c11019378088af2d24c3fbd4f0543f96b479ec90697"
-dependencies = [
- "version_check",
-]
-
-[[package]]
 name = "unicode-bidi"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3401,6 +3345,12 @@ name = "unicode-ident"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563"
+
+[[package]]
+name = "unicode-linebreak"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b09c83c3c29d37506a3e260c08c03743a6bb66a9cd432c6934ab501a190571f"
 
 [[package]]
 name = "unicode-properties"
@@ -3660,7 +3610,7 @@ dependencies = [
  "raw-window-handle",
  "rustc-hash 1.1.0",
  "smallvec",
- "thiserror",
+ "thiserror 2.0.21",
  "wgpu-core-deps-apple",
  "wgpu-core-deps-windows-linux-android",
  "wgpu-hal",
@@ -3726,7 +3676,7 @@ dependencies = [
  "renderdoc-sys",
  "smallvec",
  "static_assertions",
- "thiserror",
+ "thiserror 2.0.21",
  "wgpu-naga-bridge",
  "wgpu-types",
  "windows",

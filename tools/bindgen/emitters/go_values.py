@@ -323,7 +323,11 @@ class Values:
             output = self.type(value)
             elem = value.element
             ctype = elem.native
-            source = f"&{expr}[0]" if value.ctype.kind == "array" else expr
+            if value.counted_inline:
+                # Go's bounds check keeps the count within the extent.
+                copy = self.copy(elem, "item")
+                return f"func() {output} {{ items := {expr}[:bindingLength(uint64({count}))]; result := make({output}, len(items)); for i, item := range items {{ result[i] = {copy} }}; return result }}()"
+            source = f"&{expr}[0]" if value.extent is not None else expr
             stride = (
                 f"{scope}.{native_identifier(value.stride)}"
                 if value.stride
@@ -402,7 +406,11 @@ class Values:
             ctype = value.element.native
             count = f"len({expr})"
             pointer = f"(*C.{ctype})(arena.array({count}, unsafe.Sizeof(*{dest})))"
-            if value.ctype.kind == "array":
+            if value.counted_inline:
+                setup = f'if len({expr}) > {value.extent} {{ arena.fail("too many elements for a fixed array") }}'
+                setup += f"; {scope}.{native_identifier(value.length)} = bindingCountLike({scope}.{native_identifier(value.length)}, len({expr}))"
+                slot = f"{dest}[i]"
+            elif value.extent is not None:
                 setup = f'if len({expr}) != {value.length} {{ arena.fail("wrong fixed array length") }}'
                 slot = f"{dest}[i]"
             else:

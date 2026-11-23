@@ -8,7 +8,7 @@
 #USAGE }
 set -euo pipefail
 
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" typescript
 case "$usage_preset" in
   ohos-*)
     if [[ -n "${usage_runtime:-}" ]]; then

@@ -193,16 +193,18 @@ typedef struct mln_render_session_attach_options {
    *
    * - MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for a borrowed ring of WebGPU
    *   textures.
-   * - MLN_RENDER_DRIVER_CORE_WORKER for an offscreen target, a window, or an
-   *   exported ring.
+   * - MLN_RENDER_DRIVER_CORE_WORKER for an offscreen target, a window, a
+   *   DirectComposition visual, or an exported ring.
+   * - MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD for a XAML `SwapChainPanel`,
+   *   on the panel's UI thread.
    * - Either one for a web canvas. In a browser both run on the thread that
    *   loaded the library: MLN_RENDER_DRIVER_CORE_WORKER in the library's own
    *   tasks, and MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD when you service the
    *   session.
    * - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
-   *   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
-   *   these on MLN_RENDER_DRIVER_CORE_WORKER only, and fails an attach with
-   *   MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD then.
+   *   borrowed ring of Metal, Vulkan, D3D12, or OpenGL textures. A build may
+   *   drive these on MLN_RENDER_DRIVER_CORE_WORKER only, and fails an attach
+   *   with MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD then.
    *
    * An attach with another driver fails with MLN_STATUS_UNSUPPORTED.
    */
@@ -429,6 +431,13 @@ typedef enum mln_render_target_kind : uint32_t {
   MLN_RENDER_TARGET_KIND_EXPORTED_RING = 16u,
   /** A canvas to present to, with the device's backend. */
   MLN_RENDER_TARGET_KIND_WEB_CANVAS = 17u,
+  /** A ring of your D3D12 textures. */
+  MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES = 18u,
+  /**
+   * A DirectComposition visual or XAML `SwapChainPanel` that shows a D3D12
+   * swap chain.
+   */
+  MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION = 19u,
 } mln_render_target_kind;
 
 /** A render target kind, as a bit in a set. */
@@ -450,6 +459,8 @@ typedef enum MLN_BINDING(
   MLN_RENDER_TARGET_KIND_FLAG_WEB_GPU_BORROWED_TEXTURES = 1u << 14u,
   MLN_RENDER_TARGET_KIND_FLAG_EXPORTED_RING = 1u << 15u,
   MLN_RENDER_TARGET_KIND_FLAG_WEB_CANVAS = 1u << 16u,
+  MLN_RENDER_TARGET_KIND_FLAG_D3D12_BORROWED_TEXTURES = 1u << 17u,
+  MLN_RENDER_TARGET_KIND_FLAG_D3D12_COMPOSITION = 1u << 18u,
 } mln_render_target_kind_flag;
 
 /** A set of mln_render_target_kind_flag bits. */
@@ -788,6 +799,88 @@ typedef struct mln_web_gpu_borrowed_textures_target {
   mln_buffer_view depth_format;
 } mln_web_gpu_borrowed_textures_target;
 
+/** A D3D12 texture of a borrowed ring. */
+typedef struct mln_d3d12_borrowed_texture {
+  /** Your `ID3D12Resource`. */
+  void* resource MLN_BINDING("required=true");
+} mln_d3d12_borrowed_texture;
+
+/**
+ * A ring of your D3D12 textures to render into, on the D3D12 device that you
+ * attach on.
+ *
+ * `physical_width` and `physical_height` give the textures' size in pixels,
+ * which is usually `logical_size` times the map's scale factor. Each texture
+ * must be a 2D resource of the device with that size, one mip level, one array
+ * slice, one sample, `D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET`, and one typed
+ * color format that the device renders into, such as
+ * DXGI_FORMAT_R8G8B8A8_UNORM or DXGI_FORMAT_B8G8R8A8_UNORM. The ring holds up
+ * to MLN_TEXTURE_RING_MAX_DEPTH distinct textures, and references each.
+ *
+ * Each texture is in `state` when the session has it, and each frame leaves it
+ * there.
+ *
+ * Give the ring `depth_textures` to draw into each frame depth-tested against
+ * the map, as mln_frame_projection says: one for each of `textures`, at the
+ * same index, or none. Each frame clears the one at its slot, renders the
+ * map's depth and stencil into it, stores them, and leaves it in
+ * `depth_state`. They must have the size of `textures`, one format of
+ * mln_gpu_device_capabilities.depth_stencil_formats
+ * (DXGI_FORMAT_D24_UNORM_S8_UINT or DXGI_FORMAT_D32_FLOAT_S8X24_UINT), one
+ * sample, and `D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL`.
+ */
+typedef struct mln_d3d12_borrowed_textures_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  uint32_t physical_width MLN_BINDING("required=true");
+  uint32_t physical_height MLN_BINDING("required=true");
+  const mln_d3d12_borrowed_texture* textures
+    MLN_BINDING("length=texture_count;required=true");
+  size_t texture_count;
+  /** The textures' `D3D12_RESOURCE_STATES`. */
+  uint32_t state;
+  const mln_d3d12_borrowed_texture* depth_textures
+    MLN_BINDING("length=depth_texture_count");
+  size_t depth_texture_count;
+  /** The depth textures' `D3D12_RESOURCE_STATES`. */
+  uint32_t depth_state;
+} mln_d3d12_borrowed_textures_target;
+
+/** What shows a D3D12 composition swap chain. */
+typedef enum mln_d3d12_composition_kind : uint32_t {
+  /**
+   * An `IDCompositionVisual`, whose content the session sets to its swap
+   * chain.
+   */
+  MLN_D3D12_COMPOSITION_KIND_VISUAL = 1U,
+  /**
+   * A XAML `SwapChainPanel`'s `ISwapChainPanelNative`, of WinUI or UWP, whose
+   * swap chain the session sets.
+   */
+  MLN_D3D12_COMPOSITION_KIND_SWAP_CHAIN_PANEL = 2U,
+} mln_d3d12_composition_kind;
+
+/**
+ * A composition swap chain to present to, which your DirectComposition visual
+ * or XAML `SwapChainPanel` shows.
+ *
+ * The session renders on D3D12: on the D3D12 device that you attach on, or on
+ * one that it makes without a device. It makes a flip-model swap chain for
+ * composition of `logical_size` at the map's scale factor, with premultiplied
+ * alpha, and sets it as the visual's content or the panel's swap chain. Commit
+ * your DirectComposition device once the attach completes. A panel takes its
+ * swap chain only on its UI thread: attach it there with
+ * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, and service the session there.
+ * Scale the visual or the panel to show the swap chain at the display's scale.
+ * The session references `object` until a replacement or release of the target
+ * completes, or the session ends.
+ */
+typedef struct mln_d3d12_composition_target {
+  mln_logical_size logical_size MLN_BINDING("required=true");
+  mln_d3d12_composition_kind kind MLN_BINDING("required=true");
+  /** Your `IDCompositionVisual*` or `ISwapChainPanelNative*`. */
+  void* object MLN_BINDING("required=true");
+} mln_d3d12_composition_target;
+
 /** A DRM format and modifier that you can import. */
 typedef struct mln_dma_buf_format {
   /** A DRM fourcc code, such as DRM_FORMAT_ABGR8888. */
@@ -818,11 +911,15 @@ typedef struct mln_dma_buf_format {
  *   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
  *   `android_hardware_buffer_usage`. Get each frame's buffer with
  *   mln_acquired_frame_get_android_hardware_buffer().
- * - MLN_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE: D3D11 textures of the format
+ * - MLN_GPU_EXPORT_KIND_DXGI_SHARED_HANDLE: textures of the format
  *   DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
- *   resources and render targets. Open them on a D3D11 or D3D12 device of the
- *   same adapter, which you pick with mln_gpu_device_options.adapter_luid.
- *   Get each frame's texture with mln_acquired_frame_get_dxgi_shared_texture().
+ *   resources and render targets: D3D11 textures on a Vulkan device, and
+ *   committed D3D12 resources in a shared heap on a D3D12 device, which each
+ *   frame leaves in D3D12_RESOURCE_STATE_COMMON. Open them on a D3D11 or D3D12
+ *   device of the same adapter, which you pick with
+ *   mln_gpu_device_options.adapter_luid. Get each frame's texture with
+ *   mln_acquired_frame_get_dxgi_shared_texture(), and on a D3D12 device its
+ *   resource with mln_acquired_frame_get_d3d12_texture().
  * - MLN_GPU_EXPORT_KIND_DMA_BUF: dmabufs of a format and modifier from
  *   `dma_buf_formats`. Get each frame's buffer with
  *   mln_acquired_frame_get_dma_buf().
@@ -840,11 +937,12 @@ typedef struct mln_dma_buf_format {
  *
  * Each frame hands over with MLN_GPU_SYNC_CPU_COMPLETE or with the sync kind
  * that crosses APIs on its platform: MLN_GPU_SYNC_METAL_SHARED_EVENT for an
- * IOSurface, and MLN_GPU_SYNC_SYNC_FD for the others, where the device has
- * them. For a reader that waits on neither, such as a Wayland compositor
- * without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
- * out of mln_render_session_attach_options.producer_sync_kinds, so that each
- * frame finishes before you acquire it, and release each frame only once the
+ * IOSurface, MLN_GPU_SYNC_D3D12_FENCE for a DXGI shared texture, and
+ * MLN_GPU_SYNC_SYNC_FD for the others, where the device has them. For a reader
+ * that waits on neither, such as a Wayland compositor without explicit
+ * synchronization or Flutter's `copyPixelBuffer`, leave them out of
+ * mln_render_session_attach_options.producer_sync_kinds, so that each frame
+ * finishes before you acquire it, and release each frame only once the
  * reader is done with its texture. Give the ring 3 textures, so the session
  * can render while you hold two frames.
  */
@@ -919,6 +1017,12 @@ typedef union mln_render_target_data {
     MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_EXPORTED_RING");
   mln_web_canvas_target web_canvas
     MLN_BINDING("variant=MLN_RENDER_TARGET_KIND_WEB_CANVAS;platforms=web");
+  mln_d3d12_borrowed_textures_target d3d12_borrowed_textures MLN_BINDING(
+    "variant=MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES;platforms=windows"
+  );
+  mln_d3d12_composition_target d3d12_composition MLN_BINDING(
+    "variant=MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION;platforms=windows"
+  );
 } mln_render_target_data;
 
 /**

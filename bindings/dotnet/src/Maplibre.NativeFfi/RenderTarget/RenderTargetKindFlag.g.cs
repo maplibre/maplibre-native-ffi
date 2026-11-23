@@ -26,4 +26,6 @@ public enum RenderTargetKindFlag : uint
     WebGpuBorrowedTextures = 16384,
     ExportedRing = 32768,
     WebCanvas = 65536,
+    D3d12BorrowedTextures = 131072,
+    D3d12Composition = 262144,
 }

@@ -15,6 +15,9 @@ import (
 // The host's draw, which samples the image view.
 func drawMap(imageView uint64) {}
 
+// The host's wait for a GPU sync, as for a frame's producer sync.
+func waitForSync(gpuSync *maplibre.GPUSync) {}
+
 func destroyTextures(images, views [2]uint64) {}
 
 func drawFrame() error {
@@ -129,9 +132,12 @@ func renderToTexture(
 	if err != nil {
 		return err
 	}
-	if _, err := retargeted.Await(ctx); err != nil {
+	// The session's last work on the old textures.
+	lastWork, err := retargeted.Await(ctx)
+	if err != nil {
 		return err
 	}
+	waitForSync(lastWork)
 	// vkDestroyImageView and vkDestroyImage
 	destroyTextures(images, views)
 	// #endregion resize-borrowed

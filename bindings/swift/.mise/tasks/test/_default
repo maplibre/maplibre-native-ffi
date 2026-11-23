@@ -8,7 +8,7 @@
 #USAGE }
 set -euo pipefail
 
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" swift
 source "$MISE_MONOREPO_ROOT/tools/env/native-env.sh" "$usage_preset"
 source "$MISE_MONOREPO_ROOT/tools/env/swift-libxml2-env.sh"
 case "$usage_preset" in
@@ -94,13 +94,18 @@ case "$usage_preset" in
     ;;
   ios-maccatalyst-*)
     # swift test loads the bundle into a macOS helper, which rejects a
-    # Catalyst image.
+    # Catalyst image. Catalyst's UIKit is in the SDK's iOSSupport frameworks,
+    # which Xcode searches for a Catalyst app and SwiftPM doesn't.
+    macos_sdk=$(xcrun --sdk macosx --show-sdk-path)
+    catalyst_frameworks="$macos_sdk/System/iOSSupport/System/Library/Frameworks"
     swift build \
       --product MaplibreNativeFFIDeviceTests \
       --scratch-path ".build/$usage_preset" \
       -c "$usage_configuration" \
-      --sdk "$(xcrun --sdk macosx --show-sdk-path)" \
+      --sdk "$macos_sdk" \
       --triple arm64-apple-ios15.0-macabi \
+      -Xswiftc -Fsystem -Xswiftc "$catalyst_frameworks" \
+      -Xlinker -F -Xlinker "$catalyst_frameworks" \
       -Xswiftc -enable-testing \
       -Xlinker -rpath \
       -Xlinker "$native_install_dir/lib" \

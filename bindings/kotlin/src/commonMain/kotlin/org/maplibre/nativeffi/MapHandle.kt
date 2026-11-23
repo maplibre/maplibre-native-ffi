@@ -56,6 +56,34 @@ private constructor(
     if (binding.borrowed) CallbackOwner.global else CallbackOwner()
 
   /**
+   * Creates a gesture recognizer that moves `map`'s camera.
+   *
+   * Its moves go to the map as camera commands, which apply asynchronously, and the map's snapshot
+   * and camera events report them as gestures. After the map is released, its moves do nothing.
+   * `options` may be null for every default.
+   *
+   * See `mln_gesture_recognizer_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT` when an option is out of range.
+   */
+  public fun gestureRecognizerCreate(options: GestureOptions? = null): GestureRecognizerHandle =
+    nativeCall(this, binding) {
+      val out = allocate(8, w(8, 8, 4))
+      check(
+        C.mln_gesture_recognizer_create(
+          handle,
+          options?.let { writeGestureOptions(it) } ?: 0L,
+          out,
+          diagnostic,
+        ),
+      )
+      adopt(out, GeneratedOwnerDisposal::gestureRecognizer) { GestureRecognizerHandle.wrap(it) }
+    }
+
+  /**
    * Adds a source whose GeoJSON tiles come from callbacks.
    *
    * See `mln_map_add_custom_geometry_source` in the
@@ -281,7 +309,7 @@ private constructor(
     }
 
   /**
-   * Moves the camera relative to where it is, as a gesture does.
+   * Moves the camera relative to where it is.
    *
    * `delta` can pan the map's content by an offset on the screen, scale the zoom, and add to the
    * bearing and pitch. An anchor keeps one screen point in place while the scale, bearing, or pitch
@@ -292,17 +320,6 @@ private constructor(
    * A delta that replaces an animated one starts from where that animation left the camera, so the
    * rest of the replaced change never happens. To reach an exact camera, use
    * `MapHandle.updateCamera()`.
-   *
-   * A delta in the end phase can carry momentum, which keeps the camera moving from the gesture's
-   * release velocities and slows it on each rendered frame. The gesture lasts until the momentum
-   * ends: the snapshot keeps `gesture_in_progress` set, and camera events report
-   * `CameraChangeSource.MOMENTUM`. With momentum, `animation` sets only `transition_id` and the end
-   * handler, which runs when the gesture ends.
-   *
-   * A delta in the begin phase, `MapHandle.cancelCameraTransitions()`, or a cancellation by that ID
-   * stops the momentum. A later command that sets a field stops only the parts of the momentum that
-   * move that field. On a tilted map, the pan moves the map's content the same distance on the
-   * screen in every direction.
    *
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1289,6 +1306,12 @@ private constructor(
    *
    * See `mln_map_set_bounds` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_ARGUMENT`, changing nothing, when the minimum zoom would be above the maximum
+   *   zoom, the minimum pitch above the maximum pitch, or the maximum zoom below the lowest zoom
+   *   the map can show at its size.
    */
   public fun setBounds(options: BoundOptions): Completion<CommandCompletion> =
     nativeCommand(this, binding) {

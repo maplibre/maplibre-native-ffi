@@ -862,6 +862,10 @@ class Values:
         if kind == "array":
             element = value.element
             assert element is not None and value.length is not None
+            if value.extent is not None:
+                raise Unsupported(
+                    f"GObject: {record.native}.{member.name}: an inline array input"
+                )
             count = f"{out}->{value.length}"
             if element.kind == "record":
                 native = element.native
@@ -931,6 +935,9 @@ class Values:
             element = value.element
             assert element is not None and value.length is not None
             count = f"{source}->{value.length}"
+            if value.counted_inline:
+                # The count selects the elements in use, never past the extent.
+                count = f"MIN({count}, G_N_ELEMENTS({origin}))"
             if element.kind == "record":
                 native = element.native
                 prefix = symbol_name(native)

@@ -30,1100 +30,16 @@ G_STATIC_ASSERT(
   MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE
 );
 G_STATIC_ASSERT(
+  MAPLIBRE_NATIVE_FFI_GESTURE_RESULT_EVENT_CAPACITY ==
+  MLN_GESTURE_RESULT_EVENT_CAPACITY
+);
+G_STATIC_ASSERT(
   MAPLIBRE_NATIVE_FFI_TEXTURE_RING_MAX_DEPTH == MLN_TEXTURE_RING_MAX_DEPTH
 );
 G_STATIC_ASSERT(
   MAPLIBRE_NATIVE_FFI_VULKAN_NON_DISPATCHABLE_HANDLE_NULL ==
   MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL
 );
-
-G_DEFINE_BOXED_TYPE(
-  MaplibreNativeFfiScreenPoint, maplibre_native_ffi_screen_point,
-  maplibre_native_ffi_screen_point_copy, maplibre_native_ffi_screen_point_free
-)
-
-MaplibreNativeFfiScreenPoint* maplibre_native_ffi_screen_point_copy(
-  const MaplibreNativeFfiScreenPoint* self
-) {
-  g_return_val_if_fail(self != NULL, NULL);
-  return g_memdup2(self, sizeof *self);
-}
-
-void maplibre_native_ffi_screen_point_free(MaplibreNativeFfiScreenPoint* self) {
-  g_free(self);
-}
-
-gpointer maplibre_native_ffi_screen_point_copy_func(
-  gconstpointer self, gpointer data
-) {
-  (void)data;
-  return maplibre_native_ffi_screen_point_copy(
-    (const MaplibreNativeFfiScreenPoint*)self
-  );
-}
-
-G_STATIC_ASSERT(
-  sizeof(MaplibreNativeFfiScreenPoint) == sizeof(mln_screen_point)
-);
-SAME_MEMBER(MaplibreNativeFfiScreenPoint, mln_screen_point, x);
-SAME_MEMBER(MaplibreNativeFfiScreenPoint, mln_screen_point, y);
-
-void maplibre_native_ffi_screen_point_to_native(
-  const MaplibreNativeFfiScreenPoint* self, mln_screen_point* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memcpy(out, self, sizeof *out);
-}
-
-void maplibre_native_ffi_screen_point_read(
-  MaplibreNativeFfiScreenPoint* out, const mln_screen_point* in
-) {
-  memcpy(out, in, sizeof *out);
-}
-
-MaplibreNativeFfiScreenPoint* maplibre_native_ffi_screen_point_from_native(
-  const mln_screen_point* in
-) {
-  MaplibreNativeFfiScreenPoint* self = g_new0(MaplibreNativeFfiScreenPoint, 1);
-  maplibre_native_ffi_screen_point_read(self, in);
-  return self;
-}
-
-G_DEFINE_BOXED_TYPE(
-  MaplibreNativeFfiUnitBezier, maplibre_native_ffi_unit_bezier,
-  maplibre_native_ffi_unit_bezier_copy, maplibre_native_ffi_unit_bezier_free
-)
-
-MaplibreNativeFfiUnitBezier* maplibre_native_ffi_unit_bezier_copy(
-  const MaplibreNativeFfiUnitBezier* self
-) {
-  g_return_val_if_fail(self != NULL, NULL);
-  return g_memdup2(self, sizeof *self);
-}
-
-void maplibre_native_ffi_unit_bezier_free(MaplibreNativeFfiUnitBezier* self) {
-  g_free(self);
-}
-
-G_STATIC_ASSERT(sizeof(MaplibreNativeFfiUnitBezier) == sizeof(mln_unit_bezier));
-SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, x1);
-SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, y1);
-SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, x2);
-SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, y2);
-
-void maplibre_native_ffi_unit_bezier_to_native(
-  const MaplibreNativeFfiUnitBezier* self, mln_unit_bezier* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memcpy(out, self, sizeof *out);
-}
-
-struct _MaplibreNativeFfiMomentumDecay {
-  GObject parent_instance;
-  guint64 fields;
-  MaplibreNativeFfiMomentumDecayModel model;
-  gdouble half_life_ms;
-  gdouble stop_speed;
-  gdouble distance;
-  gdouble duration_ms;
-  MaplibreNativeFfiUnitBezier easing;
-  gdouble min_speed;
-  gdouble max_speed;
-  gdouble max_distance;
-};
-
-enum {
-  MOMENTUM_DECAY_PROP_0,
-  MOMENTUM_DECAY_PROP_MODEL,
-  MOMENTUM_DECAY_PROP_HALF_LIFE_MS,
-  MOMENTUM_DECAY_PROP_STOP_SPEED,
-  MOMENTUM_DECAY_PROP_DISTANCE,
-  MOMENTUM_DECAY_PROP_DURATION_MS,
-  MOMENTUM_DECAY_PROP_EASING,
-  MOMENTUM_DECAY_PROP_MIN_SPEED,
-  MOMENTUM_DECAY_PROP_MAX_SPEED,
-  MOMENTUM_DECAY_PROP_MAX_DISTANCE,
-  MOMENTUM_DECAY_N_PROPERTIES
-};
-
-static GParamSpec* momentum_decay_properties[MOMENTUM_DECAY_N_PROPERTIES];
-
-G_DEFINE_FINAL_TYPE(
-  MaplibreNativeFfiMomentumDecay, maplibre_native_ffi_momentum_decay,
-  G_TYPE_OBJECT
-)
-
-static void maplibre_native_ffi_momentum_decay_get_property(
-  GObject* object, guint id, GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiMomentumDecay* self =
-    MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY(object);
-  switch (id) {
-    case MOMENTUM_DECAY_PROP_MODEL:
-      g_value_set_enum(value, self->model);
-      break;
-    case MOMENTUM_DECAY_PROP_HALF_LIFE_MS:
-      g_value_set_double(value, self->half_life_ms);
-      break;
-    case MOMENTUM_DECAY_PROP_STOP_SPEED:
-      g_value_set_double(value, self->stop_speed);
-      break;
-    case MOMENTUM_DECAY_PROP_DISTANCE:
-      g_value_set_double(value, self->distance);
-      break;
-    case MOMENTUM_DECAY_PROP_DURATION_MS:
-      g_value_set_double(value, self->duration_ms);
-      break;
-    case MOMENTUM_DECAY_PROP_EASING:
-      g_value_set_boxed(value, &self->easing);
-      break;
-    case MOMENTUM_DECAY_PROP_MIN_SPEED:
-      g_value_set_double(value, self->min_speed);
-      break;
-    case MOMENTUM_DECAY_PROP_MAX_SPEED:
-      g_value_set_double(value, self->max_speed);
-      break;
-    case MOMENTUM_DECAY_PROP_MAX_DISTANCE:
-      g_value_set_double(value, self->max_distance);
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_momentum_decay_set_property(
-  GObject* object, guint id, const GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiMomentumDecay* self =
-    MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY(object);
-  switch (id) {
-    case MOMENTUM_DECAY_PROP_MODEL:
-      maplibre_native_ffi_momentum_decay_set_model(
-        self, g_value_get_enum(value)
-      );
-      break;
-    case MOMENTUM_DECAY_PROP_HALF_LIFE_MS:
-      maplibre_native_ffi_momentum_decay_set_half_life_ms(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_DECAY_PROP_STOP_SPEED:
-      maplibre_native_ffi_momentum_decay_set_stop_speed(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_DECAY_PROP_DISTANCE:
-      maplibre_native_ffi_momentum_decay_set_distance(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_DECAY_PROP_DURATION_MS:
-      maplibre_native_ffi_momentum_decay_set_duration_ms(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_DECAY_PROP_EASING:
-      maplibre_native_ffi_momentum_decay_set_easing(
-        self, g_value_get_boxed(value)
-      );
-      break;
-    case MOMENTUM_DECAY_PROP_MIN_SPEED:
-      maplibre_native_ffi_momentum_decay_set_min_speed(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_DECAY_PROP_MAX_SPEED:
-      maplibre_native_ffi_momentum_decay_set_max_speed(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_DECAY_PROP_MAX_DISTANCE:
-      maplibre_native_ffi_momentum_decay_set_max_distance(
-        self, g_value_get_double(value)
-      );
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_momentum_decay_class_init(
-  MaplibreNativeFfiMomentumDecayClass* klass
-) {
-  GObjectClass* object_class = G_OBJECT_CLASS(klass);
-  object_class->get_property = maplibre_native_ffi_momentum_decay_get_property;
-  object_class->set_property = maplibre_native_ffi_momentum_decay_set_property;
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_MODEL] = g_param_spec_enum(
-    "model", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY_MODEL, 0,
-    PROPERTY_FLAGS
-  );
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_HALF_LIFE_MS] =
-    g_param_spec_double(
-      "half-life-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_STOP_SPEED] =
-    g_param_spec_double(
-      "stop-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_DISTANCE] = g_param_spec_double(
-    "distance", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-  );
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_DURATION_MS] =
-    g_param_spec_double(
-      "duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_EASING] = g_param_spec_boxed(
-    "easing", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_UNIT_BEZIER, PROPERTY_FLAGS
-  );
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_MIN_SPEED] =
-    g_param_spec_double(
-      "min-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_MAX_SPEED] =
-    g_param_spec_double(
-      "max-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  momentum_decay_properties[MOMENTUM_DECAY_PROP_MAX_DISTANCE] =
-    g_param_spec_double(
-      "max-distance", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  g_object_class_install_properties(
-    object_class, MOMENTUM_DECAY_N_PROPERTIES, momentum_decay_properties
-  );
-}
-
-static void maplibre_native_ffi_momentum_decay_init(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  (void)self;
-}
-
-MaplibreNativeFfiMomentumDecay* maplibre_native_ffi_momentum_decay_new(void) {
-  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY, NULL);
-}
-
-MaplibreNativeFfiMomentumDecayModel
-maplibre_native_ffi_momentum_decay_get_model(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(
-    MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self),
-    (MaplibreNativeFfiMomentumDecayModel)0
-  );
-  return self->model;
-}
-
-gboolean maplibre_native_ffi_momentum_decay_has_model(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_MODEL) != 0;
-}
-
-void maplibre_native_ffi_momentum_decay_set_model(
-  MaplibreNativeFfiMomentumDecay* self,
-  MaplibreNativeFfiMomentumDecayModel value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_MODEL) != 0;
-  gboolean changed = self->model != value;
-  self->model = value;
-  self->fields |= MLN_MOMENTUM_DECAY_MODEL;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_MODEL]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_decay_get_half_life_ms(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
-  return self->half_life_ms;
-}
-
-gboolean maplibre_native_ffi_momentum_decay_has_half_life_ms(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_HALF_LIFE_MS) != 0;
-}
-
-void maplibre_native_ffi_momentum_decay_set_half_life_ms(
-  MaplibreNativeFfiMomentumDecay* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_HALF_LIFE_MS) != 0;
-  gboolean changed = self->half_life_ms != value;
-  self->half_life_ms = value;
-  self->fields |= MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      momentum_decay_properties[MOMENTUM_DECAY_PROP_HALF_LIFE_MS]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_decay_get_stop_speed(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
-  return self->stop_speed;
-}
-
-gboolean maplibre_native_ffi_momentum_decay_has_stop_speed(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_STOP_SPEED) != 0;
-}
-
-void maplibre_native_ffi_momentum_decay_set_stop_speed(
-  MaplibreNativeFfiMomentumDecay* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_STOP_SPEED) != 0;
-  gboolean changed = self->stop_speed != value;
-  self->stop_speed = value;
-  self->fields |= MLN_MOMENTUM_DECAY_STOP_SPEED;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_STOP_SPEED]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_decay_get_distance(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
-  return self->distance;
-}
-
-gboolean maplibre_native_ffi_momentum_decay_has_distance(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_DISTANCE) != 0;
-}
-
-void maplibre_native_ffi_momentum_decay_set_distance(
-  MaplibreNativeFfiMomentumDecay* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_DISTANCE) != 0;
-  gboolean changed = self->distance != value;
-  self->distance = value;
-  self->fields |= MLN_MOMENTUM_DECAY_DISTANCE;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_DISTANCE]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_decay_get_duration_ms(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
-  return self->duration_ms;
-}
-
-gboolean maplibre_native_ffi_momentum_decay_has_duration_ms(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_DURATION_MS) != 0;
-}
-
-void maplibre_native_ffi_momentum_decay_set_duration_ms(
-  MaplibreNativeFfiMomentumDecay* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_DURATION_MS) != 0;
-  gboolean changed = self->duration_ms != value;
-  self->duration_ms = value;
-  self->fields |= MLN_MOMENTUM_DECAY_DURATION_MS;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_DURATION_MS]
-    );
-}
-
-MaplibreNativeFfiUnitBezier* maplibre_native_ffi_momentum_decay_get_easing(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), NULL);
-  return (MaplibreNativeFfiUnitBezier*)&self->easing;
-}
-
-gboolean maplibre_native_ffi_momentum_decay_has_easing(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_EASING) != 0;
-}
-
-void maplibre_native_ffi_momentum_decay_set_easing(
-  MaplibreNativeFfiMomentumDecay* self, const MaplibreNativeFfiUnitBezier* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
-  g_return_if_fail(value != NULL);
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_EASING) != 0;
-  gboolean changed = memcmp(&self->easing, value, sizeof self->easing) != 0;
-  self->easing = *value;
-  self->fields |= MLN_MOMENTUM_DECAY_EASING;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_EASING]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_decay_get_min_speed(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
-  return self->min_speed;
-}
-
-gboolean maplibre_native_ffi_momentum_decay_has_min_speed(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_MIN_SPEED) != 0;
-}
-
-void maplibre_native_ffi_momentum_decay_set_min_speed(
-  MaplibreNativeFfiMomentumDecay* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_MIN_SPEED) != 0;
-  gboolean changed = self->min_speed != value;
-  self->min_speed = value;
-  self->fields |= MLN_MOMENTUM_DECAY_MIN_SPEED;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_MIN_SPEED]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_decay_get_max_speed(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
-  return self->max_speed;
-}
-
-gboolean maplibre_native_ffi_momentum_decay_has_max_speed(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_MAX_SPEED) != 0;
-}
-
-void maplibre_native_ffi_momentum_decay_set_max_speed(
-  MaplibreNativeFfiMomentumDecay* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_MAX_SPEED) != 0;
-  gboolean changed = self->max_speed != value;
-  self->max_speed = value;
-  self->fields |= MLN_MOMENTUM_DECAY_MAX_SPEED;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_MAX_SPEED]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_decay_get_max_distance(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
-  return self->max_distance;
-}
-
-gboolean maplibre_native_ffi_momentum_decay_has_max_distance(
-  MaplibreNativeFfiMomentumDecay* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_DECAY_MAX_DISTANCE) != 0;
-}
-
-void maplibre_native_ffi_momentum_decay_set_max_distance(
-  MaplibreNativeFfiMomentumDecay* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_MAX_DISTANCE) != 0;
-  gboolean changed = self->max_distance != value;
-  self->max_distance = value;
-  self->fields |= MLN_MOMENTUM_DECAY_MAX_DISTANCE;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      momentum_decay_properties[MOMENTUM_DECAY_PROP_MAX_DISTANCE]
-    );
-}
-
-MaplibreNativeFfiMomentumDecay* maplibre_native_ffi_momentum_decay_copy(
-  const MaplibreNativeFfiMomentumDecay* self
-) {
-  MaplibreNativeFfiMomentumDecay* copy =
-    maplibre_native_ffi_momentum_decay_new();
-  copy->fields = self->fields;
-  copy->model = self->model;
-  copy->half_life_ms = self->half_life_ms;
-  copy->stop_speed = self->stop_speed;
-  copy->distance = self->distance;
-  copy->duration_ms = self->duration_ms;
-  copy->easing = self->easing;
-  copy->min_speed = self->min_speed;
-  copy->max_speed = self->max_speed;
-  copy->max_distance = self->max_distance;
-  return copy;
-}
-
-void maplibre_native_ffi_momentum_decay_to_native(
-  const MaplibreNativeFfiMomentumDecay* self, mln_momentum_decay* out,
-  MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->fields = (mln_momentum_decay_fields)self->fields;
-  out->model = (mln_momentum_decay_model)(self->model);
-  out->half_life_ms = (double)(self->half_life_ms);
-  out->stop_speed = (double)(self->stop_speed);
-  out->distance = (double)(self->distance);
-  out->duration_ms = (double)(self->duration_ms);
-  maplibre_native_ffi_unit_bezier_to_native(&self->easing, &out->easing, call);
-  out->min_speed = (double)(self->min_speed);
-  out->max_speed = (double)(self->max_speed);
-  out->max_distance = (double)(self->max_distance);
-}
-
-struct _MaplibreNativeFfiMomentumSnap {
-  GObject parent_instance;
-  guint64 fields;
-  gdouble spacing;
-  gdouble offset;
-  gdouble tolerance;
-  gdouble duration_ms;
-};
-
-enum {
-  MOMENTUM_SNAP_PROP_0,
-  MOMENTUM_SNAP_PROP_SPACING,
-  MOMENTUM_SNAP_PROP_OFFSET,
-  MOMENTUM_SNAP_PROP_TOLERANCE,
-  MOMENTUM_SNAP_PROP_DURATION_MS,
-  MOMENTUM_SNAP_N_PROPERTIES
-};
-
-static GParamSpec* momentum_snap_properties[MOMENTUM_SNAP_N_PROPERTIES];
-
-G_DEFINE_FINAL_TYPE(
-  MaplibreNativeFfiMomentumSnap, maplibre_native_ffi_momentum_snap,
-  G_TYPE_OBJECT
-)
-
-static void maplibre_native_ffi_momentum_snap_get_property(
-  GObject* object, guint id, GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiMomentumSnap* self =
-    MAPLIBRE_NATIVE_FFI_MOMENTUM_SNAP(object);
-  switch (id) {
-    case MOMENTUM_SNAP_PROP_SPACING:
-      g_value_set_double(value, self->spacing);
-      break;
-    case MOMENTUM_SNAP_PROP_OFFSET:
-      g_value_set_double(value, self->offset);
-      break;
-    case MOMENTUM_SNAP_PROP_TOLERANCE:
-      g_value_set_double(value, self->tolerance);
-      break;
-    case MOMENTUM_SNAP_PROP_DURATION_MS:
-      g_value_set_double(value, self->duration_ms);
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_momentum_snap_set_property(
-  GObject* object, guint id, const GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiMomentumSnap* self =
-    MAPLIBRE_NATIVE_FFI_MOMENTUM_SNAP(object);
-  switch (id) {
-    case MOMENTUM_SNAP_PROP_SPACING:
-      maplibre_native_ffi_momentum_snap_set_spacing(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_SNAP_PROP_OFFSET:
-      maplibre_native_ffi_momentum_snap_set_offset(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_SNAP_PROP_TOLERANCE:
-      maplibre_native_ffi_momentum_snap_set_tolerance(
-        self, g_value_get_double(value)
-      );
-      break;
-    case MOMENTUM_SNAP_PROP_DURATION_MS:
-      maplibre_native_ffi_momentum_snap_set_duration_ms(
-        self, g_value_get_double(value)
-      );
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_momentum_snap_class_init(
-  MaplibreNativeFfiMomentumSnapClass* klass
-) {
-  GObjectClass* object_class = G_OBJECT_CLASS(klass);
-  object_class->get_property = maplibre_native_ffi_momentum_snap_get_property;
-  object_class->set_property = maplibre_native_ffi_momentum_snap_set_property;
-  momentum_snap_properties[MOMENTUM_SNAP_PROP_SPACING] = g_param_spec_double(
-    "spacing", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-  );
-  momentum_snap_properties[MOMENTUM_SNAP_PROP_OFFSET] = g_param_spec_double(
-    "offset", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-  );
-  momentum_snap_properties[MOMENTUM_SNAP_PROP_TOLERANCE] = g_param_spec_double(
-    "tolerance", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-  );
-  momentum_snap_properties[MOMENTUM_SNAP_PROP_DURATION_MS] =
-    g_param_spec_double(
-      "duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  g_object_class_install_properties(
-    object_class, MOMENTUM_SNAP_N_PROPERTIES, momentum_snap_properties
-  );
-}
-
-static void maplibre_native_ffi_momentum_snap_init(
-  MaplibreNativeFfiMomentumSnap* self
-) {
-  (void)self;
-}
-
-MaplibreNativeFfiMomentumSnap* maplibre_native_ffi_momentum_snap_new(void) {
-  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_SNAP, NULL);
-}
-
-gdouble maplibre_native_ffi_momentum_snap_get_spacing(
-  MaplibreNativeFfiMomentumSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
-  return self->spacing;
-}
-
-gboolean maplibre_native_ffi_momentum_snap_has_spacing(
-  MaplibreNativeFfiMomentumSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_SNAP_SPACING) != 0;
-}
-
-void maplibre_native_ffi_momentum_snap_set_spacing(
-  MaplibreNativeFfiMomentumSnap* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_SPACING) != 0;
-  gboolean changed = self->spacing != value;
-  self->spacing = value;
-  self->fields |= MLN_MOMENTUM_SNAP_SPACING;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_SPACING]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_snap_get_offset(
-  MaplibreNativeFfiMomentumSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
-  return self->offset;
-}
-
-gboolean maplibre_native_ffi_momentum_snap_has_offset(
-  MaplibreNativeFfiMomentumSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_SNAP_OFFSET) != 0;
-}
-
-void maplibre_native_ffi_momentum_snap_set_offset(
-  MaplibreNativeFfiMomentumSnap* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_OFFSET) != 0;
-  gboolean changed = self->offset != value;
-  self->offset = value;
-  self->fields |= MLN_MOMENTUM_SNAP_OFFSET;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_OFFSET]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_snap_get_tolerance(
-  MaplibreNativeFfiMomentumSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
-  return self->tolerance;
-}
-
-gboolean maplibre_native_ffi_momentum_snap_has_tolerance(
-  MaplibreNativeFfiMomentumSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_SNAP_TOLERANCE) != 0;
-}
-
-void maplibre_native_ffi_momentum_snap_set_tolerance(
-  MaplibreNativeFfiMomentumSnap* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_TOLERANCE) != 0;
-  gboolean changed = self->tolerance != value;
-  self->tolerance = value;
-  self->fields |= MLN_MOMENTUM_SNAP_TOLERANCE;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_TOLERANCE]
-    );
-}
-
-gdouble maplibre_native_ffi_momentum_snap_get_duration_ms(
-  MaplibreNativeFfiMomentumSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
-  return self->duration_ms;
-}
-
-gboolean maplibre_native_ffi_momentum_snap_has_duration_ms(
-  MaplibreNativeFfiMomentumSnap* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
-  return (self->fields & MLN_MOMENTUM_SNAP_DURATION_MS) != 0;
-}
-
-void maplibre_native_ffi_momentum_snap_set_duration_ms(
-  MaplibreNativeFfiMomentumSnap* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
-  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_DURATION_MS) != 0;
-  gboolean changed = self->duration_ms != value;
-  self->duration_ms = value;
-  self->fields |= MLN_MOMENTUM_SNAP_DURATION_MS;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_DURATION_MS]
-    );
-}
-
-MaplibreNativeFfiMomentumSnap* maplibre_native_ffi_momentum_snap_copy(
-  const MaplibreNativeFfiMomentumSnap* self
-) {
-  MaplibreNativeFfiMomentumSnap* copy = maplibre_native_ffi_momentum_snap_new();
-  copy->fields = self->fields;
-  copy->spacing = self->spacing;
-  copy->offset = self->offset;
-  copy->tolerance = self->tolerance;
-  copy->duration_ms = self->duration_ms;
-  return copy;
-}
-
-void maplibre_native_ffi_momentum_snap_to_native(
-  const MaplibreNativeFfiMomentumSnap* self, mln_momentum_snap* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memset(out, 0, sizeof *out);
-  out->fields = (mln_momentum_snap_fields)self->fields;
-  out->spacing = (double)(self->spacing);
-  out->offset = (double)(self->offset);
-  out->tolerance = (double)(self->tolerance);
-  out->duration_ms = (double)(self->duration_ms);
-}
-
-struct _MaplibreNativeFfiAnchoredMomentum {
-  GObject parent_instance;
-  guint64 fields;
-  gdouble velocity;
-  MaplibreNativeFfiScreenPoint anchor;
-  MaplibreNativeFfiMomentumDecay* decay;
-  MaplibreNativeFfiMomentumSnap* snap;
-};
-
-enum {
-  ANCHORED_MOMENTUM_PROP_0,
-  ANCHORED_MOMENTUM_PROP_VELOCITY,
-  ANCHORED_MOMENTUM_PROP_ANCHOR,
-  ANCHORED_MOMENTUM_PROP_DECAY,
-  ANCHORED_MOMENTUM_PROP_SNAP,
-  ANCHORED_MOMENTUM_N_PROPERTIES
-};
-
-static GParamSpec* anchored_momentum_properties[ANCHORED_MOMENTUM_N_PROPERTIES];
-
-G_DEFINE_FINAL_TYPE(
-  MaplibreNativeFfiAnchoredMomentum, maplibre_native_ffi_anchored_momentum,
-  G_TYPE_OBJECT
-)
-
-static void maplibre_native_ffi_anchored_momentum_finalize(GObject* object) {
-  MaplibreNativeFfiAnchoredMomentum* self =
-    MAPLIBRE_NATIVE_FFI_ANCHORED_MOMENTUM(object);
-  g_clear_object(&self->decay);
-  g_clear_object(&self->snap);
-  G_OBJECT_CLASS(maplibre_native_ffi_anchored_momentum_parent_class)
-    ->finalize(object);
-}
-
-static void maplibre_native_ffi_anchored_momentum_get_property(
-  GObject* object, guint id, GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiAnchoredMomentum* self =
-    MAPLIBRE_NATIVE_FFI_ANCHORED_MOMENTUM(object);
-  switch (id) {
-    case ANCHORED_MOMENTUM_PROP_VELOCITY:
-      g_value_set_double(value, self->velocity);
-      break;
-    case ANCHORED_MOMENTUM_PROP_ANCHOR:
-      g_value_set_boxed(value, &self->anchor);
-      break;
-    case ANCHORED_MOMENTUM_PROP_DECAY:
-      g_value_set_object(value, self->decay);
-      break;
-    case ANCHORED_MOMENTUM_PROP_SNAP:
-      g_value_set_object(value, self->snap);
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_anchored_momentum_set_property(
-  GObject* object, guint id, const GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiAnchoredMomentum* self =
-    MAPLIBRE_NATIVE_FFI_ANCHORED_MOMENTUM(object);
-  switch (id) {
-    case ANCHORED_MOMENTUM_PROP_VELOCITY:
-      maplibre_native_ffi_anchored_momentum_set_velocity(
-        self, g_value_get_double(value)
-      );
-      break;
-    case ANCHORED_MOMENTUM_PROP_ANCHOR:
-      maplibre_native_ffi_anchored_momentum_set_anchor(
-        self, g_value_get_boxed(value)
-      );
-      break;
-    case ANCHORED_MOMENTUM_PROP_DECAY:
-      maplibre_native_ffi_anchored_momentum_set_decay(
-        self, g_value_get_object(value)
-      );
-      break;
-    case ANCHORED_MOMENTUM_PROP_SNAP:
-      maplibre_native_ffi_anchored_momentum_set_snap(
-        self, g_value_get_object(value)
-      );
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_anchored_momentum_class_init(
-  MaplibreNativeFfiAnchoredMomentumClass* klass
-) {
-  GObjectClass* object_class = G_OBJECT_CLASS(klass);
-  object_class->finalize = maplibre_native_ffi_anchored_momentum_finalize;
-  object_class->get_property =
-    maplibre_native_ffi_anchored_momentum_get_property;
-  object_class->set_property =
-    maplibre_native_ffi_anchored_momentum_set_property;
-  anchored_momentum_properties[ANCHORED_MOMENTUM_PROP_VELOCITY] =
-    g_param_spec_double(
-      "velocity", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
-    );
-  anchored_momentum_properties[ANCHORED_MOMENTUM_PROP_ANCHOR] =
-    g_param_spec_boxed(
-      "anchor", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_SCREEN_POINT,
-      PROPERTY_FLAGS
-    );
-  anchored_momentum_properties[ANCHORED_MOMENTUM_PROP_DECAY] =
-    g_param_spec_object(
-      "decay", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY,
-      PROPERTY_FLAGS
-    );
-  anchored_momentum_properties[ANCHORED_MOMENTUM_PROP_SNAP] =
-    g_param_spec_object(
-      "snap", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_SNAP, PROPERTY_FLAGS
-    );
-  g_object_class_install_properties(
-    object_class, ANCHORED_MOMENTUM_N_PROPERTIES, anchored_momentum_properties
-  );
-}
-
-static void maplibre_native_ffi_anchored_momentum_init(
-  MaplibreNativeFfiAnchoredMomentum* self
-) {
-  self->decay = maplibre_native_ffi_momentum_decay_new();
-  self->snap = maplibre_native_ffi_momentum_snap_new();
-}
-
-MaplibreNativeFfiAnchoredMomentum* maplibre_native_ffi_anchored_momentum_new(
-  void
-) {
-  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_ANCHORED_MOMENTUM, NULL);
-}
-
-gdouble maplibre_native_ffi_anchored_momentum_get_velocity(
-  MaplibreNativeFfiAnchoredMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self), 0);
-  return self->velocity;
-}
-
-gboolean maplibre_native_ffi_anchored_momentum_has_velocity(
-  MaplibreNativeFfiAnchoredMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self), FALSE);
-  return (self->fields & MLN_ANCHORED_MOMENTUM_VELOCITY) != 0;
-}
-
-void maplibre_native_ffi_anchored_momentum_set_velocity(
-  MaplibreNativeFfiAnchoredMomentum* self, gdouble value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self));
-  gboolean was_set = (self->fields & MLN_ANCHORED_MOMENTUM_VELOCITY) != 0;
-  gboolean changed = self->velocity != value;
-  self->velocity = value;
-  self->fields |= MLN_ANCHORED_MOMENTUM_VELOCITY;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      anchored_momentum_properties[ANCHORED_MOMENTUM_PROP_VELOCITY]
-    );
-}
-
-MaplibreNativeFfiScreenPoint* maplibre_native_ffi_anchored_momentum_get_anchor(
-  MaplibreNativeFfiAnchoredMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self), NULL);
-  return (MaplibreNativeFfiScreenPoint*)&self->anchor;
-}
-
-gboolean maplibre_native_ffi_anchored_momentum_has_anchor(
-  MaplibreNativeFfiAnchoredMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self), FALSE);
-  return (self->fields & MLN_ANCHORED_MOMENTUM_ANCHOR) != 0;
-}
-
-void maplibre_native_ffi_anchored_momentum_set_anchor(
-  MaplibreNativeFfiAnchoredMomentum* self,
-  const MaplibreNativeFfiScreenPoint* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self));
-  g_return_if_fail(value != NULL);
-  gboolean was_set = (self->fields & MLN_ANCHORED_MOMENTUM_ANCHOR) != 0;
-  gboolean changed = memcmp(&self->anchor, value, sizeof self->anchor) != 0;
-  self->anchor = *value;
-  self->fields |= MLN_ANCHORED_MOMENTUM_ANCHOR;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self),
-      anchored_momentum_properties[ANCHORED_MOMENTUM_PROP_ANCHOR]
-    );
-}
-
-MaplibreNativeFfiMomentumDecay* maplibre_native_ffi_anchored_momentum_get_decay(
-  MaplibreNativeFfiAnchoredMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self), NULL);
-  return self->decay;
-}
-
-void maplibre_native_ffi_anchored_momentum_set_decay(
-  MaplibreNativeFfiAnchoredMomentum* self, MaplibreNativeFfiMomentumDecay* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(value));
-  MaplibreNativeFfiMomentumDecay* previous = self->decay;
-  self->decay = maplibre_native_ffi_momentum_decay_copy(value);
-  if (previous != NULL) g_object_unref(previous);
-  g_object_notify_by_pspec(
-    G_OBJECT(self), anchored_momentum_properties[ANCHORED_MOMENTUM_PROP_DECAY]
-  );
-}
-
-MaplibreNativeFfiMomentumSnap* maplibre_native_ffi_anchored_momentum_get_snap(
-  MaplibreNativeFfiAnchoredMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self), NULL);
-  return self->snap;
-}
-
-gboolean maplibre_native_ffi_anchored_momentum_has_snap(
-  MaplibreNativeFfiAnchoredMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self), FALSE);
-  return (self->fields & MLN_ANCHORED_MOMENTUM_SNAP) != 0;
-}
-
-void maplibre_native_ffi_anchored_momentum_set_snap(
-  MaplibreNativeFfiAnchoredMomentum* self, MaplibreNativeFfiMomentumSnap* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(value));
-  MaplibreNativeFfiMomentumSnap* previous = self->snap;
-  self->snap = maplibre_native_ffi_momentum_snap_copy(value);
-  if (previous != NULL) g_object_unref(previous);
-  self->fields |= MLN_ANCHORED_MOMENTUM_SNAP;
-  g_object_notify_by_pspec(
-    G_OBJECT(self), anchored_momentum_properties[ANCHORED_MOMENTUM_PROP_SNAP]
-  );
-}
-
-MaplibreNativeFfiAnchoredMomentum* maplibre_native_ffi_anchored_momentum_copy(
-  const MaplibreNativeFfiAnchoredMomentum* self
-) {
-  MaplibreNativeFfiAnchoredMomentum* copy =
-    maplibre_native_ffi_anchored_momentum_new();
-  copy->fields = self->fields;
-  copy->velocity = self->velocity;
-  copy->anchor = self->anchor;
-  g_clear_object(&copy->decay);
-  copy->decay = self->decay != NULL
-                  ? maplibre_native_ffi_momentum_decay_copy(self->decay)
-                  : NULL;
-  g_clear_object(&copy->snap);
-  copy->snap = self->snap != NULL
-                 ? maplibre_native_ffi_momentum_snap_copy(self->snap)
-                 : NULL;
-  return copy;
-}
-
-void maplibre_native_ffi_anchored_momentum_to_native(
-  const MaplibreNativeFfiAnchoredMomentum* self, mln_anchored_momentum* out,
-  MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  out->fields = (mln_anchored_momentum_fields)self->fields;
-  out->velocity = (double)(self->velocity);
-  maplibre_native_ffi_screen_point_to_native(&self->anchor, &out->anchor, call);
-  if (self->decay != NULL)
-    maplibre_native_ffi_momentum_decay_to_native(
-      self->decay, &out->decay, call
-    );
-  if (self->snap != NULL)
-    maplibre_native_ffi_momentum_snap_to_native(self->snap, &out->snap, call);
-}
 
 G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiLogicalSize, maplibre_native_ffi_logical_size,
@@ -1312,6 +228,36 @@ void maplibre_native_ffi_android_window_target_to_native(
     &self->logical_size, &out->logical_size, call
   );
   out->window = (void*)(self->window);
+}
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiUnitBezier, maplibre_native_ffi_unit_bezier,
+  maplibre_native_ffi_unit_bezier_copy, maplibre_native_ffi_unit_bezier_free
+)
+
+MaplibreNativeFfiUnitBezier* maplibre_native_ffi_unit_bezier_copy(
+  const MaplibreNativeFfiUnitBezier* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_unit_bezier_free(MaplibreNativeFfiUnitBezier* self) {
+  g_free(self);
+}
+
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiUnitBezier) == sizeof(mln_unit_bezier));
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, x1);
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, y1);
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, x2);
+SAME_MEMBER(MaplibreNativeFfiUnitBezier, mln_unit_bezier, y2);
+
+void maplibre_native_ffi_unit_bezier_to_native(
+  const MaplibreNativeFfiUnitBezier* self, mln_unit_bezier* out,
+  MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memcpy(out, self, sizeof *out);
 }
 
 struct _MaplibreNativeFfiCameraTransitionHandler {
@@ -2335,438 +1281,57 @@ MaplibreNativeFfiCameraBounds* maplibre_native_ffi_camera_bounds_from_native(
   return self;
 }
 
-struct _MaplibreNativeFfiPanMomentum {
-  GObject parent_instance;
-  guint64 fields;
-  MaplibreNativeFfiScreenPoint velocity;
-  MaplibreNativeFfiMomentumDecay* decay;
-};
-
-enum {
-  PAN_MOMENTUM_PROP_0,
-  PAN_MOMENTUM_PROP_VELOCITY,
-  PAN_MOMENTUM_PROP_DECAY,
-  PAN_MOMENTUM_N_PROPERTIES
-};
-
-static GParamSpec* pan_momentum_properties[PAN_MOMENTUM_N_PROPERTIES];
-
-G_DEFINE_FINAL_TYPE(
-  MaplibreNativeFfiPanMomentum, maplibre_native_ffi_pan_momentum, G_TYPE_OBJECT
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiScreenPoint, maplibre_native_ffi_screen_point,
+  maplibre_native_ffi_screen_point_copy, maplibre_native_ffi_screen_point_free
 )
 
-static void maplibre_native_ffi_pan_momentum_finalize(GObject* object) {
-  MaplibreNativeFfiPanMomentum* self = MAPLIBRE_NATIVE_FFI_PAN_MOMENTUM(object);
-  g_clear_object(&self->decay);
-  G_OBJECT_CLASS(maplibre_native_ffi_pan_momentum_parent_class)
-    ->finalize(object);
+MaplibreNativeFfiScreenPoint* maplibre_native_ffi_screen_point_copy(
+  const MaplibreNativeFfiScreenPoint* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
 }
 
-static void maplibre_native_ffi_pan_momentum_get_property(
-  GObject* object, guint id, GValue* value, GParamSpec* pspec
-) {
-  MaplibreNativeFfiPanMomentum* self = MAPLIBRE_NATIVE_FFI_PAN_MOMENTUM(object);
-  switch (id) {
-    case PAN_MOMENTUM_PROP_VELOCITY:
-      g_value_set_boxed(value, &self->velocity);
-      break;
-    case PAN_MOMENTUM_PROP_DECAY:
-      g_value_set_object(value, self->decay);
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
+void maplibre_native_ffi_screen_point_free(MaplibreNativeFfiScreenPoint* self) {
+  g_free(self);
 }
 
-static void maplibre_native_ffi_pan_momentum_set_property(
-  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+gpointer maplibre_native_ffi_screen_point_copy_func(
+  gconstpointer self, gpointer data
 ) {
-  MaplibreNativeFfiPanMomentum* self = MAPLIBRE_NATIVE_FFI_PAN_MOMENTUM(object);
-  switch (id) {
-    case PAN_MOMENTUM_PROP_VELOCITY:
-      maplibre_native_ffi_pan_momentum_set_velocity(
-        self, g_value_get_boxed(value)
-      );
-      break;
-    case PAN_MOMENTUM_PROP_DECAY:
-      maplibre_native_ffi_pan_momentum_set_decay(
-        self, g_value_get_object(value)
-      );
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_pan_momentum_class_init(
-  MaplibreNativeFfiPanMomentumClass* klass
-) {
-  GObjectClass* object_class = G_OBJECT_CLASS(klass);
-  object_class->finalize = maplibre_native_ffi_pan_momentum_finalize;
-  object_class->get_property = maplibre_native_ffi_pan_momentum_get_property;
-  object_class->set_property = maplibre_native_ffi_pan_momentum_set_property;
-  pan_momentum_properties[PAN_MOMENTUM_PROP_VELOCITY] = g_param_spec_boxed(
-    "velocity", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_SCREEN_POINT,
-    PROPERTY_FLAGS
-  );
-  pan_momentum_properties[PAN_MOMENTUM_PROP_DECAY] = g_param_spec_object(
-    "decay", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY, PROPERTY_FLAGS
-  );
-  g_object_class_install_properties(
-    object_class, PAN_MOMENTUM_N_PROPERTIES, pan_momentum_properties
+  (void)data;
+  return maplibre_native_ffi_screen_point_copy(
+    (const MaplibreNativeFfiScreenPoint*)self
   );
 }
 
-static void maplibre_native_ffi_pan_momentum_init(
-  MaplibreNativeFfiPanMomentum* self
-) {
-  self->decay = maplibre_native_ffi_momentum_decay_new();
-}
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiScreenPoint) == sizeof(mln_screen_point)
+);
+SAME_MEMBER(MaplibreNativeFfiScreenPoint, mln_screen_point, x);
+SAME_MEMBER(MaplibreNativeFfiScreenPoint, mln_screen_point, y);
 
-MaplibreNativeFfiPanMomentum* maplibre_native_ffi_pan_momentum_new(void) {
-  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_PAN_MOMENTUM, NULL);
-}
-
-MaplibreNativeFfiScreenPoint* maplibre_native_ffi_pan_momentum_get_velocity(
-  MaplibreNativeFfiPanMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_PAN_MOMENTUM(self), NULL);
-  return (MaplibreNativeFfiScreenPoint*)&self->velocity;
-}
-
-gboolean maplibre_native_ffi_pan_momentum_has_velocity(
-  MaplibreNativeFfiPanMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_PAN_MOMENTUM(self), FALSE);
-  return (self->fields & MLN_PAN_MOMENTUM_VELOCITY) != 0;
-}
-
-void maplibre_native_ffi_pan_momentum_set_velocity(
-  MaplibreNativeFfiPanMomentum* self, const MaplibreNativeFfiScreenPoint* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_PAN_MOMENTUM(self));
-  g_return_if_fail(value != NULL);
-  gboolean was_set = (self->fields & MLN_PAN_MOMENTUM_VELOCITY) != 0;
-  gboolean changed = memcmp(&self->velocity, value, sizeof self->velocity) != 0;
-  self->velocity = *value;
-  self->fields |= MLN_PAN_MOMENTUM_VELOCITY;
-  if (changed || !was_set)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), pan_momentum_properties[PAN_MOMENTUM_PROP_VELOCITY]
-    );
-}
-
-MaplibreNativeFfiMomentumDecay* maplibre_native_ffi_pan_momentum_get_decay(
-  MaplibreNativeFfiPanMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_PAN_MOMENTUM(self), NULL);
-  return self->decay;
-}
-
-void maplibre_native_ffi_pan_momentum_set_decay(
-  MaplibreNativeFfiPanMomentum* self, MaplibreNativeFfiMomentumDecay* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_PAN_MOMENTUM(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(value));
-  MaplibreNativeFfiMomentumDecay* previous = self->decay;
-  self->decay = maplibre_native_ffi_momentum_decay_copy(value);
-  if (previous != NULL) g_object_unref(previous);
-  g_object_notify_by_pspec(
-    G_OBJECT(self), pan_momentum_properties[PAN_MOMENTUM_PROP_DECAY]
-  );
-}
-
-MaplibreNativeFfiPanMomentum* maplibre_native_ffi_pan_momentum_copy(
-  const MaplibreNativeFfiPanMomentum* self
-) {
-  MaplibreNativeFfiPanMomentum* copy = maplibre_native_ffi_pan_momentum_new();
-  copy->fields = self->fields;
-  copy->velocity = self->velocity;
-  g_clear_object(&copy->decay);
-  copy->decay = self->decay != NULL
-                  ? maplibre_native_ffi_momentum_decay_copy(self->decay)
-                  : NULL;
-  return copy;
-}
-
-void maplibre_native_ffi_pan_momentum_to_native(
-  const MaplibreNativeFfiPanMomentum* self, mln_pan_momentum* out,
+void maplibre_native_ffi_screen_point_to_native(
+  const MaplibreNativeFfiScreenPoint* self, mln_screen_point* out,
   MaplibreNativeFfiCall* call
 ) {
-  memset(out, 0, sizeof *out);
-  out->fields = (mln_pan_momentum_fields)self->fields;
-  maplibre_native_ffi_screen_point_to_native(
-    &self->velocity, &out->velocity, call
-  );
-  if (self->decay != NULL)
-    maplibre_native_ffi_momentum_decay_to_native(
-      self->decay, &out->decay, call
-    );
+  (void)call;
+  memcpy(out, self, sizeof *out);
 }
 
-struct _MaplibreNativeFfiGestureMomentum {
-  GObject parent_instance;
-  MaplibreNativeFfiPanMomentum* pan;
-  MaplibreNativeFfiAnchoredMomentum* zoom;
-  MaplibreNativeFfiAnchoredMomentum* bearing;
-  MaplibreNativeFfiAnchoredMomentum* pitch;
-};
-
-enum {
-  GESTURE_MOMENTUM_PROP_0,
-  GESTURE_MOMENTUM_PROP_PAN,
-  GESTURE_MOMENTUM_PROP_ZOOM,
-  GESTURE_MOMENTUM_PROP_BEARING,
-  GESTURE_MOMENTUM_PROP_PITCH,
-  GESTURE_MOMENTUM_N_PROPERTIES
-};
-
-static GParamSpec* gesture_momentum_properties[GESTURE_MOMENTUM_N_PROPERTIES];
-
-G_DEFINE_FINAL_TYPE(
-  MaplibreNativeFfiGestureMomentum, maplibre_native_ffi_gesture_momentum,
-  G_TYPE_OBJECT
-)
-
-static void maplibre_native_ffi_gesture_momentum_finalize(GObject* object) {
-  MaplibreNativeFfiGestureMomentum* self =
-    MAPLIBRE_NATIVE_FFI_GESTURE_MOMENTUM(object);
-  g_clear_object(&self->pan);
-  g_clear_object(&self->zoom);
-  g_clear_object(&self->bearing);
-  g_clear_object(&self->pitch);
-  G_OBJECT_CLASS(maplibre_native_ffi_gesture_momentum_parent_class)
-    ->finalize(object);
-}
-
-static void maplibre_native_ffi_gesture_momentum_get_property(
-  GObject* object, guint id, GValue* value, GParamSpec* pspec
+void maplibre_native_ffi_screen_point_read(
+  MaplibreNativeFfiScreenPoint* out, const mln_screen_point* in
 ) {
-  MaplibreNativeFfiGestureMomentum* self =
-    MAPLIBRE_NATIVE_FFI_GESTURE_MOMENTUM(object);
-  switch (id) {
-    case GESTURE_MOMENTUM_PROP_PAN:
-      g_value_set_object(value, self->pan);
-      break;
-    case GESTURE_MOMENTUM_PROP_ZOOM:
-      g_value_set_object(value, self->zoom);
-      break;
-    case GESTURE_MOMENTUM_PROP_BEARING:
-      g_value_set_object(value, self->bearing);
-      break;
-    case GESTURE_MOMENTUM_PROP_PITCH:
-      g_value_set_object(value, self->pitch);
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
+  memcpy(out, in, sizeof *out);
 }
 
-static void maplibre_native_ffi_gesture_momentum_set_property(
-  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+MaplibreNativeFfiScreenPoint* maplibre_native_ffi_screen_point_from_native(
+  const mln_screen_point* in
 ) {
-  MaplibreNativeFfiGestureMomentum* self =
-    MAPLIBRE_NATIVE_FFI_GESTURE_MOMENTUM(object);
-  switch (id) {
-    case GESTURE_MOMENTUM_PROP_PAN:
-      maplibre_native_ffi_gesture_momentum_set_pan(
-        self, g_value_get_object(value)
-      );
-      break;
-    case GESTURE_MOMENTUM_PROP_ZOOM:
-      maplibre_native_ffi_gesture_momentum_set_zoom(
-        self, g_value_get_object(value)
-      );
-      break;
-    case GESTURE_MOMENTUM_PROP_BEARING:
-      maplibre_native_ffi_gesture_momentum_set_bearing(
-        self, g_value_get_object(value)
-      );
-      break;
-    case GESTURE_MOMENTUM_PROP_PITCH:
-      maplibre_native_ffi_gesture_momentum_set_pitch(
-        self, g_value_get_object(value)
-      );
-      break;
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
-  }
-}
-
-static void maplibre_native_ffi_gesture_momentum_class_init(
-  MaplibreNativeFfiGestureMomentumClass* klass
-) {
-  GObjectClass* object_class = G_OBJECT_CLASS(klass);
-  object_class->finalize = maplibre_native_ffi_gesture_momentum_finalize;
-  object_class->get_property =
-    maplibre_native_ffi_gesture_momentum_get_property;
-  object_class->set_property =
-    maplibre_native_ffi_gesture_momentum_set_property;
-  gesture_momentum_properties[GESTURE_MOMENTUM_PROP_PAN] = g_param_spec_object(
-    "pan", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_PAN_MOMENTUM, PROPERTY_FLAGS
-  );
-  gesture_momentum_properties[GESTURE_MOMENTUM_PROP_ZOOM] = g_param_spec_object(
-    "zoom", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_ANCHORED_MOMENTUM,
-    PROPERTY_FLAGS
-  );
-  gesture_momentum_properties[GESTURE_MOMENTUM_PROP_BEARING] =
-    g_param_spec_object(
-      "bearing", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_ANCHORED_MOMENTUM,
-      PROPERTY_FLAGS
-    );
-  gesture_momentum_properties[GESTURE_MOMENTUM_PROP_PITCH] =
-    g_param_spec_object(
-      "pitch", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_ANCHORED_MOMENTUM,
-      PROPERTY_FLAGS
-    );
-  g_object_class_install_properties(
-    object_class, GESTURE_MOMENTUM_N_PROPERTIES, gesture_momentum_properties
-  );
-}
-
-static void maplibre_native_ffi_gesture_momentum_init(
-  MaplibreNativeFfiGestureMomentum* self
-) {
-  self->pan = maplibre_native_ffi_pan_momentum_new();
-  self->zoom = maplibre_native_ffi_anchored_momentum_new();
-  self->bearing = maplibre_native_ffi_anchored_momentum_new();
-  self->pitch = maplibre_native_ffi_anchored_momentum_new();
-}
-
-MaplibreNativeFfiGestureMomentum* maplibre_native_ffi_gesture_momentum_new(
-  void
-) {
-  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_MOMENTUM, NULL);
-}
-
-MaplibreNativeFfiPanMomentum* maplibre_native_ffi_gesture_momentum_get_pan(
-  MaplibreNativeFfiGestureMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self), NULL);
-  return self->pan;
-}
-
-void maplibre_native_ffi_gesture_momentum_set_pan(
-  MaplibreNativeFfiGestureMomentum* self, MaplibreNativeFfiPanMomentum* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_PAN_MOMENTUM(value));
-  MaplibreNativeFfiPanMomentum* previous = self->pan;
-  self->pan = maplibre_native_ffi_pan_momentum_copy(value);
-  if (previous != NULL) g_object_unref(previous);
-  g_object_notify_by_pspec(
-    G_OBJECT(self), gesture_momentum_properties[GESTURE_MOMENTUM_PROP_PAN]
-  );
-}
-
-MaplibreNativeFfiAnchoredMomentum*
-maplibre_native_ffi_gesture_momentum_get_zoom(
-  MaplibreNativeFfiGestureMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self), NULL);
-  return self->zoom;
-}
-
-void maplibre_native_ffi_gesture_momentum_set_zoom(
-  MaplibreNativeFfiGestureMomentum* self,
-  MaplibreNativeFfiAnchoredMomentum* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(value));
-  MaplibreNativeFfiAnchoredMomentum* previous = self->zoom;
-  self->zoom = maplibre_native_ffi_anchored_momentum_copy(value);
-  if (previous != NULL) g_object_unref(previous);
-  g_object_notify_by_pspec(
-    G_OBJECT(self), gesture_momentum_properties[GESTURE_MOMENTUM_PROP_ZOOM]
-  );
-}
-
-MaplibreNativeFfiAnchoredMomentum*
-maplibre_native_ffi_gesture_momentum_get_bearing(
-  MaplibreNativeFfiGestureMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self), NULL);
-  return self->bearing;
-}
-
-void maplibre_native_ffi_gesture_momentum_set_bearing(
-  MaplibreNativeFfiGestureMomentum* self,
-  MaplibreNativeFfiAnchoredMomentum* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(value));
-  MaplibreNativeFfiAnchoredMomentum* previous = self->bearing;
-  self->bearing = maplibre_native_ffi_anchored_momentum_copy(value);
-  if (previous != NULL) g_object_unref(previous);
-  g_object_notify_by_pspec(
-    G_OBJECT(self), gesture_momentum_properties[GESTURE_MOMENTUM_PROP_BEARING]
-  );
-}
-
-MaplibreNativeFfiAnchoredMomentum*
-maplibre_native_ffi_gesture_momentum_get_pitch(
-  MaplibreNativeFfiGestureMomentum* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self), NULL);
-  return self->pitch;
-}
-
-void maplibre_native_ffi_gesture_momentum_set_pitch(
-  MaplibreNativeFfiGestureMomentum* self,
-  MaplibreNativeFfiAnchoredMomentum* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_ANCHORED_MOMENTUM(value));
-  MaplibreNativeFfiAnchoredMomentum* previous = self->pitch;
-  self->pitch = maplibre_native_ffi_anchored_momentum_copy(value);
-  if (previous != NULL) g_object_unref(previous);
-  g_object_notify_by_pspec(
-    G_OBJECT(self), gesture_momentum_properties[GESTURE_MOMENTUM_PROP_PITCH]
-  );
-}
-
-MaplibreNativeFfiGestureMomentum* maplibre_native_ffi_gesture_momentum_copy(
-  const MaplibreNativeFfiGestureMomentum* self
-) {
-  MaplibreNativeFfiGestureMomentum* copy =
-    maplibre_native_ffi_gesture_momentum_new();
-  g_clear_object(&copy->pan);
-  copy->pan =
-    self->pan != NULL ? maplibre_native_ffi_pan_momentum_copy(self->pan) : NULL;
-  g_clear_object(&copy->zoom);
-  copy->zoom = self->zoom != NULL
-                 ? maplibre_native_ffi_anchored_momentum_copy(self->zoom)
-                 : NULL;
-  g_clear_object(&copy->bearing);
-  copy->bearing = self->bearing != NULL
-                    ? maplibre_native_ffi_anchored_momentum_copy(self->bearing)
-                    : NULL;
-  g_clear_object(&copy->pitch);
-  copy->pitch = self->pitch != NULL
-                  ? maplibre_native_ffi_anchored_momentum_copy(self->pitch)
-                  : NULL;
-  return copy;
-}
-
-void maplibre_native_ffi_gesture_momentum_to_native(
-  const MaplibreNativeFfiGestureMomentum* self, mln_gesture_momentum* out,
-  MaplibreNativeFfiCall* call
-) {
-  memset(out, 0, sizeof *out);
-  if (self->pan != NULL)
-    maplibre_native_ffi_pan_momentum_to_native(self->pan, &out->pan, call);
-  if (self->zoom != NULL)
-    maplibre_native_ffi_anchored_momentum_to_native(
-      self->zoom, &out->zoom, call
-    );
-  if (self->bearing != NULL)
-    maplibre_native_ffi_anchored_momentum_to_native(
-      self->bearing, &out->bearing, call
-    );
-  if (self->pitch != NULL)
-    maplibre_native_ffi_anchored_momentum_to_native(
-      self->pitch, &out->pitch, call
-    );
+  MaplibreNativeFfiScreenPoint* self = g_new0(MaplibreNativeFfiScreenPoint, 1);
+  maplibre_native_ffi_screen_point_read(self, in);
+  return self;
 }
 
 struct _MaplibreNativeFfiCameraDelta {
@@ -2777,9 +1342,7 @@ struct _MaplibreNativeFfiCameraDelta {
   gdouble bearing;
   gdouble pitch;
   MaplibreNativeFfiScreenPoint anchor;
-  MaplibreNativeFfiGestureMomentum* momentum;
   MaplibreNativeFfiAnimationOptions* animation;
-  MaplibreNativeFfiGesturePhase gesture_phase;
 };
 
 enum {
@@ -2789,9 +1352,7 @@ enum {
   CAMERA_DELTA_PROP_BEARING,
   CAMERA_DELTA_PROP_PITCH,
   CAMERA_DELTA_PROP_ANCHOR,
-  CAMERA_DELTA_PROP_MOMENTUM,
   CAMERA_DELTA_PROP_ANIMATION,
-  CAMERA_DELTA_PROP_GESTURE_PHASE,
   CAMERA_DELTA_N_PROPERTIES
 };
 
@@ -2803,7 +1364,6 @@ G_DEFINE_FINAL_TYPE(
 
 static void maplibre_native_ffi_camera_delta_finalize(GObject* object) {
   MaplibreNativeFfiCameraDelta* self = MAPLIBRE_NATIVE_FFI_CAMERA_DELTA(object);
-  g_clear_object(&self->momentum);
   g_clear_object(&self->animation);
   G_OBJECT_CLASS(maplibre_native_ffi_camera_delta_parent_class)
     ->finalize(object);
@@ -2829,14 +1389,8 @@ static void maplibre_native_ffi_camera_delta_get_property(
     case CAMERA_DELTA_PROP_ANCHOR:
       g_value_set_boxed(value, &self->anchor);
       break;
-    case CAMERA_DELTA_PROP_MOMENTUM:
-      g_value_set_object(value, self->momentum);
-      break;
     case CAMERA_DELTA_PROP_ANIMATION:
       g_value_set_object(value, self->animation);
-      break;
-    case CAMERA_DELTA_PROP_GESTURE_PHASE:
-      g_value_set_enum(value, self->gesture_phase);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
@@ -2873,19 +1427,9 @@ static void maplibre_native_ffi_camera_delta_set_property(
         self, g_value_get_boxed(value)
       );
       break;
-    case CAMERA_DELTA_PROP_MOMENTUM:
-      maplibre_native_ffi_camera_delta_set_momentum(
-        self, g_value_get_object(value)
-      );
-      break;
     case CAMERA_DELTA_PROP_ANIMATION:
       maplibre_native_ffi_camera_delta_set_animation(
         self, g_value_get_object(value)
-      );
-      break;
-    case CAMERA_DELTA_PROP_GESTURE_PHASE:
-      maplibre_native_ffi_camera_delta_set_gesture_phase(
-        self, g_value_get_enum(value)
       );
       break;
     default:
@@ -2915,16 +1459,8 @@ static void maplibre_native_ffi_camera_delta_class_init(
   camera_delta_properties[CAMERA_DELTA_PROP_ANCHOR] = g_param_spec_boxed(
     "anchor", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_SCREEN_POINT, PROPERTY_FLAGS
   );
-  camera_delta_properties[CAMERA_DELTA_PROP_MOMENTUM] = g_param_spec_object(
-    "momentum", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_MOMENTUM,
-    PROPERTY_FLAGS
-  );
   camera_delta_properties[CAMERA_DELTA_PROP_ANIMATION] = g_param_spec_object(
     "animation", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_ANIMATION_OPTIONS,
-    PROPERTY_FLAGS
-  );
-  camera_delta_properties[CAMERA_DELTA_PROP_GESTURE_PHASE] = g_param_spec_enum(
-    "gesture-phase", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_PHASE, 0,
     PROPERTY_FLAGS
   );
   g_object_class_install_properties(
@@ -2935,7 +1471,6 @@ static void maplibre_native_ffi_camera_delta_class_init(
 static void maplibre_native_ffi_camera_delta_init(
   MaplibreNativeFfiCameraDelta* self
 ) {
-  self->momentum = maplibre_native_ffi_gesture_momentum_new();
   self->animation = maplibre_native_ffi_animation_options_new();
 }
 
@@ -3085,34 +1620,6 @@ void maplibre_native_ffi_camera_delta_set_anchor(
     );
 }
 
-MaplibreNativeFfiGestureMomentum* maplibre_native_ffi_camera_delta_get_momentum(
-  MaplibreNativeFfiCameraDelta* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_CAMERA_DELTA(self), NULL);
-  return self->momentum;
-}
-
-gboolean maplibre_native_ffi_camera_delta_has_momentum(
-  MaplibreNativeFfiCameraDelta* self
-) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_CAMERA_DELTA(self), FALSE);
-  return (self->fields & MLN_CAMERA_DELTA_MOMENTUM) != 0;
-}
-
-void maplibre_native_ffi_camera_delta_set_momentum(
-  MaplibreNativeFfiCameraDelta* self, MaplibreNativeFfiGestureMomentum* value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_CAMERA_DELTA(self));
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_MOMENTUM(value));
-  MaplibreNativeFfiGestureMomentum* previous = self->momentum;
-  self->momentum = maplibre_native_ffi_gesture_momentum_copy(value);
-  if (previous != NULL) g_object_unref(previous);
-  self->fields |= MLN_CAMERA_DELTA_MOMENTUM;
-  g_object_notify_by_pspec(
-    G_OBJECT(self), camera_delta_properties[CAMERA_DELTA_PROP_MOMENTUM]
-  );
-}
-
 MaplibreNativeFfiAnimationOptions*
 maplibre_native_ffi_camera_delta_get_animation(
   MaplibreNativeFfiCameraDelta* self
@@ -3134,28 +1641,6 @@ void maplibre_native_ffi_camera_delta_set_animation(
   );
 }
 
-MaplibreNativeFfiGesturePhase
-maplibre_native_ffi_camera_delta_get_gesture_phase(
-  MaplibreNativeFfiCameraDelta* self
-) {
-  g_return_val_if_fail(
-    MAPLIBRE_NATIVE_FFI_IS_CAMERA_DELTA(self), (MaplibreNativeFfiGesturePhase)0
-  );
-  return self->gesture_phase;
-}
-
-void maplibre_native_ffi_camera_delta_set_gesture_phase(
-  MaplibreNativeFfiCameraDelta* self, MaplibreNativeFfiGesturePhase value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_CAMERA_DELTA(self));
-  gboolean changed = self->gesture_phase != value;
-  self->gesture_phase = value;
-  if (changed)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), camera_delta_properties[CAMERA_DELTA_PROP_GESTURE_PHASE]
-    );
-}
-
 void maplibre_native_ffi_camera_delta_to_native(
   const MaplibreNativeFfiCameraDelta* self, mln_camera_delta* out,
   MaplibreNativeFfiCall* call
@@ -3168,15 +1653,10 @@ void maplibre_native_ffi_camera_delta_to_native(
   out->bearing = (double)(self->bearing);
   out->pitch = (double)(self->pitch);
   maplibre_native_ffi_screen_point_to_native(&self->anchor, &out->anchor, call);
-  if (self->momentum != NULL)
-    maplibre_native_ffi_gesture_momentum_to_native(
-      self->momentum, &out->momentum, call
-    );
   if (self->animation != NULL)
     maplibre_native_ffi_animation_options_to_native(
       self->animation, &out->animation, call
     );
-  out->gesture_phase = (mln_gesture_phase)(self->gesture_phase);
 }
 
 struct _MaplibreNativeFfiCameraFitOptions {
@@ -4164,47 +2644,6 @@ maplibre_native_ffi_camera_query_result_from_native(
 }
 
 G_DEFINE_BOXED_TYPE(
-  MaplibreNativeFfiCameraVelocity, maplibre_native_ffi_camera_velocity,
-  maplibre_native_ffi_camera_velocity_copy,
-  maplibre_native_ffi_camera_velocity_free
-)
-
-MaplibreNativeFfiCameraVelocity* maplibre_native_ffi_camera_velocity_copy(
-  const MaplibreNativeFfiCameraVelocity* self
-) {
-  g_return_val_if_fail(self != NULL, NULL);
-  return g_memdup2(self, sizeof *self);
-}
-
-void maplibre_native_ffi_camera_velocity_free(
-  MaplibreNativeFfiCameraVelocity* self
-) {
-  g_free(self);
-}
-
-G_STATIC_ASSERT(
-  sizeof(MaplibreNativeFfiCameraVelocity) == sizeof(mln_camera_velocity)
-);
-SAME_MEMBER(MaplibreNativeFfiCameraVelocity, mln_camera_velocity, pan);
-SAME_MEMBER(MaplibreNativeFfiCameraVelocity, mln_camera_velocity, zoom);
-SAME_MEMBER(MaplibreNativeFfiCameraVelocity, mln_camera_velocity, bearing);
-SAME_MEMBER(MaplibreNativeFfiCameraVelocity, mln_camera_velocity, pitch);
-
-void maplibre_native_ffi_camera_velocity_read(
-  MaplibreNativeFfiCameraVelocity* out, const mln_camera_velocity* in
-) {
-  memcpy(out, in, sizeof *out);
-}
-
-MaplibreNativeFfiCameraVelocity*
-maplibre_native_ffi_camera_velocity_from_native(const mln_camera_velocity* in) {
-  MaplibreNativeFfiCameraVelocity* self =
-    g_new0(MaplibreNativeFfiCameraVelocity, 1);
-  maplibre_native_ffi_camera_velocity_read(self, in);
-  return self;
-}
-
-G_DEFINE_BOXED_TYPE(
   MaplibreNativeFfiCameraTransitionEnd,
   maplibre_native_ffi_camera_transition_end,
   maplibre_native_ffi_camera_transition_end_copy,
@@ -4230,7 +2669,6 @@ void maplibre_native_ffi_camera_transition_end_read(
 ) {
   out->outcome = (MaplibreNativeFfiCameraTransitionOutcome)(in->outcome);
   out->generation = (guint64)(in->generation);
-  maplibre_native_ffi_camera_velocity_read(&out->velocity, &in->velocity);
 }
 
 MaplibreNativeFfiCameraTransitionEnd*
@@ -4248,7 +2686,6 @@ struct _MaplibreNativeFfiCameraUpdate {
   MaplibreNativeFfiCameraUpdateMode mode;
   MaplibreNativeFfiCameraOptions* camera;
   MaplibreNativeFfiAnimationOptions* animation;
-  MaplibreNativeFfiGesturePhase gesture_phase;
 };
 
 enum {
@@ -4256,7 +2693,6 @@ enum {
   CAMERA_UPDATE_PROP_MODE,
   CAMERA_UPDATE_PROP_CAMERA,
   CAMERA_UPDATE_PROP_ANIMATION,
-  CAMERA_UPDATE_PROP_GESTURE_PHASE,
   CAMERA_UPDATE_N_PROPERTIES
 };
 
@@ -4291,9 +2727,6 @@ static void maplibre_native_ffi_camera_update_get_property(
     case CAMERA_UPDATE_PROP_ANIMATION:
       g_value_set_object(value, self->animation);
       break;
-    case CAMERA_UPDATE_PROP_GESTURE_PHASE:
-      g_value_set_enum(value, self->gesture_phase);
-      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
   }
@@ -4316,11 +2749,6 @@ static void maplibre_native_ffi_camera_update_set_property(
     case CAMERA_UPDATE_PROP_ANIMATION:
       maplibre_native_ffi_camera_update_set_animation(
         self, g_value_get_object(value)
-      );
-      break;
-    case CAMERA_UPDATE_PROP_GESTURE_PHASE:
-      maplibre_native_ffi_camera_update_set_gesture_phase(
-        self, g_value_get_enum(value)
       );
       break;
     default:
@@ -4347,11 +2775,6 @@ static void maplibre_native_ffi_camera_update_class_init(
     "animation", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_ANIMATION_OPTIONS,
     PROPERTY_FLAGS
   );
-  camera_update_properties[CAMERA_UPDATE_PROP_GESTURE_PHASE] =
-    g_param_spec_enum(
-      "gesture-phase", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_PHASE, 0,
-      PROPERTY_FLAGS
-    );
   g_object_class_install_properties(
     object_class, CAMERA_UPDATE_N_PROPERTIES, camera_update_properties
   );
@@ -4431,28 +2854,6 @@ void maplibre_native_ffi_camera_update_set_animation(
   );
 }
 
-MaplibreNativeFfiGesturePhase
-maplibre_native_ffi_camera_update_get_gesture_phase(
-  MaplibreNativeFfiCameraUpdate* self
-) {
-  g_return_val_if_fail(
-    MAPLIBRE_NATIVE_FFI_IS_CAMERA_UPDATE(self), (MaplibreNativeFfiGesturePhase)0
-  );
-  return self->gesture_phase;
-}
-
-void maplibre_native_ffi_camera_update_set_gesture_phase(
-  MaplibreNativeFfiCameraUpdate* self, MaplibreNativeFfiGesturePhase value
-) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_CAMERA_UPDATE(self));
-  gboolean changed = self->gesture_phase != value;
-  self->gesture_phase = value;
-  if (changed)
-    g_object_notify_by_pspec(
-      G_OBJECT(self), camera_update_properties[CAMERA_UPDATE_PROP_GESTURE_PHASE]
-    );
-}
-
 void maplibre_native_ffi_camera_update_to_native(
   const MaplibreNativeFfiCameraUpdate* self, mln_camera_update* out,
   MaplibreNativeFfiCall* call
@@ -4468,7 +2869,6 @@ void maplibre_native_ffi_camera_update_to_native(
     maplibre_native_ffi_animation_options_to_native(
       self->animation, &out->animation, call
     );
-  out->gesture_phase = (mln_gesture_phase)(self->gesture_phase);
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -5575,11 +3975,73 @@ maplibre_native_ffi_web_gpu_custom_layer_encoder_from_native(
   return self;
 }
 
+struct _MaplibreNativeFfiD3d12CustomLayerEncoder {
+  gpointer device;
+  gpointer command_list;
+};
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiD3d12CustomLayerEncoder,
+  maplibre_native_ffi_d3d12_custom_layer_encoder,
+  maplibre_native_ffi_d3d12_custom_layer_encoder_copy,
+  maplibre_native_ffi_d3d12_custom_layer_encoder_free
+)
+
+MaplibreNativeFfiD3d12CustomLayerEncoder*
+maplibre_native_ffi_d3d12_custom_layer_encoder_new(void) {
+  MaplibreNativeFfiD3d12CustomLayerEncoder* self =
+    g_new0(MaplibreNativeFfiD3d12CustomLayerEncoder, 1);
+  return self;
+}
+
+MaplibreNativeFfiD3d12CustomLayerEncoder*
+maplibre_native_ffi_d3d12_custom_layer_encoder_copy(
+  const MaplibreNativeFfiD3d12CustomLayerEncoder* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  MaplibreNativeFfiD3d12CustomLayerEncoder* copy =
+    g_memdup2(self, sizeof *self);
+  return copy;
+}
+
+void maplibre_native_ffi_d3d12_custom_layer_encoder_free(
+  MaplibreNativeFfiD3d12CustomLayerEncoder* self
+) {
+  if (self == NULL) return;
+  g_free(self);
+}
+
+gpointer maplibre_native_ffi_d3d12_custom_layer_encoder_get_device(
+  const MaplibreNativeFfiD3d12CustomLayerEncoder* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->device;
+}
+
+gpointer maplibre_native_ffi_d3d12_custom_layer_encoder_get_command_list(
+  const MaplibreNativeFfiD3d12CustomLayerEncoder* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->command_list;
+}
+
+MaplibreNativeFfiD3d12CustomLayerEncoder*
+maplibre_native_ffi_d3d12_custom_layer_encoder_from_native(
+  const mln_d3d12_custom_layer_encoder* in
+) {
+  MaplibreNativeFfiD3d12CustomLayerEncoder* self =
+    maplibre_native_ffi_d3d12_custom_layer_encoder_new();
+  self->device = (gpointer)(in->device);
+  self->command_list = (gpointer)(in->command_list);
+  return self;
+}
+
 struct _MaplibreNativeFfiCustomLayerEncoderData {
   gint64 tag;
   MaplibreNativeFfiMetalCustomLayerEncoder* metal;
   MaplibreNativeFfiVulkanCustomLayerEncoder* vulkan;
   MaplibreNativeFfiWebGpuCustomLayerEncoder web_gpu;
+  MaplibreNativeFfiD3d12CustomLayerEncoder* d3d12;
 };
 
 G_DEFINE_BOXED_TYPE(
@@ -5603,6 +4065,10 @@ maplibre_native_ffi_custom_layer_encoder_data_copy(
     self->vulkan != NULL
       ? maplibre_native_ffi_vulkan_custom_layer_encoder_copy(self->vulkan)
       : NULL;
+  copy->d3d12 =
+    self->d3d12 != NULL
+      ? maplibre_native_ffi_d3d12_custom_layer_encoder_copy(self->d3d12)
+      : NULL;
   return copy;
 }
 
@@ -5615,6 +4081,9 @@ void maplibre_native_ffi_custom_layer_encoder_data_free(
   );
   g_clear_pointer(
     &self->vulkan, maplibre_native_ffi_vulkan_custom_layer_encoder_free
+  );
+  g_clear_pointer(
+    &self->d3d12, maplibre_native_ffi_d3d12_custom_layer_encoder_free
   );
   g_free(self);
 }
@@ -5667,6 +4136,22 @@ maplibre_native_ffi_custom_layer_encoder_data_get_web_gpu(
   return (MaplibreNativeFfiWebGpuCustomLayerEncoder*)&self->web_gpu;
 }
 
+gboolean maplibre_native_ffi_custom_layer_encoder_data_is_d3d12(
+  const MaplibreNativeFfiCustomLayerEncoderData* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_RENDER_BACKEND_D3D12;
+}
+
+MaplibreNativeFfiD3d12CustomLayerEncoder*
+maplibre_native_ffi_custom_layer_encoder_data_get_d3d12(
+  const MaplibreNativeFfiCustomLayerEncoderData* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_RENDER_BACKEND_D3D12, NULL);
+  return self->d3d12;
+}
+
 gboolean maplibre_native_ffi_custom_layer_encoder_data_is_open_gl(
   const MaplibreNativeFfiCustomLayerEncoderData* self
 ) {
@@ -5697,6 +4182,11 @@ maplibre_native_ffi_custom_layer_encoder_data_from_native(
     case MLN_RENDER_BACKEND_WEB_GPU:
       maplibre_native_ffi_web_gpu_custom_layer_encoder_read(
         &self->web_gpu, &data->web_gpu
+      );
+      break;
+    case MLN_RENDER_BACKEND_D3D12:
+      self->d3d12 = maplibre_native_ffi_d3d12_custom_layer_encoder_from_native(
+        &data->d3d12
       );
       break;
     default:
@@ -6650,12 +5140,109 @@ maplibre_native_ffi_web_gpu_custom_layer_pass_from_native(
   return self;
 }
 
+struct _MaplibreNativeFfiD3d12CustomLayerPass {
+  gpointer device;
+  gpointer command_list;
+  guint64 render_target_view;
+  guint32 color_format;
+  guint64 depth_stencil_view;
+  guint32 depth_stencil_format;
+};
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiD3d12CustomLayerPass,
+  maplibre_native_ffi_d3d12_custom_layer_pass,
+  maplibre_native_ffi_d3d12_custom_layer_pass_copy,
+  maplibre_native_ffi_d3d12_custom_layer_pass_free
+)
+
+MaplibreNativeFfiD3d12CustomLayerPass*
+maplibre_native_ffi_d3d12_custom_layer_pass_new(void) {
+  MaplibreNativeFfiD3d12CustomLayerPass* self =
+    g_new0(MaplibreNativeFfiD3d12CustomLayerPass, 1);
+  return self;
+}
+
+MaplibreNativeFfiD3d12CustomLayerPass*
+maplibre_native_ffi_d3d12_custom_layer_pass_copy(
+  const MaplibreNativeFfiD3d12CustomLayerPass* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  MaplibreNativeFfiD3d12CustomLayerPass* copy = g_memdup2(self, sizeof *self);
+  return copy;
+}
+
+void maplibre_native_ffi_d3d12_custom_layer_pass_free(
+  MaplibreNativeFfiD3d12CustomLayerPass* self
+) {
+  if (self == NULL) return;
+  g_free(self);
+}
+
+gpointer maplibre_native_ffi_d3d12_custom_layer_pass_get_device(
+  const MaplibreNativeFfiD3d12CustomLayerPass* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->device;
+}
+
+gpointer maplibre_native_ffi_d3d12_custom_layer_pass_get_command_list(
+  const MaplibreNativeFfiD3d12CustomLayerPass* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->command_list;
+}
+
+guint64 maplibre_native_ffi_d3d12_custom_layer_pass_get_render_target_view(
+  const MaplibreNativeFfiD3d12CustomLayerPass* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->render_target_view;
+}
+
+guint32 maplibre_native_ffi_d3d12_custom_layer_pass_get_color_format(
+  const MaplibreNativeFfiD3d12CustomLayerPass* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->color_format;
+}
+
+guint64 maplibre_native_ffi_d3d12_custom_layer_pass_get_depth_stencil_view(
+  const MaplibreNativeFfiD3d12CustomLayerPass* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->depth_stencil_view;
+}
+
+guint32 maplibre_native_ffi_d3d12_custom_layer_pass_get_depth_stencil_format(
+  const MaplibreNativeFfiD3d12CustomLayerPass* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->depth_stencil_format;
+}
+
+MaplibreNativeFfiD3d12CustomLayerPass*
+maplibre_native_ffi_d3d12_custom_layer_pass_from_native(
+  const mln_d3d12_custom_layer_pass* in
+) {
+  MaplibreNativeFfiD3d12CustomLayerPass* self =
+    maplibre_native_ffi_d3d12_custom_layer_pass_new();
+  self->device = (gpointer)(in->device);
+  self->command_list = (gpointer)(in->command_list);
+  self->render_target_view = (guint64)(in->render_target_view);
+  self->color_format = (guint32)(in->color_format);
+  self->depth_stencil_view = (guint64)(in->depth_stencil_view);
+  self->depth_stencil_format = (guint32)(in->depth_stencil_format);
+  return self;
+}
+
 struct _MaplibreNativeFfiCustomLayerPassData {
   gint64 tag;
   MaplibreNativeFfiMetalCustomLayerPass* metal;
   MaplibreNativeFfiVulkanCustomLayerPass* vulkan;
   MaplibreNativeFfiOpenGlCustomLayerPass open_gl;
   MaplibreNativeFfiWebGpuCustomLayerPass* web_gpu;
+  MaplibreNativeFfiD3d12CustomLayerPass* d3d12;
 };
 
 G_DEFINE_BOXED_TYPE(
@@ -6683,6 +5270,10 @@ maplibre_native_ffi_custom_layer_pass_data_copy(
     self->web_gpu != NULL
       ? maplibre_native_ffi_web_gpu_custom_layer_pass_copy(self->web_gpu)
       : NULL;
+  copy->d3d12 =
+    self->d3d12 != NULL
+      ? maplibre_native_ffi_d3d12_custom_layer_pass_copy(self->d3d12)
+      : NULL;
   return copy;
 }
 
@@ -6698,6 +5289,9 @@ void maplibre_native_ffi_custom_layer_pass_data_free(
   );
   g_clear_pointer(
     &self->web_gpu, maplibre_native_ffi_web_gpu_custom_layer_pass_free
+  );
+  g_clear_pointer(
+    &self->d3d12, maplibre_native_ffi_d3d12_custom_layer_pass_free
   );
   g_free(self);
 }
@@ -6766,6 +5360,22 @@ maplibre_native_ffi_custom_layer_pass_data_get_web_gpu(
   return self->web_gpu;
 }
 
+gboolean maplibre_native_ffi_custom_layer_pass_data_is_d3d12(
+  const MaplibreNativeFfiCustomLayerPassData* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_RENDER_BACKEND_D3D12;
+}
+
+MaplibreNativeFfiD3d12CustomLayerPass*
+maplibre_native_ffi_custom_layer_pass_data_get_d3d12(
+  const MaplibreNativeFfiCustomLayerPassData* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_RENDER_BACKEND_D3D12, NULL);
+  return self->d3d12;
+}
+
 MaplibreNativeFfiCustomLayerPassData*
 maplibre_native_ffi_custom_layer_pass_data_from_native(
   gint64 tag, const mln_custom_layer_pass_data* in
@@ -6792,6 +5402,10 @@ maplibre_native_ffi_custom_layer_pass_data_from_native(
       self->web_gpu = maplibre_native_ffi_web_gpu_custom_layer_pass_from_native(
         &data->web_gpu
       );
+      break;
+    case MLN_RENDER_BACKEND_D3D12:
+      self->d3d12 =
+        maplibre_native_ffi_d3d12_custom_layer_pass_from_native(&data->d3d12);
       break;
     default:
       break;
@@ -7222,6 +5836,739 @@ void maplibre_native_ffi_custom_vector_source_options_to_native(
                          ? custom_vector_source_options_cancel_tile_trampoline
                          : NULL;
   }
+}
+
+struct _MaplibreNativeFfiD3d12BorrowedTexture {
+  GObject parent_instance;
+  gpointer resource;
+};
+
+enum {
+  D3D12_BORROWED_TEXTURE_PROP_0,
+  D3D12_BORROWED_TEXTURE_PROP_RESOURCE,
+  D3D12_BORROWED_TEXTURE_N_PROPERTIES
+};
+
+static GParamSpec*
+  d3d12_borrowed_texture_properties[D3D12_BORROWED_TEXTURE_N_PROPERTIES];
+
+G_DEFINE_FINAL_TYPE(
+  MaplibreNativeFfiD3d12BorrowedTexture,
+  maplibre_native_ffi_d3d12_borrowed_texture, G_TYPE_OBJECT
+)
+
+static void maplibre_native_ffi_d3d12_borrowed_texture_get_property(
+  GObject* object, guint id, GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiD3d12BorrowedTexture* self =
+    MAPLIBRE_NATIVE_FFI_D3D12_BORROWED_TEXTURE(object);
+  switch (id) {
+    case D3D12_BORROWED_TEXTURE_PROP_RESOURCE:
+      g_value_set_pointer(value, self->resource);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_d3d12_borrowed_texture_set_property(
+  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiD3d12BorrowedTexture* self =
+    MAPLIBRE_NATIVE_FFI_D3D12_BORROWED_TEXTURE(object);
+  switch (id) {
+    case D3D12_BORROWED_TEXTURE_PROP_RESOURCE:
+      maplibre_native_ffi_d3d12_borrowed_texture_set_resource(
+        self, g_value_get_pointer(value)
+      );
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_d3d12_borrowed_texture_class_init(
+  MaplibreNativeFfiD3d12BorrowedTextureClass* klass
+) {
+  GObjectClass* object_class = G_OBJECT_CLASS(klass);
+  object_class->get_property =
+    maplibre_native_ffi_d3d12_borrowed_texture_get_property;
+  object_class->set_property =
+    maplibre_native_ffi_d3d12_borrowed_texture_set_property;
+  d3d12_borrowed_texture_properties[D3D12_BORROWED_TEXTURE_PROP_RESOURCE] =
+    g_param_spec_pointer("resource", NULL, NULL, PROPERTY_FLAGS);
+  g_object_class_install_properties(
+    object_class, D3D12_BORROWED_TEXTURE_N_PROPERTIES,
+    d3d12_borrowed_texture_properties
+  );
+}
+
+static void maplibre_native_ffi_d3d12_borrowed_texture_init(
+  MaplibreNativeFfiD3d12BorrowedTexture* self
+) {
+  (void)self;
+}
+
+MaplibreNativeFfiD3d12BorrowedTexture*
+maplibre_native_ffi_d3d12_borrowed_texture_new(void) {
+  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_D3D12_BORROWED_TEXTURE, NULL);
+}
+
+gpointer maplibre_native_ffi_d3d12_borrowed_texture_get_resource(
+  MaplibreNativeFfiD3d12BorrowedTexture* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURE(self), 0);
+  return self->resource;
+}
+
+void maplibre_native_ffi_d3d12_borrowed_texture_set_resource(
+  MaplibreNativeFfiD3d12BorrowedTexture* self, gpointer value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURE(self));
+  gboolean changed = self->resource != value;
+  self->resource = value;
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      d3d12_borrowed_texture_properties[D3D12_BORROWED_TEXTURE_PROP_RESOURCE]
+    );
+}
+
+MaplibreNativeFfiD3d12BorrowedTexture*
+maplibre_native_ffi_d3d12_borrowed_texture_copy(
+  const MaplibreNativeFfiD3d12BorrowedTexture* self
+) {
+  MaplibreNativeFfiD3d12BorrowedTexture* copy =
+    maplibre_native_ffi_d3d12_borrowed_texture_new();
+  copy->resource = self->resource;
+  return copy;
+}
+
+gpointer maplibre_native_ffi_d3d12_borrowed_texture_copy_func(
+  gconstpointer self, gpointer data
+) {
+  (void)data;
+  return maplibre_native_ffi_d3d12_borrowed_texture_copy(
+    (const MaplibreNativeFfiD3d12BorrowedTexture*)self
+  );
+}
+
+void maplibre_native_ffi_d3d12_borrowed_texture_to_native(
+  const MaplibreNativeFfiD3d12BorrowedTexture* self,
+  mln_d3d12_borrowed_texture* out, MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memset(out, 0, sizeof *out);
+  out->resource = (void*)(self->resource);
+}
+
+struct _MaplibreNativeFfiD3d12BorrowedTexturesTarget {
+  GObject parent_instance;
+  MaplibreNativeFfiLogicalSize logical_size;
+  guint32 physical_width;
+  guint32 physical_height;
+  GPtrArray* textures;
+  guint32 state;
+  GPtrArray* depth_textures;
+  guint32 depth_state;
+};
+
+enum {
+  D3D12_BORROWED_TEXTURES_TARGET_PROP_0,
+  D3D12_BORROWED_TEXTURES_TARGET_PROP_LOGICAL_SIZE,
+  D3D12_BORROWED_TEXTURES_TARGET_PROP_PHYSICAL_WIDTH,
+  D3D12_BORROWED_TEXTURES_TARGET_PROP_PHYSICAL_HEIGHT,
+  D3D12_BORROWED_TEXTURES_TARGET_PROP_STATE,
+  D3D12_BORROWED_TEXTURES_TARGET_PROP_DEPTH_STATE,
+  D3D12_BORROWED_TEXTURES_TARGET_N_PROPERTIES
+};
+
+static GParamSpec* d3d12_borrowed_textures_target_properties
+  [D3D12_BORROWED_TEXTURES_TARGET_N_PROPERTIES];
+
+G_DEFINE_FINAL_TYPE(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget,
+  maplibre_native_ffi_d3d12_borrowed_textures_target, G_TYPE_OBJECT
+)
+
+static void maplibre_native_ffi_d3d12_borrowed_textures_target_finalize(
+  GObject* object
+) {
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self =
+    MAPLIBRE_NATIVE_FFI_D3D12_BORROWED_TEXTURES_TARGET(object);
+  g_clear_pointer(&self->textures, g_ptr_array_unref);
+  g_clear_pointer(&self->depth_textures, g_ptr_array_unref);
+  G_OBJECT_CLASS(
+    maplibre_native_ffi_d3d12_borrowed_textures_target_parent_class
+  )
+    ->finalize(object);
+}
+
+static void maplibre_native_ffi_d3d12_borrowed_textures_target_get_property(
+  GObject* object, guint id, GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self =
+    MAPLIBRE_NATIVE_FFI_D3D12_BORROWED_TEXTURES_TARGET(object);
+  switch (id) {
+    case D3D12_BORROWED_TEXTURES_TARGET_PROP_LOGICAL_SIZE:
+      g_value_set_boxed(value, &self->logical_size);
+      break;
+    case D3D12_BORROWED_TEXTURES_TARGET_PROP_PHYSICAL_WIDTH:
+      g_value_set_uint(value, self->physical_width);
+      break;
+    case D3D12_BORROWED_TEXTURES_TARGET_PROP_PHYSICAL_HEIGHT:
+      g_value_set_uint(value, self->physical_height);
+      break;
+    case D3D12_BORROWED_TEXTURES_TARGET_PROP_STATE:
+      g_value_set_uint(value, self->state);
+      break;
+    case D3D12_BORROWED_TEXTURES_TARGET_PROP_DEPTH_STATE:
+      g_value_set_uint(value, self->depth_state);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_d3d12_borrowed_textures_target_set_property(
+  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self =
+    MAPLIBRE_NATIVE_FFI_D3D12_BORROWED_TEXTURES_TARGET(object);
+  switch (id) {
+    case D3D12_BORROWED_TEXTURES_TARGET_PROP_LOGICAL_SIZE:
+      maplibre_native_ffi_d3d12_borrowed_textures_target_set_logical_size(
+        self, g_value_get_boxed(value)
+      );
+      break;
+    case D3D12_BORROWED_TEXTURES_TARGET_PROP_PHYSICAL_WIDTH:
+      maplibre_native_ffi_d3d12_borrowed_textures_target_set_physical_width(
+        self, g_value_get_uint(value)
+      );
+      break;
+    case D3D12_BORROWED_TEXTURES_TARGET_PROP_PHYSICAL_HEIGHT:
+      maplibre_native_ffi_d3d12_borrowed_textures_target_set_physical_height(
+        self, g_value_get_uint(value)
+      );
+      break;
+    case D3D12_BORROWED_TEXTURES_TARGET_PROP_STATE:
+      maplibre_native_ffi_d3d12_borrowed_textures_target_set_state(
+        self, g_value_get_uint(value)
+      );
+      break;
+    case D3D12_BORROWED_TEXTURES_TARGET_PROP_DEPTH_STATE:
+      maplibre_native_ffi_d3d12_borrowed_textures_target_set_depth_state(
+        self, g_value_get_uint(value)
+      );
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_d3d12_borrowed_textures_target_class_init(
+  MaplibreNativeFfiD3d12BorrowedTexturesTargetClass* klass
+) {
+  GObjectClass* object_class = G_OBJECT_CLASS(klass);
+  object_class->finalize =
+    maplibre_native_ffi_d3d12_borrowed_textures_target_finalize;
+  object_class->get_property =
+    maplibre_native_ffi_d3d12_borrowed_textures_target_get_property;
+  object_class->set_property =
+    maplibre_native_ffi_d3d12_borrowed_textures_target_set_property;
+  d3d12_borrowed_textures_target_properties
+    [D3D12_BORROWED_TEXTURES_TARGET_PROP_LOGICAL_SIZE] = g_param_spec_boxed(
+      "logical-size", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_LOGICAL_SIZE,
+      PROPERTY_FLAGS
+    );
+  d3d12_borrowed_textures_target_properties
+    [D3D12_BORROWED_TEXTURES_TARGET_PROP_PHYSICAL_WIDTH] = g_param_spec_uint(
+      "physical-width", NULL, NULL, 0, G_MAXUINT32, 0, PROPERTY_FLAGS
+    );
+  d3d12_borrowed_textures_target_properties
+    [D3D12_BORROWED_TEXTURES_TARGET_PROP_PHYSICAL_HEIGHT] = g_param_spec_uint(
+      "physical-height", NULL, NULL, 0, G_MAXUINT32, 0, PROPERTY_FLAGS
+    );
+  d3d12_borrowed_textures_target_properties
+    [D3D12_BORROWED_TEXTURES_TARGET_PROP_STATE] =
+      g_param_spec_uint("state", NULL, NULL, 0, G_MAXUINT32, 0, PROPERTY_FLAGS);
+  d3d12_borrowed_textures_target_properties
+    [D3D12_BORROWED_TEXTURES_TARGET_PROP_DEPTH_STATE] = g_param_spec_uint(
+      "depth-state", NULL, NULL, 0, G_MAXUINT32, 0, PROPERTY_FLAGS
+    );
+  g_object_class_install_properties(
+    object_class, D3D12_BORROWED_TEXTURES_TARGET_N_PROPERTIES,
+    d3d12_borrowed_textures_target_properties
+  );
+}
+
+static void maplibre_native_ffi_d3d12_borrowed_textures_target_init(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self
+) {
+  self->textures =
+    g_ptr_array_new_with_free_func((GDestroyNotify)g_object_unref);
+  self->depth_textures =
+    g_ptr_array_new_with_free_func((GDestroyNotify)g_object_unref);
+}
+
+MaplibreNativeFfiD3d12BorrowedTexturesTarget*
+maplibre_native_ffi_d3d12_borrowed_textures_target_new(void) {
+  return g_object_new(
+    MAPLIBRE_NATIVE_FFI_TYPE_D3D12_BORROWED_TEXTURES_TARGET, NULL
+  );
+}
+
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_d3d12_borrowed_textures_target_get_logical_size(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self), NULL
+  );
+  return (MaplibreNativeFfiLogicalSize*)&self->logical_size;
+}
+
+void maplibre_native_ffi_d3d12_borrowed_textures_target_set_logical_size(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self));
+  g_return_if_fail(value != NULL);
+  gboolean changed =
+    memcmp(&self->logical_size, value, sizeof self->logical_size) != 0;
+  self->logical_size = *value;
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), d3d12_borrowed_textures_target_properties
+                        [D3D12_BORROWED_TEXTURES_TARGET_PROP_LOGICAL_SIZE]
+    );
+}
+
+guint32 maplibre_native_ffi_d3d12_borrowed_textures_target_get_physical_width(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self), 0
+  );
+  return self->physical_width;
+}
+
+void maplibre_native_ffi_d3d12_borrowed_textures_target_set_physical_width(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self, guint32 value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self));
+  gboolean changed = self->physical_width != value;
+  self->physical_width = value;
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), d3d12_borrowed_textures_target_properties
+                        [D3D12_BORROWED_TEXTURES_TARGET_PROP_PHYSICAL_WIDTH]
+    );
+}
+
+guint32 maplibre_native_ffi_d3d12_borrowed_textures_target_get_physical_height(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self), 0
+  );
+  return self->physical_height;
+}
+
+void maplibre_native_ffi_d3d12_borrowed_textures_target_set_physical_height(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self, guint32 value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self));
+  gboolean changed = self->physical_height != value;
+  self->physical_height = value;
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), d3d12_borrowed_textures_target_properties
+                        [D3D12_BORROWED_TEXTURES_TARGET_PROP_PHYSICAL_HEIGHT]
+    );
+}
+
+GPtrArray* maplibre_native_ffi_d3d12_borrowed_textures_target_get_textures(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self), NULL
+  );
+  return self->textures;
+}
+
+void maplibre_native_ffi_d3d12_borrowed_textures_target_set_textures(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self,
+  MaplibreNativeFfiD3d12BorrowedTexture* const* value, gsize value_count
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self));
+  for (gsize index = 0; index < value_count; index++) {
+    g_return_if_fail(
+      MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURE(value[index])
+    );
+  }
+  GPtrArray* previous = self->textures;
+  self->textures =
+    g_ptr_array_new_full((guint)value_count, (GDestroyNotify)g_object_unref);
+  for (gsize index = 0; index < value_count; index++) {
+    g_ptr_array_add(
+      self->textures,
+      maplibre_native_ffi_d3d12_borrowed_texture_copy(value[index])
+    );
+  }
+  if (previous != NULL) g_ptr_array_unref(previous);
+}
+
+guint32 maplibre_native_ffi_d3d12_borrowed_textures_target_get_state(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self), 0
+  );
+  return self->state;
+}
+
+void maplibre_native_ffi_d3d12_borrowed_textures_target_set_state(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self, guint32 value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self));
+  gboolean changed = self->state != value;
+  self->state = value;
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), d3d12_borrowed_textures_target_properties
+                        [D3D12_BORROWED_TEXTURES_TARGET_PROP_STATE]
+    );
+}
+
+GPtrArray*
+maplibre_native_ffi_d3d12_borrowed_textures_target_get_depth_textures(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self), NULL
+  );
+  return self->depth_textures;
+}
+
+void maplibre_native_ffi_d3d12_borrowed_textures_target_set_depth_textures(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self,
+  MaplibreNativeFfiD3d12BorrowedTexture* const* value, gsize value_count
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self));
+  for (gsize index = 0; index < value_count; index++) {
+    g_return_if_fail(
+      MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURE(value[index])
+    );
+  }
+  GPtrArray* previous = self->depth_textures;
+  self->depth_textures =
+    g_ptr_array_new_full((guint)value_count, (GDestroyNotify)g_object_unref);
+  for (gsize index = 0; index < value_count; index++) {
+    g_ptr_array_add(
+      self->depth_textures,
+      maplibre_native_ffi_d3d12_borrowed_texture_copy(value[index])
+    );
+  }
+  if (previous != NULL) g_ptr_array_unref(previous);
+}
+
+guint32 maplibre_native_ffi_d3d12_borrowed_textures_target_get_depth_state(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self), 0
+  );
+  return self->depth_state;
+}
+
+void maplibre_native_ffi_d3d12_borrowed_textures_target_set_depth_state(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* self, guint32 value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(self));
+  gboolean changed = self->depth_state != value;
+  self->depth_state = value;
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), d3d12_borrowed_textures_target_properties
+                        [D3D12_BORROWED_TEXTURES_TARGET_PROP_DEPTH_STATE]
+    );
+}
+
+MaplibreNativeFfiD3d12BorrowedTexturesTarget*
+maplibre_native_ffi_d3d12_borrowed_textures_target_copy(
+  const MaplibreNativeFfiD3d12BorrowedTexturesTarget* self
+) {
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* copy =
+    maplibre_native_ffi_d3d12_borrowed_textures_target_new();
+  copy->logical_size = self->logical_size;
+  copy->physical_width = self->physical_width;
+  copy->physical_height = self->physical_height;
+  g_clear_pointer(&copy->textures, g_ptr_array_unref);
+  copy->textures =
+    self->textures != NULL
+      ? g_ptr_array_copy(
+          self->textures, maplibre_native_ffi_d3d12_borrowed_texture_copy_func,
+          NULL
+        )
+      : NULL;
+  if (copy->textures != NULL)
+    g_ptr_array_set_free_func(copy->textures, (GDestroyNotify)g_object_unref);
+  copy->state = self->state;
+  g_clear_pointer(&copy->depth_textures, g_ptr_array_unref);
+  copy->depth_textures =
+    self->depth_textures != NULL
+      ? g_ptr_array_copy(
+          self->depth_textures,
+          maplibre_native_ffi_d3d12_borrowed_texture_copy_func, NULL
+        )
+      : NULL;
+  if (copy->depth_textures != NULL)
+    g_ptr_array_set_free_func(
+      copy->depth_textures, (GDestroyNotify)g_object_unref
+    );
+  copy->depth_state = self->depth_state;
+  return copy;
+}
+
+void maplibre_native_ffi_d3d12_borrowed_textures_target_to_native(
+  const MaplibreNativeFfiD3d12BorrowedTexturesTarget* self,
+  mln_d3d12_borrowed_textures_target* out, MaplibreNativeFfiCall* call
+) {
+  memset(out, 0, sizeof *out);
+  maplibre_native_ffi_logical_size_to_native(
+    &self->logical_size, &out->logical_size, call
+  );
+  out->physical_width = (uint32_t)(self->physical_width);
+  out->physical_height = (uint32_t)(self->physical_height);
+  if (self->textures != NULL && self->textures->len > 0) {
+    mln_d3d12_borrowed_texture* items =
+      maplibre_native_ffi_call_alloc(call, self->textures->len, sizeof *items);
+    for (guint index = 0; index < self->textures->len; index++) {
+      maplibre_native_ffi_d3d12_borrowed_texture_to_native(
+        self->textures->pdata[index], &items[index], call
+      );
+    }
+    out->textures = items;
+    out->texture_count = self->textures->len;
+  }
+  out->state = (uint32_t)(self->state);
+  if (self->depth_textures != NULL && self->depth_textures->len > 0) {
+    mln_d3d12_borrowed_texture* items = maplibre_native_ffi_call_alloc(
+      call, self->depth_textures->len, sizeof *items
+    );
+    for (guint index = 0; index < self->depth_textures->len; index++) {
+      maplibre_native_ffi_d3d12_borrowed_texture_to_native(
+        self->depth_textures->pdata[index], &items[index], call
+      );
+    }
+    out->depth_textures = items;
+    out->depth_texture_count = self->depth_textures->len;
+  }
+  out->depth_state = (uint32_t)(self->depth_state);
+}
+
+struct _MaplibreNativeFfiD3d12CompositionTarget {
+  GObject parent_instance;
+  MaplibreNativeFfiLogicalSize logical_size;
+  MaplibreNativeFfiD3d12CompositionKind kind;
+  gpointer object;
+};
+
+enum {
+  D3D12_COMPOSITION_TARGET_PROP_0,
+  D3D12_COMPOSITION_TARGET_PROP_LOGICAL_SIZE,
+  D3D12_COMPOSITION_TARGET_PROP_KIND,
+  D3D12_COMPOSITION_TARGET_PROP_OBJECT,
+  D3D12_COMPOSITION_TARGET_N_PROPERTIES
+};
+
+static GParamSpec*
+  d3d12_composition_target_properties[D3D12_COMPOSITION_TARGET_N_PROPERTIES];
+
+G_DEFINE_FINAL_TYPE(
+  MaplibreNativeFfiD3d12CompositionTarget,
+  maplibre_native_ffi_d3d12_composition_target, G_TYPE_OBJECT
+)
+
+static void maplibre_native_ffi_d3d12_composition_target_get_property(
+  GObject* object, guint id, GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiD3d12CompositionTarget* self =
+    MAPLIBRE_NATIVE_FFI_D3D12_COMPOSITION_TARGET(object);
+  switch (id) {
+    case D3D12_COMPOSITION_TARGET_PROP_LOGICAL_SIZE:
+      g_value_set_boxed(value, &self->logical_size);
+      break;
+    case D3D12_COMPOSITION_TARGET_PROP_KIND:
+      g_value_set_enum(value, self->kind);
+      break;
+    case D3D12_COMPOSITION_TARGET_PROP_OBJECT:
+      g_value_set_pointer(value, self->object);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_d3d12_composition_target_set_property(
+  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiD3d12CompositionTarget* self =
+    MAPLIBRE_NATIVE_FFI_D3D12_COMPOSITION_TARGET(object);
+  switch (id) {
+    case D3D12_COMPOSITION_TARGET_PROP_LOGICAL_SIZE:
+      maplibre_native_ffi_d3d12_composition_target_set_logical_size(
+        self, g_value_get_boxed(value)
+      );
+      break;
+    case D3D12_COMPOSITION_TARGET_PROP_KIND:
+      maplibre_native_ffi_d3d12_composition_target_set_kind(
+        self, g_value_get_enum(value)
+      );
+      break;
+    case D3D12_COMPOSITION_TARGET_PROP_OBJECT:
+      maplibre_native_ffi_d3d12_composition_target_set_object(
+        self, g_value_get_pointer(value)
+      );
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_d3d12_composition_target_class_init(
+  MaplibreNativeFfiD3d12CompositionTargetClass* klass
+) {
+  GObjectClass* object_class = G_OBJECT_CLASS(klass);
+  object_class->get_property =
+    maplibre_native_ffi_d3d12_composition_target_get_property;
+  object_class->set_property =
+    maplibre_native_ffi_d3d12_composition_target_set_property;
+  d3d12_composition_target_properties
+    [D3D12_COMPOSITION_TARGET_PROP_LOGICAL_SIZE] = g_param_spec_boxed(
+      "logical-size", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_LOGICAL_SIZE,
+      PROPERTY_FLAGS
+    );
+  d3d12_composition_target_properties[D3D12_COMPOSITION_TARGET_PROP_KIND] =
+    g_param_spec_enum(
+      "kind", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_D3D12_COMPOSITION_KIND,
+      MAPLIBRE_NATIVE_FFI_D3D12_COMPOSITION_KIND_VISUAL, PROPERTY_FLAGS
+    );
+  d3d12_composition_target_properties[D3D12_COMPOSITION_TARGET_PROP_OBJECT] =
+    g_param_spec_pointer("object", NULL, NULL, PROPERTY_FLAGS);
+  g_object_class_install_properties(
+    object_class, D3D12_COMPOSITION_TARGET_N_PROPERTIES,
+    d3d12_composition_target_properties
+  );
+}
+
+static void maplibre_native_ffi_d3d12_composition_target_init(
+  MaplibreNativeFfiD3d12CompositionTarget* self
+) {
+  (void)self;
+}
+
+MaplibreNativeFfiD3d12CompositionTarget*
+maplibre_native_ffi_d3d12_composition_target_new(void) {
+  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_D3D12_COMPOSITION_TARGET, NULL);
+}
+
+MaplibreNativeFfiLogicalSize*
+maplibre_native_ffi_d3d12_composition_target_get_logical_size(
+  MaplibreNativeFfiD3d12CompositionTarget* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_COMPOSITION_TARGET(self), NULL
+  );
+  return (MaplibreNativeFfiLogicalSize*)&self->logical_size;
+}
+
+void maplibre_native_ffi_d3d12_composition_target_set_logical_size(
+  MaplibreNativeFfiD3d12CompositionTarget* self,
+  const MaplibreNativeFfiLogicalSize* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_COMPOSITION_TARGET(self));
+  g_return_if_fail(value != NULL);
+  gboolean changed =
+    memcmp(&self->logical_size, value, sizeof self->logical_size) != 0;
+  self->logical_size = *value;
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), d3d12_composition_target_properties
+                        [D3D12_COMPOSITION_TARGET_PROP_LOGICAL_SIZE]
+    );
+}
+
+MaplibreNativeFfiD3d12CompositionKind
+maplibre_native_ffi_d3d12_composition_target_get_kind(
+  MaplibreNativeFfiD3d12CompositionTarget* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_COMPOSITION_TARGET(self),
+    (MaplibreNativeFfiD3d12CompositionKind)0
+  );
+  return self->kind;
+}
+
+void maplibre_native_ffi_d3d12_composition_target_set_kind(
+  MaplibreNativeFfiD3d12CompositionTarget* self,
+  MaplibreNativeFfiD3d12CompositionKind value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_COMPOSITION_TARGET(self));
+  gboolean changed = self->kind != value;
+  self->kind = value;
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      d3d12_composition_target_properties[D3D12_COMPOSITION_TARGET_PROP_KIND]
+    );
+}
+
+gpointer maplibre_native_ffi_d3d12_composition_target_get_object(
+  MaplibreNativeFfiD3d12CompositionTarget* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_COMPOSITION_TARGET(self), 0
+  );
+  return self->object;
+}
+
+void maplibre_native_ffi_d3d12_composition_target_set_object(
+  MaplibreNativeFfiD3d12CompositionTarget* self, gpointer value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_D3D12_COMPOSITION_TARGET(self));
+  gboolean changed = self->object != value;
+  self->object = value;
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      d3d12_composition_target_properties[D3D12_COMPOSITION_TARGET_PROP_OBJECT]
+    );
+}
+
+MaplibreNativeFfiD3d12CompositionTarget*
+maplibre_native_ffi_d3d12_composition_target_copy(
+  const MaplibreNativeFfiD3d12CompositionTarget* self
+) {
+  MaplibreNativeFfiD3d12CompositionTarget* copy =
+    maplibre_native_ffi_d3d12_composition_target_new();
+  copy->logical_size = self->logical_size;
+  copy->kind = self->kind;
+  copy->object = self->object;
+  return copy;
+}
+
+void maplibre_native_ffi_d3d12_composition_target_to_native(
+  const MaplibreNativeFfiD3d12CompositionTarget* self,
+  mln_d3d12_composition_target* out, MaplibreNativeFfiCall* call
+) {
+  memset(out, 0, sizeof *out);
+  maplibre_native_ffi_logical_size_to_native(
+    &self->logical_size, &out->logical_size, call
+  );
+  out->kind = (mln_d3d12_composition_kind)(self->kind);
+  out->object = (void*)(self->object);
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -8394,49 +7741,59 @@ void maplibre_native_ffi_frame_demand_to_native(
   out->token = (uint64_t)(self->token);
 }
 
-struct _MaplibreNativeFfiFramePacerOptions {
+struct _MaplibreNativeFfiFramePacingOptions {
   GObject parent_instance;
   guint64 fields;
   guint32 maximum_frames_per_second;
+  gpointer view;
 };
 
 enum {
-  FRAME_PACER_OPTIONS_PROP_0,
-  FRAME_PACER_OPTIONS_PROP_MAXIMUM_FRAMES_PER_SECOND,
-  FRAME_PACER_OPTIONS_N_PROPERTIES
+  FRAME_PACING_OPTIONS_PROP_0,
+  FRAME_PACING_OPTIONS_PROP_MAXIMUM_FRAMES_PER_SECOND,
+  FRAME_PACING_OPTIONS_PROP_VIEW,
+  FRAME_PACING_OPTIONS_N_PROPERTIES
 };
 
 static GParamSpec*
-  frame_pacer_options_properties[FRAME_PACER_OPTIONS_N_PROPERTIES];
+  frame_pacing_options_properties[FRAME_PACING_OPTIONS_N_PROPERTIES];
 
 G_DEFINE_FINAL_TYPE(
-  MaplibreNativeFfiFramePacerOptions, maplibre_native_ffi_frame_pacer_options,
+  MaplibreNativeFfiFramePacingOptions, maplibre_native_ffi_frame_pacing_options,
   G_TYPE_OBJECT
 )
 
-static void maplibre_native_ffi_frame_pacer_options_get_property(
+static void maplibre_native_ffi_frame_pacing_options_get_property(
   GObject* object, guint id, GValue* value, GParamSpec* pspec
 ) {
-  MaplibreNativeFfiFramePacerOptions* self =
-    MAPLIBRE_NATIVE_FFI_FRAME_PACER_OPTIONS(object);
+  MaplibreNativeFfiFramePacingOptions* self =
+    MAPLIBRE_NATIVE_FFI_FRAME_PACING_OPTIONS(object);
   switch (id) {
-    case FRAME_PACER_OPTIONS_PROP_MAXIMUM_FRAMES_PER_SECOND:
+    case FRAME_PACING_OPTIONS_PROP_MAXIMUM_FRAMES_PER_SECOND:
       g_value_set_uint(value, self->maximum_frames_per_second);
+      break;
+    case FRAME_PACING_OPTIONS_PROP_VIEW:
+      g_value_set_pointer(value, self->view);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
   }
 }
 
-static void maplibre_native_ffi_frame_pacer_options_set_property(
+static void maplibre_native_ffi_frame_pacing_options_set_property(
   GObject* object, guint id, const GValue* value, GParamSpec* pspec
 ) {
-  MaplibreNativeFfiFramePacerOptions* self =
-    MAPLIBRE_NATIVE_FFI_FRAME_PACER_OPTIONS(object);
+  MaplibreNativeFfiFramePacingOptions* self =
+    MAPLIBRE_NATIVE_FFI_FRAME_PACING_OPTIONS(object);
   switch (id) {
-    case FRAME_PACER_OPTIONS_PROP_MAXIMUM_FRAMES_PER_SECOND:
-      maplibre_native_ffi_frame_pacer_options_set_maximum_frames_per_second(
+    case FRAME_PACING_OPTIONS_PROP_MAXIMUM_FRAMES_PER_SECOND:
+      maplibre_native_ffi_frame_pacing_options_set_maximum_frames_per_second(
         self, g_value_get_uint(value)
+      );
+      break;
+    case FRAME_PACING_OPTIONS_PROP_VIEW:
+      maplibre_native_ffi_frame_pacing_options_set_view(
+        self, g_value_get_pointer(value)
       );
       break;
     default:
@@ -8444,75 +7801,111 @@ static void maplibre_native_ffi_frame_pacer_options_set_property(
   }
 }
 
-static void maplibre_native_ffi_frame_pacer_options_class_init(
-  MaplibreNativeFfiFramePacerOptionsClass* klass
+static void maplibre_native_ffi_frame_pacing_options_class_init(
+  MaplibreNativeFfiFramePacingOptionsClass* klass
 ) {
   GObjectClass* object_class = G_OBJECT_CLASS(klass);
   object_class->get_property =
-    maplibre_native_ffi_frame_pacer_options_get_property;
+    maplibre_native_ffi_frame_pacing_options_get_property;
   object_class->set_property =
-    maplibre_native_ffi_frame_pacer_options_set_property;
-  frame_pacer_options_properties
-    [FRAME_PACER_OPTIONS_PROP_MAXIMUM_FRAMES_PER_SECOND] = g_param_spec_uint(
+    maplibre_native_ffi_frame_pacing_options_set_property;
+  frame_pacing_options_properties
+    [FRAME_PACING_OPTIONS_PROP_MAXIMUM_FRAMES_PER_SECOND] = g_param_spec_uint(
       "maximum-frames-per-second", NULL, NULL, 0, G_MAXUINT32, 0, PROPERTY_FLAGS
     );
+  frame_pacing_options_properties[FRAME_PACING_OPTIONS_PROP_VIEW] =
+    g_param_spec_pointer("view", NULL, NULL, PROPERTY_FLAGS);
   g_object_class_install_properties(
-    object_class, FRAME_PACER_OPTIONS_N_PROPERTIES,
-    frame_pacer_options_properties
+    object_class, FRAME_PACING_OPTIONS_N_PROPERTIES,
+    frame_pacing_options_properties
   );
 }
 
-static void maplibre_native_ffi_frame_pacer_options_init(
-  MaplibreNativeFfiFramePacerOptions* self
+static void maplibre_native_ffi_frame_pacing_options_init(
+  MaplibreNativeFfiFramePacingOptions* self
 ) {
   (void)self;
 }
 
-MaplibreNativeFfiFramePacerOptions* maplibre_native_ffi_frame_pacer_options_new(
-  void
-) {
-  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_FRAME_PACER_OPTIONS, NULL);
+MaplibreNativeFfiFramePacingOptions*
+maplibre_native_ffi_frame_pacing_options_new(void) {
+  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_FRAME_PACING_OPTIONS, NULL);
 }
 
-guint32 maplibre_native_ffi_frame_pacer_options_get_maximum_frames_per_second(
-  MaplibreNativeFfiFramePacerOptions* self
+guint32 maplibre_native_ffi_frame_pacing_options_get_maximum_frames_per_second(
+  MaplibreNativeFfiFramePacingOptions* self
 ) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACER_OPTIONS(self), 0);
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACING_OPTIONS(self), 0);
   return self->maximum_frames_per_second;
 }
 
-gboolean maplibre_native_ffi_frame_pacer_options_has_maximum_frames_per_second(
-  MaplibreNativeFfiFramePacerOptions* self
+gboolean maplibre_native_ffi_frame_pacing_options_has_maximum_frames_per_second(
+  MaplibreNativeFfiFramePacingOptions* self
 ) {
-  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACER_OPTIONS(self), FALSE);
-  return (self->fields & MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND) != 0;
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_FRAME_PACING_OPTIONS(self), FALSE
+  );
+  return (self->fields & MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND) !=
+         0;
 }
 
-void maplibre_native_ffi_frame_pacer_options_set_maximum_frames_per_second(
-  MaplibreNativeFfiFramePacerOptions* self, guint32 value
+void maplibre_native_ffi_frame_pacing_options_set_maximum_frames_per_second(
+  MaplibreNativeFfiFramePacingOptions* self, guint32 value
 ) {
-  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACER_OPTIONS(self));
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACING_OPTIONS(self));
   gboolean was_set =
-    (self->fields & MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND) != 0;
+    (self->fields & MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND) != 0;
   gboolean changed = self->maximum_frames_per_second != value;
   self->maximum_frames_per_second = value;
-  self->fields |= MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+  self->fields |= MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND;
   if (changed || !was_set)
     g_object_notify_by_pspec(
-      G_OBJECT(self), frame_pacer_options_properties
-                        [FRAME_PACER_OPTIONS_PROP_MAXIMUM_FRAMES_PER_SECOND]
+      G_OBJECT(self), frame_pacing_options_properties
+                        [FRAME_PACING_OPTIONS_PROP_MAXIMUM_FRAMES_PER_SECOND]
     );
 }
 
-void maplibre_native_ffi_frame_pacer_options_to_native(
-  const MaplibreNativeFfiFramePacerOptions* self, mln_frame_pacer_options* out,
-  MaplibreNativeFfiCall* call
+gpointer maplibre_native_ffi_frame_pacing_options_get_view(
+  MaplibreNativeFfiFramePacingOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACING_OPTIONS(self), 0);
+  return self->view;
+}
+
+gboolean maplibre_native_ffi_frame_pacing_options_has_view(
+  MaplibreNativeFfiFramePacingOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_FRAME_PACING_OPTIONS(self), FALSE
+  );
+  return (self->fields & MLN_FRAME_PACING_OPTION_VIEW) != 0;
+}
+
+void maplibre_native_ffi_frame_pacing_options_set_view(
+  MaplibreNativeFfiFramePacingOptions* self, gpointer value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_FRAME_PACING_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_FRAME_PACING_OPTION_VIEW) != 0;
+  gboolean changed = self->view != value;
+  self->view = value;
+  self->fields |= MLN_FRAME_PACING_OPTION_VIEW;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      frame_pacing_options_properties[FRAME_PACING_OPTIONS_PROP_VIEW]
+    );
+}
+
+void maplibre_native_ffi_frame_pacing_options_to_native(
+  const MaplibreNativeFfiFramePacingOptions* self,
+  mln_frame_pacing_options* out, MaplibreNativeFfiCall* call
 ) {
   (void)call;
   memset(out, 0, sizeof *out);
   out->size = sizeof *out;
-  out->fields = (mln_frame_pacer_option_fields)self->fields;
+  out->fields = (mln_frame_pacing_option_fields)self->fields;
   out->maximum_frames_per_second = (uint32_t)(self->maximum_frames_per_second);
+  out->view = (void*)(self->view);
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -9405,6 +8798,2594 @@ maplibre_native_ffi_geo_json_source_options_from_native(
   }
   if ((in->fields & MLN_GEO_JSON_SOURCE_OPTION_CLUSTER) != 0) {
     self->cluster = (in->cluster) ? TRUE : FALSE;
+  }
+  return self;
+}
+
+struct _MaplibreNativeFfiMomentumDecay {
+  GObject parent_instance;
+  guint64 fields;
+  MaplibreNativeFfiMomentumDecayModel model;
+  gdouble half_life_ms;
+  gdouble stop_speed;
+  gdouble reference_speed;
+  gdouble duration_ms;
+  gdouble duration_exponent;
+  MaplibreNativeFfiUnitBezier easing;
+  gdouble min_speed;
+  gdouble max_speed;
+  gdouble max_distance;
+};
+
+enum {
+  MOMENTUM_DECAY_PROP_0,
+  MOMENTUM_DECAY_PROP_MODEL,
+  MOMENTUM_DECAY_PROP_HALF_LIFE_MS,
+  MOMENTUM_DECAY_PROP_STOP_SPEED,
+  MOMENTUM_DECAY_PROP_REFERENCE_SPEED,
+  MOMENTUM_DECAY_PROP_DURATION_MS,
+  MOMENTUM_DECAY_PROP_DURATION_EXPONENT,
+  MOMENTUM_DECAY_PROP_EASING,
+  MOMENTUM_DECAY_PROP_MIN_SPEED,
+  MOMENTUM_DECAY_PROP_MAX_SPEED,
+  MOMENTUM_DECAY_PROP_MAX_DISTANCE,
+  MOMENTUM_DECAY_N_PROPERTIES
+};
+
+static GParamSpec* momentum_decay_properties[MOMENTUM_DECAY_N_PROPERTIES];
+
+G_DEFINE_FINAL_TYPE(
+  MaplibreNativeFfiMomentumDecay, maplibre_native_ffi_momentum_decay,
+  G_TYPE_OBJECT
+)
+
+static void maplibre_native_ffi_momentum_decay_get_property(
+  GObject* object, guint id, GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiMomentumDecay* self =
+    MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY(object);
+  switch (id) {
+    case MOMENTUM_DECAY_PROP_MODEL:
+      g_value_set_enum(value, self->model);
+      break;
+    case MOMENTUM_DECAY_PROP_HALF_LIFE_MS:
+      g_value_set_double(value, self->half_life_ms);
+      break;
+    case MOMENTUM_DECAY_PROP_STOP_SPEED:
+      g_value_set_double(value, self->stop_speed);
+      break;
+    case MOMENTUM_DECAY_PROP_REFERENCE_SPEED:
+      g_value_set_double(value, self->reference_speed);
+      break;
+    case MOMENTUM_DECAY_PROP_DURATION_MS:
+      g_value_set_double(value, self->duration_ms);
+      break;
+    case MOMENTUM_DECAY_PROP_DURATION_EXPONENT:
+      g_value_set_double(value, self->duration_exponent);
+      break;
+    case MOMENTUM_DECAY_PROP_EASING:
+      g_value_set_boxed(value, &self->easing);
+      break;
+    case MOMENTUM_DECAY_PROP_MIN_SPEED:
+      g_value_set_double(value, self->min_speed);
+      break;
+    case MOMENTUM_DECAY_PROP_MAX_SPEED:
+      g_value_set_double(value, self->max_speed);
+      break;
+    case MOMENTUM_DECAY_PROP_MAX_DISTANCE:
+      g_value_set_double(value, self->max_distance);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_momentum_decay_set_property(
+  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiMomentumDecay* self =
+    MAPLIBRE_NATIVE_FFI_MOMENTUM_DECAY(object);
+  switch (id) {
+    case MOMENTUM_DECAY_PROP_MODEL:
+      maplibre_native_ffi_momentum_decay_set_model(
+        self, g_value_get_enum(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_HALF_LIFE_MS:
+      maplibre_native_ffi_momentum_decay_set_half_life_ms(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_STOP_SPEED:
+      maplibre_native_ffi_momentum_decay_set_stop_speed(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_REFERENCE_SPEED:
+      maplibre_native_ffi_momentum_decay_set_reference_speed(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_DURATION_MS:
+      maplibre_native_ffi_momentum_decay_set_duration_ms(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_DURATION_EXPONENT:
+      maplibre_native_ffi_momentum_decay_set_duration_exponent(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_EASING:
+      maplibre_native_ffi_momentum_decay_set_easing(
+        self, g_value_get_boxed(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_MIN_SPEED:
+      maplibre_native_ffi_momentum_decay_set_min_speed(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_MAX_SPEED:
+      maplibre_native_ffi_momentum_decay_set_max_speed(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_DECAY_PROP_MAX_DISTANCE:
+      maplibre_native_ffi_momentum_decay_set_max_distance(
+        self, g_value_get_double(value)
+      );
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_momentum_decay_class_init(
+  MaplibreNativeFfiMomentumDecayClass* klass
+) {
+  GObjectClass* object_class = G_OBJECT_CLASS(klass);
+  object_class->get_property = maplibre_native_ffi_momentum_decay_get_property;
+  object_class->set_property = maplibre_native_ffi_momentum_decay_set_property;
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_MODEL] = g_param_spec_enum(
+    "model", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY_MODEL, 0,
+    PROPERTY_FLAGS
+  );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_HALF_LIFE_MS] =
+    g_param_spec_double(
+      "half-life-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_STOP_SPEED] =
+    g_param_spec_double(
+      "stop-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_REFERENCE_SPEED] =
+    g_param_spec_double(
+      "reference-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_DURATION_MS] =
+    g_param_spec_double(
+      "duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_DURATION_EXPONENT] =
+    g_param_spec_double(
+      "duration-exponent", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_EASING] = g_param_spec_boxed(
+    "easing", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_UNIT_BEZIER, PROPERTY_FLAGS
+  );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_MIN_SPEED] =
+    g_param_spec_double(
+      "min-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_MAX_SPEED] =
+    g_param_spec_double(
+      "max-speed", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  momentum_decay_properties[MOMENTUM_DECAY_PROP_MAX_DISTANCE] =
+    g_param_spec_double(
+      "max-distance", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  g_object_class_install_properties(
+    object_class, MOMENTUM_DECAY_N_PROPERTIES, momentum_decay_properties
+  );
+}
+
+static void maplibre_native_ffi_momentum_decay_init(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  (void)self;
+}
+
+MaplibreNativeFfiMomentumDecay* maplibre_native_ffi_momentum_decay_new(void) {
+  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY, NULL);
+}
+
+MaplibreNativeFfiMomentumDecayModel
+maplibre_native_ffi_momentum_decay_get_model(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self),
+    (MaplibreNativeFfiMomentumDecayModel)0
+  );
+  return self->model;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_model(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_MODEL) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_model(
+  MaplibreNativeFfiMomentumDecay* self,
+  MaplibreNativeFfiMomentumDecayModel value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_MODEL) != 0;
+  gboolean changed = self->model != value;
+  self->model = value;
+  self->fields |= MLN_MOMENTUM_DECAY_MODEL;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_MODEL]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_decay_get_half_life_ms(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
+  return self->half_life_ms;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_half_life_ms(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_HALF_LIFE_MS) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_half_life_ms(
+  MaplibreNativeFfiMomentumDecay* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_HALF_LIFE_MS) != 0;
+  gboolean changed = self->half_life_ms != value;
+  self->half_life_ms = value;
+  self->fields |= MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      momentum_decay_properties[MOMENTUM_DECAY_PROP_HALF_LIFE_MS]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_decay_get_stop_speed(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
+  return self->stop_speed;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_stop_speed(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_STOP_SPEED) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_stop_speed(
+  MaplibreNativeFfiMomentumDecay* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_STOP_SPEED) != 0;
+  gboolean changed = self->stop_speed != value;
+  self->stop_speed = value;
+  self->fields |= MLN_MOMENTUM_DECAY_STOP_SPEED;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_STOP_SPEED]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_decay_get_reference_speed(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
+  return self->reference_speed;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_reference_speed(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_REFERENCE_SPEED) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_reference_speed(
+  MaplibreNativeFfiMomentumDecay* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_REFERENCE_SPEED) != 0;
+  gboolean changed = self->reference_speed != value;
+  self->reference_speed = value;
+  self->fields |= MLN_MOMENTUM_DECAY_REFERENCE_SPEED;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      momentum_decay_properties[MOMENTUM_DECAY_PROP_REFERENCE_SPEED]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_decay_get_duration_ms(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
+  return self->duration_ms;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_duration_ms(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_DURATION_MS) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_duration_ms(
+  MaplibreNativeFfiMomentumDecay* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_DURATION_MS) != 0;
+  gboolean changed = self->duration_ms != value;
+  self->duration_ms = value;
+  self->fields |= MLN_MOMENTUM_DECAY_DURATION_MS;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_DURATION_MS]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_decay_get_duration_exponent(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
+  return self->duration_exponent;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_duration_exponent(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_DURATION_EXPONENT) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_duration_exponent(
+  MaplibreNativeFfiMomentumDecay* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_DURATION_EXPONENT) != 0;
+  gboolean changed = self->duration_exponent != value;
+  self->duration_exponent = value;
+  self->fields |= MLN_MOMENTUM_DECAY_DURATION_EXPONENT;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      momentum_decay_properties[MOMENTUM_DECAY_PROP_DURATION_EXPONENT]
+    );
+}
+
+MaplibreNativeFfiUnitBezier* maplibre_native_ffi_momentum_decay_get_easing(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), NULL);
+  return (MaplibreNativeFfiUnitBezier*)&self->easing;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_easing(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_EASING) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_easing(
+  MaplibreNativeFfiMomentumDecay* self, const MaplibreNativeFfiUnitBezier* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  g_return_if_fail(value != NULL);
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_EASING) != 0;
+  gboolean changed = memcmp(&self->easing, value, sizeof self->easing) != 0;
+  self->easing = *value;
+  self->fields |= MLN_MOMENTUM_DECAY_EASING;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_EASING]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_decay_get_min_speed(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
+  return self->min_speed;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_min_speed(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_MIN_SPEED) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_min_speed(
+  MaplibreNativeFfiMomentumDecay* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_MIN_SPEED) != 0;
+  gboolean changed = self->min_speed != value;
+  self->min_speed = value;
+  self->fields |= MLN_MOMENTUM_DECAY_MIN_SPEED;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_MIN_SPEED]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_decay_get_max_speed(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
+  return self->max_speed;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_max_speed(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_MAX_SPEED) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_max_speed(
+  MaplibreNativeFfiMomentumDecay* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_MAX_SPEED) != 0;
+  gboolean changed = self->max_speed != value;
+  self->max_speed = value;
+  self->fields |= MLN_MOMENTUM_DECAY_MAX_SPEED;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_decay_properties[MOMENTUM_DECAY_PROP_MAX_SPEED]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_decay_get_max_distance(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), 0);
+  return self->max_distance;
+}
+
+gboolean maplibre_native_ffi_momentum_decay_has_max_distance(
+  MaplibreNativeFfiMomentumDecay* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_DECAY_MAX_DISTANCE) != 0;
+}
+
+void maplibre_native_ffi_momentum_decay_set_max_distance(
+  MaplibreNativeFfiMomentumDecay* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_DECAY_MAX_DISTANCE) != 0;
+  gboolean changed = self->max_distance != value;
+  self->max_distance = value;
+  self->fields |= MLN_MOMENTUM_DECAY_MAX_DISTANCE;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      momentum_decay_properties[MOMENTUM_DECAY_PROP_MAX_DISTANCE]
+    );
+}
+
+MaplibreNativeFfiMomentumDecay* maplibre_native_ffi_momentum_decay_copy(
+  const MaplibreNativeFfiMomentumDecay* self
+) {
+  MaplibreNativeFfiMomentumDecay* copy =
+    maplibre_native_ffi_momentum_decay_new();
+  copy->fields = self->fields;
+  copy->model = self->model;
+  copy->half_life_ms = self->half_life_ms;
+  copy->stop_speed = self->stop_speed;
+  copy->reference_speed = self->reference_speed;
+  copy->duration_ms = self->duration_ms;
+  copy->duration_exponent = self->duration_exponent;
+  copy->easing = self->easing;
+  copy->min_speed = self->min_speed;
+  copy->max_speed = self->max_speed;
+  copy->max_distance = self->max_distance;
+  return copy;
+}
+
+void maplibre_native_ffi_momentum_decay_to_native(
+  const MaplibreNativeFfiMomentumDecay* self, mln_momentum_decay* out,
+  MaplibreNativeFfiCall* call
+) {
+  memset(out, 0, sizeof *out);
+  out->fields = (mln_momentum_decay_fields)self->fields;
+  out->model = (mln_momentum_decay_model)(self->model);
+  out->half_life_ms = (double)(self->half_life_ms);
+  out->stop_speed = (double)(self->stop_speed);
+  out->reference_speed = (double)(self->reference_speed);
+  out->duration_ms = (double)(self->duration_ms);
+  out->duration_exponent = (double)(self->duration_exponent);
+  maplibre_native_ffi_unit_bezier_to_native(&self->easing, &out->easing, call);
+  out->min_speed = (double)(self->min_speed);
+  out->max_speed = (double)(self->max_speed);
+  out->max_distance = (double)(self->max_distance);
+}
+
+struct _MaplibreNativeFfiMomentumSnap {
+  GObject parent_instance;
+  guint64 fields;
+  gdouble spacing;
+  gdouble offset;
+  gdouble tolerance;
+  gdouble duration_ms;
+};
+
+enum {
+  MOMENTUM_SNAP_PROP_0,
+  MOMENTUM_SNAP_PROP_SPACING,
+  MOMENTUM_SNAP_PROP_OFFSET,
+  MOMENTUM_SNAP_PROP_TOLERANCE,
+  MOMENTUM_SNAP_PROP_DURATION_MS,
+  MOMENTUM_SNAP_N_PROPERTIES
+};
+
+static GParamSpec* momentum_snap_properties[MOMENTUM_SNAP_N_PROPERTIES];
+
+G_DEFINE_FINAL_TYPE(
+  MaplibreNativeFfiMomentumSnap, maplibre_native_ffi_momentum_snap,
+  G_TYPE_OBJECT
+)
+
+static void maplibre_native_ffi_momentum_snap_get_property(
+  GObject* object, guint id, GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiMomentumSnap* self =
+    MAPLIBRE_NATIVE_FFI_MOMENTUM_SNAP(object);
+  switch (id) {
+    case MOMENTUM_SNAP_PROP_SPACING:
+      g_value_set_double(value, self->spacing);
+      break;
+    case MOMENTUM_SNAP_PROP_OFFSET:
+      g_value_set_double(value, self->offset);
+      break;
+    case MOMENTUM_SNAP_PROP_TOLERANCE:
+      g_value_set_double(value, self->tolerance);
+      break;
+    case MOMENTUM_SNAP_PROP_DURATION_MS:
+      g_value_set_double(value, self->duration_ms);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_momentum_snap_set_property(
+  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiMomentumSnap* self =
+    MAPLIBRE_NATIVE_FFI_MOMENTUM_SNAP(object);
+  switch (id) {
+    case MOMENTUM_SNAP_PROP_SPACING:
+      maplibre_native_ffi_momentum_snap_set_spacing(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_SNAP_PROP_OFFSET:
+      maplibre_native_ffi_momentum_snap_set_offset(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_SNAP_PROP_TOLERANCE:
+      maplibre_native_ffi_momentum_snap_set_tolerance(
+        self, g_value_get_double(value)
+      );
+      break;
+    case MOMENTUM_SNAP_PROP_DURATION_MS:
+      maplibre_native_ffi_momentum_snap_set_duration_ms(
+        self, g_value_get_double(value)
+      );
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_momentum_snap_class_init(
+  MaplibreNativeFfiMomentumSnapClass* klass
+) {
+  GObjectClass* object_class = G_OBJECT_CLASS(klass);
+  object_class->get_property = maplibre_native_ffi_momentum_snap_get_property;
+  object_class->set_property = maplibre_native_ffi_momentum_snap_set_property;
+  momentum_snap_properties[MOMENTUM_SNAP_PROP_SPACING] = g_param_spec_double(
+    "spacing", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+  );
+  momentum_snap_properties[MOMENTUM_SNAP_PROP_OFFSET] = g_param_spec_double(
+    "offset", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+  );
+  momentum_snap_properties[MOMENTUM_SNAP_PROP_TOLERANCE] = g_param_spec_double(
+    "tolerance", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+  );
+  momentum_snap_properties[MOMENTUM_SNAP_PROP_DURATION_MS] =
+    g_param_spec_double(
+      "duration-ms", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  g_object_class_install_properties(
+    object_class, MOMENTUM_SNAP_N_PROPERTIES, momentum_snap_properties
+  );
+}
+
+static void maplibre_native_ffi_momentum_snap_init(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  (void)self;
+}
+
+MaplibreNativeFfiMomentumSnap* maplibre_native_ffi_momentum_snap_new(void) {
+  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_SNAP, NULL);
+}
+
+gdouble maplibre_native_ffi_momentum_snap_get_spacing(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
+  return self->spacing;
+}
+
+gboolean maplibre_native_ffi_momentum_snap_has_spacing(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_SNAP_SPACING) != 0;
+}
+
+void maplibre_native_ffi_momentum_snap_set_spacing(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_SPACING) != 0;
+  gboolean changed = self->spacing != value;
+  self->spacing = value;
+  self->fields |= MLN_MOMENTUM_SNAP_SPACING;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_SPACING]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_snap_get_offset(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
+  return self->offset;
+}
+
+gboolean maplibre_native_ffi_momentum_snap_has_offset(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_SNAP_OFFSET) != 0;
+}
+
+void maplibre_native_ffi_momentum_snap_set_offset(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_OFFSET) != 0;
+  gboolean changed = self->offset != value;
+  self->offset = value;
+  self->fields |= MLN_MOMENTUM_SNAP_OFFSET;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_OFFSET]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_snap_get_tolerance(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
+  return self->tolerance;
+}
+
+gboolean maplibre_native_ffi_momentum_snap_has_tolerance(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_SNAP_TOLERANCE) != 0;
+}
+
+void maplibre_native_ffi_momentum_snap_set_tolerance(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_TOLERANCE) != 0;
+  gboolean changed = self->tolerance != value;
+  self->tolerance = value;
+  self->fields |= MLN_MOMENTUM_SNAP_TOLERANCE;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_TOLERANCE]
+    );
+}
+
+gdouble maplibre_native_ffi_momentum_snap_get_duration_ms(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), 0);
+  return self->duration_ms;
+}
+
+gboolean maplibre_native_ffi_momentum_snap_has_duration_ms(
+  MaplibreNativeFfiMomentumSnap* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self), FALSE);
+  return (self->fields & MLN_MOMENTUM_SNAP_DURATION_MS) != 0;
+}
+
+void maplibre_native_ffi_momentum_snap_set_duration_ms(
+  MaplibreNativeFfiMomentumSnap* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(self));
+  gboolean was_set = (self->fields & MLN_MOMENTUM_SNAP_DURATION_MS) != 0;
+  gboolean changed = self->duration_ms != value;
+  self->duration_ms = value;
+  self->fields |= MLN_MOMENTUM_SNAP_DURATION_MS;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), momentum_snap_properties[MOMENTUM_SNAP_PROP_DURATION_MS]
+    );
+}
+
+MaplibreNativeFfiMomentumSnap* maplibre_native_ffi_momentum_snap_copy(
+  const MaplibreNativeFfiMomentumSnap* self
+) {
+  MaplibreNativeFfiMomentumSnap* copy = maplibre_native_ffi_momentum_snap_new();
+  copy->fields = self->fields;
+  copy->spacing = self->spacing;
+  copy->offset = self->offset;
+  copy->tolerance = self->tolerance;
+  copy->duration_ms = self->duration_ms;
+  return copy;
+}
+
+void maplibre_native_ffi_momentum_snap_to_native(
+  const MaplibreNativeFfiMomentumSnap* self, mln_momentum_snap* out,
+  MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memset(out, 0, sizeof *out);
+  out->fields = (mln_momentum_snap_fields)self->fields;
+  out->spacing = (double)(self->spacing);
+  out->offset = (double)(self->offset);
+  out->tolerance = (double)(self->tolerance);
+  out->duration_ms = (double)(self->duration_ms);
+}
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiGestureNotch, maplibre_native_ffi_gesture_notch,
+  maplibre_native_ffi_gesture_notch_copy, maplibre_native_ffi_gesture_notch_free
+)
+
+MaplibreNativeFfiGestureNotch* maplibre_native_ffi_gesture_notch_copy(
+  const MaplibreNativeFfiGestureNotch* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_gesture_notch_free(
+  MaplibreNativeFfiGestureNotch* self
+) {
+  g_free(self);
+}
+
+gpointer maplibre_native_ffi_gesture_notch_copy_func(
+  gconstpointer self, gpointer data
+) {
+  (void)data;
+  return maplibre_native_ffi_gesture_notch_copy(
+    (const MaplibreNativeFfiGestureNotch*)self
+  );
+}
+
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiGestureNotch) == sizeof(mln_gesture_notch)
+);
+SAME_MEMBER(MaplibreNativeFfiGestureNotch, mln_gesture_notch, spacing);
+SAME_MEMBER(MaplibreNativeFfiGestureNotch, mln_gesture_notch, offset);
+SAME_MEMBER(MaplibreNativeFfiGestureNotch, mln_gesture_notch, kind);
+
+void maplibre_native_ffi_gesture_notch_to_native(
+  const MaplibreNativeFfiGestureNotch* self, mln_gesture_notch* out,
+  MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memcpy(out, self, sizeof *out);
+}
+
+struct _MaplibreNativeFfiGestureAxisOptions {
+  GObject parent_instance;
+  guint64 fields;
+  gboolean enabled;
+  gboolean glides;
+  MaplibreNativeFfiMomentumDecay* momentum;
+  gboolean snaps;
+  MaplibreNativeFfiMomentumSnap* snap;
+  GPtrArray* notches;
+};
+
+enum {
+  GESTURE_AXIS_OPTIONS_PROP_0,
+  GESTURE_AXIS_OPTIONS_PROP_ENABLED,
+  GESTURE_AXIS_OPTIONS_PROP_GLIDES,
+  GESTURE_AXIS_OPTIONS_PROP_MOMENTUM,
+  GESTURE_AXIS_OPTIONS_PROP_SNAPS,
+  GESTURE_AXIS_OPTIONS_PROP_SNAP,
+  GESTURE_AXIS_OPTIONS_N_PROPERTIES
+};
+
+static GParamSpec*
+  gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_N_PROPERTIES];
+
+G_DEFINE_FINAL_TYPE(
+  MaplibreNativeFfiGestureAxisOptions, maplibre_native_ffi_gesture_axis_options,
+  G_TYPE_OBJECT
+)
+
+static void maplibre_native_ffi_gesture_axis_options_finalize(GObject* object) {
+  MaplibreNativeFfiGestureAxisOptions* self =
+    MAPLIBRE_NATIVE_FFI_GESTURE_AXIS_OPTIONS(object);
+  g_clear_object(&self->momentum);
+  g_clear_object(&self->snap);
+  g_clear_pointer(&self->notches, g_ptr_array_unref);
+  G_OBJECT_CLASS(maplibre_native_ffi_gesture_axis_options_parent_class)
+    ->finalize(object);
+}
+
+static void maplibre_native_ffi_gesture_axis_options_get_property(
+  GObject* object, guint id, GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiGestureAxisOptions* self =
+    MAPLIBRE_NATIVE_FFI_GESTURE_AXIS_OPTIONS(object);
+  switch (id) {
+    case GESTURE_AXIS_OPTIONS_PROP_ENABLED:
+      g_value_set_boolean(value, self->enabled);
+      break;
+    case GESTURE_AXIS_OPTIONS_PROP_GLIDES:
+      g_value_set_boolean(value, self->glides);
+      break;
+    case GESTURE_AXIS_OPTIONS_PROP_MOMENTUM:
+      g_value_set_object(value, self->momentum);
+      break;
+    case GESTURE_AXIS_OPTIONS_PROP_SNAPS:
+      g_value_set_boolean(value, self->snaps);
+      break;
+    case GESTURE_AXIS_OPTIONS_PROP_SNAP:
+      g_value_set_object(value, self->snap);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_gesture_axis_options_set_property(
+  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiGestureAxisOptions* self =
+    MAPLIBRE_NATIVE_FFI_GESTURE_AXIS_OPTIONS(object);
+  switch (id) {
+    case GESTURE_AXIS_OPTIONS_PROP_ENABLED:
+      maplibre_native_ffi_gesture_axis_options_set_enabled(
+        self, g_value_get_boolean(value)
+      );
+      break;
+    case GESTURE_AXIS_OPTIONS_PROP_GLIDES:
+      maplibre_native_ffi_gesture_axis_options_set_glides(
+        self, g_value_get_boolean(value)
+      );
+      break;
+    case GESTURE_AXIS_OPTIONS_PROP_MOMENTUM:
+      maplibre_native_ffi_gesture_axis_options_set_momentum(
+        self, g_value_get_object(value)
+      );
+      break;
+    case GESTURE_AXIS_OPTIONS_PROP_SNAPS:
+      maplibre_native_ffi_gesture_axis_options_set_snaps(
+        self, g_value_get_boolean(value)
+      );
+      break;
+    case GESTURE_AXIS_OPTIONS_PROP_SNAP:
+      maplibre_native_ffi_gesture_axis_options_set_snap(
+        self, g_value_get_object(value)
+      );
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_gesture_axis_options_class_init(
+  MaplibreNativeFfiGestureAxisOptionsClass* klass
+) {
+  GObjectClass* object_class = G_OBJECT_CLASS(klass);
+  object_class->finalize = maplibre_native_ffi_gesture_axis_options_finalize;
+  object_class->get_property =
+    maplibre_native_ffi_gesture_axis_options_get_property;
+  object_class->set_property =
+    maplibre_native_ffi_gesture_axis_options_set_property;
+  gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_PROP_ENABLED] =
+    g_param_spec_boolean("enabled", NULL, NULL, FALSE, PROPERTY_FLAGS);
+  gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_PROP_GLIDES] =
+    g_param_spec_boolean("glides", NULL, NULL, FALSE, PROPERTY_FLAGS);
+  gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_PROP_MOMENTUM] =
+    g_param_spec_object(
+      "momentum", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY,
+      PROPERTY_FLAGS
+    );
+  gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_PROP_SNAPS] =
+    g_param_spec_boolean("snaps", NULL, NULL, FALSE, PROPERTY_FLAGS);
+  gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_PROP_SNAP] =
+    g_param_spec_object(
+      "snap", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_SNAP, PROPERTY_FLAGS
+    );
+  g_object_class_install_properties(
+    object_class, GESTURE_AXIS_OPTIONS_N_PROPERTIES,
+    gesture_axis_options_properties
+  );
+}
+
+static void maplibre_native_ffi_gesture_axis_options_init(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  self->momentum = maplibre_native_ffi_momentum_decay_new();
+  self->snap = maplibre_native_ffi_momentum_snap_new();
+  self->notches = g_ptr_array_new_with_free_func(
+    (GDestroyNotify)maplibre_native_ffi_gesture_notch_free
+  );
+}
+
+MaplibreNativeFfiGestureAxisOptions*
+maplibre_native_ffi_gesture_axis_options_new(void) {
+  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_AXIS_OPTIONS, NULL);
+}
+
+gboolean maplibre_native_ffi_gesture_axis_options_get_enabled(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), FALSE
+  );
+  return self->enabled;
+}
+
+gboolean maplibre_native_ffi_gesture_axis_options_has_enabled(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), FALSE
+  );
+  return (self->fields & MLN_GESTURE_AXIS_OPTION_ENABLED) != 0;
+}
+
+void maplibre_native_ffi_gesture_axis_options_set_enabled(
+  MaplibreNativeFfiGestureAxisOptions* self, gboolean value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_GESTURE_AXIS_OPTION_ENABLED) != 0;
+  gboolean changed = self->enabled != value;
+  self->enabled = value;
+  self->fields |= MLN_GESTURE_AXIS_OPTION_ENABLED;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_PROP_ENABLED]
+    );
+}
+
+gboolean maplibre_native_ffi_gesture_axis_options_get_glides(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), FALSE
+  );
+  return self->glides;
+}
+
+gboolean maplibre_native_ffi_gesture_axis_options_has_glides(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), FALSE
+  );
+  return (self->fields & MLN_GESTURE_AXIS_OPTION_GLIDES) != 0;
+}
+
+void maplibre_native_ffi_gesture_axis_options_set_glides(
+  MaplibreNativeFfiGestureAxisOptions* self, gboolean value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_GESTURE_AXIS_OPTION_GLIDES) != 0;
+  gboolean changed = self->glides != value;
+  self->glides = value;
+  self->fields |= MLN_GESTURE_AXIS_OPTION_GLIDES;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_PROP_GLIDES]
+    );
+}
+
+MaplibreNativeFfiMomentumDecay*
+maplibre_native_ffi_gesture_axis_options_get_momentum(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), NULL);
+  return self->momentum;
+}
+
+gboolean maplibre_native_ffi_gesture_axis_options_has_momentum(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), FALSE
+  );
+  return (self->fields & MLN_GESTURE_AXIS_OPTION_MOMENTUM) != 0;
+}
+
+void maplibre_native_ffi_gesture_axis_options_set_momentum(
+  MaplibreNativeFfiGestureAxisOptions* self,
+  MaplibreNativeFfiMomentumDecay* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self));
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(value));
+  MaplibreNativeFfiMomentumDecay* previous = self->momentum;
+  self->momentum = maplibre_native_ffi_momentum_decay_copy(value);
+  if (previous != NULL) g_object_unref(previous);
+  self->fields |= MLN_GESTURE_AXIS_OPTION_MOMENTUM;
+  g_object_notify_by_pspec(
+    G_OBJECT(self),
+    gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_PROP_MOMENTUM]
+  );
+}
+
+gboolean maplibre_native_ffi_gesture_axis_options_get_snaps(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), FALSE
+  );
+  return self->snaps;
+}
+
+gboolean maplibre_native_ffi_gesture_axis_options_has_snaps(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), FALSE
+  );
+  return (self->fields & MLN_GESTURE_AXIS_OPTION_SNAPS) != 0;
+}
+
+void maplibre_native_ffi_gesture_axis_options_set_snaps(
+  MaplibreNativeFfiGestureAxisOptions* self, gboolean value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_GESTURE_AXIS_OPTION_SNAPS) != 0;
+  gboolean changed = self->snaps != value;
+  self->snaps = value;
+  self->fields |= MLN_GESTURE_AXIS_OPTION_SNAPS;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_PROP_SNAPS]
+    );
+}
+
+MaplibreNativeFfiMomentumSnap*
+maplibre_native_ffi_gesture_axis_options_get_snap(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), NULL);
+  return self->snap;
+}
+
+gboolean maplibre_native_ffi_gesture_axis_options_has_snap(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), FALSE
+  );
+  return (self->fields & MLN_GESTURE_AXIS_OPTION_SNAP) != 0;
+}
+
+void maplibre_native_ffi_gesture_axis_options_set_snap(
+  MaplibreNativeFfiGestureAxisOptions* self,
+  MaplibreNativeFfiMomentumSnap* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self));
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_SNAP(value));
+  MaplibreNativeFfiMomentumSnap* previous = self->snap;
+  self->snap = maplibre_native_ffi_momentum_snap_copy(value);
+  if (previous != NULL) g_object_unref(previous);
+  self->fields |= MLN_GESTURE_AXIS_OPTION_SNAP;
+  g_object_notify_by_pspec(
+    G_OBJECT(self),
+    gesture_axis_options_properties[GESTURE_AXIS_OPTIONS_PROP_SNAP]
+  );
+}
+
+GPtrArray* maplibre_native_ffi_gesture_axis_options_get_notches(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), NULL);
+  return self->notches;
+}
+
+gboolean maplibre_native_ffi_gesture_axis_options_has_notches(
+  MaplibreNativeFfiGestureAxisOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self), FALSE
+  );
+  return (self->fields & MLN_GESTURE_AXIS_OPTION_NOTCHES) != 0;
+}
+
+void maplibre_native_ffi_gesture_axis_options_set_notches(
+  MaplibreNativeFfiGestureAxisOptions* self,
+  const MaplibreNativeFfiGestureNotch* value, gsize value_count
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(self));
+  GPtrArray* previous = self->notches;
+  self->notches = g_ptr_array_new_full(
+    (guint)value_count, (GDestroyNotify)maplibre_native_ffi_gesture_notch_free
+  );
+  for (gsize index = 0; index < value_count; index++) {
+    g_ptr_array_add(
+      self->notches, maplibre_native_ffi_gesture_notch_copy(&value[index])
+    );
+  }
+  if (previous != NULL) g_ptr_array_unref(previous);
+  self->fields |= MLN_GESTURE_AXIS_OPTION_NOTCHES;
+}
+
+MaplibreNativeFfiGestureAxisOptions*
+maplibre_native_ffi_gesture_axis_options_copy(
+  const MaplibreNativeFfiGestureAxisOptions* self
+) {
+  MaplibreNativeFfiGestureAxisOptions* copy =
+    maplibre_native_ffi_gesture_axis_options_new();
+  copy->fields = self->fields;
+  copy->enabled = self->enabled;
+  copy->glides = self->glides;
+  g_clear_object(&copy->momentum);
+  copy->momentum = self->momentum != NULL
+                     ? maplibre_native_ffi_momentum_decay_copy(self->momentum)
+                     : NULL;
+  copy->snaps = self->snaps;
+  g_clear_object(&copy->snap);
+  copy->snap = self->snap != NULL
+                 ? maplibre_native_ffi_momentum_snap_copy(self->snap)
+                 : NULL;
+  g_clear_pointer(&copy->notches, g_ptr_array_unref);
+  copy->notches =
+    self->notches != NULL
+      ? g_ptr_array_copy(
+          self->notches, maplibre_native_ffi_gesture_notch_copy_func, NULL
+        )
+      : NULL;
+  if (copy->notches != NULL)
+    g_ptr_array_set_free_func(
+      copy->notches, (GDestroyNotify)maplibre_native_ffi_gesture_notch_free
+    );
+  return copy;
+}
+
+void maplibre_native_ffi_gesture_axis_options_to_native(
+  const MaplibreNativeFfiGestureAxisOptions* self,
+  mln_gesture_axis_options* out, MaplibreNativeFfiCall* call
+) {
+  memset(out, 0, sizeof *out);
+  out->fields = (mln_gesture_axis_option_fields)self->fields;
+  out->enabled = (self->enabled) != FALSE;
+  out->glides = (self->glides) != FALSE;
+  if (self->momentum != NULL)
+    maplibre_native_ffi_momentum_decay_to_native(
+      self->momentum, &out->momentum, call
+    );
+  out->snaps = (self->snaps) != FALSE;
+  if (self->snap != NULL)
+    maplibre_native_ffi_momentum_snap_to_native(self->snap, &out->snap, call);
+  if (self->notches != NULL && self->notches->len > 0) {
+    mln_gesture_notch* items =
+      maplibre_native_ffi_call_alloc(call, self->notches->len, sizeof *items);
+    for (guint index = 0; index < self->notches->len; index++) {
+      maplibre_native_ffi_gesture_notch_to_native(
+        self->notches->pdata[index], &items[index], call
+      );
+    }
+    out->notches = items;
+    out->notch_count = self->notches->len;
+  }
+}
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiGestureDelta, maplibre_native_ffi_gesture_delta,
+  maplibre_native_ffi_gesture_delta_copy, maplibre_native_ffi_gesture_delta_free
+)
+
+MaplibreNativeFfiGestureDelta* maplibre_native_ffi_gesture_delta_copy(
+  const MaplibreNativeFfiGestureDelta* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_gesture_delta_free(
+  MaplibreNativeFfiGestureDelta* self
+) {
+  g_free(self);
+}
+
+void maplibre_native_ffi_gesture_delta_to_native(
+  const MaplibreNativeFfiGestureDelta* self, mln_gesture_delta* out,
+  MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memset(out, 0, sizeof *out);
+  maplibre_native_ffi_screen_point_to_native(
+    &self->position, &out->position, call
+  );
+  out->discrete = (self->discrete) != FALSE;
+  maplibre_native_ffi_screen_point_to_native(&self->pan, &out->pan, call);
+  out->zoom = (double)(self->zoom);
+  out->bearing = (double)(self->bearing);
+  out->pitch = (double)(self->pitch);
+}
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiGestureTap, maplibre_native_ffi_gesture_tap,
+  maplibre_native_ffi_gesture_tap_copy, maplibre_native_ffi_gesture_tap_free
+)
+
+MaplibreNativeFfiGestureTap* maplibre_native_ffi_gesture_tap_copy(
+  const MaplibreNativeFfiGestureTap* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_gesture_tap_free(MaplibreNativeFfiGestureTap* self) {
+  g_free(self);
+}
+
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiGestureTap) == sizeof(mln_gesture_tap));
+SAME_MEMBER(MaplibreNativeFfiGestureTap, mln_gesture_tap, id);
+SAME_MEMBER(MaplibreNativeFfiGestureTap, mln_gesture_tap, position);
+
+void maplibre_native_ffi_gesture_tap_read(
+  MaplibreNativeFfiGestureTap* out, const mln_gesture_tap* in
+) {
+  memcpy(out, in, sizeof *out);
+}
+
+MaplibreNativeFfiGestureTap* maplibre_native_ffi_gesture_tap_from_native(
+  const mln_gesture_tap* in
+) {
+  MaplibreNativeFfiGestureTap* self = g_new0(MaplibreNativeFfiGestureTap, 1);
+  maplibre_native_ffi_gesture_tap_read(self, in);
+  return self;
+}
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiGestureNotchEvent, maplibre_native_ffi_gesture_notch_event,
+  maplibre_native_ffi_gesture_notch_event_copy,
+  maplibre_native_ffi_gesture_notch_event_free
+)
+
+MaplibreNativeFfiGestureNotchEvent*
+maplibre_native_ffi_gesture_notch_event_copy(
+  const MaplibreNativeFfiGestureNotchEvent* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_gesture_notch_event_free(
+  MaplibreNativeFfiGestureNotchEvent* self
+) {
+  g_free(self);
+}
+
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiGestureNotchEvent) == sizeof(mln_gesture_notch_event)
+);
+SAME_MEMBER(MaplibreNativeFfiGestureNotchEvent, mln_gesture_notch_event, axis);
+SAME_MEMBER(MaplibreNativeFfiGestureNotchEvent, mln_gesture_notch_event, kind);
+SAME_MEMBER(MaplibreNativeFfiGestureNotchEvent, mln_gesture_notch_event, value);
+
+void maplibre_native_ffi_gesture_notch_event_read(
+  MaplibreNativeFfiGestureNotchEvent* out, const mln_gesture_notch_event* in
+) {
+  memcpy(out, in, sizeof *out);
+}
+
+MaplibreNativeFfiGestureNotchEvent*
+maplibre_native_ffi_gesture_notch_event_from_native(
+  const mln_gesture_notch_event* in
+) {
+  MaplibreNativeFfiGestureNotchEvent* self =
+    g_new0(MaplibreNativeFfiGestureNotchEvent, 1);
+  maplibre_native_ffi_gesture_notch_event_read(self, in);
+  return self;
+}
+
+struct _MaplibreNativeFfiGestureEvent {
+  gint64 tag;
+  MaplibreNativeFfiGestureTap tap;
+  MaplibreNativeFfiGestureTap double_tap;
+  MaplibreNativeFfiGestureTap two_finger_tap;
+  MaplibreNativeFfiGestureNotchEvent notch;
+  MaplibreNativeFfiGestureTap long_press;
+};
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiGestureEvent, maplibre_native_ffi_gesture_event,
+  maplibre_native_ffi_gesture_event_copy, maplibre_native_ffi_gesture_event_free
+)
+
+MaplibreNativeFfiGestureEvent* maplibre_native_ffi_gesture_event_copy(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  MaplibreNativeFfiGestureEvent* copy = g_memdup2(self, sizeof *self);
+  return copy;
+}
+
+void maplibre_native_ffi_gesture_event_free(
+  MaplibreNativeFfiGestureEvent* self
+) {
+  if (self == NULL) return;
+  g_free(self);
+}
+
+gboolean maplibre_native_ffi_gesture_event_is_tap(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_EVENT_TAP;
+}
+
+MaplibreNativeFfiGestureTap* maplibre_native_ffi_gesture_event_get_tap(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_EVENT_TAP, NULL);
+  return (MaplibreNativeFfiGestureTap*)&self->tap;
+}
+
+gboolean maplibre_native_ffi_gesture_event_is_double_tap(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_EVENT_DOUBLE_TAP;
+}
+
+MaplibreNativeFfiGestureTap* maplibre_native_ffi_gesture_event_get_double_tap(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_EVENT_DOUBLE_TAP, NULL);
+  return (MaplibreNativeFfiGestureTap*)&self->double_tap;
+}
+
+gboolean maplibre_native_ffi_gesture_event_is_two_finger_tap(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_EVENT_TWO_FINGER_TAP;
+}
+
+MaplibreNativeFfiGestureTap*
+maplibre_native_ffi_gesture_event_get_two_finger_tap(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_EVENT_TWO_FINGER_TAP, NULL);
+  return (MaplibreNativeFfiGestureTap*)&self->two_finger_tap;
+}
+
+gboolean maplibre_native_ffi_gesture_event_is_notch(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_EVENT_NOTCH;
+}
+
+MaplibreNativeFfiGestureNotchEvent* maplibre_native_ffi_gesture_event_get_notch(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_EVENT_NOTCH, NULL);
+  return (MaplibreNativeFfiGestureNotchEvent*)&self->notch;
+}
+
+gboolean maplibre_native_ffi_gesture_event_is_long_press(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_EVENT_LONG_PRESS;
+}
+
+MaplibreNativeFfiGestureTap* maplibre_native_ffi_gesture_event_get_long_press(
+  const MaplibreNativeFfiGestureEvent* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_EVENT_LONG_PRESS, NULL);
+  return (MaplibreNativeFfiGestureTap*)&self->long_press;
+}
+
+MaplibreNativeFfiGestureEvent* maplibre_native_ffi_gesture_event_from_native(
+  const mln_gesture_event* in
+) {
+  gint64 tag = (gint64)in->type;
+  const mln_gesture_event_data* data = &in->data;
+  MaplibreNativeFfiGestureEvent* self =
+    g_new0(MaplibreNativeFfiGestureEvent, 1);
+  self->tag = tag;
+  switch (tag) {
+    case MLN_GESTURE_EVENT_TAP:
+      maplibre_native_ffi_gesture_tap_read(&self->tap, &data->tap);
+      break;
+    case MLN_GESTURE_EVENT_DOUBLE_TAP:
+      maplibre_native_ffi_gesture_tap_read(
+        &self->double_tap, &data->double_tap
+      );
+      break;
+    case MLN_GESTURE_EVENT_TWO_FINGER_TAP:
+      maplibre_native_ffi_gesture_tap_read(
+        &self->two_finger_tap, &data->two_finger_tap
+      );
+      break;
+    case MLN_GESTURE_EVENT_NOTCH:
+      maplibre_native_ffi_gesture_notch_event_read(&self->notch, &data->notch);
+      break;
+    case MLN_GESTURE_EVENT_LONG_PRESS:
+      maplibre_native_ffi_gesture_tap_read(
+        &self->long_press, &data->long_press
+      );
+      break;
+    default:
+      break;
+  }
+  return self;
+}
+
+gpointer maplibre_native_ffi_gesture_event_copy_func(
+  gconstpointer self, gpointer data
+) {
+  (void)data;
+  return maplibre_native_ffi_gesture_event_copy(
+    (const MaplibreNativeFfiGestureEvent*)self
+  );
+}
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiGesturePointerDown, maplibre_native_ffi_gesture_pointer_down,
+  maplibre_native_ffi_gesture_pointer_down_copy,
+  maplibre_native_ffi_gesture_pointer_down_free
+)
+
+MaplibreNativeFfiGesturePointerDown*
+maplibre_native_ffi_gesture_pointer_down_copy(
+  const MaplibreNativeFfiGesturePointerDown* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_gesture_pointer_down_free(
+  MaplibreNativeFfiGesturePointerDown* self
+) {
+  g_free(self);
+}
+
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiGesturePointerDown) ==
+  sizeof(mln_gesture_pointer_down)
+);
+SAME_MEMBER(MaplibreNativeFfiGesturePointerDown, mln_gesture_pointer_down, id);
+SAME_MEMBER(
+  MaplibreNativeFfiGesturePointerDown, mln_gesture_pointer_down, kind
+);
+SAME_MEMBER(
+  MaplibreNativeFfiGesturePointerDown, mln_gesture_pointer_down, position
+);
+SAME_MEMBER(
+  MaplibreNativeFfiGesturePointerDown, mln_gesture_pointer_down, modes
+);
+
+void maplibre_native_ffi_gesture_pointer_down_to_native(
+  const MaplibreNativeFfiGesturePointerDown* self,
+  mln_gesture_pointer_down* out, MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memcpy(out, self, sizeof *out);
+}
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiGesturePointer, maplibre_native_ffi_gesture_pointer,
+  maplibre_native_ffi_gesture_pointer_copy,
+  maplibre_native_ffi_gesture_pointer_free
+)
+
+MaplibreNativeFfiGesturePointer* maplibre_native_ffi_gesture_pointer_copy(
+  const MaplibreNativeFfiGesturePointer* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_gesture_pointer_free(
+  MaplibreNativeFfiGesturePointer* self
+) {
+  g_free(self);
+}
+
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiGesturePointer) == sizeof(mln_gesture_pointer)
+);
+SAME_MEMBER(MaplibreNativeFfiGesturePointer, mln_gesture_pointer, id);
+SAME_MEMBER(MaplibreNativeFfiGesturePointer, mln_gesture_pointer, position);
+
+void maplibre_native_ffi_gesture_pointer_to_native(
+  const MaplibreNativeFfiGesturePointer* self, mln_gesture_pointer* out,
+  MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memcpy(out, self, sizeof *out);
+}
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiGesturePinch, maplibre_native_ffi_gesture_pinch,
+  maplibre_native_ffi_gesture_pinch_copy, maplibre_native_ffi_gesture_pinch_free
+)
+
+MaplibreNativeFfiGesturePinch* maplibre_native_ffi_gesture_pinch_copy(
+  const MaplibreNativeFfiGesturePinch* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_gesture_pinch_free(
+  MaplibreNativeFfiGesturePinch* self
+) {
+  g_free(self);
+}
+
+G_STATIC_ASSERT(
+  sizeof(MaplibreNativeFfiGesturePinch) == sizeof(mln_gesture_pinch)
+);
+SAME_MEMBER(MaplibreNativeFfiGesturePinch, mln_gesture_pinch, center);
+SAME_MEMBER(MaplibreNativeFfiGesturePinch, mln_gesture_pinch, scale);
+SAME_MEMBER(MaplibreNativeFfiGesturePinch, mln_gesture_pinch, rotation);
+SAME_MEMBER(MaplibreNativeFfiGesturePinch, mln_gesture_pinch, phase);
+
+void maplibre_native_ffi_gesture_pinch_to_native(
+  const MaplibreNativeFfiGesturePinch* self, mln_gesture_pinch* out,
+  MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memcpy(out, self, sizeof *out);
+}
+
+struct _MaplibreNativeFfiGestureInput {
+  gint64 tag;
+  MaplibreNativeFfiGesturePointerDown pointer_down;
+  MaplibreNativeFfiGesturePointer pointer_move;
+  MaplibreNativeFfiGesturePointer pointer_up;
+  MaplibreNativeFfiGesturePointer pointer_cancel;
+  MaplibreNativeFfiGestureMode modes;
+  MaplibreNativeFfiGestureDelta delta;
+  MaplibreNativeFfiGesturePinch pinch;
+};
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiGestureInput, maplibre_native_ffi_gesture_input,
+  maplibre_native_ffi_gesture_input_copy, maplibre_native_ffi_gesture_input_free
+)
+
+MaplibreNativeFfiGestureInput* maplibre_native_ffi_gesture_input_copy(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  MaplibreNativeFfiGestureInput* copy = g_memdup2(self, sizeof *self);
+  return copy;
+}
+
+void maplibre_native_ffi_gesture_input_free(
+  MaplibreNativeFfiGestureInput* self
+) {
+  if (self == NULL) return;
+  g_free(self);
+}
+
+MaplibreNativeFfiGestureInput*
+maplibre_native_ffi_gesture_input_new_pointer_down(
+  const MaplibreNativeFfiGesturePointerDown* value
+) {
+  g_return_val_if_fail(value != NULL, NULL);
+  MaplibreNativeFfiGestureInput* self =
+    g_new0(MaplibreNativeFfiGestureInput, 1);
+  self->tag = MLN_GESTURE_INPUT_POINTER_DOWN;
+  self->pointer_down = *value;
+  return self;
+}
+
+gboolean maplibre_native_ffi_gesture_input_is_pointer_down(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_INPUT_POINTER_DOWN;
+}
+
+MaplibreNativeFfiGesturePointerDown*
+maplibre_native_ffi_gesture_input_get_pointer_down(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_INPUT_POINTER_DOWN, NULL);
+  return (MaplibreNativeFfiGesturePointerDown*)&self->pointer_down;
+}
+
+MaplibreNativeFfiGestureInput*
+maplibre_native_ffi_gesture_input_new_pointer_move(
+  const MaplibreNativeFfiGesturePointer* value
+) {
+  g_return_val_if_fail(value != NULL, NULL);
+  MaplibreNativeFfiGestureInput* self =
+    g_new0(MaplibreNativeFfiGestureInput, 1);
+  self->tag = MLN_GESTURE_INPUT_POINTER_MOVE;
+  self->pointer_move = *value;
+  return self;
+}
+
+gboolean maplibre_native_ffi_gesture_input_is_pointer_move(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_INPUT_POINTER_MOVE;
+}
+
+MaplibreNativeFfiGesturePointer*
+maplibre_native_ffi_gesture_input_get_pointer_move(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_INPUT_POINTER_MOVE, NULL);
+  return (MaplibreNativeFfiGesturePointer*)&self->pointer_move;
+}
+
+MaplibreNativeFfiGestureInput* maplibre_native_ffi_gesture_input_new_pointer_up(
+  const MaplibreNativeFfiGesturePointer* value
+) {
+  g_return_val_if_fail(value != NULL, NULL);
+  MaplibreNativeFfiGestureInput* self =
+    g_new0(MaplibreNativeFfiGestureInput, 1);
+  self->tag = MLN_GESTURE_INPUT_POINTER_UP;
+  self->pointer_up = *value;
+  return self;
+}
+
+gboolean maplibre_native_ffi_gesture_input_is_pointer_up(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_INPUT_POINTER_UP;
+}
+
+MaplibreNativeFfiGesturePointer*
+maplibre_native_ffi_gesture_input_get_pointer_up(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_INPUT_POINTER_UP, NULL);
+  return (MaplibreNativeFfiGesturePointer*)&self->pointer_up;
+}
+
+MaplibreNativeFfiGestureInput*
+maplibre_native_ffi_gesture_input_new_pointer_cancel(
+  const MaplibreNativeFfiGesturePointer* value
+) {
+  g_return_val_if_fail(value != NULL, NULL);
+  MaplibreNativeFfiGestureInput* self =
+    g_new0(MaplibreNativeFfiGestureInput, 1);
+  self->tag = MLN_GESTURE_INPUT_POINTER_CANCEL;
+  self->pointer_cancel = *value;
+  return self;
+}
+
+gboolean maplibre_native_ffi_gesture_input_is_pointer_cancel(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_INPUT_POINTER_CANCEL;
+}
+
+MaplibreNativeFfiGesturePointer*
+maplibre_native_ffi_gesture_input_get_pointer_cancel(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_INPUT_POINTER_CANCEL, NULL);
+  return (MaplibreNativeFfiGesturePointer*)&self->pointer_cancel;
+}
+
+MaplibreNativeFfiGestureInput* maplibre_native_ffi_gesture_input_new_modes(
+  MaplibreNativeFfiGestureMode value
+) {
+  MaplibreNativeFfiGestureInput* self =
+    g_new0(MaplibreNativeFfiGestureInput, 1);
+  self->tag = MLN_GESTURE_INPUT_MODES;
+  self->modes = value;
+  return self;
+}
+
+gboolean maplibre_native_ffi_gesture_input_is_modes(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_INPUT_MODES;
+}
+
+MaplibreNativeFfiGestureMode maplibre_native_ffi_gesture_input_get_modes(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, (MaplibreNativeFfiGestureMode)0);
+  g_return_val_if_fail(
+    self->tag == MLN_GESTURE_INPUT_MODES, (MaplibreNativeFfiGestureMode)0
+  );
+  return self->modes;
+}
+
+MaplibreNativeFfiGestureInput* maplibre_native_ffi_gesture_input_new_delta(
+  const MaplibreNativeFfiGestureDelta* value
+) {
+  g_return_val_if_fail(value != NULL, NULL);
+  MaplibreNativeFfiGestureInput* self =
+    g_new0(MaplibreNativeFfiGestureInput, 1);
+  self->tag = MLN_GESTURE_INPUT_DELTA;
+  self->delta = *value;
+  return self;
+}
+
+gboolean maplibre_native_ffi_gesture_input_is_delta(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_INPUT_DELTA;
+}
+
+MaplibreNativeFfiGestureDelta* maplibre_native_ffi_gesture_input_get_delta(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_INPUT_DELTA, NULL);
+  return (MaplibreNativeFfiGestureDelta*)&self->delta;
+}
+
+MaplibreNativeFfiGestureInput* maplibre_native_ffi_gesture_input_new_pinch(
+  const MaplibreNativeFfiGesturePinch* value
+) {
+  g_return_val_if_fail(value != NULL, NULL);
+  MaplibreNativeFfiGestureInput* self =
+    g_new0(MaplibreNativeFfiGestureInput, 1);
+  self->tag = MLN_GESTURE_INPUT_PINCH;
+  self->pinch = *value;
+  return self;
+}
+
+gboolean maplibre_native_ffi_gesture_input_is_pinch(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_GESTURE_INPUT_PINCH;
+}
+
+MaplibreNativeFfiGesturePinch* maplibre_native_ffi_gesture_input_get_pinch(
+  const MaplibreNativeFfiGestureInput* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(self->tag == MLN_GESTURE_INPUT_PINCH, NULL);
+  return (MaplibreNativeFfiGesturePinch*)&self->pinch;
+}
+
+void maplibre_native_ffi_gesture_input_to_native(
+  const MaplibreNativeFfiGestureInput* self, mln_gesture_input* out,
+  MaplibreNativeFfiCall* call
+) {
+  memset(out, 0, sizeof *out);
+  out->size = sizeof *out;
+  out->type = (mln_gesture_input_type)self->tag;
+  mln_gesture_input_data* data = &out->data;
+  switch (self->tag) {
+    case MLN_GESTURE_INPUT_POINTER_DOWN:
+      maplibre_native_ffi_gesture_pointer_down_to_native(
+        &self->pointer_down, &data->pointer_down, call
+      );
+      break;
+    case MLN_GESTURE_INPUT_POINTER_MOVE:
+      maplibre_native_ffi_gesture_pointer_to_native(
+        &self->pointer_move, &data->pointer_move, call
+      );
+      break;
+    case MLN_GESTURE_INPUT_POINTER_UP:
+      maplibre_native_ffi_gesture_pointer_to_native(
+        &self->pointer_up, &data->pointer_up, call
+      );
+      break;
+    case MLN_GESTURE_INPUT_POINTER_CANCEL:
+      maplibre_native_ffi_gesture_pointer_to_native(
+        &self->pointer_cancel, &data->pointer_cancel, call
+      );
+      break;
+    case MLN_GESTURE_INPUT_MODES:
+      data->modes = (mln_gesture_modes)(self->modes);
+      break;
+    case MLN_GESTURE_INPUT_DELTA:
+      maplibre_native_ffi_gesture_delta_to_native(
+        &self->delta, &data->delta, call
+      );
+      break;
+    case MLN_GESTURE_INPUT_PINCH:
+      maplibre_native_ffi_gesture_pinch_to_native(
+        &self->pinch, &data->pinch, call
+      );
+      break;
+    default:
+      break;
+  }
+}
+
+struct _MaplibreNativeFfiGesturePanOptions {
+  GObject parent_instance;
+  guint64 fields;
+  gboolean enabled;
+  gboolean glides;
+  MaplibreNativeFfiMomentumDecay* momentum;
+};
+
+enum {
+  GESTURE_PAN_OPTIONS_PROP_0,
+  GESTURE_PAN_OPTIONS_PROP_ENABLED,
+  GESTURE_PAN_OPTIONS_PROP_GLIDES,
+  GESTURE_PAN_OPTIONS_PROP_MOMENTUM,
+  GESTURE_PAN_OPTIONS_N_PROPERTIES
+};
+
+static GParamSpec*
+  gesture_pan_options_properties[GESTURE_PAN_OPTIONS_N_PROPERTIES];
+
+G_DEFINE_FINAL_TYPE(
+  MaplibreNativeFfiGesturePanOptions, maplibre_native_ffi_gesture_pan_options,
+  G_TYPE_OBJECT
+)
+
+static void maplibre_native_ffi_gesture_pan_options_finalize(GObject* object) {
+  MaplibreNativeFfiGesturePanOptions* self =
+    MAPLIBRE_NATIVE_FFI_GESTURE_PAN_OPTIONS(object);
+  g_clear_object(&self->momentum);
+  G_OBJECT_CLASS(maplibre_native_ffi_gesture_pan_options_parent_class)
+    ->finalize(object);
+}
+
+static void maplibre_native_ffi_gesture_pan_options_get_property(
+  GObject* object, guint id, GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiGesturePanOptions* self =
+    MAPLIBRE_NATIVE_FFI_GESTURE_PAN_OPTIONS(object);
+  switch (id) {
+    case GESTURE_PAN_OPTIONS_PROP_ENABLED:
+      g_value_set_boolean(value, self->enabled);
+      break;
+    case GESTURE_PAN_OPTIONS_PROP_GLIDES:
+      g_value_set_boolean(value, self->glides);
+      break;
+    case GESTURE_PAN_OPTIONS_PROP_MOMENTUM:
+      g_value_set_object(value, self->momentum);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_gesture_pan_options_set_property(
+  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiGesturePanOptions* self =
+    MAPLIBRE_NATIVE_FFI_GESTURE_PAN_OPTIONS(object);
+  switch (id) {
+    case GESTURE_PAN_OPTIONS_PROP_ENABLED:
+      maplibre_native_ffi_gesture_pan_options_set_enabled(
+        self, g_value_get_boolean(value)
+      );
+      break;
+    case GESTURE_PAN_OPTIONS_PROP_GLIDES:
+      maplibre_native_ffi_gesture_pan_options_set_glides(
+        self, g_value_get_boolean(value)
+      );
+      break;
+    case GESTURE_PAN_OPTIONS_PROP_MOMENTUM:
+      maplibre_native_ffi_gesture_pan_options_set_momentum(
+        self, g_value_get_object(value)
+      );
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_gesture_pan_options_class_init(
+  MaplibreNativeFfiGesturePanOptionsClass* klass
+) {
+  GObjectClass* object_class = G_OBJECT_CLASS(klass);
+  object_class->finalize = maplibre_native_ffi_gesture_pan_options_finalize;
+  object_class->get_property =
+    maplibre_native_ffi_gesture_pan_options_get_property;
+  object_class->set_property =
+    maplibre_native_ffi_gesture_pan_options_set_property;
+  gesture_pan_options_properties[GESTURE_PAN_OPTIONS_PROP_ENABLED] =
+    g_param_spec_boolean("enabled", NULL, NULL, FALSE, PROPERTY_FLAGS);
+  gesture_pan_options_properties[GESTURE_PAN_OPTIONS_PROP_GLIDES] =
+    g_param_spec_boolean("glides", NULL, NULL, FALSE, PROPERTY_FLAGS);
+  gesture_pan_options_properties[GESTURE_PAN_OPTIONS_PROP_MOMENTUM] =
+    g_param_spec_object(
+      "momentum", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_MOMENTUM_DECAY,
+      PROPERTY_FLAGS
+    );
+  g_object_class_install_properties(
+    object_class, GESTURE_PAN_OPTIONS_N_PROPERTIES,
+    gesture_pan_options_properties
+  );
+}
+
+static void maplibre_native_ffi_gesture_pan_options_init(
+  MaplibreNativeFfiGesturePanOptions* self
+) {
+  self->momentum = maplibre_native_ffi_momentum_decay_new();
+}
+
+MaplibreNativeFfiGesturePanOptions* maplibre_native_ffi_gesture_pan_options_new(
+  void
+) {
+  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_PAN_OPTIONS, NULL);
+}
+
+gboolean maplibre_native_ffi_gesture_pan_options_get_enabled(
+  MaplibreNativeFfiGesturePanOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_PAN_OPTIONS(self), FALSE);
+  return self->enabled;
+}
+
+gboolean maplibre_native_ffi_gesture_pan_options_has_enabled(
+  MaplibreNativeFfiGesturePanOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_PAN_OPTIONS(self), FALSE);
+  return (self->fields & MLN_GESTURE_PAN_OPTION_ENABLED) != 0;
+}
+
+void maplibre_native_ffi_gesture_pan_options_set_enabled(
+  MaplibreNativeFfiGesturePanOptions* self, gboolean value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_PAN_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_GESTURE_PAN_OPTION_ENABLED) != 0;
+  gboolean changed = self->enabled != value;
+  self->enabled = value;
+  self->fields |= MLN_GESTURE_PAN_OPTION_ENABLED;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      gesture_pan_options_properties[GESTURE_PAN_OPTIONS_PROP_ENABLED]
+    );
+}
+
+gboolean maplibre_native_ffi_gesture_pan_options_get_glides(
+  MaplibreNativeFfiGesturePanOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_PAN_OPTIONS(self), FALSE);
+  return self->glides;
+}
+
+gboolean maplibre_native_ffi_gesture_pan_options_has_glides(
+  MaplibreNativeFfiGesturePanOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_PAN_OPTIONS(self), FALSE);
+  return (self->fields & MLN_GESTURE_PAN_OPTION_GLIDES) != 0;
+}
+
+void maplibre_native_ffi_gesture_pan_options_set_glides(
+  MaplibreNativeFfiGesturePanOptions* self, gboolean value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_PAN_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_GESTURE_PAN_OPTION_GLIDES) != 0;
+  gboolean changed = self->glides != value;
+  self->glides = value;
+  self->fields |= MLN_GESTURE_PAN_OPTION_GLIDES;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      gesture_pan_options_properties[GESTURE_PAN_OPTIONS_PROP_GLIDES]
+    );
+}
+
+MaplibreNativeFfiMomentumDecay*
+maplibre_native_ffi_gesture_pan_options_get_momentum(
+  MaplibreNativeFfiGesturePanOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_PAN_OPTIONS(self), NULL);
+  return self->momentum;
+}
+
+gboolean maplibre_native_ffi_gesture_pan_options_has_momentum(
+  MaplibreNativeFfiGesturePanOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_PAN_OPTIONS(self), FALSE);
+  return (self->fields & MLN_GESTURE_PAN_OPTION_MOMENTUM) != 0;
+}
+
+void maplibre_native_ffi_gesture_pan_options_set_momentum(
+  MaplibreNativeFfiGesturePanOptions* self,
+  MaplibreNativeFfiMomentumDecay* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_PAN_OPTIONS(self));
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MOMENTUM_DECAY(value));
+  MaplibreNativeFfiMomentumDecay* previous = self->momentum;
+  self->momentum = maplibre_native_ffi_momentum_decay_copy(value);
+  if (previous != NULL) g_object_unref(previous);
+  self->fields |= MLN_GESTURE_PAN_OPTION_MOMENTUM;
+  g_object_notify_by_pspec(
+    G_OBJECT(self),
+    gesture_pan_options_properties[GESTURE_PAN_OPTIONS_PROP_MOMENTUM]
+  );
+}
+
+MaplibreNativeFfiGesturePanOptions*
+maplibre_native_ffi_gesture_pan_options_copy(
+  const MaplibreNativeFfiGesturePanOptions* self
+) {
+  MaplibreNativeFfiGesturePanOptions* copy =
+    maplibre_native_ffi_gesture_pan_options_new();
+  copy->fields = self->fields;
+  copy->enabled = self->enabled;
+  copy->glides = self->glides;
+  g_clear_object(&copy->momentum);
+  copy->momentum = self->momentum != NULL
+                     ? maplibre_native_ffi_momentum_decay_copy(self->momentum)
+                     : NULL;
+  return copy;
+}
+
+void maplibre_native_ffi_gesture_pan_options_to_native(
+  const MaplibreNativeFfiGesturePanOptions* self, mln_gesture_pan_options* out,
+  MaplibreNativeFfiCall* call
+) {
+  memset(out, 0, sizeof *out);
+  out->fields = (mln_gesture_pan_option_fields)self->fields;
+  out->enabled = (self->enabled) != FALSE;
+  out->glides = (self->glides) != FALSE;
+  if (self->momentum != NULL)
+    maplibre_native_ffi_momentum_decay_to_native(
+      self->momentum, &out->momentum, call
+    );
+}
+
+struct _MaplibreNativeFfiGestureOptions {
+  GObject parent_instance;
+  guint64 fields;
+  gdouble double_tap_zoom;
+  gdouble two_finger_tap_zoom;
+  MaplibreNativeFfiGesturePanOptions* pan;
+  MaplibreNativeFfiGestureAxisOptions* zoom;
+  MaplibreNativeFfiGestureAxisOptions* bearing;
+  MaplibreNativeFfiGestureAxisOptions* pitch;
+};
+
+enum {
+  GESTURE_OPTIONS_PROP_0,
+  GESTURE_OPTIONS_PROP_DOUBLE_TAP_ZOOM,
+  GESTURE_OPTIONS_PROP_TWO_FINGER_TAP_ZOOM,
+  GESTURE_OPTIONS_PROP_PAN,
+  GESTURE_OPTIONS_PROP_ZOOM,
+  GESTURE_OPTIONS_PROP_BEARING,
+  GESTURE_OPTIONS_PROP_PITCH,
+  GESTURE_OPTIONS_N_PROPERTIES
+};
+
+static GParamSpec* gesture_options_properties[GESTURE_OPTIONS_N_PROPERTIES];
+
+G_DEFINE_FINAL_TYPE(
+  MaplibreNativeFfiGestureOptions, maplibre_native_ffi_gesture_options,
+  G_TYPE_OBJECT
+)
+
+static void maplibre_native_ffi_gesture_options_finalize(GObject* object) {
+  MaplibreNativeFfiGestureOptions* self =
+    MAPLIBRE_NATIVE_FFI_GESTURE_OPTIONS(object);
+  g_clear_object(&self->pan);
+  g_clear_object(&self->zoom);
+  g_clear_object(&self->bearing);
+  g_clear_object(&self->pitch);
+  G_OBJECT_CLASS(maplibre_native_ffi_gesture_options_parent_class)
+    ->finalize(object);
+}
+
+static void maplibre_native_ffi_gesture_options_get_property(
+  GObject* object, guint id, GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiGestureOptions* self =
+    MAPLIBRE_NATIVE_FFI_GESTURE_OPTIONS(object);
+  switch (id) {
+    case GESTURE_OPTIONS_PROP_DOUBLE_TAP_ZOOM:
+      g_value_set_double(value, self->double_tap_zoom);
+      break;
+    case GESTURE_OPTIONS_PROP_TWO_FINGER_TAP_ZOOM:
+      g_value_set_double(value, self->two_finger_tap_zoom);
+      break;
+    case GESTURE_OPTIONS_PROP_PAN:
+      g_value_set_object(value, self->pan);
+      break;
+    case GESTURE_OPTIONS_PROP_ZOOM:
+      g_value_set_object(value, self->zoom);
+      break;
+    case GESTURE_OPTIONS_PROP_BEARING:
+      g_value_set_object(value, self->bearing);
+      break;
+    case GESTURE_OPTIONS_PROP_PITCH:
+      g_value_set_object(value, self->pitch);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_gesture_options_set_property(
+  GObject* object, guint id, const GValue* value, GParamSpec* pspec
+) {
+  MaplibreNativeFfiGestureOptions* self =
+    MAPLIBRE_NATIVE_FFI_GESTURE_OPTIONS(object);
+  switch (id) {
+    case GESTURE_OPTIONS_PROP_DOUBLE_TAP_ZOOM:
+      maplibre_native_ffi_gesture_options_set_double_tap_zoom(
+        self, g_value_get_double(value)
+      );
+      break;
+    case GESTURE_OPTIONS_PROP_TWO_FINGER_TAP_ZOOM:
+      maplibre_native_ffi_gesture_options_set_two_finger_tap_zoom(
+        self, g_value_get_double(value)
+      );
+      break;
+    case GESTURE_OPTIONS_PROP_PAN:
+      maplibre_native_ffi_gesture_options_set_pan(
+        self, g_value_get_object(value)
+      );
+      break;
+    case GESTURE_OPTIONS_PROP_ZOOM:
+      maplibre_native_ffi_gesture_options_set_zoom(
+        self, g_value_get_object(value)
+      );
+      break;
+    case GESTURE_OPTIONS_PROP_BEARING:
+      maplibre_native_ffi_gesture_options_set_bearing(
+        self, g_value_get_object(value)
+      );
+      break;
+    case GESTURE_OPTIONS_PROP_PITCH:
+      maplibre_native_ffi_gesture_options_set_pitch(
+        self, g_value_get_object(value)
+      );
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
+  }
+}
+
+static void maplibre_native_ffi_gesture_options_class_init(
+  MaplibreNativeFfiGestureOptionsClass* klass
+) {
+  GObjectClass* object_class = G_OBJECT_CLASS(klass);
+  object_class->finalize = maplibre_native_ffi_gesture_options_finalize;
+  object_class->get_property = maplibre_native_ffi_gesture_options_get_property;
+  object_class->set_property = maplibre_native_ffi_gesture_options_set_property;
+  gesture_options_properties[GESTURE_OPTIONS_PROP_DOUBLE_TAP_ZOOM] =
+    g_param_spec_double(
+      "double-tap-zoom", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  gesture_options_properties[GESTURE_OPTIONS_PROP_TWO_FINGER_TAP_ZOOM] =
+    g_param_spec_double(
+      "two-finger-tap-zoom", NULL, NULL, -INFINITY, INFINITY, 0, PROPERTY_FLAGS
+    );
+  gesture_options_properties[GESTURE_OPTIONS_PROP_PAN] = g_param_spec_object(
+    "pan", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_PAN_OPTIONS,
+    PROPERTY_FLAGS
+  );
+  gesture_options_properties[GESTURE_OPTIONS_PROP_ZOOM] = g_param_spec_object(
+    "zoom", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_AXIS_OPTIONS,
+    PROPERTY_FLAGS
+  );
+  gesture_options_properties[GESTURE_OPTIONS_PROP_BEARING] =
+    g_param_spec_object(
+      "bearing", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_AXIS_OPTIONS,
+      PROPERTY_FLAGS
+    );
+  gesture_options_properties[GESTURE_OPTIONS_PROP_PITCH] = g_param_spec_object(
+    "pitch", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_AXIS_OPTIONS,
+    PROPERTY_FLAGS
+  );
+  g_object_class_install_properties(
+    object_class, GESTURE_OPTIONS_N_PROPERTIES, gesture_options_properties
+  );
+}
+
+static void maplibre_native_ffi_gesture_options_init(
+  MaplibreNativeFfiGestureOptions* self
+) {
+  self->pan = maplibre_native_ffi_gesture_pan_options_new();
+  self->zoom = maplibre_native_ffi_gesture_axis_options_new();
+  self->bearing = maplibre_native_ffi_gesture_axis_options_new();
+  self->pitch = maplibre_native_ffi_gesture_axis_options_new();
+}
+
+MaplibreNativeFfiGestureOptions* maplibre_native_ffi_gesture_options_new(void) {
+  return g_object_new(MAPLIBRE_NATIVE_FFI_TYPE_GESTURE_OPTIONS, NULL);
+}
+
+gdouble maplibre_native_ffi_gesture_options_get_double_tap_zoom(
+  MaplibreNativeFfiGestureOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self), 0);
+  return self->double_tap_zoom;
+}
+
+gboolean maplibre_native_ffi_gesture_options_has_double_tap_zoom(
+  MaplibreNativeFfiGestureOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self), FALSE);
+  return (self->fields & MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM) != 0;
+}
+
+void maplibre_native_ffi_gesture_options_set_double_tap_zoom(
+  MaplibreNativeFfiGestureOptions* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM) != 0;
+  gboolean changed = self->double_tap_zoom != value;
+  self->double_tap_zoom = value;
+  self->fields |= MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      gesture_options_properties[GESTURE_OPTIONS_PROP_DOUBLE_TAP_ZOOM]
+    );
+}
+
+gdouble maplibre_native_ffi_gesture_options_get_two_finger_tap_zoom(
+  MaplibreNativeFfiGestureOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self), 0);
+  return self->two_finger_tap_zoom;
+}
+
+gboolean maplibre_native_ffi_gesture_options_has_two_finger_tap_zoom(
+  MaplibreNativeFfiGestureOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self), FALSE);
+  return (self->fields & MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM) != 0;
+}
+
+void maplibre_native_ffi_gesture_options_set_two_finger_tap_zoom(
+  MaplibreNativeFfiGestureOptions* self, gdouble value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self));
+  gboolean was_set =
+    (self->fields & MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM) != 0;
+  gboolean changed = self->two_finger_tap_zoom != value;
+  self->two_finger_tap_zoom = value;
+  self->fields |= MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      gesture_options_properties[GESTURE_OPTIONS_PROP_TWO_FINGER_TAP_ZOOM]
+    );
+}
+
+MaplibreNativeFfiGesturePanOptions* maplibre_native_ffi_gesture_options_get_pan(
+  MaplibreNativeFfiGestureOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self), NULL);
+  return self->pan;
+}
+
+void maplibre_native_ffi_gesture_options_set_pan(
+  MaplibreNativeFfiGestureOptions* self,
+  MaplibreNativeFfiGesturePanOptions* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self));
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_PAN_OPTIONS(value));
+  MaplibreNativeFfiGesturePanOptions* previous = self->pan;
+  self->pan = maplibre_native_ffi_gesture_pan_options_copy(value);
+  if (previous != NULL) g_object_unref(previous);
+  g_object_notify_by_pspec(
+    G_OBJECT(self), gesture_options_properties[GESTURE_OPTIONS_PROP_PAN]
+  );
+}
+
+MaplibreNativeFfiGestureAxisOptions*
+maplibre_native_ffi_gesture_options_get_zoom(
+  MaplibreNativeFfiGestureOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self), NULL);
+  return self->zoom;
+}
+
+void maplibre_native_ffi_gesture_options_set_zoom(
+  MaplibreNativeFfiGestureOptions* self,
+  MaplibreNativeFfiGestureAxisOptions* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self));
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(value));
+  MaplibreNativeFfiGestureAxisOptions* previous = self->zoom;
+  self->zoom = maplibre_native_ffi_gesture_axis_options_copy(value);
+  if (previous != NULL) g_object_unref(previous);
+  g_object_notify_by_pspec(
+    G_OBJECT(self), gesture_options_properties[GESTURE_OPTIONS_PROP_ZOOM]
+  );
+}
+
+MaplibreNativeFfiGestureAxisOptions*
+maplibre_native_ffi_gesture_options_get_bearing(
+  MaplibreNativeFfiGestureOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self), NULL);
+  return self->bearing;
+}
+
+void maplibre_native_ffi_gesture_options_set_bearing(
+  MaplibreNativeFfiGestureOptions* self,
+  MaplibreNativeFfiGestureAxisOptions* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self));
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(value));
+  MaplibreNativeFfiGestureAxisOptions* previous = self->bearing;
+  self->bearing = maplibre_native_ffi_gesture_axis_options_copy(value);
+  if (previous != NULL) g_object_unref(previous);
+  g_object_notify_by_pspec(
+    G_OBJECT(self), gesture_options_properties[GESTURE_OPTIONS_PROP_BEARING]
+  );
+}
+
+MaplibreNativeFfiGestureAxisOptions*
+maplibre_native_ffi_gesture_options_get_pitch(
+  MaplibreNativeFfiGestureOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self), NULL);
+  return self->pitch;
+}
+
+void maplibre_native_ffi_gesture_options_set_pitch(
+  MaplibreNativeFfiGestureOptions* self,
+  MaplibreNativeFfiGestureAxisOptions* value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_OPTIONS(self));
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_GESTURE_AXIS_OPTIONS(value));
+  MaplibreNativeFfiGestureAxisOptions* previous = self->pitch;
+  self->pitch = maplibre_native_ffi_gesture_axis_options_copy(value);
+  if (previous != NULL) g_object_unref(previous);
+  g_object_notify_by_pspec(
+    G_OBJECT(self), gesture_options_properties[GESTURE_OPTIONS_PROP_PITCH]
+  );
+}
+
+void maplibre_native_ffi_gesture_options_to_native(
+  const MaplibreNativeFfiGestureOptions* self, mln_gesture_options* out,
+  MaplibreNativeFfiCall* call
+) {
+  memset(out, 0, sizeof *out);
+  out->size = sizeof *out;
+  out->fields = (mln_gesture_option_fields)self->fields;
+  out->double_tap_zoom = (double)(self->double_tap_zoom);
+  out->two_finger_tap_zoom = (double)(self->two_finger_tap_zoom);
+  if (self->pan != NULL)
+    maplibre_native_ffi_gesture_pan_options_to_native(
+      self->pan, &out->pan, call
+    );
+  if (self->zoom != NULL)
+    maplibre_native_ffi_gesture_axis_options_to_native(
+      self->zoom, &out->zoom, call
+    );
+  if (self->bearing != NULL)
+    maplibre_native_ffi_gesture_axis_options_to_native(
+      self->bearing, &out->bearing, call
+    );
+  if (self->pitch != NULL)
+    maplibre_native_ffi_gesture_axis_options_to_native(
+      self->pitch, &out->pitch, call
+    );
+}
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiScreenBox, maplibre_native_ffi_screen_box,
+  maplibre_native_ffi_screen_box_copy, maplibre_native_ffi_screen_box_free
+)
+
+MaplibreNativeFfiScreenBox* maplibre_native_ffi_screen_box_copy(
+  const MaplibreNativeFfiScreenBox* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_screen_box_free(MaplibreNativeFfiScreenBox* self) {
+  g_free(self);
+}
+
+G_STATIC_ASSERT(sizeof(MaplibreNativeFfiScreenBox) == sizeof(mln_screen_box));
+SAME_MEMBER(MaplibreNativeFfiScreenBox, mln_screen_box, min);
+SAME_MEMBER(MaplibreNativeFfiScreenBox, mln_screen_box, max);
+
+void maplibre_native_ffi_screen_box_to_native(
+  const MaplibreNativeFfiScreenBox* self, mln_screen_box* out,
+  MaplibreNativeFfiCall* call
+) {
+  (void)call;
+  memcpy(out, self, sizeof *out);
+}
+
+void maplibre_native_ffi_screen_box_read(
+  MaplibreNativeFfiScreenBox* out, const mln_screen_box* in
+) {
+  memcpy(out, in, sizeof *out);
+}
+
+MaplibreNativeFfiScreenBox* maplibre_native_ffi_screen_box_from_native(
+  const mln_screen_box* in
+) {
+  MaplibreNativeFfiScreenBox* self = g_new0(MaplibreNativeFfiScreenBox, 1);
+  maplibre_native_ffi_screen_box_read(self, in);
+  return self;
+}
+
+struct _MaplibreNativeFfiGestureResult {
+  gboolean handled;
+  MaplibreNativeFfiGestureNextTick next_tick;
+  gdouble next_tick_ms;
+  gboolean box_zoom_active;
+  MaplibreNativeFfiScreenBox box_zoom;
+  GPtrArray* events;
+};
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiGestureResult, maplibre_native_ffi_gesture_result,
+  maplibre_native_ffi_gesture_result_copy,
+  maplibre_native_ffi_gesture_result_free
+)
+
+MaplibreNativeFfiGestureResult* maplibre_native_ffi_gesture_result_new(void) {
+  MaplibreNativeFfiGestureResult* self =
+    g_new0(MaplibreNativeFfiGestureResult, 1);
+  self->events = g_ptr_array_new_with_free_func(
+    (GDestroyNotify)maplibre_native_ffi_gesture_event_free
+  );
+  return self;
+}
+
+MaplibreNativeFfiGestureResult* maplibre_native_ffi_gesture_result_copy(
+  const MaplibreNativeFfiGestureResult* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  MaplibreNativeFfiGestureResult* copy = g_memdup2(self, sizeof *self);
+  copy->events =
+    self->events != NULL
+      ? g_ptr_array_copy(
+          self->events, maplibre_native_ffi_gesture_event_copy_func, NULL
+        )
+      : NULL;
+  if (copy->events != NULL)
+    g_ptr_array_set_free_func(
+      copy->events, (GDestroyNotify)maplibre_native_ffi_gesture_event_free
+    );
+  return copy;
+}
+
+void maplibre_native_ffi_gesture_result_free(
+  MaplibreNativeFfiGestureResult* self
+) {
+  if (self == NULL) return;
+  g_clear_pointer(&self->events, g_ptr_array_unref);
+  g_free(self);
+}
+
+gboolean maplibre_native_ffi_gesture_result_get_handled(
+  const MaplibreNativeFfiGestureResult* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->handled;
+}
+
+MaplibreNativeFfiGestureNextTick
+maplibre_native_ffi_gesture_result_get_next_tick(
+  const MaplibreNativeFfiGestureResult* self
+) {
+  g_return_val_if_fail(self != NULL, (MaplibreNativeFfiGestureNextTick)0);
+  return self->next_tick;
+}
+
+gdouble maplibre_native_ffi_gesture_result_get_next_tick_ms(
+  const MaplibreNativeFfiGestureResult* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->next_tick_ms;
+}
+
+gboolean maplibre_native_ffi_gesture_result_get_box_zoom_active(
+  const MaplibreNativeFfiGestureResult* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->box_zoom_active;
+}
+
+MaplibreNativeFfiScreenBox* maplibre_native_ffi_gesture_result_get_box_zoom(
+  const MaplibreNativeFfiGestureResult* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return (MaplibreNativeFfiScreenBox*)&self->box_zoom;
+}
+
+GPtrArray* maplibre_native_ffi_gesture_result_get_events(
+  const MaplibreNativeFfiGestureResult* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return self->events;
+}
+
+MaplibreNativeFfiGestureResult* maplibre_native_ffi_gesture_result_from_native(
+  const mln_gesture_result* in
+) {
+  MaplibreNativeFfiGestureResult* self =
+    maplibre_native_ffi_gesture_result_new();
+  self->handled = (in->handled) ? TRUE : FALSE;
+  self->next_tick = (MaplibreNativeFfiGestureNextTick)(in->next_tick);
+  self->next_tick_ms = (gdouble)(in->next_tick_ms);
+  self->box_zoom_active = (in->box_zoom_active) ? TRUE : FALSE;
+  maplibre_native_ffi_screen_box_read(&self->box_zoom, &in->box_zoom);
+  g_clear_pointer(&self->events, g_ptr_array_unref);
+  self->events = g_ptr_array_new_full(
+    (guint)MIN(in->event_count, G_N_ELEMENTS(in->events)),
+    (GDestroyNotify)maplibre_native_ffi_gesture_event_free
+  );
+  for (size_t index = 0; index < MIN(in->event_count, G_N_ELEMENTS(in->events));
+       index++) {
+    g_ptr_array_add(
+      self->events,
+      maplibre_native_ffi_gesture_event_from_native(&in->events[index])
+    );
   }
   return self;
 }
@@ -10923,6 +12904,7 @@ struct _MaplibreNativeFfiMapOptions {
   gboolean tile_cache_enabled;
   char* fallback_font_faces;
   gboolean system_fonts_enabled;
+  gboolean local_ideographs_enabled;
 };
 
 enum {
@@ -10934,6 +12916,7 @@ enum {
   MAP_OPTIONS_PROP_TILE_CACHE_ENABLED,
   MAP_OPTIONS_PROP_FALLBACK_FONT_FACES,
   MAP_OPTIONS_PROP_SYSTEM_FONTS_ENABLED,
+  MAP_OPTIONS_PROP_LOCAL_IDEOGRAPHS_ENABLED,
   MAP_OPTIONS_N_PROPERTIES
 };
 
@@ -10975,6 +12958,9 @@ static void maplibre_native_ffi_map_options_get_property(
       break;
     case MAP_OPTIONS_PROP_SYSTEM_FONTS_ENABLED:
       g_value_set_boolean(value, self->system_fonts_enabled);
+      break;
+    case MAP_OPTIONS_PROP_LOCAL_IDEOGRAPHS_ENABLED:
+      g_value_set_boolean(value, self->local_ideographs_enabled);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
@@ -11021,6 +13007,11 @@ static void maplibre_native_ffi_map_options_set_property(
         self, g_value_get_boolean(value)
       );
       break;
+    case MAP_OPTIONS_PROP_LOCAL_IDEOGRAPHS_ENABLED:
+      maplibre_native_ffi_map_options_set_local_ideographs_enabled(
+        self, g_value_get_boolean(value)
+      );
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
   }
@@ -11057,6 +13048,10 @@ static void maplibre_native_ffi_map_options_class_init(
   map_options_properties[MAP_OPTIONS_PROP_SYSTEM_FONTS_ENABLED] =
     g_param_spec_boolean(
       "system-fonts-enabled", NULL, NULL, FALSE, PROPERTY_FLAGS
+    );
+  map_options_properties[MAP_OPTIONS_PROP_LOCAL_IDEOGRAPHS_ENABLED] =
+    g_param_spec_boolean(
+      "local-ideographs-enabled", NULL, NULL, FALSE, PROPERTY_FLAGS
     );
   g_object_class_install_properties(
     object_class, MAP_OPTIONS_N_PROPERTIES, map_options_properties
@@ -11247,6 +13242,36 @@ void maplibre_native_ffi_map_options_set_system_fonts_enabled(
     );
 }
 
+gboolean maplibre_native_ffi_map_options_get_local_ideographs_enabled(
+  MaplibreNativeFfiMapOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self), FALSE);
+  return self->local_ideographs_enabled;
+}
+
+gboolean maplibre_native_ffi_map_options_has_local_ideographs_enabled(
+  MaplibreNativeFfiMapOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self), FALSE);
+  return (self->fields & MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED) != 0;
+}
+
+void maplibre_native_ffi_map_options_set_local_ideographs_enabled(
+  MaplibreNativeFfiMapOptions* self, gboolean value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self));
+  gboolean was_set =
+    (self->fields & MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED) != 0;
+  gboolean changed = self->local_ideographs_enabled != value;
+  self->local_ideographs_enabled = value;
+  self->fields |= MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      map_options_properties[MAP_OPTIONS_PROP_LOCAL_IDEOGRAPHS_ENABLED]
+    );
+}
+
 void maplibre_native_ffi_map_options_to_native(
   const MaplibreNativeFfiMapOptions* self, mln_map_options* out,
   MaplibreNativeFfiCall* call
@@ -11264,6 +13289,7 @@ void maplibre_native_ffi_map_options_to_native(
   out->fallback_font_faces =
     maplibre_native_ffi_text_view(self->fallback_font_faces);
   out->system_fonts_enabled = (self->system_fonts_enabled) != FALSE;
+  out->local_ideographs_enabled = (self->local_ideographs_enabled) != FALSE;
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -13812,6 +15838,107 @@ maplibre_native_ffi_offline_region_definition_from_native(
     default:
       break;
   }
+  return self;
+}
+
+struct _MaplibreNativeFfiOfflineRegionExpiry {
+  guint64 fields;
+  gint64 stale_after_unix_ms;
+  gint64 usable_offline_until_unix_ms;
+  guint64 stale_resource_count;
+  guint64 unusable_resource_count;
+};
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiOfflineRegionExpiry,
+  maplibre_native_ffi_offline_region_expiry,
+  maplibre_native_ffi_offline_region_expiry_copy,
+  maplibre_native_ffi_offline_region_expiry_free
+)
+
+MaplibreNativeFfiOfflineRegionExpiry*
+maplibre_native_ffi_offline_region_expiry_new(void) {
+  MaplibreNativeFfiOfflineRegionExpiry* self =
+    g_new0(MaplibreNativeFfiOfflineRegionExpiry, 1);
+  return self;
+}
+
+MaplibreNativeFfiOfflineRegionExpiry*
+maplibre_native_ffi_offline_region_expiry_copy(
+  const MaplibreNativeFfiOfflineRegionExpiry* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  MaplibreNativeFfiOfflineRegionExpiry* copy = g_memdup2(self, sizeof *self);
+  return copy;
+}
+
+void maplibre_native_ffi_offline_region_expiry_free(
+  MaplibreNativeFfiOfflineRegionExpiry* self
+) {
+  if (self == NULL) return;
+  g_free(self);
+}
+
+gint64 maplibre_native_ffi_offline_region_expiry_get_stale_after_unix_ms(
+  const MaplibreNativeFfiOfflineRegionExpiry* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->stale_after_unix_ms;
+}
+
+gboolean maplibre_native_ffi_offline_region_expiry_has_stale_after_unix_ms(
+  const MaplibreNativeFfiOfflineRegionExpiry* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return (self->fields & MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER) != 0;
+}
+
+gint64
+maplibre_native_ffi_offline_region_expiry_get_usable_offline_until_unix_ms(
+  const MaplibreNativeFfiOfflineRegionExpiry* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->usable_offline_until_unix_ms;
+}
+
+gboolean
+maplibre_native_ffi_offline_region_expiry_has_usable_offline_until_unix_ms(
+  const MaplibreNativeFfiOfflineRegionExpiry* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return (self->fields & MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL) != 0;
+}
+
+guint64 maplibre_native_ffi_offline_region_expiry_get_stale_resource_count(
+  const MaplibreNativeFfiOfflineRegionExpiry* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->stale_resource_count;
+}
+
+guint64 maplibre_native_ffi_offline_region_expiry_get_unusable_resource_count(
+  const MaplibreNativeFfiOfflineRegionExpiry* self
+) {
+  g_return_val_if_fail(self != NULL, 0);
+  return self->unusable_resource_count;
+}
+
+MaplibreNativeFfiOfflineRegionExpiry*
+maplibre_native_ffi_offline_region_expiry_from_native(
+  const mln_offline_region_expiry* in
+) {
+  MaplibreNativeFfiOfflineRegionExpiry* self =
+    maplibre_native_ffi_offline_region_expiry_new();
+  self->fields = (guint64)in->fields;
+  if ((in->fields & MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER) != 0) {
+    self->stale_after_unix_ms = (gint64)(in->stale_after_unix_ms);
+  }
+  if ((in->fields & MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL) != 0) {
+    self->usable_offline_until_unix_ms =
+      (gint64)(in->usable_offline_until_unix_ms);
+  }
+  self->stale_resource_count = (guint64)(in->stale_resource_count);
+  self->unusable_resource_count = (guint64)(in->unusable_resource_count);
   return self;
 }
 
@@ -18148,6 +20275,8 @@ struct _MaplibreNativeFfiRenderTarget {
   MaplibreNativeFfiWebGpuBorrowedTexturesTarget* web_gpu_borrowed_textures;
   MaplibreNativeFfiExportedRingTarget* exported_ring;
   MaplibreNativeFfiWebCanvasTarget* web_canvas;
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* d3d12_borrowed_textures;
+  MaplibreNativeFfiD3d12CompositionTarget* d3d12_composition;
 };
 
 G_DEFINE_BOXED_TYPE(
@@ -18220,6 +20349,18 @@ MaplibreNativeFfiRenderTarget* maplibre_native_ffi_render_target_copy(
     self->web_canvas != NULL
       ? maplibre_native_ffi_web_canvas_target_copy(self->web_canvas)
       : NULL;
+  copy->d3d12_borrowed_textures =
+    self->d3d12_borrowed_textures != NULL
+      ? maplibre_native_ffi_d3d12_borrowed_textures_target_copy(
+          self->d3d12_borrowed_textures
+        )
+      : NULL;
+  copy->d3d12_composition =
+    self->d3d12_composition != NULL
+      ? maplibre_native_ffi_d3d12_composition_target_copy(
+          self->d3d12_composition
+        )
+      : NULL;
   return copy;
 }
 
@@ -18240,6 +20381,8 @@ void maplibre_native_ffi_render_target_free(
   g_clear_object(&self->web_gpu_borrowed_textures);
   g_clear_object(&self->exported_ring);
   g_clear_object(&self->web_canvas);
+  g_clear_object(&self->d3d12_borrowed_textures);
+  g_clear_object(&self->d3d12_composition);
   g_free(self);
 }
 
@@ -18746,6 +20889,80 @@ maplibre_native_ffi_render_target_get_web_canvas(
   return self->web_canvas;
 }
 
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_d3d12_borrowed_textures(
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* value
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_BORROWED_TEXTURES_TARGET(value), NULL
+  );
+  MaplibreNativeFfiRenderTarget* self =
+    g_new0(MaplibreNativeFfiRenderTarget, 1);
+  self->tag = MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES;
+  self->d3d12_borrowed_textures =
+    maplibre_native_ffi_d3d12_borrowed_textures_target_new();
+  MaplibreNativeFfiD3d12BorrowedTexturesTarget* previous =
+    self->d3d12_borrowed_textures;
+  self->d3d12_borrowed_textures =
+    maplibre_native_ffi_d3d12_borrowed_textures_target_copy(value);
+  if (previous != NULL) g_object_unref(previous);
+  return self;
+}
+
+gboolean maplibre_native_ffi_render_target_is_d3d12_borrowed_textures(
+  const MaplibreNativeFfiRenderTarget* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES;
+}
+
+MaplibreNativeFfiD3d12BorrowedTexturesTarget*
+maplibre_native_ffi_render_target_get_d3d12_borrowed_textures(
+  const MaplibreNativeFfiRenderTarget* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(
+    self->tag == MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES, NULL
+  );
+  return self->d3d12_borrowed_textures;
+}
+
+MaplibreNativeFfiRenderTarget*
+maplibre_native_ffi_render_target_new_d3d12_composition(
+  MaplibreNativeFfiD3d12CompositionTarget* value
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_D3D12_COMPOSITION_TARGET(value), NULL
+  );
+  MaplibreNativeFfiRenderTarget* self =
+    g_new0(MaplibreNativeFfiRenderTarget, 1);
+  self->tag = MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION;
+  self->d3d12_composition = maplibre_native_ffi_d3d12_composition_target_new();
+  MaplibreNativeFfiD3d12CompositionTarget* previous = self->d3d12_composition;
+  self->d3d12_composition =
+    maplibre_native_ffi_d3d12_composition_target_copy(value);
+  if (previous != NULL) g_object_unref(previous);
+  return self;
+}
+
+gboolean maplibre_native_ffi_render_target_is_d3d12_composition(
+  const MaplibreNativeFfiRenderTarget* self
+) {
+  g_return_val_if_fail(self != NULL, FALSE);
+  return self->tag == MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION;
+}
+
+MaplibreNativeFfiD3d12CompositionTarget*
+maplibre_native_ffi_render_target_get_d3d12_composition(
+  const MaplibreNativeFfiRenderTarget* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  g_return_val_if_fail(
+    self->tag == MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION, NULL
+  );
+  return self->d3d12_composition;
+}
+
 void maplibre_native_ffi_render_target_to_native(
   const MaplibreNativeFfiRenderTarget* self, mln_render_target* out,
   MaplibreNativeFfiCall* call
@@ -18843,6 +21060,18 @@ void maplibre_native_ffi_render_target_to_native(
       if (self->web_canvas != NULL)
         maplibre_native_ffi_web_canvas_target_to_native(
           self->web_canvas, &data->web_canvas, call
+        );
+      break;
+    case MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES:
+      if (self->d3d12_borrowed_textures != NULL)
+        maplibre_native_ffi_d3d12_borrowed_textures_target_to_native(
+          self->d3d12_borrowed_textures, &data->d3d12_borrowed_textures, call
+        );
+      break;
+    case MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION:
+      if (self->d3d12_composition != NULL)
+        maplibre_native_ffi_d3d12_composition_target_to_native(
+          self->d3d12_composition, &data->d3d12_composition, call
         );
       break;
     default:
@@ -19144,34 +21373,6 @@ void maplibre_native_ffi_rendered_feature_query_options_to_native(
     out->layer_id_count = count;
   }
   out->filter = maplibre_native_ffi_text_view(self->filter);
-}
-
-G_DEFINE_BOXED_TYPE(
-  MaplibreNativeFfiScreenBox, maplibre_native_ffi_screen_box,
-  maplibre_native_ffi_screen_box_copy, maplibre_native_ffi_screen_box_free
-)
-
-MaplibreNativeFfiScreenBox* maplibre_native_ffi_screen_box_copy(
-  const MaplibreNativeFfiScreenBox* self
-) {
-  g_return_val_if_fail(self != NULL, NULL);
-  return g_memdup2(self, sizeof *self);
-}
-
-void maplibre_native_ffi_screen_box_free(MaplibreNativeFfiScreenBox* self) {
-  g_free(self);
-}
-
-G_STATIC_ASSERT(sizeof(MaplibreNativeFfiScreenBox) == sizeof(mln_screen_box));
-SAME_MEMBER(MaplibreNativeFfiScreenBox, mln_screen_box, min);
-SAME_MEMBER(MaplibreNativeFfiScreenBox, mln_screen_box, max);
-
-void maplibre_native_ffi_screen_box_to_native(
-  const MaplibreNativeFfiScreenBox* self, mln_screen_box* out,
-  MaplibreNativeFfiCall* call
-) {
-  (void)call;
-  memcpy(out, self, sizeof *out);
 }
 
 struct _MaplibreNativeFfiScreenLineString {
@@ -20151,6 +22352,7 @@ struct _MaplibreNativeFfiResourceResponse {
   gint64 expires_unix_ms;
   char* etag;
   gint64 retry_after_unix_ms;
+  gboolean no_store;
 };
 
 enum {
@@ -20164,6 +22366,7 @@ enum {
   RESOURCE_RESPONSE_PROP_EXPIRES_UNIX_MS,
   RESOURCE_RESPONSE_PROP_ETAG,
   RESOURCE_RESPONSE_PROP_RETRY_AFTER_UNIX_MS,
+  RESOURCE_RESPONSE_PROP_NO_STORE,
   RESOURCE_RESPONSE_N_PROPERTIES
 };
 
@@ -20216,6 +22419,9 @@ static void maplibre_native_ffi_resource_response_get_property(
       break;
     case RESOURCE_RESPONSE_PROP_RETRY_AFTER_UNIX_MS:
       g_value_set_int64(value, self->retry_after_unix_ms);
+      break;
+    case RESOURCE_RESPONSE_PROP_NO_STORE:
+      g_value_set_boolean(value, self->no_store);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
@@ -20273,6 +22479,11 @@ static void maplibre_native_ffi_resource_response_set_property(
         self, g_value_get_int64(value)
       );
       break;
+    case RESOURCE_RESPONSE_PROP_NO_STORE:
+      maplibre_native_ffi_resource_response_set_no_store(
+        self, g_value_get_boolean(value)
+      );
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
   }
@@ -20318,6 +22529,8 @@ static void maplibre_native_ffi_resource_response_class_init(
       "retry-after-unix-ms", NULL, NULL, G_MININT64, G_MAXINT64, 0,
       PROPERTY_FLAGS
     );
+  resource_response_properties[RESOURCE_RESPONSE_PROP_NO_STORE] =
+    g_param_spec_boolean("no-store", NULL, NULL, FALSE, PROPERTY_FLAGS);
   g_object_class_install_properties(
     object_class, RESOURCE_RESPONSE_N_PROPERTIES, resource_response_properties
   );
@@ -20557,6 +22770,26 @@ void maplibre_native_ffi_resource_response_set_retry_after_unix_ms(
     );
 }
 
+gboolean maplibre_native_ffi_resource_response_get_no_store(
+  MaplibreNativeFfiResourceResponse* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_RESOURCE_RESPONSE(self), FALSE);
+  return self->no_store;
+}
+
+void maplibre_native_ffi_resource_response_set_no_store(
+  MaplibreNativeFfiResourceResponse* self, gboolean value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_RESOURCE_RESPONSE(self));
+  gboolean changed = self->no_store != value;
+  self->no_store = value;
+  if (changed)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      resource_response_properties[RESOURCE_RESPONSE_PROP_NO_STORE]
+    );
+}
+
 void maplibre_native_ffi_resource_response_to_native(
   const MaplibreNativeFfiResourceResponse* self, mln_resource_response* out,
   MaplibreNativeFfiCall* call
@@ -20578,6 +22811,7 @@ void maplibre_native_ffi_resource_response_to_native(
   out->expires_unix_ms = (int64_t)(self->expires_unix_ms);
   out->etag = maplibre_native_ffi_text_view(self->etag);
   out->retry_after_unix_ms = (int64_t)(self->retry_after_unix_ms);
+  out->no_store = (self->no_store) != FALSE;
 }
 
 struct _MaplibreNativeFfiUrlQueryParameter {

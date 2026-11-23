@@ -3,7 +3,7 @@
 // blocks it, so the map's work stays off the page's thread, and the page
 // sends the worker the canvas and the user's input.
 
-import type { CameraDelta, CameraOptions } from "@maplibre/native-ffi";
+import type { CameraOptions, GestureInput } from "@maplibre/native-ffi";
 
 /** The camera, as the map last reported it. */
 export interface View {
@@ -30,7 +30,15 @@ export type ToWorker =
       readonly styleId: string;
     }
   | { readonly type: "resize"; readonly size: LogicalSize }
-  | { readonly type: "cameraDelta"; readonly delta: CameraDelta }
+  /**
+   * The inputs of one event for the map's gesture recognizer, at the event's
+   * time as `performance.timeOrigin + timeStamp`.
+   */
+  | {
+      readonly type: "gesture";
+      readonly inputs: readonly GestureInput[];
+      readonly time: number;
+    }
   | { readonly type: "setStyle"; readonly styleId: string };
 
 export type FromWorker =

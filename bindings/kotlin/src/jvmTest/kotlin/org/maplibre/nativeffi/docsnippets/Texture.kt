@@ -30,6 +30,10 @@ private fun onFrameWake() {}
 // The host's draw, which samples the image view.
 private fun drawMap(imageView: ULong) {}
 
+// The host's wait for a GPU sync, as for an acquired frame's producer
+// sync.
+private fun waitForSync(sync: GpuSync) {}
+
 private fun destroyTextures(
   images: List<ULong>,
   views: List<ULong>,
@@ -142,9 +146,12 @@ private suspend fun renderToTexture(
         ),
     )
 
-  session
-    .setTarget(RenderTarget.VulkanBorrowedTextures(resized))
-    .await()
+  val sync =
+    session
+      .setTarget(RenderTarget.VulkanBorrowedTextures(resized))
+      .await()
+  // Wait for its sync before you destroy the old textures.
+  if (sync != null) waitForSync(sync)
   // vkDestroyImageView and vkDestroyImage
   destroyTextures(images, views)
   // #endregion resize-borrowed

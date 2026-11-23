@@ -16,9 +16,10 @@ final class CacheDatabaseOperation extends _Enum {
   /// Offline regions keep their resources.
   static const clear = CacheDatabaseOperation.fromRawValue(1);
 
-  /// Keeps the ambient cache's resources, but makes maps check each one with
-  /// the server before they use it again. Offline regions keep their resources
-  /// as they are.
+  /// Keeps the ambient cache's resources, but makes them stale: maps check each
+  /// one with the server when they next use it, and show it meanwhile unless
+  /// the server requires checking it first. Offline regions keep their
+  /// resources as they are.
   static const invalidate = CacheDatabaseOperation.fromRawValue(2);
 
   /// Compacts the whole database file to free the disk space that it no longer
@@ -65,10 +66,10 @@ final class CameraChangeSource extends _Enum {
   /// keeps the camera within its bounds.
   static const command = CameraChangeSource.fromRawValue(0);
 
-  /// A camera command with a gesture phase.
+  /// A gesture that a gesture recognizer recognized.
   static const gesture = CameraChangeSource.fromRawValue(1);
 
-  /// The momentum and bearing snap that a gesture's end started.
+  /// The glide and snap after a gesture recognizer's gesture.
   static const momentum = CameraChangeSource.fromRawValue(2);
   @override
   String toString() => switch (rawValue) {
@@ -94,11 +95,10 @@ final class CameraTransitionOutcome extends _Enum {
   static const completed = CameraTransitionOutcome.fromRawValue(0);
 
   /// `MapHandle.cancelCameraTransitions()`,
-  /// `MapHandle.cancelCameraTransitionsWithId()`, a gesture's
-  /// `GesturePhase.begin` or `GesturePhase.cancel`,
-  /// `MapHandle.setFreeCameraOptions()`, or a resize that moved the camera back
-  /// inside its bounds stopped the change. A command that fails before it moves
-  /// the camera also reports this.
+  /// `MapHandle.cancelCameraTransitionsWithId()`, a gesture that a gesture
+  /// recognizer begins or cancels, `MapHandle.setFreeCameraOptions()`, or a
+  /// resize that moved the camera back inside its bounds stopped the change. A
+  /// command that fails before it moves the camera also reports this.
   static const cancelled = CameraTransitionOutcome.fromRawValue(1);
 
   /// The map closed before the change ended.
@@ -193,6 +193,28 @@ final class ConstrainMode extends _Enum {
   };
 }
 
+/// What shows a D3D12 composition swap chain.
+///
+/// See `mln_d3d12_composition_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class D3d12CompositionKind extends _Enum {
+  const D3d12CompositionKind.fromRawValue(super.rawValue);
+
+  /// An `IDCompositionVisual`, whose content the session sets to its swap
+  /// chain.
+  static const visual = D3d12CompositionKind.fromRawValue(1);
+
+  /// A XAML `SwapChainPanel`'s `ISwapChainPanelNative`, of WinUI or UWP, whose
+  /// swap chain the session sets.
+  static const swapChainPanel = D3d12CompositionKind.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    1 => 'D3d12CompositionKind.visual',
+    2 => 'D3d12CompositionKind.swapChainPanel',
+    _ => 'D3d12CompositionKind($rawValue)',
+  };
+}
+
 /// A format of depth and stencil textures, as a bit in a set.
 ///
 /// See `mln_depth_stencil_format_flag` in the
@@ -254,39 +276,79 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   });
 }
 
-/// Where a camera change falls in a gesture that the user makes.
+/// The part of the camera that a notch is on.
 ///
-/// `GesturePhase.begin` and `GesturePhase.update` mark a gesture in progress,
-/// and `GesturePhase.end` and `GesturePhase.cancel` end it.
-///
-/// See `mln_gesture_phase` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class GesturePhase extends _Enum {
-  const GesturePhase.fromRawValue(super.rawValue);
-
-  /// The change isn't part of a gesture.
-  static const none = GesturePhase.fromRawValue(0);
-
-  /// The gesture starts. This cancels every running camera animation before the
-  /// change applies.
-  static const begin = GesturePhase.fromRawValue(1);
-
-  /// The gesture continues. To start a gesture that keeps the running camera
-  /// animations, start it with this phase instead of `GesturePhase.begin`.
-  static const update = GesturePhase.fromRawValue(2);
-  static const end = GesturePhase.fromRawValue(3);
-
-  /// The platform cancelled the gesture. This also cancels every running camera
-  /// animation after the change applies.
-  static const cancel = GesturePhase.fromRawValue(4);
+/// See `mln_gesture_axis` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GestureAxis extends _Enum {
+  const GestureAxis.fromRawValue(super.rawValue);
+  static const zoom = GestureAxis.fromRawValue(0);
+  static const bearing = GestureAxis.fromRawValue(1);
+  static const pitch = GestureAxis.fromRawValue(2);
   @override
   String toString() => switch (rawValue) {
-    0 => 'GesturePhase.none',
-    1 => 'GesturePhase.begin',
-    2 => 'GesturePhase.update',
-    3 => 'GesturePhase.end',
-    4 => 'GesturePhase.cancel',
-    _ => 'GesturePhase($rawValue)',
+    0 => 'GestureAxis.zoom',
+    1 => 'GestureAxis.bearing',
+    2 => 'GestureAxis.pitch',
+    _ => 'GestureAxis($rawValue)',
+  };
+}
+
+/// What a one-pointer drag or a double tap does instead of its default, from
+/// the pointer's held buttons or from held keys. A drag reads its modes when it
+/// starts and keeps them until it ends, and a double tap when it lifts;
+/// rotating wins over a box zoom.
+///
+/// See `mln_gesture_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GestureMode extends _Flags<GestureMode> {
+  const GestureMode.fromRawValue(super.rawValue);
+
+  /// Sideways turns the map and up and down tilts it.
+  static const rotate = GestureMode.fromRawValue(1);
+
+  /// Draws a box that the map zooms to when the pointer lifts.
+  static const boxZoom = GestureMode.fromRawValue(2);
+
+  /// A double tap zooms out instead of in.
+  static const zoomOut = GestureMode.fromRawValue(4);
+
+  /// No flags.
+  static const none = GestureMode.fromRawValue(0);
+  @override
+  GestureMode _of(int rawValue) => GestureMode.fromRawValue(rawValue);
+  @override
+  String toString() => _describe('GestureMode', const {
+    0: 'none',
+    1: 'rotate',
+    2: 'boxZoom',
+    4: 'zoomOut',
+  });
+}
+
+/// When a gesture recognizer next needs `GestureRecognizerHandle.tick()`.
+///
+/// See `mln_gesture_next_tick` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GestureNextTick extends _Enum {
+  const GestureNextTick.fromRawValue(super.rawValue);
+
+  /// Not until the next input.
+  static const none = GestureNextTick.fromRawValue(0);
+
+  /// Every display frame, while a delta eases or a gesture, its glide, or its
+  /// snap may reach a notch.
+  static const frame = GestureNextTick.fromRawValue(1);
+
+  /// At `next_tick_ms`, on the inputs' clock: when a press becomes a long
+  /// press, or idle deltas end.
+  static const at = GestureNextTick.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'GestureNextTick.none',
+    1 => 'GestureNextTick.frame',
+    2 => 'GestureNextTick.at',
+    _ => 'GestureNextTick($rawValue)',
   };
 }
 
@@ -606,10 +668,10 @@ final class MapMode extends _Enum {
   };
 }
 
-/// How a part of a gesture's momentum slows from its release speed.
+/// How a part's glide unfolds from its release speed.
 ///
 /// See `mln_momentum_decay_model` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
 final class MomentumDecayModel extends _Enum {
   const MomentumDecayModel.fromRawValue(super.rawValue);
 
@@ -618,14 +680,17 @@ final class MomentumDecayModel extends _Enum {
   /// deceleration 69 ms.
   static const friction = MomentumDecayModel.fromRawValue(0);
 
-  /// The part eases `distance` over `duration_ms`, along `easing`, as a camera
-  /// animation does. The caller plans the glide, for example from the
-  /// platform's own fling physics, such as Android's OverScroller.
-  static const ease = MomentumDecayModel.fromRawValue(1);
+  /// The glide lasts `duration_ms` × (speed / `reference_speed`) to the power
+  /// of `duration_exponent`, and follows `easing`, starting at the release
+  /// speed. Its defaults are Android's OverScroller fling, in its
+  /// density-independent pixels: a reference speed of 1000, 555.182 ms, an
+  /// exponent of 0.7362676, the curve (0.175, 0.5, 0.35, 1), a minimum speed of
+  /// 50 and a maximum of 8000.
+  static const curve = MomentumDecayModel.fromRawValue(1);
   @override
   String toString() => switch (rawValue) {
     0 => 'MomentumDecayModel.friction',
-    1 => 'MomentumDecayModel.ease',
+    1 => 'MomentumDecayModel.curve',
     _ => 'MomentumDecayModel($rawValue)',
   };
 }
@@ -725,6 +790,51 @@ final class OpenGlContextProviderFlag
   });
 }
 
+/// Where a platform-recognized pinch is.
+///
+/// See `mln_pinch_phase` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class PinchPhase extends _Enum {
+  const PinchPhase.fromRawValue(super.rawValue);
+  static const begin = PinchPhase.fromRawValue(0);
+  static const update = PinchPhase.fromRawValue(1);
+
+  /// The fingers lifted: the pinch glides on.
+  static const end = PinchPhase.fromRawValue(2);
+
+  /// The platform took the pinch away: nothing continues, and the camera's
+  /// animations stop.
+  static const cancel = PinchPhase.fromRawValue(3);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'PinchPhase.begin',
+    1 => 'PinchPhase.update',
+    2 => 'PinchPhase.end',
+    3 => 'PinchPhase.cancel',
+    _ => 'PinchPhase($rawValue)',
+  };
+}
+
+/// What kind of device a pointer is.
+///
+/// See `mln_pointer_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class PointerKind extends _Enum {
+  const PointerKind.fromRawValue(super.rawValue);
+  static const mouse = PointerKind.fromRawValue(0);
+
+  /// Two touches pinch, twist, and tilt, and a held second tap zooms.
+  static const touch = PointerKind.fromRawValue(1);
+  static const pen = PointerKind.fromRawValue(2);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'PointerKind.mouse',
+    1 => 'PointerKind.touch',
+    2 => 'PointerKind.pen',
+    _ => 'PointerKind($rawValue)',
+  };
+}
+
 /// A projection that a style's
 /// \[projection\](https://maplibre.org/maplibre-style-spec/projection/) names.
 ///
@@ -778,12 +888,20 @@ final class RenderBackend extends _Enum {
   static const vulkan = RenderBackend.fromRawValue(2);
   static const openGl = RenderBackend.fromRawValue(3);
   static const webGpu = RenderBackend.fromRawValue(4);
+
+  /// D3D12, on Windows. It compiles its shaders at run time with DXC, which
+  /// your app ships: `dxcompiler.dll`, 1.8.2502 or later, beside your app's
+  /// executable or in another directory of the DLL search path, which doesn't
+  /// take the library's own directory. Without it, the library renders on
+  /// another backend.
+  static const d3d12 = RenderBackend.fromRawValue(5);
   @override
   String toString() => switch (rawValue) {
     1 => 'RenderBackend.metal',
     2 => 'RenderBackend.vulkan',
     3 => 'RenderBackend.openGl',
     4 => 'RenderBackend.webGpu',
+    5 => 'RenderBackend.d3d12',
     _ => 'RenderBackend($rawValue)',
   };
 }
@@ -798,6 +916,7 @@ final class RenderBackendFlag extends _Flags<RenderBackendFlag> {
   static const vulkan = RenderBackendFlag.fromRawValue(2);
   static const openGl = RenderBackendFlag.fromRawValue(4);
   static const webGpu = RenderBackendFlag.fromRawValue(8);
+  static const d3d12 = RenderBackendFlag.fromRawValue(16);
 
   /// No flags.
   static const none = RenderBackendFlag.fromRawValue(0);
@@ -811,6 +930,7 @@ final class RenderBackendFlag extends _Flags<RenderBackendFlag> {
     2: 'vulkan',
     4: 'openGl',
     8: 'webGpu',
+    16: 'd3d12',
   });
 }
 
@@ -963,6 +1083,10 @@ final class RenderTargetKindFlag extends _Flags<RenderTargetKindFlag> {
   );
   static const exportedRing = RenderTargetKindFlag.fromRawValue(32768);
   static const webCanvas = RenderTargetKindFlag.fromRawValue(65536);
+  static const d3d12BorrowedTextures = RenderTargetKindFlag.fromRawValue(
+    131072,
+  );
+  static const d3d12Composition = RenderTargetKindFlag.fromRawValue(262144);
 
   /// No flags.
   static const none = RenderTargetKindFlag.fromRawValue(0);
@@ -987,6 +1111,8 @@ final class RenderTargetKindFlag extends _Flags<RenderTargetKindFlag> {
     16384: 'webGpuBorrowedTextures',
     32768: 'exportedRing',
     65536: 'webCanvas',
+    131072: 'd3d12BorrowedTextures',
+    262144: 'd3d12Composition',
   });
 }
 
@@ -1701,6 +1827,85 @@ final class AndroidHardwareBufferFrame extends _Value {
     'scaleFactor',
     'slot',
     'buffer',
+  ]);
+}
+
+/// The D3D12 texture of an acquired frame.
+///
+/// The depth members are set when the frame has a depth texture, as for
+/// `MetalTextureFrame`. Otherwise they are zero.
+///
+/// See `mln_d3d12_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class D3d12TextureFrame extends _Value {
+  const D3d12TextureFrame({
+    this.width = 0,
+    this.height = 0,
+    this.scaleFactor = 0,
+    this.slot = 0,
+    this.resource = NativePointer.nullPointer,
+    this.device = NativePointer.nullPointer,
+    this.format = 0,
+    this.state = 0,
+    this.depthResource = NativePointer.nullPointer,
+    this.depthFormat = 0,
+    this.depthState = 0,
+  });
+  final int width;
+  final int height;
+  final double scaleFactor;
+
+  /// The texture's index in the descriptor's `textures`, or in the ring.
+  final int slot;
+
+  /// The `ID3D12Resource`.
+  final NativePointer resource;
+
+  /// The resource's `ID3D12Device`.
+  final NativePointer device;
+
+  /// The resource's `DXGI_FORMAT`.
+  final int format;
+
+  /// The `D3D12_RESOURCE_STATES` that the frame left the resource in.
+  final int state;
+
+  /// The `ID3D12Resource` that holds the frame's depth and stencil.
+  final NativePointer depthResource;
+
+  /// The depth resource's `DXGI_FORMAT`.
+  final int depthFormat;
+
+  /// The `D3D12_RESOURCE_STATES` that the frame left the depth resource in.
+  final int depthState;
+
+  @override
+  List<Object?> get _members => [
+    width,
+    height,
+    scaleFactor,
+    slot,
+    resource,
+    device,
+    format,
+    state,
+    depthResource,
+    depthFormat,
+    depthState,
+  ];
+  @override
+  String toString() => _describe('D3d12TextureFrame', const [
+    'width',
+    'height',
+    'scaleFactor',
+    'slot',
+    'resource',
+    'device',
+    'format',
+    'state',
+    'depthResource',
+    'depthFormat',
+    'depthState',
   ]);
 }
 
@@ -2890,45 +3095,860 @@ final class LogicalSize extends _Value {
   String toString() => _describe('LogicalSize', const ['width', 'height']);
 }
 
-/// Options for creating a frame pacer, or for `FramePacerHandle.setOptions()`.
+/// A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`)
+/// and (`x2`, `y2`).
 ///
-/// See `mln_frame_pacer_options` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-final class FramePacerOptions extends _Value {
-  const FramePacerOptions({
-    this.maximumFramesPerSecond,
-    this.unlimitedFramesPerSecond = false,
-  });
-
-  /// The most frames per second that the pacer demands, greater than zero. The
-  /// pacer skips display refreshes to stay within it. By default, it can demand
-  /// frames at every refresh.
-  final int? maximumFramesPerSecond;
-
-  /// Removes the frame rate limit, so the pacer can demand frames at every
-  /// display refresh, as it does by default.
-  final bool unlimitedFramesPerSecond;
+/// `x1` and `x2` are between 0 and 1.
+///
+/// See `mln_unit_bezier` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class UnitBezier extends _Value {
+  const UnitBezier({this.x1 = 0, this.y1 = 0, this.x2 = 0, this.y2 = 0});
+  final double x1;
+  final double y1;
+  final double x2;
+  final double y2;
 
   /// A copy of this value with the given members replaced.
-  FramePacerOptions copyWith({
-    int? maximumFramesPerSecond,
-    bool? unlimitedFramesPerSecond,
-  }) => FramePacerOptions(
-    maximumFramesPerSecond:
-        maximumFramesPerSecond ?? this.maximumFramesPerSecond,
-    unlimitedFramesPerSecond:
-        unlimitedFramesPerSecond ?? this.unlimitedFramesPerSecond,
+  UnitBezier copyWith({double? x1, double? y1, double? x2, double? y2}) =>
+      UnitBezier(
+        x1: x1 ?? this.x1,
+        y1: y1 ?? this.y1,
+        x2: x2 ?? this.x2,
+        y2: y2 ?? this.y2,
+      );
+
+  @override
+  List<Object?> get _members => [x1, y1, x2, y2];
+  @override
+  String toString() => _describe('UnitBezier', const ['x1', 'y1', 'x2', 'y2']);
+}
+
+/// How one part of a gesture glides after release.
+///
+/// Speeds and distances are in the part's unit: logical pixels for pan, zoom
+/// levels for zoom, and degrees for bearing and pitch, with speeds per second.
+/// A setting whose bit isn't set keeps its current value. A new `model` starts
+/// from its defaults: friction from the part's, which
+/// `MapHandle.gestureRecognizerCreate()` lists, and a curve from Android's
+/// fling. Settings of the other model are an error. `min_speed` is finite and
+/// not negative, `duration_exponent` finite and above -1, and every other
+/// number positive; the maximums may be infinite.
+///
+/// See `mln_momentum_decay` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class MomentumDecay extends _Value {
+  const MomentumDecay({
+    this.model,
+    this.halfLifeMs,
+    this.stopSpeed,
+    this.referenceSpeed,
+    this.durationMs,
+    this.durationExponent,
+    this.easing,
+    this.minSpeed,
+    this.maxSpeed,
+    this.maxDistance,
+  });
+  final MomentumDecayModel? model;
+
+  /// For `MomentumDecayModel.friction`.
+  final double? halfLifeMs;
+
+  /// For `MomentumDecayModel.friction`, the speed at which it ends.
+  final double? stopSpeed;
+
+  /// For `MomentumDecayModel.curve`, the speed that lasts `duration_ms`.
+  final double? referenceSpeed;
+
+  /// For `MomentumDecayModel.curve`.
+  final double? durationMs;
+
+  /// For `MomentumDecayModel.curve`, how the duration grows with the speed.
+  final double? durationExponent;
+
+  /// For `MomentumDecayModel.curve`, the share of the glide covered over the
+  /// share of its duration. Its control points are between 0 and 1, and `x1`
+  /// and `y1` above 0, so the glide starts moving and never passes its end.
+  final UnitBezier? easing;
+
+  /// A slower release doesn't glide.
+  final double? minSpeed;
+
+  /// A faster release counts as this.
+  final double? maxSpeed;
+
+  /// The farthest the part glides. A release that would glide farther counts as
+  /// the speed that glides this far.
+  final double? maxDistance;
+
+  /// A copy of this value with the given members replaced.
+  MomentumDecay copyWith({
+    MomentumDecayModel? model,
+    double? halfLifeMs,
+    double? stopSpeed,
+    double? referenceSpeed,
+    double? durationMs,
+    double? durationExponent,
+    UnitBezier? easing,
+    double? minSpeed,
+    double? maxSpeed,
+    double? maxDistance,
+  }) => MomentumDecay(
+    model: model ?? this.model,
+    halfLifeMs: halfLifeMs ?? this.halfLifeMs,
+    stopSpeed: stopSpeed ?? this.stopSpeed,
+    referenceSpeed: referenceSpeed ?? this.referenceSpeed,
+    durationMs: durationMs ?? this.durationMs,
+    durationExponent: durationExponent ?? this.durationExponent,
+    easing: easing ?? this.easing,
+    minSpeed: minSpeed ?? this.minSpeed,
+    maxSpeed: maxSpeed ?? this.maxSpeed,
+    maxDistance: maxDistance ?? this.maxDistance,
   );
 
   @override
   List<Object?> get _members => [
-    maximumFramesPerSecond,
-    unlimitedFramesPerSecond,
+    model,
+    halfLifeMs,
+    stopSpeed,
+    referenceSpeed,
+    durationMs,
+    durationExponent,
+    easing,
+    minSpeed,
+    maxSpeed,
+    maxDistance,
   ];
   @override
-  String toString() => _describe('FramePacerOptions', const [
-    'maximumFramesPerSecond',
-    'unlimitedFramesPerSecond',
+  String toString() => _describe('MomentumDecay', const [
+    'model',
+    'halfLifeMs',
+    'stopSpeed',
+    'referenceSpeed',
+    'durationMs',
+    'durationExponent',
+    'easing',
+    'minSpeed',
+    'maxSpeed',
+    'maxDistance',
+  ]);
+}
+
+/// How gestures move the map's content.
+///
+/// See `mln_gesture_pan_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GesturePanOptions extends _Value {
+  const GesturePanOptions({this.enabled, this.glides, this.momentum});
+
+  /// Whether drags, two fingers moving together, and deltas pan.
+  final bool? enabled;
+
+  /// Whether a release glides on.
+  final bool? glides;
+  final MomentumDecay? momentum;
+
+  /// A copy of this value with the given members replaced.
+  GesturePanOptions copyWith({
+    bool? enabled,
+    bool? glides,
+    MomentumDecay? momentum,
+  }) => GesturePanOptions(
+    enabled: enabled ?? this.enabled,
+    glides: glides ?? this.glides,
+    momentum: momentum ?? this.momentum,
+  );
+
+  @override
+  List<Object?> get _members => [enabled, glides, momentum];
+  @override
+  String toString() =>
+      _describe('GesturePanOptions', const ['enabled', 'glides', 'momentum']);
+}
+
+/// Where a part settles after a gesture that changed it.
+///
+/// The targets are every `spacing` from `offset`, in the part's unit. Bearing
+/// targets lie within one turn from `offset`, and the bearing takes the shorter
+/// way around to the nearest. Once the part's glide ends, or right away when it
+/// has none, the part eases to the nearest target if it is within `tolerance`
+/// of it, and otherwise stays where it is. A setting whose bit isn't set keeps
+/// its current value.
+///
+/// See `mln_momentum_snap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class MomentumSnap extends _Value {
+  const MomentumSnap({
+    this.spacing,
+    this.offset,
+    this.tolerance,
+    this.durationMs,
+  });
+
+  /// Positive.
+  final double? spacing;
+
+  /// Finite.
+  final double? offset;
+
+  /// Not negative.
+  final double? tolerance;
+
+  /// Zero settles without easing.
+  final double? durationMs;
+
+  /// A copy of this value with the given members replaced.
+  MomentumSnap copyWith({
+    double? spacing,
+    double? offset,
+    double? tolerance,
+    double? durationMs,
+  }) => MomentumSnap(
+    spacing: spacing ?? this.spacing,
+    offset: offset ?? this.offset,
+    tolerance: tolerance ?? this.tolerance,
+    durationMs: durationMs ?? this.durationMs,
+  );
+
+  @override
+  List<Object?> get _members => [spacing, offset, tolerance, durationMs];
+  @override
+  String toString() => _describe('MomentumSnap', const [
+    'spacing',
+    'offset',
+    'tolerance',
+    'durationMs',
+  ]);
+}
+
+/// Values every `spacing` from `offset`, in the part's unit, that report an
+/// `GestureEventNotch` as a gesture moves the part to or across one, for the
+/// host to play as haptic feedback. Bearing notches lie within one turn from
+/// the offset.
+///
+/// See `mln_gesture_notch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GestureNotch extends _Value {
+  const GestureNotch({this.spacing = 0, this.offset = 0, this.kind = 0});
+
+  /// Positive.
+  final double spacing;
+
+  /// Finite.
+  final double offset;
+
+  /// The host's name for the feedback, which the notch's events carry.
+  final int kind;
+
+  /// A copy of this value with the given members replaced.
+  GestureNotch copyWith({double? spacing, double? offset, int? kind}) =>
+      GestureNotch(
+        spacing: spacing ?? this.spacing,
+        offset: offset ?? this.offset,
+        kind: kind ?? this.kind,
+      );
+
+  @override
+  List<Object?> get _members => [spacing, offset, kind];
+  @override
+  String toString() =>
+      _describe('GestureNotch', const ['spacing', 'offset', 'kind']);
+}
+
+/// How gestures move the zoom, the bearing, or the pitch.
+///
+/// See `mln_gesture_axis_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GestureAxisOptions extends _Value {
+  GestureAxisOptions({
+    this.enabled,
+    this.glides,
+    this.momentum,
+    this.snaps,
+    this.snap,
+    List<GestureNotch>? notches,
+  }) : notches = notches == null ? null : List.unmodifiable(notches);
+
+  /// Whether gestures move the part.
+  final bool? enabled;
+
+  /// Whether a release glides on.
+  final bool? glides;
+  final MomentumDecay? momentum;
+
+  /// Whether the part settles once its glide ends.
+  final bool? snaps;
+  final MomentumSnap? snap;
+
+  /// Where the part reports notches while gestures, their glides, and their
+  /// snaps move it, replacing the ones it had. Several notches at one value
+  /// report one event, with the kind of the first in the list.
+  final List<GestureNotch>? notches;
+
+  /// A copy of this value with the given members replaced.
+  GestureAxisOptions copyWith({
+    bool? enabled,
+    bool? glides,
+    MomentumDecay? momentum,
+    bool? snaps,
+    MomentumSnap? snap,
+    List<GestureNotch>? notches,
+  }) => GestureAxisOptions(
+    enabled: enabled ?? this.enabled,
+    glides: glides ?? this.glides,
+    momentum: momentum ?? this.momentum,
+    snaps: snaps ?? this.snaps,
+    snap: snap ?? this.snap,
+    notches: notches ?? this.notches,
+  );
+
+  @override
+  List<Object?> get _members => [
+    enabled,
+    glides,
+    momentum,
+    snaps,
+    snap,
+    notches,
+  ];
+  @override
+  String toString() => _describe('GestureAxisOptions', const [
+    'enabled',
+    'glides',
+    'momentum',
+    'snaps',
+    'snap',
+    'notches',
+  ]);
+}
+
+/// How a gesture recognizer moves each part of the camera.
+///
+/// Settings whose bits aren't set keep their values. A new recognizer moves
+/// every part, and glides each by friction with a half-life of 140 ms, a
+/// minimum speed of 0, and no maximum speed or distance, with these exceptions:
+///
+/// - Pan stops at 10 logical pixels per second, needs a release of at least
+///   200, and counts a release faster than 10000 as 10000.
+/// - Zoom stops at 0.01 levels per second and glides at most 2.5 levels. Its
+///   snap, when on, settles on the nearest whole level within half a level.
+/// - Bearing stops at 1 degree per second and needs a release of at least 60.
+///   It snaps to north within 7 degrees, and has a notch of kind 0 at north.
+/// - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+///   snap, when on, settles flat within 7 degrees.
+///
+/// Snaps take 300 ms. A double tap zooms in a level and a two-finger tap out.
+///
+/// See `mln_gesture_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GestureOptions extends _Value {
+  GestureOptions({
+    this.doubleTapZoom,
+    this.twoFingerTapZoom,
+    this.pan = const GesturePanOptions(),
+    GestureAxisOptions? zoom,
+    GestureAxisOptions? bearing,
+    GestureAxisOptions? pitch,
+  }) : zoom = zoom ?? GestureAxisOptions(),
+       bearing = bearing ?? GestureAxisOptions(),
+       pitch = pitch ?? GestureAxisOptions();
+
+  /// Zoom levels that a double tap zooms in, eased; with `GestureMode.zoomOut`
+  /// it zooms out instead. 0 leaves double taps to the host. Finite.
+  final double? doubleTapZoom;
+
+  /// Zoom levels that a two-finger tap zooms, eased; negative zooms out. 0
+  /// leaves two-finger taps to the host. Finite.
+  final double? twoFingerTapZoom;
+  final GesturePanOptions pan;
+  final GestureAxisOptions zoom;
+  final GestureAxisOptions bearing;
+  final GestureAxisOptions pitch;
+
+  /// A copy of this value with the given members replaced.
+  GestureOptions copyWith({
+    double? doubleTapZoom,
+    double? twoFingerTapZoom,
+    GesturePanOptions? pan,
+    GestureAxisOptions? zoom,
+    GestureAxisOptions? bearing,
+    GestureAxisOptions? pitch,
+  }) => GestureOptions(
+    doubleTapZoom: doubleTapZoom ?? this.doubleTapZoom,
+    twoFingerTapZoom: twoFingerTapZoom ?? this.twoFingerTapZoom,
+    pan: pan ?? this.pan,
+    zoom: zoom ?? this.zoom,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+  );
+
+  @override
+  List<Object?> get _members => [
+    doubleTapZoom,
+    twoFingerTapZoom,
+    pan,
+    zoom,
+    bearing,
+    pitch,
+  ];
+  @override
+  String toString() => _describe('GestureOptions', const [
+    'doubleTapZoom',
+    'twoFingerTapZoom',
+    'pan',
+    'zoom',
+    'bearing',
+    'pitch',
+  ]);
+}
+
+/// A pointer went down. The host sends no pointer whose buttons mean nothing,
+/// such as a mouse's middle button.
+///
+/// See `mln_gesture_pointer_down` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GesturePointerDown extends _Value {
+  const GesturePointerDown({
+    this.id = 0,
+    this.kind = const PointerKind.fromRawValue(0),
+    this.position = const ScreenPoint(),
+    this.modes = GestureMode.none,
+  });
+  final int id;
+  final PointerKind kind;
+  final ScreenPoint position;
+
+  /// The modes of the pointer's held buttons.
+  final GestureMode modes;
+
+  /// A copy of this value with the given members replaced.
+  GesturePointerDown copyWith({
+    int? id,
+    PointerKind? kind,
+    ScreenPoint? position,
+    GestureMode? modes,
+  }) => GesturePointerDown(
+    id: id ?? this.id,
+    kind: kind ?? this.kind,
+    position: position ?? this.position,
+    modes: modes ?? this.modes,
+  );
+
+  @override
+  List<Object?> get _members => [id, kind, position, modes];
+  @override
+  String toString() => _describe('GesturePointerDown', const [
+    'id',
+    'kind',
+    'position',
+    'modes',
+  ]);
+}
+
+/// A pointer moved, went up, or was taken away.
+///
+/// See `mln_gesture_pointer` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GesturePointer extends _Value {
+  const GesturePointer({this.id = 0, this.position = const ScreenPoint()});
+  final int id;
+
+  /// Unused for `GestureInputPointerCancel`.
+  final ScreenPoint position;
+
+  /// A copy of this value with the given members replaced.
+  GesturePointer copyWith({int? id, ScreenPoint? position}) =>
+      GesturePointer(id: id ?? this.id, position: position ?? this.position);
+
+  @override
+  List<Object?> get _members => [id, position];
+  @override
+  String toString() => _describe('GesturePointer', const ['id', 'position']);
+}
+
+/// Camera movement from anything but a pointer, such as a wheel, a trackpad
+/// scroll, a dial, a crown, keys, or buttons, which the host converts into
+/// camera units. Zooms and turns hold `position` in place.
+///
+/// A continuous delta, such as a trackpad scroll, applies at once. A discrete
+/// one, such as a wheel detent or a key press, eases, and a quick run of them
+/// merges into one ease that speeds up. Deltas are one gesture until they idle.
+/// The recommended amounts are a third of a level per wheel detent, 1/300 of a
+/// level per pixel of trackpad scrolling, and, for keys, 100 logical pixels of
+/// pan, a level of zoom, 15 degrees of bearing, and 10 of pitch.
+///
+/// See `mln_gesture_delta` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GestureDelta extends _Value {
+  const GestureDelta({
+    this.position = const ScreenPoint(),
+    this.discrete = false,
+    this.pan = const ScreenPoint(),
+    this.zoom = 0,
+    this.bearing = 0,
+    this.pitch = 0,
+  });
+  final ScreenPoint position;
+  final bool discrete;
+
+  /// How far the map's content moves on the screen, in logical pixels.
+  final ScreenPoint pan;
+
+  /// Zoom levels to add.
+  final double zoom;
+
+  /// Degrees to turn clockwise.
+  final double bearing;
+
+  /// Degrees to tilt.
+  final double pitch;
+
+  /// A copy of this value with the given members replaced.
+  GestureDelta copyWith({
+    ScreenPoint? position,
+    bool? discrete,
+    ScreenPoint? pan,
+    double? zoom,
+    double? bearing,
+    double? pitch,
+  }) => GestureDelta(
+    position: position ?? this.position,
+    discrete: discrete ?? this.discrete,
+    pan: pan ?? this.pan,
+    zoom: zoom ?? this.zoom,
+    bearing: bearing ?? this.bearing,
+    pitch: pitch ?? this.pitch,
+  );
+
+  @override
+  List<Object?> get _members => [position, discrete, pan, zoom, bearing, pitch];
+  @override
+  String toString() => _describe('GestureDelta', const [
+    'position',
+    'discrete',
+    'pan',
+    'zoom',
+    'bearing',
+    'pitch',
+  ]);
+}
+
+/// A pinch the platform recognized, such as a macOS trackpad's magnify and
+/// rotate or a browser's Ctrl+wheel. Each update zooms by `scale` (above 1
+/// zooms in) and turns `rotation` degrees clockwise on the screen since the
+/// last, around `center`. It glides on when it ends, as a touch pinch does.
+///
+/// See `mln_gesture_pinch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GesturePinch extends _Value {
+  const GesturePinch({
+    this.center = const ScreenPoint(),
+    this.scale = 0,
+    this.rotation = 0,
+    this.phase = const PinchPhase.fromRawValue(0),
+  });
+  final ScreenPoint center;
+  final double scale;
+  final double rotation;
+  final PinchPhase phase;
+
+  /// A copy of this value with the given members replaced.
+  GesturePinch copyWith({
+    ScreenPoint? center,
+    double? scale,
+    double? rotation,
+    PinchPhase? phase,
+  }) => GesturePinch(
+    center: center ?? this.center,
+    scale: scale ?? this.scale,
+    rotation: rotation ?? this.rotation,
+    phase: phase ?? this.phase,
+  );
+
+  @override
+  List<Object?> get _members => [center, scale, rotation, phase];
+  @override
+  String toString() =>
+      _describe('GesturePinch', const ['center', 'scale', 'rotation', 'phase']);
+}
+
+/// One input, in logical pixels from the map's top-left corner.
+///
+/// When the view loses focus, the host cancels the pointers it sent and sends
+/// empty modes.
+///
+/// See `mln_gesture_input` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+sealed class GestureInput {
+  const GestureInput._();
+  const factory GestureInput.pointerDown(GesturePointerDown value) =
+      GestureInputPointerDown;
+  const factory GestureInput.pointerMove(GesturePointer value) =
+      GestureInputPointerMove;
+  const factory GestureInput.pointerUp(GesturePointer value) =
+      GestureInputPointerUp;
+  const factory GestureInput.pointerCancel(GesturePointer value) =
+      GestureInputPointerCancel;
+  const factory GestureInput.modes(GestureMode value) = GestureInputModes;
+  const factory GestureInput.delta(GestureDelta value) = GestureInputDelta;
+  const factory GestureInput.pinch(GesturePinch value) = GestureInputPinch;
+}
+
+final class GestureInputPointerDown extends GestureInput {
+  const GestureInputPointerDown(this.value) : super._();
+  final GesturePointerDown value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureInputPointerDown && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureInputPointerMove extends GestureInput {
+  const GestureInputPointerMove(this.value) : super._();
+  final GesturePointer value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureInputPointerMove && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureInputPointerUp extends GestureInput {
+  const GestureInputPointerUp(this.value) : super._();
+  final GesturePointer value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureInputPointerUp && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureInputPointerCancel extends GestureInput {
+  const GestureInputPointerCancel(this.value) : super._();
+  final GesturePointer value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureInputPointerCancel && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureInputModes extends GestureInput {
+  const GestureInputModes(this.value) : super._();
+  final GestureMode value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureInputModes && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureInputDelta extends GestureInput {
+  const GestureInputDelta(this.value) : super._();
+  final GestureDelta value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureInputDelta && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureInputPinch extends GestureInput {
+  const GestureInputPinch(this.value) : super._();
+  final GesturePinch value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureInputPinch && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+/// A rectangle of the screen, from its `min` corner to its `max` corner.
+///
+/// See `mln_screen_box` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+final class ScreenBox extends _Value {
+  const ScreenBox({
+    this.min = const ScreenPoint(),
+    this.max = const ScreenPoint(),
+  });
+  final ScreenPoint min;
+  final ScreenPoint max;
+
+  /// A copy of this value with the given members replaced.
+  ScreenBox copyWith({ScreenPoint? min, ScreenPoint? max}) =>
+      ScreenBox(min: min ?? this.min, max: max ?? this.max);
+
+  @override
+  List<Object?> get _members => [min, max];
+  @override
+  String toString() => _describe('ScreenBox', const ['min', 'max']);
+}
+
+/// A tap, at `position`, by the pointer `id`.
+///
+/// See `mln_gesture_tap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GestureTap extends _Value {
+  const GestureTap({this.id = 0, this.position = const ScreenPoint()});
+
+  /// Unused for `GestureEventTwoFingerTap`.
+  final int id;
+  final ScreenPoint position;
+
+  @override
+  List<Object?> get _members => [id, position];
+  @override
+  String toString() => _describe('GestureTap', const ['id', 'position']);
+}
+
+/// A notch that a part reached.
+///
+/// See `mln_gesture_notch_event` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GestureNotchEvent extends _Value {
+  const GestureNotchEvent({
+    this.axis = const GestureAxis.fromRawValue(0),
+    this.kind = 0,
+    this.value = 0,
+  });
+  final GestureAxis axis;
+
+  /// The notch's kind, from the options.
+  final int kind;
+
+  /// In the part's unit; a bearing from 0 up to 360 degrees.
+  final double value;
+
+  @override
+  List<Object?> get _members => [axis, kind, value];
+  @override
+  String toString() =>
+      _describe('GestureNotchEvent', const ['axis', 'kind', 'value']);
+}
+
+/// What a gesture means beyond moving the camera. Double taps and two-finger
+/// taps also zoom, as the options say.
+///
+/// See `mln_gesture_event` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+sealed class GestureEvent {
+  const GestureEvent._();
+  const factory GestureEvent.tap(GestureTap value) = GestureEventTap;
+  const factory GestureEvent.doubleTap(GestureTap value) =
+      GestureEventDoubleTap;
+  const factory GestureEvent.twoFingerTap(GestureTap value) =
+      GestureEventTwoFingerTap;
+  const factory GestureEvent.notch(GestureNotchEvent value) = GestureEventNotch;
+  const factory GestureEvent.longPress(GestureTap value) =
+      GestureEventLongPress;
+}
+
+final class GestureEventTap extends GestureEvent {
+  const GestureEventTap(this.value) : super._();
+  final GestureTap value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureEventTap && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureEventDoubleTap extends GestureEvent {
+  const GestureEventDoubleTap(this.value) : super._();
+  final GestureTap value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureEventDoubleTap && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureEventTwoFingerTap extends GestureEvent {
+  const GestureEventTwoFingerTap(this.value) : super._();
+  final GestureTap value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureEventTwoFingerTap && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureEventNotch extends GestureEvent {
+  const GestureEventNotch(this.value) : super._();
+  final GestureNotchEvent value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureEventNotch && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureEventLongPress extends GestureEvent {
+  const GestureEventLongPress(this.value) : super._();
+  final GestureTap value;
+  @override
+  bool operator ==(Object other) =>
+      other is GestureEventLongPress && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class GestureEventUnknown extends GestureEvent {
+  GestureEventUnknown(this.tag, Uint8List rawRecord)
+    : rawRecord = Uint8List.fromList(rawRecord).asUnmodifiableView(),
+      super._();
+  final int tag;
+  final Uint8List rawRecord;
+}
+
+/// What an input or a tick did.
+///
+/// See `mln_gesture_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+final class GestureResult extends _Value {
+  GestureResult({
+    this.handled = false,
+    this.nextTick = const GestureNextTick.fromRawValue(0),
+    this.nextTickMs = 0,
+    this.boxZoomActive = false,
+    this.boxZoom = const ScreenBox(),
+    List<GestureEvent> events = const [],
+  }) : events = List.unmodifiable(events);
+
+  /// Whether the recognizer used the input, so the host stops the platform's
+  /// default for it. Ticks report false.
+  final bool handled;
+  final GestureNextTick nextTick;
+
+  /// For `GestureNextTick.at`.
+  final double nextTickMs;
+
+  /// Whether a box-zoom drag is drawing `box_zoom`, which the host shows, in
+  /// logical pixels corner to corner.
+  final bool boxZoomActive;
+  final ScreenBox boxZoom;
+  final List<GestureEvent> events;
+
+  @override
+  List<Object?> get _members => [
+    handled,
+    nextTick,
+    nextTickMs,
+    boxZoomActive,
+    boxZoom,
+    events,
+  ];
+  @override
+  String toString() => _describe('GestureResult', const [
+    'handled',
+    'nextTick',
+    'nextTickMs',
+    'boxZoomActive',
+    'boxZoom',
+    'events',
   ]);
 }
 
@@ -2994,9 +4014,9 @@ final class GpuDeviceOptions extends _Value {
            : Uint8List.fromList(adapterLuid).asUnmodifiableView();
 
   /// The backend that the device renders with. By default, the platform's own:
-  /// Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has
-  /// no Vulkan driver, and in a browser the build's one backend: WebGPU or
-  /// OpenGL (WebGL2).
+  /// Metal on Apple platforms, Vulkan elsewhere, then D3D12 on Windows, or
+  /// OpenGL where the system has neither, and in a browser the build's one
+  /// backend: WebGPU or OpenGL (WebGL2).
   final RenderBackend? backend;
 
   /// The GPU to use, as an index into the backend's list of GPUs. OpenGL's list
@@ -3008,8 +4028,9 @@ final class GpuDeviceOptions extends _Value {
   final Uint8List? adapterUuid;
 
   /// The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
-  /// which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a
-  /// Vulkan device takes one.
+  /// which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID` and
+  /// D3D12 as `ID3D12Device::GetAdapterLuid`. Only a Vulkan or D3D12 device
+  /// takes one.
   final Uint8List? adapterLuid;
 
   /// The OpenGL API that an OpenGL device renders with. An EGL device defaults
@@ -3124,6 +4145,32 @@ final class GpuDeviceCapabilities extends _Value {
   ]);
 }
 
+/// The D3D12 objects of a device, as `GpuDeviceHandle.getD3d12Context()`
+/// reports them.
+///
+/// See `mln_gpu_device_d3d12_context_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+final class GpuDeviceD3d12ContextResult extends _Value {
+  const GpuDeviceD3d12ContextResult({
+    this.device = NativePointer.nullPointer,
+    this.commandQueue = NativePointer.nullPointer,
+  });
+
+  /// The `ID3D12Device`.
+  final NativePointer device;
+
+  /// The direct `ID3D12CommandQueue` that sessions on the device submit to.
+  final NativePointer commandQueue;
+
+  @override
+  List<Object?> get _members => [device, commandQueue];
+  @override
+  String toString() => _describe('GpuDeviceD3d12ContextResult', const [
+    'device',
+    'commandQueue',
+  ]);
+}
+
 /// The Vulkan device and queue that a render session uses.
 ///
 /// Keep these objects alive until a detach or release of the session completes,
@@ -3218,6 +4265,41 @@ final class GpuDeviceVulkanContextResult extends _Value {
   @override
   String toString() =>
       _describe('GpuDeviceVulkanContextResult', const ['context']);
+}
+
+/// Your D3D12 device and direct command queue, for
+/// `GpuDeviceHandle.wrapD3d12()`.
+///
+/// See `mln_d3d12_device_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+final class D3d12DeviceDescriptor extends _Value {
+  const D3d12DeviceDescriptor({
+    required this.device,
+    required this.commandQueue,
+  });
+
+  /// Your `ID3D12Device`.
+  final NativePointer device;
+
+  /// Your `ID3D12CommandQueue` of `D3D12_COMMAND_LIST_TYPE_DIRECT` on `device`,
+  /// which sessions on the device submit to. Submit your reads of a borrowed
+  /// ring's textures to it for `GpuSyncKind.queueOrder`.
+  final NativePointer commandQueue;
+
+  /// A copy of this value with the given members replaced.
+  D3d12DeviceDescriptor copyWith({
+    NativePointer? device,
+    NativePointer? commandQueue,
+  }) => D3d12DeviceDescriptor(
+    device: device ?? this.device,
+    commandQueue: commandQueue ?? this.commandQueue,
+  );
+
+  @override
+  List<Object?> get _members => [device, commandQueue];
+  @override
+  String toString() =>
+      _describe('D3d12DeviceDescriptor', const ['device', 'commandQueue']);
 }
 
 /// Your Metal device and command queue, for `GpuDeviceHandle.wrapMetal()`.
@@ -3774,350 +4856,6 @@ final class PremultipliedRgba8Image extends _Value {
   ]);
 }
 
-/// A timing curve from (0, 0) to (1, 1), with the control points (`x1`, `y1`)
-/// and (`x2`, `y2`).
-///
-/// `x1` and `x2` are between 0 and 1.
-///
-/// See `mln_unit_bezier` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class UnitBezier extends _Value {
-  const UnitBezier({this.x1 = 0, this.y1 = 0, this.x2 = 0, this.y2 = 0});
-  final double x1;
-  final double y1;
-  final double x2;
-  final double y2;
-
-  /// A copy of this value with the given members replaced.
-  UnitBezier copyWith({double? x1, double? y1, double? x2, double? y2}) =>
-      UnitBezier(
-        x1: x1 ?? this.x1,
-        y1: y1 ?? this.y1,
-        x2: x2 ?? this.x2,
-        y2: y2 ?? this.y2,
-      );
-
-  @override
-  List<Object?> get _members => [x1, y1, x2, y2];
-  @override
-  String toString() => _describe('UnitBezier', const ['x1', 'y1', 'x2', 'y2']);
-}
-
-/// How one part of a gesture's momentum slows from its release speed.
-///
-/// Speeds and distances are in the part's unit: logical pixels for pan, zoom
-/// levels for zoom, and degrees for bearing and pitch. A setting whose bit
-/// isn't set takes the part's default, which `GestureMomentum` lists.
-/// `min_speed` is finite and not negative, and every other number is finite and
-/// positive. A friction decay can serve every release, as a preset that matches
-/// a platform's scrolling. An eased glide takes its direction from the part's
-/// velocity, and its distance and duration from the caller's plan.
-///
-/// See `mln_momentum_decay` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class MomentumDecay extends _Value {
-  const MomentumDecay({
-    this.model,
-    this.halfLifeMs,
-    this.stopSpeed,
-    this.distance,
-    this.durationMs,
-    this.easing,
-    this.minSpeed,
-    this.maxSpeed,
-    this.maxDistance,
-  });
-  final MomentumDecayModel? model;
-
-  /// For `MomentumDecayModel.friction`, how long the speed takes to halve.
-  final double? halfLifeMs;
-
-  /// For `MomentumDecayModel.friction`, the speed at which it ends.
-  final double? stopSpeed;
-
-  /// Required for `MomentumDecayModel.ease`.
-  final double? distance;
-
-  /// Required for `MomentumDecayModel.ease`.
-  final double? durationMs;
-
-  /// For `MomentumDecayModel.ease`, the share of `distance` covered over the
-  /// share of `duration_ms`. Its control points are between 0 and 1, so the
-  /// glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
-  /// that camera animations ease along by default. Android's scroll fling
-  /// follows (0.175, 0.5, 0.35, 1).
-  final UnitBezier? easing;
-
-  /// A slower release starts no momentum.
-  final double? minSpeed;
-
-  /// For `MomentumDecayModel.friction`, a faster release counts as this.
-  final double? maxSpeed;
-
-  /// The farthest the part moves. A friction release that would move farther
-  /// starts slower, so it ends sooner, and a planned glide moves at most this
-  /// far over its duration.
-  final double? maxDistance;
-
-  /// A copy of this value with the given members replaced.
-  MomentumDecay copyWith({
-    MomentumDecayModel? model,
-    double? halfLifeMs,
-    double? stopSpeed,
-    double? distance,
-    double? durationMs,
-    UnitBezier? easing,
-    double? minSpeed,
-    double? maxSpeed,
-    double? maxDistance,
-  }) => MomentumDecay(
-    model: model ?? this.model,
-    halfLifeMs: halfLifeMs ?? this.halfLifeMs,
-    stopSpeed: stopSpeed ?? this.stopSpeed,
-    distance: distance ?? this.distance,
-    durationMs: durationMs ?? this.durationMs,
-    easing: easing ?? this.easing,
-    minSpeed: minSpeed ?? this.minSpeed,
-    maxSpeed: maxSpeed ?? this.maxSpeed,
-    maxDistance: maxDistance ?? this.maxDistance,
-  );
-
-  @override
-  List<Object?> get _members => [
-    model,
-    halfLifeMs,
-    stopSpeed,
-    distance,
-    durationMs,
-    easing,
-    minSpeed,
-    maxSpeed,
-    maxDistance,
-  ];
-  @override
-  String toString() => _describe('MomentumDecay', const [
-    'model',
-    'halfLifeMs',
-    'stopSpeed',
-    'distance',
-    'durationMs',
-    'easing',
-    'minSpeed',
-    'maxSpeed',
-    'maxDistance',
-  ]);
-}
-
-/// How a gesture's pan keeps moving the map's content after release.
-///
-/// See `mln_pan_momentum` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class PanMomentum extends _Value {
-  const PanMomentum({this.velocity, this.decay = const MomentumDecay()});
-
-  /// How fast the map's content moved on the screen at release, in logical
-  /// pixels per second. The pan moves only when this is set.
-  final ScreenPoint? velocity;
-  final MomentumDecay decay;
-
-  /// A copy of this value with the given members replaced.
-  PanMomentum copyWith({ScreenPoint? velocity, MomentumDecay? decay}) =>
-      PanMomentum(
-        velocity: velocity ?? this.velocity,
-        decay: decay ?? this.decay,
-      );
-
-  @override
-  List<Object?> get _members => [velocity, decay];
-  @override
-  String toString() => _describe('PanMomentum', const ['velocity', 'decay']);
-}
-
-/// Where a part settles after a gesture that changed it.
-///
-/// The targets are every `spacing` from `offset`, in the part's unit. Bearing
-/// targets wrap around the circle. Once the part's glide ends, or right away
-/// when it doesn't move, the part eases to the nearest target if it is within
-/// `tolerance` of it, and otherwise stays where it is. A setting whose bit
-/// isn't set takes the part's default, which `GestureMomentum` lists.
-///
-/// See `mln_momentum_snap` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class MomentumSnap extends _Value {
-  const MomentumSnap({
-    this.spacing,
-    this.offset,
-    this.tolerance,
-    this.durationMs,
-  });
-
-  /// Positive.
-  final double? spacing;
-
-  /// Defaults to 0.
-  final double? offset;
-
-  /// Not negative.
-  final double? tolerance;
-
-  /// Zero settles without easing. Defaults to 300.
-  final double? durationMs;
-
-  /// A copy of this value with the given members replaced.
-  MomentumSnap copyWith({
-    double? spacing,
-    double? offset,
-    double? tolerance,
-    double? durationMs,
-  }) => MomentumSnap(
-    spacing: spacing ?? this.spacing,
-    offset: offset ?? this.offset,
-    tolerance: tolerance ?? this.tolerance,
-    durationMs: durationMs ?? this.durationMs,
-  );
-
-  @override
-  List<Object?> get _members => [spacing, offset, tolerance, durationMs];
-  @override
-  String toString() => _describe('MomentumSnap', const [
-    'spacing',
-    'offset',
-    'tolerance',
-    'durationMs',
-  ]);
-}
-
-/// How a gesture's zoom, bearing, or pitch keeps changing after release.
-///
-/// See `mln_anchored_momentum` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class AnchoredMomentum extends _Value {
-  const AnchoredMomentum({
-    this.velocity,
-    this.anchor,
-    this.decay = const MomentumDecay(),
-    this.snap,
-  });
-
-  /// How fast the value changed at release: zoom levels per second for zoom,
-  /// and degrees per second for bearing and pitch. The part moves only when
-  /// this is set.
-  final double? velocity;
-
-  /// The screen point that the change keeps in place. Without one, the change
-  /// keeps the center of the view in place.
-  final ScreenPoint? anchor;
-  final MomentumDecay decay;
-
-  /// Where the part settles. Without this, it stays where the gesture and its
-  /// glide leave it.
-  final MomentumSnap? snap;
-
-  /// A copy of this value with the given members replaced.
-  AnchoredMomentum copyWith({
-    double? velocity,
-    ScreenPoint? anchor,
-    MomentumDecay? decay,
-    MomentumSnap? snap,
-  }) => AnchoredMomentum(
-    velocity: velocity ?? this.velocity,
-    anchor: anchor ?? this.anchor,
-    decay: decay ?? this.decay,
-    snap: snap ?? this.snap,
-  );
-
-  @override
-  List<Object?> get _members => [velocity, anchor, decay, snap];
-  @override
-  String toString() => _describe('AnchoredMomentum', const [
-    'velocity',
-    'anchor',
-    'decay',
-    'snap',
-  ]);
-}
-
-/// How a gesture keeps moving the camera after the user lets go.
-///
-/// A part moves only when its velocity is set, and each part slows on its own.
-/// Every part defaults to `MomentumDecayModel.friction` with a half-life of 140
-/// ms, and these other defaults:
-///
-/// - Pan stops at 10 logical pixels per second, needs a release of at least
-///   200, and counts a release faster than 10000 as 10000.
-/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
-///   snap settles on the nearest whole level.
-/// - Bearing stops at 1 degree per second and needs a release of at least 60.
-///   Its snap settles on north within 7 degrees.
-/// - Pitch stops at 1 degree per second and needs a release of at least 5. Its
-///   snap settles flat within 7 degrees.
-///
-/// See `mln_gesture_momentum` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class GestureMomentum extends _Value {
-  const GestureMomentum({
-    this.pan = const PanMomentum(),
-    this.zoom = const AnchoredMomentum(),
-    this.bearing = const AnchoredMomentum(),
-    this.pitch = const AnchoredMomentum(),
-  });
-  final PanMomentum pan;
-  final AnchoredMomentum zoom;
-  final AnchoredMomentum bearing;
-  final AnchoredMomentum pitch;
-
-  /// A copy of this value with the given members replaced.
-  GestureMomentum copyWith({
-    PanMomentum? pan,
-    AnchoredMomentum? zoom,
-    AnchoredMomentum? bearing,
-    AnchoredMomentum? pitch,
-  }) => GestureMomentum(
-    pan: pan ?? this.pan,
-    zoom: zoom ?? this.zoom,
-    bearing: bearing ?? this.bearing,
-    pitch: pitch ?? this.pitch,
-  );
-
-  @override
-  List<Object?> get _members => [pan, zoom, bearing, pitch];
-  @override
-  String toString() =>
-      _describe('GestureMomentum', const ['pan', 'zoom', 'bearing', 'pitch']);
-}
-
-/// How fast each part of a camera change moves.
-///
-/// See `mln_camera_velocity` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraVelocity extends _Value {
-  const CameraVelocity({
-    this.pan = const ScreenPoint(),
-    this.zoom = 0,
-    this.bearing = 0,
-    this.pitch = 0,
-  });
-
-  /// How fast the map's content moves on the screen, in logical pixels per
-  /// second.
-  final ScreenPoint pan;
-
-  /// In zoom levels per second.
-  final double zoom;
-
-  /// In degrees per second.
-  final double bearing;
-
-  /// In degrees per second.
-  final double pitch;
-
-  @override
-  List<Object?> get _members => [pan, zoom, bearing, pitch];
-  @override
-  String toString() =>
-      _describe('CameraVelocity', const ['pan', 'zoom', 'bearing', 'pitch']);
-}
-
 /// The end of a camera change.
 ///
 /// See `mln_camera_transition_end` in the
@@ -4126,7 +4864,6 @@ final class CameraTransitionEnd extends _Value {
   const CameraTransitionEnd({
     this.outcome = const CameraTransitionOutcome.fromRawValue(0),
     this.generation = 0,
-    this.velocity = const CameraVelocity(),
   });
   final CameraTransitionOutcome outcome;
 
@@ -4134,19 +4871,11 @@ final class CameraTransitionEnd extends _Value {
   /// the camera, or 0 when the map closed first.
   final int generation;
 
-  /// How fast a gesture's momentum still moved when it was cancelled, which the
-  /// next gesture can add to its own release velocities. Zero for every other
-  /// end.
-  final CameraVelocity velocity;
-
   @override
-  List<Object?> get _members => [outcome, generation, velocity];
+  List<Object?> get _members => [outcome, generation];
   @override
-  String toString() => _describe('CameraTransitionEnd', const [
-    'outcome',
-    'generation',
-    'velocity',
-  ]);
+  String toString() =>
+      _describe('CameraTransitionEnd', const ['outcome', 'generation']);
 }
 
 /// Receives the end of a camera change.
@@ -4243,7 +4972,7 @@ final class AnimationOptions extends _Value {
   ]);
 }
 
-/// A change to the camera from where it is now, for gestures.
+/// A change to the camera from where it is now.
 ///
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -4254,9 +4983,7 @@ final class CameraDelta extends _Value {
     this.bearing,
     this.pitch,
     this.anchor,
-    this.momentum,
     this.animation = const AnimationOptions(),
-    this.gesturePhase = const GesturePhase.fromRawValue(0),
   });
 
   /// Moves the map's content this far on the screen, as a drag does.
@@ -4275,12 +5002,7 @@ final class CameraDelta extends _Value {
   /// needs one of them, and it combines with `offset` only in a delta without a
   /// duration.
   final ScreenPoint? anchor;
-
-  /// How the gesture keeps moving after this delta. Only a delta in the
-  /// `GesturePhase.end` phase carries it.
-  final GestureMomentum? momentum;
   final AnimationOptions animation;
-  final GesturePhase gesturePhase;
 
   /// A copy of this value with the given members replaced.
   CameraDelta copyWith({
@@ -4289,18 +5011,14 @@ final class CameraDelta extends _Value {
     double? bearing,
     double? pitch,
     ScreenPoint? anchor,
-    GestureMomentum? momentum,
     AnimationOptions? animation,
-    GesturePhase? gesturePhase,
   }) => CameraDelta(
     offset: offset ?? this.offset,
     scale: scale ?? this.scale,
     bearing: bearing ?? this.bearing,
     pitch: pitch ?? this.pitch,
     anchor: anchor ?? this.anchor,
-    momentum: momentum ?? this.momentum,
     animation: animation ?? this.animation,
-    gesturePhase: gesturePhase ?? this.gesturePhase,
   );
 
   @override
@@ -4310,9 +5028,7 @@ final class CameraDelta extends _Value {
     bearing,
     pitch,
     anchor,
-    momentum,
     animation,
-    gesturePhase,
   ];
   @override
   String toString() => _describe('CameraDelta', const [
@@ -4321,9 +5037,7 @@ final class CameraDelta extends _Value {
     'bearing',
     'pitch',
     'anchor',
-    'momentum',
     'animation',
-    'gesturePhase',
   ]);
 }
 
@@ -5077,11 +5791,15 @@ final class DmaBufFormat extends _Value {
 ///   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
 ///   `android_hardware_buffer_usage`. Get each frame's buffer with
 ///   `AcquiredFrameHandle.withAndroidHardwareBuffer()`.
-/// - `GpuExportKind.dxgiSharedHandle`: D3D11 textures of the format
+/// - `GpuExportKind.dxgiSharedHandle`: textures of the format
 ///   DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
-///   resources and render targets. Open them on a D3D11 or D3D12 device of the
-///   same adapter, which you pick with `GpuDeviceOptions.adapterLuid`. Get each
-///   frame's texture with `AcquiredFrameHandle.withDxgiSharedTexture()`.
+///   resources and render targets: D3D11 textures on a Vulkan device, and
+///   committed D3D12 resources in a shared heap on a D3D12 device, which each
+///   frame leaves in D3D12_RESOURCE_STATE_COMMON. Open them on a D3D11 or D3D12
+///   device of the same adapter, which you pick with
+///   `GpuDeviceOptions.adapterLuid`. Get each frame's texture with
+///   `AcquiredFrameHandle.withDxgiSharedTexture()`, and on a D3D12 device its
+///   resource with `AcquiredFrameHandle.withD3d12Texture()`.
 /// - `GpuExportKind.dmaBuf`: dmabufs of a format and modifier from
 ///   `dma_buf_formats`. Get each frame's buffer with
 ///   `AcquiredFrameHandle.withDmaBuf()`.
@@ -5098,13 +5816,14 @@ final class DmaBufFormat extends _Value {
 ///
 /// Each frame hands over with `GpuSyncKind.cpuComplete` or with the sync kind
 /// that crosses APIs on its platform: `GpuSyncKind.metalSharedEvent` for an
-/// IOSurface, and `GpuSyncKind.syncFd` for the others, where the device has
-/// them. For a reader that waits on neither, such as a Wayland compositor
-/// without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
-/// out of `RenderSessionAttachOptions.producerSyncKinds`, so that each frame
-/// finishes before you acquire it, and release each frame only once the reader
-/// is done with its texture. Give the ring 3 textures, so the session can
-/// render while you hold two frames.
+/// IOSurface, `GpuSyncKind.d3d12Fence` for a DXGI shared texture, and
+/// `GpuSyncKind.syncFd` for the others, where the device has them. For a reader
+/// that waits on neither, such as a Wayland compositor without explicit
+/// synchronization or Flutter's `copyPixelBuffer`, leave them out of
+/// `RenderSessionAttachOptions.producerSyncKinds`, so that each frame finishes
+/// before you acquire it, and release each frame only once the reader is done
+/// with its texture. Give the ring 3 textures, so the session can render while
+/// you hold two frames.
 ///
 /// See `mln_exported_ring_target` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
@@ -5220,6 +5939,164 @@ final class WebCanvasTarget extends _Value {
       _describe('WebCanvasTarget', const ['logicalSize', 'canvas', 'format']);
 }
 
+/// A D3D12 texture of a borrowed ring.
+///
+/// See `mln_d3d12_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class D3d12BorrowedTexture extends _Value {
+  const D3d12BorrowedTexture({required this.resource});
+
+  /// Your `ID3D12Resource`.
+  final NativePointer resource;
+
+  /// A copy of this value with the given members replaced.
+  D3d12BorrowedTexture copyWith({NativePointer? resource}) =>
+      D3d12BorrowedTexture(resource: resource ?? this.resource);
+
+  @override
+  List<Object?> get _members => [resource];
+  @override
+  String toString() => _describe('D3d12BorrowedTexture', const ['resource']);
+}
+
+/// A ring of your D3D12 textures to render into, on the D3D12 device that you
+/// attach on.
+///
+/// `physical_width` and `physical_height` give the textures' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. Each texture
+/// must be a 2D resource of the device with that size, one mip level, one array
+/// slice, one sample, `D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET`, and one typed
+/// color format that the device renders into, such as
+/// DXGI_FORMAT_R8G8B8A8_UNORM or DXGI_FORMAT_B8G8R8A8_UNORM. The ring holds up
+/// to `textureRingMaxDepth` distinct textures, and references each.
+///
+/// Each texture is in `state` when the session has it, and each frame leaves it
+/// there.
+///
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, renders the map's
+/// depth and stencil into it, stores them, and leaves it in `depth_state`. They
+/// must have the size of `textures`, one format of
+/// `GpuDeviceCapabilities.depthStencilFormats` (DXGI_FORMAT_D24_UNORM_S8_UINT
+/// or DXGI_FORMAT_D32_FLOAT_S8X24_UINT), one sample, and
+/// `D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL`.
+///
+/// See `mln_d3d12_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class D3d12BorrowedTexturesTarget extends _Value {
+  D3d12BorrowedTexturesTarget({
+    required this.logicalSize,
+    required this.physicalWidth,
+    required this.physicalHeight,
+    required List<D3d12BorrowedTexture> textures,
+    this.state = 0,
+    List<D3d12BorrowedTexture> depthTextures = const [],
+    this.depthState = 0,
+  }) : textures = List.unmodifiable(textures),
+       depthTextures = List.unmodifiable(depthTextures);
+  final LogicalSize logicalSize;
+  final int physicalWidth;
+  final int physicalHeight;
+  final List<D3d12BorrowedTexture> textures;
+
+  /// The textures' `D3D12_RESOURCE_STATES`.
+  final int state;
+  final List<D3d12BorrowedTexture> depthTextures;
+
+  /// The depth textures' `D3D12_RESOURCE_STATES`.
+  final int depthState;
+
+  /// A copy of this value with the given members replaced.
+  D3d12BorrowedTexturesTarget copyWith({
+    LogicalSize? logicalSize,
+    int? physicalWidth,
+    int? physicalHeight,
+    List<D3d12BorrowedTexture>? textures,
+    int? state,
+    List<D3d12BorrowedTexture>? depthTextures,
+    int? depthState,
+  }) => D3d12BorrowedTexturesTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    physicalWidth: physicalWidth ?? this.physicalWidth,
+    physicalHeight: physicalHeight ?? this.physicalHeight,
+    textures: textures ?? this.textures,
+    state: state ?? this.state,
+    depthTextures: depthTextures ?? this.depthTextures,
+    depthState: depthState ?? this.depthState,
+  );
+
+  @override
+  List<Object?> get _members => [
+    logicalSize,
+    physicalWidth,
+    physicalHeight,
+    textures,
+    state,
+    depthTextures,
+    depthState,
+  ];
+  @override
+  String toString() => _describe('D3d12BorrowedTexturesTarget', const [
+    'logicalSize',
+    'physicalWidth',
+    'physicalHeight',
+    'textures',
+    'state',
+    'depthTextures',
+    'depthState',
+  ]);
+}
+
+/// A composition swap chain to present to, which your DirectComposition visual
+/// or XAML `SwapChainPanel` shows.
+///
+/// The session renders on D3D12: on the D3D12 device that you attach on, or on
+/// one that it makes without a device. It makes a flip-model swap chain for
+/// composition of `logical_size` at the map's scale factor, with premultiplied
+/// alpha, and sets it as the visual's content or the panel's swap chain. Commit
+/// your DirectComposition device once the attach completes. A panel takes its
+/// swap chain only on its UI thread: attach it there with
+/// `RenderDriverKind.callerGraphicsThread`, and service the session there.
+/// Scale the visual or the panel to show the swap chain at the display's scale.
+/// The session references `object` until a replacement or release of the target
+/// completes, or the session ends.
+///
+/// See `mln_d3d12_composition_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+final class D3d12CompositionTarget extends _Value {
+  const D3d12CompositionTarget({
+    required this.logicalSize,
+    required this.kind,
+    required this.object,
+  });
+  final LogicalSize logicalSize;
+  final D3d12CompositionKind kind;
+
+  /// Your `IDCompositionVisual*` or `ISwapChainPanelNative*`.
+  final NativePointer object;
+
+  /// A copy of this value with the given members replaced.
+  D3d12CompositionTarget copyWith({
+    LogicalSize? logicalSize,
+    D3d12CompositionKind? kind,
+    NativePointer? object,
+  }) => D3d12CompositionTarget(
+    logicalSize: logicalSize ?? this.logicalSize,
+    kind: kind ?? this.kind,
+    object: object ?? this.object,
+  );
+
+  @override
+  List<Object?> get _members => [logicalSize, kind, object];
+  @override
+  String toString() => _describe('D3d12CompositionTarget', const [
+    'logicalSize',
+    'kind',
+    'object',
+  ]);
+}
+
 /// What a render session renders into: one kind of target, and its descriptor.
 ///
 /// Every target has a size in logical pixels, which sets the map's size. The
@@ -5272,6 +6149,11 @@ sealed class RenderTarget {
       RenderTargetExportedRing;
   const factory RenderTarget.webCanvas(WebCanvasTarget value) =
       RenderTargetWebCanvas;
+  const factory RenderTarget.d3d12BorrowedTextures(
+    D3d12BorrowedTexturesTarget value,
+  ) = RenderTargetD3d12BorrowedTextures;
+  const factory RenderTarget.d3d12Composition(D3d12CompositionTarget value) =
+      RenderTargetD3d12Composition;
 }
 
 final class RenderTargetOffscreen extends RenderTarget {
@@ -5424,6 +6306,26 @@ final class RenderTargetWebCanvas extends RenderTarget {
   int get hashCode => value.hashCode;
 }
 
+final class RenderTargetD3d12BorrowedTextures extends RenderTarget {
+  const RenderTargetD3d12BorrowedTextures(this.value) : super._();
+  final D3d12BorrowedTexturesTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetD3d12BorrowedTextures && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
+final class RenderTargetD3d12Composition extends RenderTarget {
+  const RenderTargetD3d12Composition(this.value) : super._();
+  final D3d12CompositionTarget value;
+  @override
+  bool operator ==(Object other) =>
+      other is RenderTargetD3d12Composition && other.value == value;
+  @override
+  int get hashCode => value.hashCode;
+}
+
 /// Tells the caller that work is ready for it.
 ///
 /// One call can stand for several pieces of ready work, so take all of it each
@@ -5489,16 +6391,18 @@ final class RenderSessionAttachOptions extends _Value {
   ///
   /// - `RenderDriverKind.callerGraphicsThread` for a borrowed ring of WebGPU
   ///   textures.
-  /// - `RenderDriverKind.coreWorker` for an offscreen target, a window, or an
-  ///   exported ring.
+  /// - `RenderDriverKind.coreWorker` for an offscreen target, a window, a
+  ///   DirectComposition visual, or an exported ring.
+  /// - `RenderDriverKind.callerGraphicsThread` for a XAML `SwapChainPanel`, on
+  ///   the panel's UI thread.
   /// - Either one for a web canvas. In a browser both run on the thread that
   ///   loaded the library: `RenderDriverKind.coreWorker` in the library's own
   ///   tasks, and `RenderDriverKind.callerGraphicsThread` when you service the
   ///   session.
   /// - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or a
-  ///   borrowed ring of Metal, Vulkan, or OpenGL textures. A build may drive
-  ///   these on `RenderDriverKind.coreWorker` only, and fails an attach with
-  ///   `RenderDriverKind.callerGraphicsThread` then.
+  ///   borrowed ring of Metal, Vulkan, D3D12, or OpenGL textures. A build may
+  ///   drive these on `RenderDriverKind.coreWorker` only, and fails an attach
+  ///   with `RenderDriverKind.callerGraphicsThread` then.
   ///
   /// An attach with another driver fails with `Status.unsupported`.
   ///
@@ -5988,6 +6892,9 @@ final class MapSnapshot extends _Value {
   /// Whether the style and every resource that the view needs have loaded.
   final bool fullyLoaded;
   final bool renderingStatsViewEnabled;
+
+  /// Whether a gesture recognizer's gesture, or the glide and snap after it,
+  /// moves the camera.
   final bool gestureInProgress;
   final bool transitionInProgress;
   final RuntimeEventFlag eventMask;
@@ -6704,35 +7611,27 @@ final class CameraUpdate extends _Value {
     this.mode = const CameraUpdateMode.fromRawValue(0),
     this.camera = const CameraOptions(),
     this.animation = const AnimationOptions(),
-    this.gesturePhase = const GesturePhase.fromRawValue(0),
   });
   final CameraUpdateMode mode;
   final CameraOptions camera;
   final AnimationOptions animation;
-  final GesturePhase gesturePhase;
 
   /// A copy of this value with the given members replaced.
   CameraUpdate copyWith({
     CameraUpdateMode? mode,
     CameraOptions? camera,
     AnimationOptions? animation,
-    GesturePhase? gesturePhase,
   }) => CameraUpdate(
     mode: mode ?? this.mode,
     camera: camera ?? this.camera,
     animation: animation ?? this.animation,
-    gesturePhase: gesturePhase ?? this.gesturePhase,
   );
 
   @override
-  List<Object?> get _members => [mode, camera, animation, gesturePhase];
+  List<Object?> get _members => [mode, camera, animation];
   @override
-  String toString() => _describe('CameraUpdate', const [
-    'mode',
-    'camera',
-    'animation',
-    'gesturePhase',
-  ]);
+  String toString() =>
+      _describe('CameraUpdate', const ['mode', 'camera', 'animation']);
 }
 
 /// The outcome of `RenderSessionHandle.abandon()`.
@@ -6880,28 +7779,6 @@ final class RenderSessionSnapshot extends _Value {
     'failureStatus',
     'hasTarget',
   ]);
-}
-
-/// A rectangle of the screen, from its `min` corner to its `max` corner.
-///
-/// See `mln_screen_box` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
-final class ScreenBox extends _Value {
-  const ScreenBox({
-    this.min = const ScreenPoint(),
-    this.max = const ScreenPoint(),
-  });
-  final ScreenPoint min;
-  final ScreenPoint max;
-
-  /// A copy of this value with the given members replaced.
-  ScreenBox copyWith({ScreenPoint? min, ScreenPoint? max}) =>
-      ScreenBox(min: min ?? this.min, max: max ?? this.max);
-
-  @override
-  List<Object?> get _members => [min, max];
-  @override
-  String toString() => _describe('ScreenBox', const ['min', 'max']);
 }
 
 /// A line through points on the screen.
@@ -7147,6 +8024,41 @@ final class TextureReadbackResult extends _Value {
       _describe('TextureReadbackResult', const ['data', 'info']);
 }
 
+/// Options for `RenderSessionHandle.setFramePacing()`.
+///
+/// See `mln_frame_pacing_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+final class FramePacingOptions extends _Value {
+  const FramePacingOptions({this.maximumFramesPerSecond, this.view});
+
+  /// The most frames per second that the library demands, greater than zero. It
+  /// skips display refreshes to stay within it. By default, it can demand a
+  /// frame at every refresh.
+  final int? maximumFramesPerSecond;
+
+  /// The `NSView*` on macOS, or the `UIView*` on iOS and tvOS, that shows the
+  /// session's frames, to pace them to its window's display rather than the
+  /// main one. On iOS and tvOS, set the pacing again when the scene moves to
+  /// another screen, as `windowScene:didUpdateEffectiveGeometry:` reports.
+  final NativePointer? view;
+
+  /// A copy of this value with the given members replaced.
+  FramePacingOptions copyWith({
+    int? maximumFramesPerSecond,
+    NativePointer? view,
+  }) => FramePacingOptions(
+    maximumFramesPerSecond:
+        maximumFramesPerSecond ?? this.maximumFramesPerSecond,
+    view: view ?? this.view,
+  );
+
+  @override
+  List<Object?> get _members => [maximumFramesPerSecond, view];
+  @override
+  String toString() =>
+      _describe('FramePacingOptions', const ['maximumFramesPerSecond', 'view']);
+}
+
 /// The answer to a resource request.
 ///
 /// See `mln_resource_response` in the
@@ -7162,6 +8074,7 @@ final class ResourceResponse extends _Value {
     this.expiresUnixMs,
     this.etag = '',
     this.retryAfterUnixMs,
+    this.noStore = false,
   }) : bytes = Uint8List.fromList(bytes ?? const <int>[]).asUnmodifiableView();
   final ResourceResponseStatus status;
 
@@ -7174,10 +8087,13 @@ final class ResourceResponse extends _Value {
   /// A description of the error, for `ResourceResponseStatus.error`.
   final String errorMessage;
 
-  /// Whether the library must request the resource again before it reuses this
-  /// copy.
+  /// Whether the library must not use this copy once it expires until it
+  /// requests the resource again, not even while the server can't be reached,
+  /// as `Cache-Control: must-revalidate` or `no-cache` says.
   final bool mustRevalidate;
   final int? modifiedUnixMs;
+
+  /// When this copy stops being fresh. Without it, the copy never expires.
   final int? expiresUnixMs;
 
   /// Empty when the resource has no ETag.
@@ -7185,6 +8101,10 @@ final class ResourceResponse extends _Value {
 
   /// When to retry, for `ResourceResponseStatus.error`.
   final int? retryAfterUnixMs;
+
+  /// Whether the library must not store this copy, as `Cache-Control: no-store`
+  /// says.
+  final bool noStore;
 
   /// A copy of this value with the given members replaced.
   ResourceResponse copyWith({
@@ -7197,6 +8117,7 @@ final class ResourceResponse extends _Value {
     int? expiresUnixMs,
     String? etag,
     int? retryAfterUnixMs,
+    bool? noStore,
   }) => ResourceResponse(
     status: status ?? this.status,
     errorReason: errorReason ?? this.errorReason,
@@ -7207,6 +8128,7 @@ final class ResourceResponse extends _Value {
     expiresUnixMs: expiresUnixMs ?? this.expiresUnixMs,
     etag: etag ?? this.etag,
     retryAfterUnixMs: retryAfterUnixMs ?? this.retryAfterUnixMs,
+    noStore: noStore ?? this.noStore,
   );
 
   @override
@@ -7220,6 +8142,7 @@ final class ResourceResponse extends _Value {
     expiresUnixMs,
     etag,
     retryAfterUnixMs,
+    noStore,
   ];
   @override
   String toString() => _describe('ResourceResponse', const [
@@ -7232,6 +8155,7 @@ final class ResourceResponse extends _Value {
     'expiresUnixMs',
     'etag',
     'retryAfterUnixMs',
+    'noStore',
   ]);
 }
 
@@ -7333,6 +8257,7 @@ final class MapOptions extends _Value {
     this.tileCacheEnabled,
     this.fallbackFontFaces = '',
     this.systemFontsEnabled,
+    this.localIdeographsEnabled,
   });
 
   /// The map's first size, and its scale factor. Render sessions of the map
@@ -7352,21 +8277,29 @@ final class MapOptions extends _Value {
   /// show again without loading. Without it, the map keeps them.
   final bool? tileCacheEnabled;
 
-  /// Fonts for the text that a style's own fonts don't draw, such as scripts
-  /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
+  /// Fonts for the text that a style's own fonts don't draw. A JSON array of
   /// font files, each an object with a `url` and an optional `unicode-range`,
-  /// as in a font face of a style's `font-faces`, which every font stack uses
-  /// after the style's own font faces. Empty for the system's fonts, unless
-  /// `system_fonts_enabled` is false.
+  /// as in a font face of a style's `font-faces`. They shape, in order, the
+  /// text that glyph PBFs can't shape, such as Myanmar or Devanagari, or all
+  /// the text of a style without glyph PBFs, and draw the glyphs that come from
+  /// local fonts: those a style's PBFs lack, and CJK with
+  /// `local_ideographs_enabled`. Empty for the system's fonts alone.
   final String fallbackFontFaces;
 
-  /// Whether the map falls back to the system's fonts for CJK and the scripts
-  /// that need complex shaping when `fallback_font_faces` is empty: fonts that
-  /// the platform's font matcher picks for the user's preferred languages.
-  /// Without it, the map does. The first map that uses them waits for them to
-  /// be found. In the browser, the browser draws CJK glyphs in its sans-serif
-  /// font instead, where `fallback_font_faces` doesn't cover them.
+  /// Whether the map draws from the system's fonts what the style's fonts and
+  /// `fallback_font_faces` don't: fonts that the platform's font matcher picks
+  /// for the font stack's names, or for the character and the user's preferred
+  /// languages. It shapes with them the text that glyph PBFs can't shape, and
+  /// all the text of a style without glyph PBFs. Without it, the map does. The
+  /// first map that uses them waits for the matcher to load. In the browser,
+  /// the browser draws those glyphs in the font stack's families, then its
+  /// sans-serif font, one at a time.
   final bool? systemFontsEnabled;
+
+  /// Whether CJK ideographs, kana and hangul come from local fonts
+  /// (`fallback_font_faces`, then the system's) before glyph PBFs, rather than
+  /// from a glyph PBF downloaded for every few characters. Without it, they do.
+  final bool? localIdeographsEnabled;
 
   /// A copy of this value with the given members replaced.
   MapOptions copyWith({
@@ -7377,6 +8310,7 @@ final class MapOptions extends _Value {
     bool? tileCacheEnabled,
     String? fallbackFontFaces,
     bool? systemFontsEnabled,
+    bool? localIdeographsEnabled,
   }) => MapOptions(
     initialExtent: initialExtent ?? this.initialExtent,
     mapMode: mapMode ?? this.mapMode,
@@ -7385,6 +8319,8 @@ final class MapOptions extends _Value {
     tileCacheEnabled: tileCacheEnabled ?? this.tileCacheEnabled,
     fallbackFontFaces: fallbackFontFaces ?? this.fallbackFontFaces,
     systemFontsEnabled: systemFontsEnabled ?? this.systemFontsEnabled,
+    localIdeographsEnabled:
+        localIdeographsEnabled ?? this.localIdeographsEnabled,
   );
 
   @override
@@ -7396,6 +8332,7 @@ final class MapOptions extends _Value {
     tileCacheEnabled,
     fallbackFontFaces,
     systemFontsEnabled,
+    localIdeographsEnabled,
   ];
   @override
   String toString() => _describe('MapOptions', const [
@@ -7406,6 +8343,7 @@ final class MapOptions extends _Value {
     'tileCacheEnabled',
     'fallbackFontFaces',
     'systemFontsEnabled',
+    'localIdeographsEnabled',
   ]);
 }
 
@@ -7598,6 +8536,52 @@ final class OfflineRegionInfo extends _Value {
   @override
   String toString() =>
       _describe('OfflineRegionInfo', const ['id', 'definition', 'metadata']);
+}
+
+/// How long the resources that an offline region holds stay usable.
+///
+/// See `mln_offline_region_expiry` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class OfflineRegionExpiry extends _Value {
+  const OfflineRegionExpiry({
+    this.staleAfterUnixMs,
+    this.usableOfflineUntilUnixMs,
+    this.staleResourceCount = 0,
+    this.unusableResourceCount = 0,
+  });
+
+  /// When the first of the region's resources goes stale, which may have
+  /// passed. Maps show a stale resource while they check it with the server,
+  /// unless it must be checked first, and the region's download refreshes it.
+  /// Without it, no resource ever goes stale.
+  final int? staleAfterUnixMs;
+
+  /// When the first of the region's resources that the server requires checking
+  /// once stale stops being usable without the server, which may have passed.
+  /// Refresh the region before then to keep all of it usable offline. Without
+  /// it, every resource stays usable offline.
+  final int? usableOfflineUntilUnixMs;
+
+  /// The resources that are stale now, tiles included.
+  final int staleResourceCount;
+
+  /// The stale resources that maps can't use now without the server.
+  final int unusableResourceCount;
+
+  @override
+  List<Object?> get _members => [
+    staleAfterUnixMs,
+    usableOfflineUntilUnixMs,
+    staleResourceCount,
+    unusableResourceCount,
+  ];
+  @override
+  String toString() => _describe('OfflineRegionExpiry', const [
+    'staleAfterUnixMs',
+    'usableOfflineUntilUnixMs',
+    'staleResourceCount',
+    'unusableResourceCount',
+  ]);
 }
 
 /// The download progress of an offline region.
@@ -8573,6 +9557,12 @@ const int diagnosticMessageCapacity = 4096;
 /// See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 const int frameDemandTokenStillImage = 0xFFFFFFFFFFFFFFFF;
+
+/// The most events that one input or tick reports.
+///
+/// See `MLN_GESTURE_RESULT_EVENT_CAPACITY` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+const int gestureResultEventCapacity = 4;
 
 /// The most textures that a render session's texture ring can have.
 ///

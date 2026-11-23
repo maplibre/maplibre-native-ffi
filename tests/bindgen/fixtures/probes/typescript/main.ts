@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 
 import {
   MaplibreError,
+  ProbeTrackerHandle,
   keywordCombine,
   probeBatchPoints,
   probeBatchScores,
@@ -66,6 +67,15 @@ assert.throws(() => probeBatchPoints([{ x: 2 } as (typeof batch)[number]]), {
   name: "TypeError",
   message: "points[0].y: expected a number",
 });
+
+// A counted inline array holds only the elements that its count holds, though
+// native fills every slot.
+const tracker = ProbeTrackerHandle.open();
+assert.deepEqual(tracker.poll().marks, [
+  { kind: "tap", value: { id: 9 } },
+  { kind: "level", value: 1 },
+]);
+tracker.release();
 
 // Parameters that are TypeScript keywords keep their order.
 assert.deepEqual(keywordCombine(5, 2, 7, 11), { type: 3, defer: 7, raw: 11 });

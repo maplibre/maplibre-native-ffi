@@ -25,6 +25,17 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_acquired_frame_get_d3d12_texture(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_get_d3d12_texture(
+      frame.toULong(),
+      outFrame.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_acquired_frame_get_dma_buf(frame: Long, outFrame: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_get_dma_buf(
       frame.toULong(),
@@ -190,21 +201,59 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_delivery_queue_release(queue.toULong())
   }
 
-  actual fun mln_frame_pacer_create(options: Long, outPacer: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_frame_pacer_create(
+  actual fun mln_gesture_recognizer_create(
+    map: Long,
+    options: Long,
+    outRecognizer: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gesture_recognizer_create(
+      map.toULong(),
       options.toCPointer(),
-      outPacer.toCPointer(),
+      outRecognizer.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_frame_pacer_release(pacer: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_frame_pacer_release(pacer.toULong())
+  actual fun mln_gesture_recognizer_handle(
+    recognizer: Long,
+    input: Long,
+    timeMs: Double,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gesture_recognizer_handle(
+      recognizer.toULong(),
+      input.toCPointer(),
+      timeMs,
+      outResult.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_gesture_recognizer_release(recognizer: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_gesture_recognizer_release(recognizer.toULong())
   }
 
-  actual fun mln_frame_pacer_set_options(pacer: Long, options: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_frame_pacer_set_options(
-      pacer.toULong(),
+  actual fun mln_gesture_recognizer_set_options(
+    recognizer: Long,
+    options: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gesture_recognizer_set_options(
+      recognizer.toULong(),
       options.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_gesture_recognizer_tick(
+    recognizer: Long,
+    timeMs: Double,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gesture_recognizer_tick(
+      recognizer.toULong(),
+      timeMs,
+      outResult.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -226,6 +275,17 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_gpu_device_get_d3d12_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_get_d3d12_context(
+      device.toULong(),
+      outResult.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_gpu_device_get_vulkan_context(
     device: Long,
     outResult: Long,
@@ -240,6 +300,17 @@ internal actual object C {
   actual fun mln_gpu_device_release(device: Long) {
     org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_release(device.toULong())
   }
+
+  actual fun mln_gpu_device_wrap_d3d12(
+    descriptor: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_gpu_device_wrap_d3d12(
+      descriptor.toCPointer(),
+      outDevice.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
 
   actual fun mln_gpu_device_wrap_metal(
     descriptor: Long,
@@ -1839,14 +1910,14 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_render_session_set_frame_pacer(
+  actual fun mln_render_session_set_frame_pacing(
     session: Long,
-    pacer: Long,
+    options: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_frame_pacer(
+    org.maplibre.nativeffi.internal.cinterop.mln_render_session_set_frame_pacing(
       session.toULong(),
-      pacer.toULong(),
+      options.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -2041,6 +2112,19 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_runtime_get_offline_region(
+      runtime.toULong(),
+      regionId,
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_runtime_get_offline_region_expiry(
+    runtime: Long,
+    regionId: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_runtime_get_offline_region_expiry(
       runtime.toULong(),
       regionId,
       completion.toCPointer(),

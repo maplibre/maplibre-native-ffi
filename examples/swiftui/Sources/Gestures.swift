@@ -1,379 +1,355 @@
-// Gestures, as camera deltas. On iOS, a drag pans, two fingers pinch, rotate,
-// and pan, and a double tap zooms in. On macOS, a drag pans, a right or Control
-// drag rotates and pitches, a trackpad scrolls, pinches, and rotates, a mouse
-// wheel zooms, and a double click or a two-finger double tap zooms in, or out
-// with Shift. Each gesture ends with its release velocities, so the map keeps
-// moving until a touch or a click stops it.
+// Gestures. The map's gesture recognizer turns the view's raw input into camera
+// movement: a drag pans, two fingers pinch, twist, and tilt, a double tap zooms
+// in, a two-finger tap zooms out, and a flick glides on. On macOS, a right or
+// Control drag rotates and pitches, a trackpad pans, pinches, and rotates, a
+// mouse wheel zooms, a double click zooms in, or out with Shift, the arrow keys
+// pan, and plus and minus zoom. A notch, such as north on the bearing, plays a
+// haptic tick. This file translates the platform's events, and ticks the
+// recognizer when it asks.
 
-import CoreGraphics
 import MaplibreNativeFFI
+import QuartzCore
 
 #if os(iOS)
   import UIKit
+#elseif os(macOS)
+  import AppKit
+#endif
 
-  @MainActor
-  final class TouchGestures: NSObject, UIGestureRecognizerDelegate {
-    private unowned let view: UIView
-    private let apply: (CameraDelta) -> Void
-    // The gesture lasts while any of the view's touches or recognizers do.
-    private var touches: Set<UITouch> = []
-    private var recognizing = 0
-    private var cancelled = false
-    private var momentum = GestureMomentum()
-    // When the pinch and rotation ended, so a later release can drop their
-    // velocities once the fingers have moved on.
-    private var pinchEnded = 0.0
-    private var rotationEnded = 0.0
-    // The pinch's scale and rotation at the last event, and their centroid.
-    private var scale = 1.0
-    private var rotation = 0.0
-    private var anchor: ScreenPoint?
+@MainActor
+final class MapGestures: NSObject {
+  private weak var view: MetalView?
+  private let recognizer: () -> GestureRecognizerHandle?
+  /// Ticks the recognizer each frame, while it asks.
+  private var link: CADisplayLink?
+  /// Ticks the recognizer once, at the time it asks for.
+  private var timer: Timer?
+  /// The last time that the recognizer took, in milliseconds since boot.
+  private var lastMs = 0.0
 
-    init(view: UIView, apply: @escaping (CameraDelta) -> Void) {
-      self.view = view
-      self.apply = apply
-      super.init()
-      let doubleTap = UITapGestureRecognizer(
-        target: self,
-        action: #selector(doubleTapped)
-      )
-      doubleTap.numberOfTapsRequired = 2
-      for recognizer in [
-        UIPanGestureRecognizer(target: self, action: #selector(panned)),
-        UIPinchGestureRecognizer(target: self, action: #selector(pinched)),
-        UIRotationGestureRecognizer(target: self, action: #selector(rotated)),
-        doubleTap,
-      ] {
-        recognizer.delegate = self
-        view.addGestureRecognizer(recognizer)
-      }
+  init(
+    view: MetalView,
+    recognizer: @escaping () -> GestureRecognizerHandle?
+  ) {
+    self.view = view
+    self.recognizer = recognizer
+  }
+
+  /// Stops ticking, once the view leaves its window.
+  func stop() {
+    link?.invalidate()
+    link = nil
+    timer?.invalidate()
+    timer = nil
+  }
+
+  /// Passes one input to the recognizer at `time`, in seconds since boot, and
+  /// returns whether it used the input.
+  @discardableResult
+  private func handle(_ input: GestureInput, at time: TimeInterval) -> Bool {
+    guard let result = try? recognizer()?.handle(
+      input: input,
+      timeMs: milliseconds(time)
+    ) else { return false }
+    follow(result)
+    return result.handled
+  }
+
+  @objc private func tick() {
+    guard let result = try? recognizer()?.tick(
+      timeMs: milliseconds(CACurrentMediaTime())
+    ) else { return stop() }
+    follow(result)
+  }
+
+  /// Plays the result's notches, and ticks the recognizer when it asks: each
+  /// frame while the camera glides or eases, or once at a time, as when a
+  /// press may become a long press.
+  private func follow(_ result: GestureResult) {
+    for case .notch in result.events {
+      playNotch()
+      break
     }
-
-    /// A touch down starts a gesture, which stops the last one's momentum.
-    func began(_ began: Set<UITouch>) {
-      if touches.isEmpty, recognizing == 0 {
-        cancelled = false
-        momentum = GestureMomentum()
-        apply(CameraDelta(gesturePhase: .begin))
-      }
-      touches.formUnion(began)
+    if result.nextTick != .frame {
+      link?.invalidate()
+      link = nil
+    } else if link == nil {
+      link = makeDisplayLink()
+      link?.add(to: .main, forMode: .common)
     }
-
-    func ended(_ ended: Set<UITouch>) {
-      touches.subtract(ended)
-      finish()
-    }
-
-    func gestureRecognizer(
-      _: UIGestureRecognizer,
-      shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
-    ) -> Bool {
-      true
-    }
-
-    @objc private func panned(_ pan: UIPanGestureRecognizer) {
-      let offset = pan.translation(in: view)
-      pan.setTranslation(.zero, in: view)
-      handle(pan, CameraDelta(offset: ScreenPoint(x: offset.x, y: offset.y))) {
-        let velocity = pan.velocity(in: view)
-        momentum.pan.velocity = ScreenPoint(x: velocity.x, y: velocity.y)
+    timer?.invalidate()
+    timer = nil
+    if result.nextTick == .at {
+      let delay = result.nextTickMs / 1000 - CACurrentMediaTime()
+      timer = Timer.scheduledTimer(
+        withTimeInterval: max(0, delay),
+        repeats: false
+      ) { [weak self] _ in
+        MainActor.assumeIsolated { self?.tick() }
       }
-    }
-
-    @objc private func pinched(_ pinch: UIPinchGestureRecognizer) {
-      if pinch.state == .began {
-        scale = 1
-      }
-      let change = pinch.scale / scale
-      scale = pinch.scale
-      anchor = centroid(pinch)
-      handle(pinch, CameraDelta(scale: change, anchor: anchor)) {
-        // The velocity is in scale factor per second, and each doubling of
-        // the scale is a zoom level.
-        momentum.zoom = AnchoredMomentum(
-          velocity: pinch.velocity / pinch.scale / log(2),
-          anchor: anchor
-        )
-        pinchEnded = ProcessInfo.processInfo.systemUptime
-      }
-    }
-
-    @objc private func rotated(_ turn: UIRotationGestureRecognizer) {
-      if turn.state == .began {
-        rotation = 0
-      }
-      // The rotation runs clockwise, which turns the bearing the other way.
-      let change = -(turn.rotation - rotation) * 180 / .pi
-      rotation = turn.rotation
-      anchor = centroid(turn)
-      handle(turn, CameraDelta(bearing: change, anchor: anchor)) {
-        momentum.bearing = AnchoredMomentum(
-          velocity: -turn.velocity * 180 / .pi,
-          anchor: anchor
-        )
-        rotationEnded = ProcessInfo.processInfo.systemUptime
-      }
-    }
-
-    @objc private func doubleTapped(_ tap: UITapGestureRecognizer) {
-      let point = tap.location(in: view)
-      apply(CameraDelta(
-        scale: 2,
-        anchor: ScreenPoint(x: point.x, y: point.y),
-        animation: AnimationOptions(durationMs: 300)
-      ))
-    }
-
-    /// Applies a recognizer's change, and keeps its velocity at release.
-    private func handle(
-      _ recognizer: UIGestureRecognizer,
-      _ change: CameraDelta,
-      release: () -> Void
-    ) {
-      var change = change
-      change.gesturePhase = .update
-      switch recognizer.state {
-      case .began:
-        recognizing += 1
-        apply(change)
-      case .changed:
-        apply(change)
-      case .ended:
-        apply(change)
-        release()
-        recognizing -= 1
-        finish()
-      case .cancelled:
-        cancelled = true
-        recognizing -= 1
-        finish()
-      default:
-        break
-      }
-    }
-
-    /// Ends the gesture once its touches and recognizers have all ended.
-    private func finish() {
-      guard touches.isEmpty, recognizing == 0 else { return }
-      // A pinch or rotation that ended well before the release, as when one
-      // finger lifts and the other keeps panning, adds no momentum.
-      let now = ProcessInfo.processInfo.systemUptime
-      if now - pinchEnded > 0.1 {
-        momentum.zoom = AnchoredMomentum()
-      }
-      if now - rotationEnded > 0.1 {
-        momentum.bearing = AnchoredMomentum()
-      }
-      apply(cancelled
-        ? CameraDelta(gesturePhase: .cancel)
-        : CameraDelta(momentum: momentum, gesturePhase: .end))
-    }
-
-    /// Where a two-finger recognizer's touches meet, while it has both.
-    private func centroid(_ recognizer: UIGestureRecognizer) -> ScreenPoint? {
-      guard recognizer.numberOfTouches == 2 else { return anchor }
-      let point = recognizer.location(in: view)
-      return ScreenPoint(x: point.x, y: point.y)
     }
   }
 
-#elseif os(macOS)
-  import AppKit
+  /// Events and display links count seconds since boot, as
+  /// CACurrentMediaTime() does. An event can carry an earlier time than a
+  /// tick that ran before it, so the recognizer's clock keeps the later one.
+  private func milliseconds(_ time: TimeInterval) -> Double {
+    lastMs = max(lastMs, time * 1000)
+    return lastMs
+  }
 
-  @MainActor
-  final class PointerGestures {
-    /// How far a right drag turns the bearing and pitch.
-    private static let degreesPerPoint = 0.5
+  #if os(iOS)
+    private let notchFeedback = UISelectionFeedbackGenerator()
+    // The recognizer's ID for each touch that is down.
+    private var touchIds: [ObjectIdentifier: UInt32] = [:]
+    private var nextTouchId: UInt32 = 0
 
-    private unowned let view: NSView
-    private let apply: (CameraDelta) -> Void
-    private var previous: CGPoint?
-    private var rotating = false
-    private var drag = VelocityTracker()
-    private var scroll = VelocityTracker()
-    private var magnification = VelocityTracker()
-    private var rotation = VelocityTracker()
-
-    init(view: NSView, apply: @escaping (CameraDelta) -> Void) {
-      self.view = view
-      self.apply = apply
+    private func makeDisplayLink() -> CADisplayLink {
+      CADisplayLink(target: self, selector: #selector(tick))
     }
 
-    func mouseDown(_ event: NSEvent, rotating: Bool) {
-      previous = point(event)
-      self.rotating = rotating
-      drag = VelocityTracker()
-      apply(CameraDelta(gesturePhase: .begin))
+    private func playNotch() {
+      notchFeedback.selectionChanged()
+    }
+
+    func touchesBegan(_ touches: Set<UITouch>) {
+      for touch in touches {
+        nextTouchId &+= 1
+        touchIds[ObjectIdentifier(touch)] = nextTouchId
+        let kind: PointerKind = switch touch.type {
+        case .pencil: .pen
+        case .indirectPointer: .mouse
+        default: .touch
+        }
+        handle(.pointerDown(GesturePointerDown(
+          id: nextTouchId,
+          kind: kind,
+          position: point(touch)
+        )), at: touch.timestamp)
+      }
+    }
+
+    func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+      for touch in touches {
+        guard let id = touchIds[ObjectIdentifier(touch)] else { continue }
+        // The samples that UIKit coalesced into this event, so the recognizer
+        // measures a flick's speed from each.
+        for sample in event?.coalescedTouches(for: touch) ?? [touch] {
+          handle(
+            .pointerMove(GesturePointer(id: id, position: point(sample))),
+            at: sample.timestamp
+          )
+        }
+      }
+    }
+
+    func touchesEnded(_ touches: Set<UITouch>) {
+      for touch in touches {
+        guard let id = touchIds.removeValue(forKey: ObjectIdentifier(touch))
+        else { continue }
+        handle(
+          .pointerUp(GesturePointer(id: id, position: point(touch))),
+          at: touch.timestamp
+        )
+      }
+    }
+
+    /// The system took the touches away, as for a system gesture: no tap and
+    /// no glide.
+    func touchesCancelled(_ touches: Set<UITouch>) {
+      for touch in touches {
+        guard let id = touchIds.removeValue(forKey: ObjectIdentifier(touch))
+        else { continue }
+        handle(.pointerCancel(GesturePointer(id: id)), at: touch.timestamp)
+      }
+    }
+
+    private func point(_ touch: UITouch) -> ScreenPoint {
+      let point = touch.location(in: view)
+      return ScreenPoint(x: point.x, y: point.y)
+    }
+
+  #elseif os(macOS)
+    /// The recognizer's ID for the mouse.
+    private static let mouse: UInt32 = 0
+
+    /// The mouse button that started the mouse's drag.
+    private var dragButton: Int?
+    // Whether each of the trackpad's two pinch streams is under way.
+    private var magnifying = false
+    private var rotating = false
+
+    private func makeDisplayLink() -> CADisplayLink? {
+      view?.displayLink(target: self, selector: #selector(tick))
+    }
+
+    private func playNotch() {
+      NSHapticFeedbackManager.defaultPerformer
+        .perform(.alignment, performanceTime: .now)
+    }
+
+    /// `modes` are what the button does: the right one rotates and pitches.
+    func mouseDown(_ event: NSEvent, modes: GestureMode) {
+      guard dragButton == nil else { return }
+      dragButton = event.buttonNumber
+      flagsChanged(event)
+      handle(.pointerDown(GesturePointerDown(
+        id: Self.mouse,
+        kind: .mouse,
+        position: point(event),
+        modes: modes
+      )), at: event.timestamp)
     }
 
     func mouseDragged(_ event: NSEvent) {
-      guard let previous else { return }
-      let current = point(event)
-      self.previous = current
-      let dx = current.x - previous.x
-      let dy = current.y - previous.y
-      drag.add(dx, dy, at: event.timestamp)
-      if rotating {
-        apply(CameraDelta(
-          bearing: dx * Self.degreesPerPoint,
-          pitch: -dy * Self.degreesPerPoint,
-          gesturePhase: .update
-        ))
-      } else {
-        apply(CameraDelta(
-          offset: ScreenPoint(x: dx, y: dy),
-          gesturePhase: .update
-        ))
-      }
+      guard dragButton != nil else { return }
+      handle(
+        .pointerMove(GesturePointer(id: Self.mouse, position: point(event))),
+        at: event.timestamp
+      )
     }
 
     func mouseUp(_ event: NSEvent) {
-      guard previous != nil else { return }
-      previous = nil
-      let velocity = drag.velocity(at: event.timestamp)
-      let turn = Self.degreesPerPoint
-      let momentum = rotating
-        ? GestureMomentum(
-          bearing: AnchoredMomentum(velocity: velocity.x * turn),
-          pitch: AnchoredMomentum(velocity: -velocity.y * turn)
-        )
-        : GestureMomentum(pan: PanMomentum(velocity: velocity))
-      apply(CameraDelta(momentum: momentum, gesturePhase: .end))
-      if event.clickCount == 2 {
-        zoom(event, in: !event.modifierFlags.contains(.shift))
-      }
-    }
-
-    func scrollWheel(_ event: NSEvent) {
-      guard event.hasPreciseScrollingDeltas else {
-        // A mouse wheel zooms about the pointer, by lines.
-        let at = point(event)
-        apply(CameraDelta(
-          scale: pow(2, event.scrollingDeltaY * 40 / 300),
-          anchor: ScreenPoint(x: at.x, y: at.y)
-        ))
-        return
-      }
-      // A trackpad or Magic Mouse scroll pans. The system's momentum events
-      // after release are skipped, as the map makes its own.
-      guard event.momentumPhase.isEmpty else { return }
-      let phase = phase(event.phase)
-      if phase == .begin {
-        scroll = VelocityTracker()
-      }
-      scroll.add(
-        event.scrollingDeltaX,
-        event.scrollingDeltaY,
+      guard event.buttonNumber == dragButton else { return }
+      dragButton = nil
+      handle(
+        .pointerUp(GesturePointer(id: Self.mouse, position: point(event))),
         at: event.timestamp
       )
-      apply(CameraDelta(
-        offset: ScreenPoint(x: event.scrollingDeltaX, y: event.scrollingDeltaY),
-        momentum: phase == .end
-          ? GestureMomentum(pan: PanMomentum(
-            velocity: scroll.velocity(at: event.timestamp)
-          ))
-          : nil,
-        gesturePhase: phase
-      ))
+    }
+
+    /// What held keys do: Control rotates and pitches on a drag, and Shift
+    /// zooms out on a double click.
+    func flagsChanged(_ event: NSEvent) {
+      var modes: GestureMode = []
+      if event.modifierFlags.contains(.control) {
+        modes.insert(.rotate)
+      }
+      if event.modifierFlags.contains(.shift) {
+        modes.insert(.zoomOut)
+      }
+      handle(.modes(modes), at: event.timestamp)
+    }
+
+    /// A trackpad or a Magic Mouse pans, along with the system's glide after
+    /// it. A mouse wheel zooms a third of a level a line, eased.
+    func scrollWheel(_ event: NSEvent) {
+      let position = point(event)
+      let delta = event.hasPreciseScrollingDeltas
+        ? GestureDelta(
+          position: position,
+          pan: ScreenPoint(x: event.scrollingDeltaX, y: event.scrollingDeltaY)
+        )
+        : GestureDelta(
+          position: position,
+          discrete: true,
+          zoom: event.scrollingDeltaY / 3
+        )
+      handle(.delta(delta), at: event.timestamp)
     }
 
     func magnify(_ event: NSEvent) {
-      let at = point(event)
-      let anchor = ScreenPoint(x: at.x, y: at.y)
-      let scale = max(0.01, 1 + event.magnification)
-      let phase = phase(event.phase)
-      if phase == .begin {
-        magnification = VelocityTracker()
-      }
-      magnification.add(log2(scale), at: event.timestamp)
-      apply(CameraDelta(
-        scale: scale,
-        anchor: anchor,
-        momentum: phase == .end
-          ? GestureMomentum(zoom: AnchoredMomentum(
-            velocity: magnification.velocity(at: event.timestamp).x,
-            anchor: anchor
-          ))
-          : nil,
-        gesturePhase: phase
-      ))
+      pinch(event, stream: \.magnifying, scale: 1 + event.magnification)
     }
 
+    /// The event turns counterclockwise, and the pinch clockwise.
     func rotate(_ event: NSEvent) {
-      // The rotation is in degrees, counterclockwise, which turns the bearing
-      // the same way.
-      let at = point(event)
-      let anchor = ScreenPoint(x: at.x, y: at.y)
-      let phase = phase(event.phase)
-      if phase == .begin {
-        rotation = VelocityTracker()
-      }
-      rotation.add(Double(event.rotation), at: event.timestamp)
-      apply(CameraDelta(
-        bearing: Double(event.rotation),
-        anchor: anchor,
-        momentum: phase == .end
-          ? GestureMomentum(bearing: AnchoredMomentum(
-            velocity: rotation.velocity(at: event.timestamp).x,
-            anchor: anchor
-          ))
-          : nil,
-        gesturePhase: phase
-      ))
+      pinch(event, stream: \.rotating, rotation: -Double(event.rotation))
     }
 
+    /// A two-finger double tap zooms in a level.
     func smartMagnify(_ event: NSEvent) {
-      zoom(event, in: true)
-    }
-
-    private func zoom(_ event: NSEvent, in zoomIn: Bool) {
-      let at = point(event)
-      apply(CameraDelta(
-        scale: zoomIn ? 2 : 0.5,
-        anchor: ScreenPoint(x: at.x, y: at.y),
-        animation: AnimationOptions(durationMs: 300)
-      ))
-    }
-
-    private func point(_ event: NSEvent) -> CGPoint {
-      view.convert(event.locationInWindow, from: nil)
-    }
-
-    /// The gesture phase of a trackpad event. Fingers that rest on the
-    /// trackpad may begin a scroll, which stops the last one's momentum.
-    private func phase(_ phase: NSEvent.Phase) -> GesturePhase {
-      switch phase {
-      case .mayBegin, .began: .begin
-      case .changed, .stationary: .update
-      case .ended: .end
-      case .cancelled: .cancel
-      default: .none
-      }
-    }
-  }
-
-  /// Estimates how fast a gesture moved as it ended, from its recent events.
-  private struct VelocityTracker {
-    private static let window: TimeInterval = 0.1
-
-    private var samples: [(time: TimeInterval, x: Double, y: Double)] = []
-
-    mutating func add(_ dx: Double, _ dy: Double = 0, at time: TimeInterval) {
-      let x = (samples.last?.x ?? 0) + dx
-      let y = (samples.last?.y ?? 0) + dy
-      samples.removeAll { time - $0.time > Self.window }
-      samples.append((time, x, y))
-    }
-
-    /// The velocity, in units per second, over the window that ends at `time`.
-    func velocity(at time: TimeInterval) -> ScreenPoint {
-      guard let first = samples.first(where: { time - $0.time <= Self.window }),
-            let last = samples.last, time > first.time
-      else { return ScreenPoint(x: 0, y: 0) }
-      return ScreenPoint(
-        x: (last.x - first.x) / (time - first.time),
-        y: (last.y - first.y) / (time - first.time)
+      handle(
+        .delta(GestureDelta(position: point(event), discrete: true, zoom: 1)),
+        at: event.timestamp
       )
     }
-  }
-#endif
+
+    /// The arrow keys pan 100 points, and plus and minus zoom a level, about
+    /// the view's center. Escape drops a drag. Returns whether the map used
+    /// the key.
+    func keyDown(_ event: NSEvent) -> Bool {
+      let bounds = view?.bounds ?? .zero
+      var delta = GestureDelta(
+        position: ScreenPoint(x: bounds.midX, y: bounds.midY),
+        discrete: true
+      )
+      switch event.specialKey {
+      case .leftArrow?: delta.pan.x = 100
+      case .rightArrow?: delta.pan.x = -100
+      case .upArrow?: delta.pan.y = 100
+      case .downArrow?: delta.pan.y = -100
+      default:
+        switch event.charactersIgnoringModifiers ?? "" {
+        case "+", "=": delta.zoom = 1
+        case "-": delta.zoom = -1
+        case "\u{1b}" where dragButton != nil:
+          dragButton = nil
+          return handle(
+            .pointerCancel(GesturePointer(id: Self.mouse)),
+            at: event.timestamp
+          )
+        default: return false
+        }
+      }
+      return handle(.delta(delta), at: event.timestamp)
+    }
+
+    /// Drops the drag and the pinch, and lets go of the held keys, once the
+    /// view can't see their ends: when it or its window loses focus.
+    func cancel() {
+      let now = CACurrentMediaTime()
+      if dragButton != nil {
+        dragButton = nil
+        handle(.pointerCancel(GesturePointer(id: Self.mouse)), at: now)
+      }
+      if magnifying || rotating {
+        magnifying = false
+        rotating = false
+        handle(
+          .pinch(GesturePinch(center: ScreenPoint(), scale: 1, phase: .cancel)),
+          at: now
+        )
+      }
+      handle(.modes([]), at: now)
+    }
+
+    /// One of the trackpad's two streams, as part of one pinch: the first to
+    /// begin begins it, and the last to end ends it.
+    private func pinch(
+      _ event: NSEvent,
+      stream: ReferenceWritableKeyPath<MapGestures, Bool>,
+      scale: Double = 1,
+      rotation: Double = 0
+    ) {
+      let phase: PinchPhase
+      switch event.phase {
+      case .began:
+        let started = magnifying || rotating
+        self[keyPath: stream] = true
+        guard !started else { return }
+        phase = .begin
+      case .changed where self[keyPath: stream]:
+        phase = .update
+      case .ended, .cancelled:
+        guard self[keyPath: stream] else { return }
+        self[keyPath: stream] = false
+        guard !magnifying, !rotating else { return }
+        phase = event.phase == .ended ? .end : .cancel
+      default:
+        return
+      }
+      handle(.pinch(GesturePinch(
+        center: point(event),
+        scale: scale,
+        rotation: rotation,
+        phase: phase
+      )), at: event.timestamp)
+    }
+
+    private func point(_ event: NSEvent) -> ScreenPoint {
+      let point = view?.convert(event.locationInWindow, from: nil) ?? .zero
+      return ScreenPoint(x: point.x, y: point.y)
+    }
+  #endif
+}

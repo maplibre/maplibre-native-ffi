@@ -5,18 +5,22 @@ package org.maplibre.nativeffi.docsnippets
 import org.maplibre.nativeffi.AnimationOptions
 import org.maplibre.nativeffi.BoundOptions
 import org.maplibre.nativeffi.Camera
-import org.maplibre.nativeffi.CameraDelta
 import org.maplibre.nativeffi.CameraFitUpdate
 import org.maplibre.nativeffi.CameraOptions
 import org.maplibre.nativeffi.CameraTransitionHandler
 import org.maplibre.nativeffi.CameraTransitionOutcome
 import org.maplibre.nativeffi.CameraUpdate
 import org.maplibre.nativeffi.CameraUpdateMode
-import org.maplibre.nativeffi.GesturePhase
+import org.maplibre.nativeffi.GestureInput
+import org.maplibre.nativeffi.GesturePointer
+import org.maplibre.nativeffi.GesturePointerDown
+import org.maplibre.nativeffi.GestureRecognizerHandle
+import org.maplibre.nativeffi.GestureResult
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LatLngBounds
 import org.maplibre.nativeffi.MapHandle
 import org.maplibre.nativeffi.MapProjectionHandle
+import org.maplibre.nativeffi.PointerKind
 import org.maplibre.nativeffi.ScreenPoint
 
 private fun useCamera(camera: Camera) {}
@@ -26,39 +30,49 @@ private fun usePoint(point: ScreenPoint) {}
 private fun flyEnded(completed: Boolean) {}
 
 // #region gesture
-private fun beginGesture(map: MapHandle) {
-  map.discarding.applyCameraDelta(
-    CameraDelta(gesturePhase = GesturePhase.BEGIN),
-  )
-}
-
-private fun applyDrag(map: MapHandle, movement: ScreenPoint) {
-  map.discarding.applyCameraDelta(
-    CameraDelta(
-      offset = movement,
-      gesturePhase = GesturePhase.UPDATE,
-    ),
-  )
-}
-
-private fun applyPinch(
+private fun createRecognizer(
   map: MapHandle,
-  scale: Double,
-  center: ScreenPoint,
-) {
-  map.discarding.applyCameraDelta(
-    CameraDelta(
-      scale = scale,
-      anchor = center,
-      gesturePhase = GesturePhase.UPDATE,
-    ),
-  )
+): GestureRecognizerHandle = map.gestureRecognizerCreate()
+
+private fun scheduleTick(result: GestureResult) {
+  // On the next frame, or at result.nextTickMs.
 }
 
-private fun endGesture(map: MapHandle) {
-  map.discarding.applyCameraDelta(
-    CameraDelta(gesturePhase = GesturePhase.END),
-  )
+private fun pointerDown(
+  recognizer: GestureRecognizerHandle,
+  id: UInt,
+  position: ScreenPoint,
+  timeMs: Double,
+) {
+  val input =
+    GestureInput.PointerDown(
+      GesturePointerDown(
+        id = id,
+        kind = PointerKind.TOUCH,
+        position = position,
+      ),
+    )
+  scheduleTick(recognizer.handle(input, timeMs))
+}
+
+private fun pointerMove(
+  recognizer: GestureRecognizerHandle,
+  id: UInt,
+  position: ScreenPoint,
+  timeMs: Double,
+) {
+  val input =
+    GestureInput.PointerMove(
+      GesturePointer(id = id, position = position),
+    )
+  scheduleTick(recognizer.handle(input, timeMs))
+}
+
+private fun tick(
+  recognizer: GestureRecognizerHandle,
+  timeMs: Double,
+) {
+  scheduleTick(recognizer.tick(timeMs))
 }
 
 // #endregion gesture
@@ -131,10 +145,11 @@ private suspend fun camera(map: MapHandle) {
   )
   // #endregion limit
 
-  beginGesture(map)
-  applyDrag(map, ScreenPoint(x = 12.0, y = -4.0))
-  applyPinch(map, 1.1, ScreenPoint(x = 200.0, y = 150.0))
-  endGesture(map)
+  val recognizer = createRecognizer(map)
+  pointerDown(recognizer, 1u, ScreenPoint(x = 100.0, y = 100.0), 0.0)
+  pointerMove(recognizer, 1u, ScreenPoint(x = 112.0, y = 96.0), 16.0)
+  tick(recognizer, 32.0)
+  recognizer.release()
 
   // #region convert
   val projection = MapProjectionHandle.create(map.getSnapshot().view)

@@ -46,9 +46,9 @@ typedef struct mln_gpu_device_options {
   mln_gpu_device_option_fields fields;
   /**
    * The backend that the device renders with. By default, the platform's own:
-   * Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the system has
-   * no Vulkan driver, and in a browser the build's one backend: WebGPU or
-   * OpenGL (WebGL2).
+   * Metal on Apple platforms, Vulkan elsewhere, then D3D12 on Windows, or
+   * OpenGL where the system has neither, and in a browser the build's one
+   * backend: WebGPU or OpenGL (WebGL2).
    */
   mln_render_backend backend
     MLN_BINDING("mask=fields;bit=MLN_GPU_DEVICE_OPTION_BACKEND");
@@ -67,8 +67,9 @@ typedef struct mln_gpu_device_options {
   );
   /**
    * The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
-   * which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only a
-   * Vulkan device takes one.
+   * which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID` and
+   * D3D12 as `ID3D12Device::GetAdapterLuid`. Only a Vulkan or D3D12 device
+   * takes one.
    */
   mln_buffer_view adapter_luid MLN_BINDING(
     "encoding=bytes;mask=fields;bit=MLN_GPU_DEVICE_OPTION_ADAPTER_LUID"
@@ -169,6 +170,34 @@ typedef struct mln_metal_device_descriptor {
 } mln_metal_device_descriptor;
 
 /**
+ * Your D3D12 device and direct command queue, for
+ * mln_gpu_device_wrap_d3d12().
+ */
+typedef struct mln_d3d12_device_descriptor {
+  uint32_t size;
+  /** Your `ID3D12Device`. */
+  void* device MLN_BINDING("required=true");
+  /**
+   * Your `ID3D12CommandQueue` of `D3D12_COMMAND_LIST_TYPE_DIRECT` on `device`,
+   * which sessions on the device submit to. Submit your reads of a borrowed
+   * ring's textures to it for MLN_GPU_SYNC_QUEUE_ORDER.
+   */
+  void* command_queue MLN_BINDING("required=true");
+} mln_d3d12_device_descriptor;
+
+/**
+ * The D3D12 objects of a device, as mln_gpu_device_get_d3d12_context()
+ * reports them.
+ */
+typedef struct mln_gpu_device_d3d12_context_result {
+  uint32_t size;
+  /** The `ID3D12Device`. */
+  void* device;
+  /** The direct `ID3D12CommandQueue` that sessions on the device submit to. */
+  void* command_queue;
+} mln_gpu_device_d3d12_context_result;
+
+/**
  * The Vulkan objects of a device, as mln_gpu_device_get_vulkan_context()
  * reports them.
  */
@@ -191,8 +220,9 @@ typedef struct mln_gpu_device_vulkan_context_result {
  * - MLN_STATUS_UNSUPPORTED when this build or platform lacks `backend`, when
  *   the device can't render with `open_gl_client_api`, when options name a GPU
  *   that the backend can't select (an OpenGL device takes no `adapter_index`,
- *   `adapter_uuid`, or `adapter_luid`, and only a Vulkan device takes
- *   `adapter_uuid` or `adapter_luid`), when a device that doesn't render with
+ *   `adapter_uuid`, or `adapter_luid`, only a Vulkan device takes
+ *   `adapter_uuid`, and only a Vulkan or D3D12 device `adapter_luid`), when a
+ *   device that doesn't render with
  *   Vulkan gets a `queue_lock`, or in a browser for every backend: WebGPU makes
  *   devices asynchronously, and a WebGL2 context needs a canvas. Attach
  *   without a device, which the session makes itself, or wrap your WebGL2
@@ -245,6 +275,31 @@ MLN_API mln_status mln_gpu_device_wrap_vulkan(
 MLN_BINDING("platforms=ios,macos,tvos,visionos")
 MLN_API mln_status mln_gpu_device_wrap_metal(
   const mln_metal_device_descriptor* descriptor,
+  mln_gpu_device* out_device MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Wraps your D3D12 device and direct command queue, so that sessions render
+ * on them.
+ *
+ * Sessions on the device render into your textures and submit to your queue.
+ *
+ * Returns:
+ * - MLN_STATUS_UNSUPPORTED when mln_supported_render_backend_mask() lacks
+ *   MLN_RENDER_BACKEND_FLAG_D3D12, when the device runs no shader model 6.0,
+ *   when `command_queue` isn't a direct queue of `device`, or when the library
+ *   can't load DXC (`dxcompiler.dll`) to compile its shaders.
+ * - MLN_STATUS_INVALID_ARGUMENT when `device` or `command_queue` isn't of its
+ *   interface.
+ *
+ * Lifetimes:
+ * The device references the objects that `descriptor` names until every
+ * session on it ends and you release it.
+ */
+MLN_BINDING("platforms=windows")
+MLN_API mln_status mln_gpu_device_wrap_d3d12(
+  const mln_d3d12_device_descriptor* descriptor,
   mln_gpu_device* out_device MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -324,6 +379,27 @@ MLN_BINDING("platforms=android,freebsd,linux,macos,ohos,windows")
 MLN_API mln_status mln_gpu_device_get_vulkan_context(
   mln_gpu_device device,
   mln_gpu_device_vulkan_context_result* out_result MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Gets the D3D12 device and direct command queue of a D3D12 device.
+ *
+ * Use them to make the textures of a borrowed ring that sessions on the device
+ * render into, and to submit your reads of them, which the queue orders after
+ * the frames submitted before them.
+ *
+ * Returns:
+ * - MLN_STATUS_UNSUPPORTED when the device doesn't render with D3D12.
+ *
+ * Lifetimes:
+ * The objects that `out_result` names stay valid until you release the
+ * device. Add a reference of your own to keep one longer.
+ */
+MLN_BINDING("platforms=windows")
+MLN_API mln_status mln_gpu_device_get_d3d12_context(
+  mln_gpu_device device,
+  mln_gpu_device_d3d12_context_result* out_result MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

@@ -44,6 +44,11 @@ pub const diagnostic_message_capacity: u32 = 4096;
 /// See `MLN_FRAME_DEMAND_TOKEN_STILL_IMAGE` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const frame_demand_token_still_image: u64 = 18446744073709551615;
+/// The most events that one input or tick reports.
+///
+/// See `MLN_GESTURE_RESULT_EVENT_CAPACITY` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const gesture_result_event_capacity: i32 = 4;
 /// The most textures that a render session's texture ring can have.
 ///
 /// See `MLN_TEXTURE_RING_MAX_DEPTH` in the
@@ -103,6 +108,27 @@ pub const AcquiredFrame = struct {
     pub const getAndroidHardwareBuffer = if (builtin.abi.isAndroid()) struct {
         fn function(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
             return call.scopedView("mln_acquired_frame_get_android_hardware_buffer", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", AndroidHardwareBufferFrame, self, context, use, diagnostic);
+        }
+    }.function else {};
+
+    /// Gets the D3D12 texture of an acquired frame.
+    ///
+    /// It gets a borrowed ring's texture, or an exported ring's on a D3D12 device:
+    /// the resource whose memory the ring shares, and the frame's depth resource
+    /// with `RenderSessionAttachOptions.keep_depth`. Wait for
+    /// `AcquiredFrame.getProducerSync()` before you use them.
+    ///
+    /// See `mln_acquired_frame_get_d3d12_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when the frame isn't of a D3D12 device.
+    /// - `error.TargetLost` when the session failed, or you detached, abandoned, or
+    ///   disposed it.
+    pub const getD3d12Texture = if (builtin.os.tag == .windows) struct {
+        fn function(self: AcquiredFrame, context: anytype, comptime use: anytype, diagnostic: ?*diagnostics.Diagnostic) call.ViewResult(@TypeOf(use)) {
+            return call.scopedView("mln_acquired_frame_get_d3d12_texture", "mln_acquired_frame_view_begin", "mln_acquired_frame_view_end", D3d12TextureFrame, self, context, use, diagnostic);
         }
     }.function else {};
 
@@ -316,17 +342,17 @@ pub const AcquiredFrame = struct {
     }
 };
 
-/// Demands render sessions' frames at a display's refreshes.
+/// A gesture recognizer that moves a map's camera.
 ///
-/// See `mln_frame_pacer` in the
+/// See `mln_gesture_recognizer` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const FramePacer = struct {
+pub const GestureRecognizer = struct {
     raw: u64,
     closed: bool = false,
-    pub const native_name = "mln_frame_pacer";
-    const methods = owner.Handle(@This(), "FramePacer", struct {
+    pub const native_name = "mln_gesture_recognizer";
+    const methods = owner.Handle(@This(), "GestureRecognizer", struct {
         fn dispose(raw: u64) status.Error!void {
-            c.mln_frame_pacer_release(raw);
+            c.mln_gesture_recognizer_release(raw);
         }
     }.dispose);
     pub const adopt = methods.adopt;
@@ -334,76 +360,51 @@ pub const FramePacer = struct {
     pub const isClosed = methods.isClosed;
     pub const format = methods.format;
     pub const deinit = methods.deinit;
-    /// Creates a frame pacer that follows the platform's display.
+    /// Handles one input at `time_ms`, in milliseconds on any clock that only goes
+    /// forward, the same for every input and frame.
     ///
-    /// On iOS, macOS, and tvOS, the pacer follows the display through a
-    /// `CADisplayLink`. You can call it on any thread, and the pacer needs no run
-    /// loop of yours. On macOS, it follows the main display, the one with the menu
-    /// bar. With `FramePacerOptions.maximum_frames_per_second`, the pacer also asks
-    /// the system for that refresh rate. On iPhone, a rate above 60 needs
-    /// `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
-    ///
-    /// On Android, the pacer follows the display through the calling thread's
-    /// `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
-    /// main thread, and keep that thread running its looper while sessions use the
-    /// pacer. `AChoreographer` can stop while the phone's display is off, even
-    /// while a Surface on another display, such as an Android Auto projection,
-    /// still shows the map. The pacer then keeps demanding frames from a timer on
-    /// the looper, within the frame rate limit, until vsyncs arrive again.
-    ///
-    /// On OpenHarmony, the pacer follows the display through `OH_NativeVSync`. You
-    /// can call it on any thread, and the pacer needs no event loop of yours.
-    ///
-    /// See `mln_frame_pacer_create` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    /// See `mln_gesture_recognizer_handle` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
     ///
     /// Errors:
     ///
-    /// - `error.Unsupported` on the other platforms, such as visionOS, Linux, and
-    ///   Windows, where the library has no source of display refreshes.
-    /// - `error.InvalidState` on Android when the calling thread has no `ALooper`.
-    /// - `error.NativeError` on iOS, macOS, and tvOS when the system has no display
-    ///   to follow, and on OpenHarmony when the system can't report the display's
-    ///   refreshes to the process.
-    pub fn create(options: ?FramePacerOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!FramePacer {
-        return call.invoke("mln_frame_pacer_create", .none, {}, null, diagnostic, .{ options, call.adopt(FramePacer) });
+    /// - `error.InvalidArgument` when `input` isn't a valid input.
+    pub fn handle(self: GestureRecognizer, allocator: std.mem.Allocator, input: GestureInput, time_ms: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue(GestureResult) {
+        return call.invoke("mln_gesture_recognizer_handle", .handle, self, allocator, diagnostic, .{ input, time_ms, call.sizedOut(OwnedValue(GestureResult)) });
     }
 
-    /// Releases a frame pacer.
+    /// Releases a gesture recognizer. A glide it started keeps going.
     ///
-    /// Render sessions that use the pacer stay paced until you release them or set
-    /// another pacer.
-    ///
-    /// See `mln_frame_pacer_release` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn release(self: *FramePacer) void {
+    /// See `mln_gesture_recognizer_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    pub fn release(self: *GestureRecognizer) void {
         if (self.closed) return;
-        c.mln_frame_pacer_release(self.raw);
+        c.mln_gesture_recognizer_release(self.raw);
         self.closed = true;
     }
 
-    /// Changes a frame pacer's settings.
+    /// Changes the settings whose bits are set, from the next input on.
     ///
-    /// Settings that `options` doesn't set keep their current values. To remove the
-    /// frame rate limit, set `FramePacerOptions.unlimited_frames_per_second`. You
-    /// can call it on any thread.
-    ///
-    /// The sessions that the pacer serves follow the new settings from the next
-    /// display refresh, including a refresh that they already wait for. The pacer
-    /// counts a new limit from the last frames it demanded, so a higher limit can
-    /// demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also asks
-    /// the system for the new limit's refresh rate, or for the display's own rate
-    /// once the limit is removed.
-    ///
-    /// See `mln_frame_pacer_set_options` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    /// See `mln_gesture_recognizer_set_options` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
     ///
     /// Errors:
     ///
-    /// - `error.InvalidState` when you released `pacer`, even while sessions still
-    ///   use it.
-    pub fn setOptions(self: FramePacer, options: FramePacerOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        return call.invoke("mln_frame_pacer_set_options", .handle, self, null, diagnostic, .{options});
+    /// - `error.InvalidArgument` when an option is out of range.
+    pub fn setOptions(self: GestureRecognizer, allocator: std.mem.Allocator, options: GestureOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        return call.invoke("mln_gesture_recognizer_set_options", .handle, self, allocator, diagnostic, .{options});
+    }
+
+    /// Times long presses, steps the eases of discrete deltas, ends deltas once
+    /// they idle, and samples the camera for notches, at `time_ms` on the inputs'
+    /// clock. Call it when the last result's `next_tick` says: on the next display
+    /// frame, or at its time with a frame or a timer. A tick at any other time does
+    /// no harm.
+    ///
+    /// See `mln_gesture_recognizer_tick` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    pub fn tick(self: GestureRecognizer, allocator: std.mem.Allocator, time_ms: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue(GestureResult) {
+        return call.invoke("mln_gesture_recognizer_tick", .handle, self, allocator, diagnostic, .{ time_ms, call.sizedOut(OwnedValue(GestureResult)) });
     }
 };
 
@@ -442,12 +443,12 @@ pub const GpuDevice = struct {
     /// - `error.Unsupported` when this build or platform lacks `backend`, when the
     ///   device can't render with `open_gl_client_api`, when options name a GPU
     ///   that the backend can't select (an OpenGL device takes no `adapter_index`,
-    ///   `adapter_uuid`, or `adapter_luid`, and only a Vulkan device takes
-    ///   `adapter_uuid` or `adapter_luid`), when a device that doesn't render with
-    ///   Vulkan gets a `queue_lock`, or in a browser for every backend: WebGPU
-    ///   makes devices asynchronously, and a WebGL2 context needs a canvas. Attach
-    ///   without a device, which the session makes itself, or wrap your WebGL2
-    ///   context.
+    ///   `adapter_uuid`, or `adapter_luid`, only a Vulkan device takes
+    ///   `adapter_uuid`, and only a Vulkan or D3D12 device `adapter_luid`), when a
+    ///   device that doesn't render with Vulkan gets a `queue_lock`, or in a
+    ///   browser for every backend: WebGPU makes devices asynchronously, and a
+    ///   WebGL2 context needs a canvas. Attach without a device, which the session
+    ///   makes itself, or wrap your WebGL2 context.
     /// - `error.NotFound` when no GPU matches `adapter_index`, `adapter_uuid`, or
     ///   `adapter_luid`.
     /// - `error.NativeError` when the platform can't create the device.
@@ -465,6 +466,24 @@ pub const GpuDevice = struct {
     pub fn getCapabilities(self: GpuDevice, diagnostic: ?*diagnostics.Diagnostic) status.Error!GpuDeviceCapabilities {
         return call.invoke("mln_gpu_device_get_capabilities", .handle, self, null, diagnostic, .{call.sizedOut(GpuDeviceCapabilities)});
     }
+
+    /// Gets the D3D12 device and direct command queue of a D3D12 device.
+    ///
+    /// Use them to make the textures of a borrowed ring that sessions on the device
+    /// render into, and to submit your reads of them, which the queue orders after
+    /// the frames submitted before them.
+    ///
+    /// See `mln_gpu_device_get_d3d12_context` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when the device doesn't render with D3D12.
+    pub const getD3d12Context = if (builtin.os.tag == .windows) struct {
+        fn function(self: GpuDevice, diagnostic: ?*diagnostics.Diagnostic) status.Error!GpuDeviceD3d12ContextResult {
+            return call.invoke("mln_gpu_device_get_d3d12_context", .handle, self, null, diagnostic, .{call.sizedOut(GpuDeviceD3d12ContextResult)});
+        }
+    }.function else {};
 
     /// Gets the Vulkan instance, device, and graphics queue of a Vulkan device.
     ///
@@ -497,6 +516,28 @@ pub const GpuDevice = struct {
         c.mln_gpu_device_release(self.raw);
         self.closed = true;
     }
+
+    /// Wraps your D3D12 device and direct command queue, so that sessions render on
+    /// them.
+    ///
+    /// Sessions on the device render into your textures and submit to your queue.
+    ///
+    /// See `mln_gpu_device_wrap_d3d12` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.Unsupported` when `supportedRenderBackendMask()` lacks
+    ///   `RenderBackendFlag.d3d12`, when the device runs no shader model 6.0, when
+    ///   `command_queue` isn't a direct queue of `device`, or when the library
+    ///   can't load DXC (`dxcompiler.dll`) to compile its shaders.
+    /// - `error.InvalidArgument` when `device` or `command_queue` isn't of its
+    ///   interface.
+    pub const wrapD3d12 = if (builtin.os.tag == .windows) struct {
+        fn function(descriptor: D3d12DeviceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!GpuDevice {
+            return call.invoke("mln_gpu_device_wrap_d3d12", .none, {}, null, diagnostic, .{ descriptor, call.adopt(GpuDevice) });
+        }
+    }.function else {};
 
     /// Wraps your Metal device and command queue, so that sessions render on them.
     ///
@@ -584,6 +625,22 @@ pub const Map = struct {
     pub fn discarding(self: Map) MapDiscarding {
         return .{ .receiver = self };
     }
+    /// Creates a gesture recognizer that moves `map`'s camera.
+    ///
+    /// Its moves go to the map as camera commands, which apply asynchronously, and
+    /// the map's snapshot and camera events report them as gestures. After the map
+    /// is released, its moves do nothing. `options` may be null for every default.
+    ///
+    /// See `mln_gesture_recognizer_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument` when an option is out of range.
+    pub fn gestureRecognizerCreate(self: Map, allocator: std.mem.Allocator, options: ?GestureOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!GestureRecognizer {
+        return call.invoke("mln_gesture_recognizer_create", .handle, self, allocator, diagnostic, .{ options, call.adopt(GestureRecognizer) });
+    }
+
     /// Adds a source whose GeoJSON tiles come from callbacks.
     ///
     /// See `mln_map_add_custom_geometry_source` in the
@@ -721,7 +778,7 @@ pub const Map = struct {
         return call.submit("mln_map_add_style_source_json", .handle, self, call.command, null, diagnostic, .{ source_id, source_json });
     }
 
-    /// Moves the camera relative to where it is, as a gesture does.
+    /// Moves the camera relative to where it is.
     ///
     /// `delta` can pan the map's content by an offset on the screen, scale the
     /// zoom, and add to the bearing and pitch. An anchor keeps one screen point in
@@ -733,19 +790,6 @@ pub const Map = struct {
     /// A delta that replaces an animated one starts from where that animation left
     /// the camera, so the rest of the replaced change never happens. To reach an
     /// exact camera, use `Map.updateCamera()`.
-    ///
-    /// A delta in the end phase can carry momentum, which keeps the camera moving
-    /// from the gesture's release velocities and slows it on each rendered frame.
-    /// The gesture lasts until the momentum ends: the snapshot keeps
-    /// `gesture_in_progress` set, and camera events report
-    /// `CameraChangeSource.momentum`. With momentum, `animation` sets only
-    /// `transition_id` and the end handler, which runs when the gesture ends.
-    ///
-    /// A delta in the begin phase, `Map.cancelCameraTransitions()`, or a
-    /// cancellation by that ID stops the momentum. A later command that sets a
-    /// field stops only the parts of the momentum that move that field. On a tilted
-    /// map, the pan moves the map's content the same distance on the screen in
-    /// every direction.
     ///
     /// See `mln_map_apply_camera_delta` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1365,6 +1409,12 @@ pub const Map = struct {
     ///
     /// See `mln_map_set_bounds` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidArgument`, changing nothing, when the minimum zoom would be
+    ///   above the maximum zoom, the minimum pitch above the maximum pitch, or the
+    ///   maximum zoom below the lowest zoom the map can show at its size.
     pub fn setBounds(self: Map, options: BoundOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_bounds", .handle, self, call.command, null, diagnostic, .{options});
     }
@@ -2065,7 +2115,10 @@ pub const RenderSession = struct {
     /// Asks the session to render a frame.
     ///
     /// The frame shows the map commands that you sent before the call, except the
-    /// changes that an open command group holds back.
+    /// changes that an open command group holds back, and the map's camera
+    /// animations as they are at the time of the call. Demand each frame when the
+    /// display is ready for it, so that animations move evenly.
+    /// `RenderSession.setFramePacing()` does that for you.
     ///
     /// You can call it once the attach call returns. While the attach runs, the
     /// demand waits for it to complete. Every demand finishes with one frame result
@@ -2328,18 +2381,21 @@ pub const RenderSession = struct {
     /// Use it when the platform takes a surface away, such as when your app goes to
     /// the background. Release every acquired frame first. Frame demands that are
     /// still pending, and later ones until you give the session a new target,
-    /// finish with `RenderResult.target_not_ready`. Once the release completes, you
-    /// can destroy the old target. An Android or OpenHarmony window can go away
-    /// sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
+    /// finish with `RenderResult.target_not_ready`. Once the release of a window or
+    /// surface completes, you can destroy it. An Android or OpenHarmony window can
+    /// go away sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
     ///
-    /// For a borrowed ring, a completed release also means that the session has
-    /// stopped waiting on the consumer sync that you released its frames with, so
-    /// you can reuse or destroy the textures. The session waits about a second at
-    /// most for that sync, and logs a warning when the wait runs out. It checks the
-    /// sync without blocking a thread: keep servicing a session driven by
-    /// `RenderDriverKind.caller_graphics_thread` until the release completes. The
-    /// session keeps nothing of the released textures: a texture that a later
-    /// target gives it again is a new one, even one that you discarded a frame of.
+    /// For a borrowed ring, the release completes with an `GpuSync` of
+    /// `RenderSessionCapabilities.producer_sync_kind`, or
+    /// `GpuSyncKind.cpu_complete` when the session has no textures since an earlier
+    /// release. Wait for it before you reuse or destroy the textures, as you wait
+    /// for an acquired frame's producer sync: for `GpuSyncKind.queue_order`,
+    /// destroy them once work that you submit to the queue after the completion has
+    /// finished. The session's GPU work on the textures, and its waits for the
+    /// consumer syncs that you released its frames with, end there, so keep those
+    /// syncs until then too. The session keeps nothing of the released textures: a
+    /// texture that a later target gives it again is a new one, even one that you
+    /// discarded a frame of. For another target, the completion has no value.
     ///
     /// See `mln_render_session_release_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2350,8 +2406,10 @@ pub const RenderSession = struct {
     ///   ring.
     /// - `error.TargetLost` when the session loses its target before the release
     ///   runs.
-    pub fn releaseTarget(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_render_session_release_target", .handle, self, call.unit, null, diagnostic, .{});
+    /// - `error.NativeError` when the session can't submit its work on a borrowed
+    ///   ring's textures. It keeps them then.
+    pub fn releaseTarget(self: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?GpuSync) {
+        return call.submit("mln_render_session_release_target", .handle, self, call.orNull(call.value(GpuSync, c.mln_gpu_sync)), null, diagnostic, .{});
     }
 
     /// Resizes the session's target and its map, and sets the map's scale factor.
@@ -2401,25 +2459,52 @@ pub const RenderSession = struct {
         return call.invoke("mln_render_session_service_driver_work", .handle, self, null, diagnostic, .{});
     }
 
-    /// Sets the frame pacer that demands the session's frames.
+    /// Paces the session's frames to the display.
     ///
     /// At the first display refresh after the session has something new to draw,
-    /// `pacer` demands a frame without flags and with token 0. One pacer can serve
-    /// many sessions. A null `pacer` stops pacing the session. You can call it once
-    /// the attach call returns.
+    /// the library demands a frame without flags and with token 0, unless you
+    /// demanded one first. Each call replaces the session's pacing, and a null
+    /// `options` stops it. You can call it once the attach call returns.
     ///
-    /// See `mln_render_session_set_frame_pacer` in the
+    /// On iOS, macOS, and tvOS, the library uses a `CADisplayLink` on a thread of
+    /// its own. With `FramePacingOptions.view`, call it on the main thread. The
+    /// library asks the system for the frame rate limit's refresh rate. On iPhone,
+    /// a rate above 60 needs `CADisableMinimumFrameDurationOnPhone` in the app's
+    /// `Info.plist`.
+    ///
+    /// On Android, the library follows the display through the calling thread's
+    /// `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
+    /// main thread, and keep that thread running its looper while the session is
+    /// paced. `AChoreographer` can stop while the phone's display is off, even
+    /// while a Surface on another display, such as an Android Auto projection,
+    /// still shows the map. The library then keeps demanding frames from a timer on
+    /// the looper, within the frame rate limit, until vsyncs arrive again.
+    ///
+    /// On OpenHarmony, the library uses `OH_NativeVSync`, from any thread.
+    ///
+    /// See `mln_render_session_set_frame_pacing` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     ///
     /// Errors:
     ///
+    /// - `error.InvalidArgument` when `options` sets `maximum_frames_per_second` to
+    ///   0, or sets `view` to null.
+    /// - `error.Unsupported` on the other platforms, such as visionOS, Linux, and
+    ///   Windows, where the library has no source of display refreshes, on macOS
+    ///   before 14, and when `options` sets `view` on a platform other than macOS,
+    ///   iOS, and tvOS.
     /// - `error.TargetLost` or `error.NativeError`, as
     ///   `RenderSessionSnapshot.failure_status` reports, when the session has
     ///   failed.
     /// - `error.InvalidState` when you attached the session with a redraw wake, or
-    ///   detached, abandoned, released, or disposed it.
-    pub fn setFramePacer(self: RenderSession, pacer: ?FramePacer, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        return call.invoke("mln_render_session_set_frame_pacer", .handle, self, null, diagnostic, .{pacer});
+    ///   detached, abandoned, released, or disposed it, on Android when the calling
+    ///   thread has no `ALooper`, and when `options` sets `view` off the main
+    ///   thread or, on iOS and tvOS, to a view in no window.
+    /// - `error.NativeError` on iOS, macOS, and tvOS when the system has no display
+    ///   to follow, and on OpenHarmony when the system can't report the display's
+    ///   refreshes to the process.
+    pub fn setFramePacing(self: RenderSession, options: ?FramePacingOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+        return call.invoke("mln_render_session_set_frame_pacing", .handle, self, null, diagnostic, .{options});
     }
 
     /// Replaces the window, surface, or borrowed ring that the session renders to,
@@ -2433,10 +2518,11 @@ pub const RenderSession = struct {
     /// ring takes only a ring of the kind it attached with, with as many textures,
     /// with depth textures only when it attached with them, and with the same
     /// formats, final layouts, and owner. Release every acquired frame of a
-    /// borrowed ring first. Once the replacement completes, the session has also
-    /// stopped waiting on the consumer sync of the textures that the new ring
-    /// doesn't have, as `RenderSession.releaseTarget()` says, so you can reuse or
-    /// destroy them.
+    /// borrowed ring first. For a borrowed ring, the replacement completes with an
+    /// `GpuSync`: wait for it before you reuse or destroy the textures that the new
+    /// ring doesn't have, as `RenderSession.releaseTarget()` says. When it lets go
+    /// of no textures, such as after a release, the sync is
+    /// `GpuSyncKind.cpu_complete`. For another target, the completion has no value.
     ///
     /// See `mln_render_session_set_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2460,8 +2546,8 @@ pub const RenderSession = struct {
     ///   their formats, final layouts, or owner, or in having depth textures.
     ///   Attach a new session instead.
     /// - `error.NativeError` when the library can't render to the new target.
-    pub fn setTarget(self: RenderSession, allocator: std.mem.Allocator, target: RenderTarget, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-        return call.submit("mln_render_session_set_target", .handle, self, call.unit, allocator, diagnostic, .{target});
+    pub fn setTarget(self: RenderSession, allocator: std.mem.Allocator, target: RenderTarget, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?GpuSync) {
+        return call.submit("mln_render_session_set_target", .handle, self, call.orNull(call.value(GpuSync, c.mln_gpu_sync)), allocator, diagnostic, .{target});
     }
 };
 
@@ -2757,6 +2843,18 @@ pub const Runtime = struct {
         return call.submit("mln_runtime_get_offline_region", .handle, self, call.orNull(call.value(OwnedValue(OfflineRegionInfo), c.mln_offline_region_info)), allocator, diagnostic, .{region_id});
     }
 
+    /// Reads how long the resources of the offline region `region_id` stay usable.
+    ///
+    /// See `mln_runtime_get_offline_region_expiry` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.NotFound` when the cache file has no region `region_id`.
+    pub fn getOfflineRegionExpiry(self: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OfflineRegionExpiry) {
+        return call.submit("mln_runtime_get_offline_region_expiry", .handle, self, call.value(OfflineRegionExpiry, c.mln_offline_region_expiry), null, diagnostic, .{region_id});
+    }
+
     /// Reads the download progress of the offline region `region_id`.
     ///
     /// While the download is active, the counts cover what it has visited. Once
@@ -2774,14 +2872,16 @@ pub const Runtime = struct {
         return call.submit("mln_runtime_get_offline_region_status", .handle, self, call.value(OfflineRegionStatus, c.mln_offline_region_status), null, diagnostic, .{region_id});
     }
 
-    /// Makes maps check each resource of the offline region `region_id` with the
-    /// server before they use it.
+    /// Makes each resource of the offline region `region_id` stale, so maps check
+    /// it with the server when they next use it.
     ///
-    /// The region keeps its resources. Starting its download again fetches the
-    /// invalidated resources for offline use. If the style or a TileJSON document
-    /// is then missing or invalid, the download reports an offline region response
-    /// error and goes on from the stored copy. Resources that the current style no
-    /// longer lists stay in the region until it's deleted.
+    /// The region keeps its resources, and maps show them while they check them,
+    /// except those that the server requires checking first. Starting the region's
+    /// download again checks every resource with the server. If the style or a
+    /// TileJSON document is then missing or invalid, the download reports an
+    /// offline region response error and goes on from the stored copy. Resources
+    /// that the current style no longer lists stay in the region until it's
+    /// deleted.
     ///
     /// See `mln_runtime_invalidate_offline_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2880,8 +2980,10 @@ pub const Runtime = struct {
 
     /// Starts or pauses the download of the offline region `region_id`.
     ///
-    /// Setting the state that the download already has does nothing. A download
-    /// stops when the runtime closes.
+    /// A download fetches the resources that the region lacks, and checks those
+    /// that are stale with the server, keeping each stored copy until its refresh
+    /// arrives. Setting the state that the download already has does nothing. A
+    /// download stops when the runtime closes.
     ///
     /// See `mln_runtime_set_offline_region_download_state` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3014,41 +3116,6 @@ pub const StyleExpression = struct {
         if (self.closed) return;
         c.mln_style_expression_release(self.raw);
         self.closed = true;
-    }
-};
-
-/// How a gesture's zoom, bearing, or pitch keeps changing after release.
-///
-/// See `mln_anchored_momentum` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const AnchoredMomentum = struct {
-    /// How fast the value changed at release: zoom levels per second for zoom,
-    /// and degrees per second for bearing and pitch. The part moves only when
-    /// this is set.
-    velocity: ?f64 = null,
-    /// The screen point that the change keeps in place. Without one, the change
-    /// keeps the center of the view in place.
-    anchor: ?ScreenPoint = null,
-    decay: MomentumDecay = .{},
-    /// Where the part settles. Without this, it stays where the gesture and its
-    /// glide leave it.
-    snap: ?MomentumSnap = null,
-    pub fn toNative(self: AnchoredMomentum) c.mln_anchored_momentum {
-        var raw = std.mem.zeroes(c.mln_anchored_momentum);
-        raw.fields = 0;
-        marshal.present(&raw.fields, c.MLN_ANCHORED_MOMENTUM_VELOCITY, &raw.velocity, self.velocity);
-        marshal.present(&raw.fields, c.MLN_ANCHORED_MOMENTUM_ANCHOR, &raw.anchor, self.anchor);
-        raw.decay = self.decay.toNative();
-        marshal.present(&raw.fields, c.MLN_ANCHORED_MOMENTUM_SNAP, &raw.snap, self.snap);
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_anchored_momentum) AnchoredMomentum {
-        return .{
-            .velocity = if (raw.fields & c.MLN_ANCHORED_MOMENTUM_VELOCITY != 0) raw.velocity else null,
-            .anchor = if (raw.fields & c.MLN_ANCHORED_MOMENTUM_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
-            .decay = MomentumDecay.fromNative(raw.decay),
-            .snap = if (raw.fields & c.MLN_ANCHORED_MOMENTUM_SNAP != 0) MomentumSnap.fromNative(raw.snap) else null,
-        };
     }
 };
 
@@ -3205,8 +3272,9 @@ pub const CacheDatabaseOperation = enum(u32) {
     /// Deletes the ambient cache's resources and frees the space they used.
     /// Offline regions keep their resources.
     clear = 1,
-    /// Keeps the ambient cache's resources, but makes maps check each one with
-    /// the server before they use it again. Offline regions keep their
+    /// Keeps the ambient cache's resources, but makes them stale: maps check
+    /// each one with the server when they next use it, and show it meanwhile
+    /// unless the server requires checking it first. Offline regions keep their
     /// resources as they are.
     invalidate = 2,
     /// Compacts the whole database file to free the disk space that it no
@@ -3328,16 +3396,16 @@ pub const CameraChangeSource = enum(u32) {
     /// A camera command outside a gesture, or the map itself, as when a resize
     /// keeps the camera within its bounds.
     command = 0,
-    /// A camera command with a gesture phase.
+    /// A gesture that a gesture recognizer recognized.
     gesture = 1,
-    /// The momentum and bearing snap that a gesture's end started.
+    /// The glide and snap after a gesture recognizer's gesture.
     momentum = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// A change to the camera from where it is now, for gestures.
+/// A change to the camera from where it is now.
 ///
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3354,11 +3422,7 @@ pub const CameraDelta = struct {
     /// needs one of them, and it combines with `offset` only in a delta without
     /// a duration.
     anchor: ?ScreenPoint = null,
-    /// How the gesture keeps moving after this delta. Only a delta in the
-    /// `GesturePhase.end` phase carries it.
-    momentum: ?GestureMomentum = null,
     animation: AnimationOptions = .{},
-    gesture_phase: GesturePhase = .none,
     pub fn toNative(self: CameraDelta, roots: *callbacks.Roots) status.Error!c.mln_camera_delta {
         var raw = std.mem.zeroes(c.mln_camera_delta);
         raw.fields = 0;
@@ -3368,9 +3432,7 @@ pub const CameraDelta = struct {
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_BEARING, &raw.bearing, self.bearing);
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_PITCH, &raw.pitch, self.pitch);
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_ANCHOR, &raw.anchor, self.anchor);
-        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_MOMENTUM, &raw.momentum, self.momentum);
         raw.animation = try self.animation.toNative(roots);
-        raw.gesture_phase = self.gesture_phase.toNative();
         return raw;
     }
 
@@ -3381,9 +3443,7 @@ pub const CameraDelta = struct {
             .bearing = if (raw.fields & c.MLN_CAMERA_DELTA_BEARING != 0) raw.bearing else null,
             .pitch = if (raw.fields & c.MLN_CAMERA_DELTA_PITCH != 0) raw.pitch else null,
             .anchor = if (raw.fields & c.MLN_CAMERA_DELTA_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
-            .momentum = if (raw.fields & c.MLN_CAMERA_DELTA_MOMENTUM != 0) GestureMomentum.fromNative(raw.momentum) else null,
             .animation = try AnimationOptions.fromNative(allocator, raw.animation),
-            .gesture_phase = GesturePhase.fromNative(raw.gesture_phase),
         };
     }
 };
@@ -3524,15 +3584,10 @@ pub const CameraTransitionEnd = struct {
     /// The generation of the first map snapshot that shows where the change
     /// left the camera, or 0 when the map closed first.
     generation: u64 = 0,
-    /// How fast a gesture's momentum still moved when it was cancelled, which
-    /// the next gesture can add to its own release velocities. Zero for every
-    /// other end.
-    velocity: CameraVelocity = .{},
     pub fn fromNative(raw: c.mln_camera_transition_end) CameraTransitionEnd {
         return .{
             .outcome = CameraTransitionOutcome.fromNative(raw.outcome),
             .generation = raw.generation,
-            .velocity = CameraVelocity.fromNative(raw.velocity),
         };
     }
 };
@@ -3608,7 +3663,7 @@ pub const CameraTransitionOutcome = enum(u32) {
     /// The camera finished the change.
     completed = 0,
     /// `Map.cancelCameraTransitions()`, `Map.cancelCameraTransitionsWithId()`,
-    /// a gesture's `GesturePhase.begin` or `GesturePhase.cancel`,
+    /// a gesture that a gesture recognizer begins or cancels,
     /// `Map.setFreeCameraOptions()`, or a resize that moved the camera back
     /// inside its bounds stopped the change. A command that fails before it
     /// moves the camera also reports this.
@@ -3641,14 +3696,12 @@ pub const CameraUpdate = struct {
     mode: CameraUpdateMode = .jump,
     camera: CameraOptions = .{},
     animation: AnimationOptions = .{},
-    gesture_phase: GesturePhase = .none,
     pub fn toNative(self: CameraUpdate, roots: *callbacks.Roots) status.Error!c.mln_camera_update {
         var raw = std.mem.zeroes(c.mln_camera_update);
         raw.size = @sizeOf(c.mln_camera_update);
         raw.mode = self.mode.toNative();
         raw.camera = self.camera.toNative();
         raw.animation = try self.animation.toNative(roots);
-        raw.gesture_phase = self.gesture_phase.toNative();
         return raw;
     }
 
@@ -3657,7 +3710,6 @@ pub const CameraUpdate = struct {
             .mode = CameraUpdateMode.fromNative(raw.mode),
             .camera = CameraOptions.fromNative(raw.camera),
             .animation = try AnimationOptions.fromNative(allocator, raw.animation),
-            .gesture_phase = GesturePhase.fromNative(raw.gesture_phase),
         };
     }
 };
@@ -3676,30 +3728,6 @@ pub const CameraUpdateMode = enum(u32) {
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
-};
-
-/// How fast each part of a camera change moves.
-///
-/// See `mln_camera_velocity` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const CameraVelocity = struct {
-    /// How fast the map's content moves on the screen, in logical pixels per
-    /// second.
-    pan: ScreenPoint = .{},
-    /// In zoom levels per second.
-    zoom: f64 = 0,
-    /// In degrees per second.
-    bearing: f64 = 0,
-    /// In degrees per second.
-    pitch: f64 = 0,
-    pub fn fromNative(raw: c.mln_camera_velocity) CameraVelocity {
-        return .{
-            .pan = ScreenPoint.fromNative(raw.pan),
-            .zoom = raw.zoom,
-            .bearing = raw.bearing,
-            .pitch = raw.pitch,
-        };
-    }
 };
 
 /// A tile's zoom level `z`, column `x`, and row `y`, with row 0 at the north.
@@ -3870,6 +3898,7 @@ pub const CustomLayerEncoderData = union(enum) {
     metal: MetalCustomLayerEncoder,
     vulkan: VulkanCustomLayerEncoder,
     web_gpu: WebGpuCustomLayerEncoder,
+    d3d12: D3d12CustomLayerEncoder,
     empty,
     unknown: u32,
 };
@@ -4043,6 +4072,7 @@ pub const CustomLayerPassData = union(enum) {
     vulkan: VulkanCustomLayerPass,
     open_gl: OpenGlCustomLayerPass,
     web_gpu: WebGpuCustomLayerPass,
+    d3d12: D3d12CustomLayerPass,
     unknown: u32,
 };
 
@@ -4061,6 +4091,7 @@ pub const CustomLayerPrerenderParameters = struct {
                 c.MLN_RENDER_BACKEND_METAL => .{ .metal = MetalCustomLayerEncoder.fromNative(raw.encoder.metal) },
                 c.MLN_RENDER_BACKEND_VULKAN => .{ .vulkan = VulkanCustomLayerEncoder.fromNative(raw.encoder.vulkan) },
                 c.MLN_RENDER_BACKEND_WEB_GPU => .{ .web_gpu = WebGpuCustomLayerEncoder.fromNative(raw.encoder.web_gpu) },
+                c.MLN_RENDER_BACKEND_D3D12 => .{ .d3d12 = D3d12CustomLayerEncoder.fromNative(raw.encoder.d3d12) },
                 c.MLN_RENDER_BACKEND_OPEN_GL => .empty,
                 else => |tag| .{ .unknown = @intCast(tag) },
             },
@@ -4094,6 +4125,7 @@ pub const CustomLayerRenderParameters = struct {
                 c.MLN_RENDER_BACKEND_VULKAN => .{ .vulkan = VulkanCustomLayerPass.fromNative(raw.pass.vulkan) },
                 c.MLN_RENDER_BACKEND_OPEN_GL => .{ .open_gl = OpenGlCustomLayerPass.fromNative(raw.pass.open_gl) },
                 c.MLN_RENDER_BACKEND_WEB_GPU => .{ .web_gpu = try WebGpuCustomLayerPass.fromNative(raw.pass.web_gpu) },
+                c.MLN_RENDER_BACKEND_D3D12 => .{ .d3d12 = D3d12CustomLayerPass.fromNative(raw.pass.d3d12) },
                 else => |tag| .{ .unknown = @intCast(tag) },
             },
             .frame = CustomLayerFrame.fromNative(raw.frame),
@@ -4181,6 +4213,287 @@ pub const CustomVectorSourceOptions = struct {
                     return cancel_tile(@as(Context, @ptrCast(@alignCast(erased.?))), argument_0, argument_1, argument_2);
                 }
             }.call,
+        };
+    }
+};
+
+/// A D3D12 texture of a borrowed ring.
+///
+/// See `mln_d3d12_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const D3d12BorrowedTexture = struct {
+    /// Your `ID3D12Resource`.
+    resource: ?*anyopaque,
+    pub fn toNative(self: D3d12BorrowedTexture) c.mln_d3d12_borrowed_texture {
+        var raw = std.mem.zeroes(c.mln_d3d12_borrowed_texture);
+        raw.resource = self.resource;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_d3d12_borrowed_texture) D3d12BorrowedTexture {
+        return .{
+            .resource = raw.resource,
+        };
+    }
+};
+
+/// A ring of your D3D12 textures to render into, on the D3D12 device that you
+/// attach on.
+///
+/// `physical_width` and `physical_height` give the textures' size in pixels,
+/// which is usually `logical_size` times the map's scale factor. Each texture
+/// must be a 2D resource of the device with that size, one mip level, one array
+/// slice, one sample, `D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET`, and one typed
+/// color format that the device renders into, such as
+/// DXGI_FORMAT_R8G8B8A8_UNORM or DXGI_FORMAT_B8G8R8A8_UNORM. The ring holds up
+/// to `texture_ring_max_depth` distinct textures, and references each.
+///
+/// Each texture is in `state` when the session has it, and each frame leaves it
+/// there.
+///
+/// Give the ring `depth_textures` to draw into each frame depth-tested against
+/// the map, as `FrameProjection` says: one for each of `textures`, at the same
+/// index, or none. Each frame clears the one at its slot, renders the map's
+/// depth and stencil into it, stores them, and leaves it in `depth_state`. They
+/// must have the size of `textures`, one format of
+/// `GpuDeviceCapabilities.depth_stencil_formats` (DXGI_FORMAT_D24_UNORM_S8_UINT
+/// or DXGI_FORMAT_D32_FLOAT_S8X24_UINT), one sample, and
+/// `D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL`.
+///
+/// See `mln_d3d12_borrowed_textures_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const D3d12BorrowedTexturesTarget = struct {
+    logical_size: LogicalSize,
+    physical_width: u32,
+    physical_height: u32,
+    textures: []const D3d12BorrowedTexture,
+    /// The textures' `D3D12_RESOURCE_STATES`.
+    state: u32 = 0,
+    depth_textures: []const D3d12BorrowedTexture = &.{},
+    /// The depth textures' `D3D12_RESOURCE_STATES`.
+    depth_state: u32 = 0,
+    pub fn toNative(self: D3d12BorrowedTexturesTarget, allocator: std.mem.Allocator) status.Error!c.mln_d3d12_borrowed_textures_target {
+        var raw = std.mem.zeroes(c.mln_d3d12_borrowed_textures_target);
+        raw.logical_size = self.logical_size.toNative();
+        raw.physical_width = self.physical_width;
+        raw.physical_height = self.physical_height;
+        raw.textures = blk: {
+            const items = try allocator.alloc(c.mln_d3d12_borrowed_texture, self.textures.len);
+            for (self.textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.texture_count = std.math.cast(@TypeOf(raw.texture_count), self.textures.len) orelse return error.InvalidArgument;
+        raw.state = self.state;
+        raw.depth_textures = blk: {
+            const items = try allocator.alloc(c.mln_d3d12_borrowed_texture, self.depth_textures.len);
+            for (self.depth_textures, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.depth_texture_count = std.math.cast(@TypeOf(raw.depth_texture_count), self.depth_textures.len) orelse return error.InvalidArgument;
+        raw.depth_state = self.depth_state;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_d3d12_borrowed_textures_target) status.Error!D3d12BorrowedTexturesTarget {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .physical_width = raw.physical_width,
+            .physical_height = raw.physical_height,
+            .textures = blk: {
+                const copied = try allocator.alloc(D3d12BorrowedTexture, raw.texture_count);
+                for (try marshal.nativeSlice(c.mln_d3d12_borrowed_texture, raw.textures, raw.texture_count), 0..) |item, index| copied[index] = D3d12BorrowedTexture.fromNative(item);
+                break :blk copied;
+            },
+            .state = raw.state,
+            .depth_textures = blk: {
+                const copied = try allocator.alloc(D3d12BorrowedTexture, raw.depth_texture_count);
+                for (try marshal.nativeSlice(c.mln_d3d12_borrowed_texture, raw.depth_textures, raw.depth_texture_count), 0..) |item, index| copied[index] = D3d12BorrowedTexture.fromNative(item);
+                break :blk copied;
+            },
+            .depth_state = raw.depth_state,
+        };
+    }
+};
+
+/// What shows a D3D12 composition swap chain.
+///
+/// See `mln_d3d12_composition_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const D3d12CompositionKind = enum(u32) {
+    /// An `IDCompositionVisual`, whose content the session sets to its swap
+    /// chain.
+    visual = 1,
+    /// A XAML `SwapChainPanel`'s `ISwapChainPanelNative`, of WinUI or UWP,
+    /// whose swap chain the session sets.
+    swap_chain_panel = 2,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// A composition swap chain to present to, which your DirectComposition visual
+/// or XAML `SwapChainPanel` shows.
+///
+/// The session renders on D3D12: on the D3D12 device that you attach on, or on
+/// one that it makes without a device. It makes a flip-model swap chain for
+/// composition of `logical_size` at the map's scale factor, with premultiplied
+/// alpha, and sets it as the visual's content or the panel's swap chain. Commit
+/// your DirectComposition device once the attach completes. A panel takes its
+/// swap chain only on its UI thread: attach it there with
+/// `RenderDriverKind.caller_graphics_thread`, and service the session there.
+/// Scale the visual or the panel to show the swap chain at the display's scale.
+/// The session references `object` until a replacement or release of the target
+/// completes, or the session ends.
+///
+/// See `mln_d3d12_composition_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub const D3d12CompositionTarget = struct {
+    logical_size: LogicalSize,
+    kind: D3d12CompositionKind,
+    /// Your `IDCompositionVisual*` or `ISwapChainPanelNative*`.
+    object: ?*anyopaque,
+    pub fn toNative(self: D3d12CompositionTarget) c.mln_d3d12_composition_target {
+        var raw = std.mem.zeroes(c.mln_d3d12_composition_target);
+        raw.logical_size = self.logical_size.toNative();
+        raw.kind = self.kind.toNative();
+        raw.object = self.object;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_d3d12_composition_target) D3d12CompositionTarget {
+        return .{
+            .logical_size = LogicalSize.fromNative(raw.logical_size),
+            .kind = D3d12CompositionKind.fromNative(raw.kind),
+            .object = raw.object,
+        };
+    }
+};
+
+/// The frame's D3D12 command list, outside the map's render pass.
+///
+/// Record work such as copies and render passes of your own, with the barriers
+/// that it needs, and leave the resources that you use in the states that you
+/// found them in. Don't close or execute `command_list`. After the callback
+/// returns, the map sets its own descriptor heaps and root signature again.
+///
+/// See `mln_d3d12_custom_layer_encoder` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const D3d12CustomLayerEncoder = struct {
+    /// The `ID3D12Device` that the session renders on, to make objects with.
+    device: ?*anyopaque = null,
+    /// The frame's `ID3D12GraphicsCommandList`, outside a render pass.
+    command_list: ?*anyopaque = null,
+    pub fn fromNative(raw: c.mln_d3d12_custom_layer_encoder) D3d12CustomLayerEncoder {
+        return .{
+            .device = raw.device,
+            .command_list = raw.command_list,
+        };
+    }
+};
+
+/// The map's D3D12 render pass, at a custom layer's place in the style.
+///
+/// Set your own pipeline state, root signature, descriptor heaps, vertex and
+/// index buffers, primitive topology, viewport, scissor rectangle, and stencil
+/// reference, with pipeline states for `color_format` and
+/// `depth_stencil_format`, and draw. After the callback returns, the map sets
+/// again what its own draws need. Record nothing that a render pass can't hold,
+/// such as barriers, copies, or other render targets, and don't end the pass.
+///
+/// See `mln_d3d12_custom_layer_pass` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const D3d12CustomLayerPass = struct {
+    /// The `ID3D12Device` that the session renders on, to make objects with.
+    device: ?*anyopaque = null,
+    /// The frame's `ID3D12GraphicsCommandList`, in the render pass that
+    /// `BeginRenderPass` began.
+    command_list: ?*anyopaque = null,
+    /// The `D3D12_CPU_DESCRIPTOR_HANDLE` of the pass's render target view.
+    render_target_view: u64 = 0,
+    /// The `DXGI_FORMAT` of the pass's color attachment.
+    color_format: u32 = 0,
+    /// The `D3D12_CPU_DESCRIPTOR_HANDLE` of the pass's depth-stencil view, or 0
+    /// when it has none.
+    depth_stencil_view: u64 = 0,
+    /// The `DXGI_FORMAT` of the pass's depth-stencil attachment, or
+    /// `DXGI_FORMAT_UNKNOWN` when it has none.
+    depth_stencil_format: u32 = 0,
+    pub fn fromNative(raw: c.mln_d3d12_custom_layer_pass) D3d12CustomLayerPass {
+        return .{
+            .device = raw.device,
+            .command_list = raw.command_list,
+            .render_target_view = raw.render_target_view,
+            .color_format = raw.color_format,
+            .depth_stencil_view = raw.depth_stencil_view,
+            .depth_stencil_format = raw.depth_stencil_format,
+        };
+    }
+};
+
+/// Your D3D12 device and direct command queue, for `GpuDevice.wrapD3d12()`.
+///
+/// See `mln_d3d12_device_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+pub const D3d12DeviceDescriptor = struct {
+    /// Your `ID3D12Device`.
+    device: ?*anyopaque,
+    /// Your `ID3D12CommandQueue` of `D3D12_COMMAND_LIST_TYPE_DIRECT` on
+    /// `device`, which sessions on the device submit to. Submit your reads of a
+    /// borrowed ring's textures to it for `GpuSyncKind.queue_order`.
+    command_queue: ?*anyopaque,
+    pub fn toNative(self: D3d12DeviceDescriptor) c.mln_d3d12_device_descriptor {
+        var raw = std.mem.zeroes(c.mln_d3d12_device_descriptor);
+        raw.size = @sizeOf(c.mln_d3d12_device_descriptor);
+        raw.device = self.device;
+        raw.command_queue = self.command_queue;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_d3d12_device_descriptor) D3d12DeviceDescriptor {
+        return .{
+            .device = raw.device,
+            .command_queue = raw.command_queue,
+        };
+    }
+};
+
+/// The D3D12 texture of an acquired frame.
+///
+/// The depth members are set when the frame has a depth texture, as for
+/// `MetalTextureFrame`. Otherwise they are zero.
+///
+/// See `mln_d3d12_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub const D3d12TextureFrame = struct {
+    width: u32 = 0,
+    height: u32 = 0,
+    scale_factor: f64 = 0,
+    /// The texture's index in the descriptor's `textures`, or in the ring.
+    slot: u32 = 0,
+    /// The `ID3D12Resource`.
+    resource: ?*anyopaque = null,
+    /// The resource's `ID3D12Device`.
+    device: ?*anyopaque = null,
+    /// The resource's `DXGI_FORMAT`.
+    format: u32 = 0,
+    /// The `D3D12_RESOURCE_STATES` that the frame left the resource in.
+    state: u32 = 0,
+    /// The `ID3D12Resource` that holds the frame's depth and stencil.
+    depth_resource: ?*anyopaque = null,
+    /// The depth resource's `DXGI_FORMAT`.
+    depth_format: u32 = 0,
+    /// The `D3D12_RESOURCE_STATES` that the frame left the depth resource in.
+    depth_state: u32 = 0,
+    pub fn fromNative(raw: c.mln_d3d12_texture_frame) D3d12TextureFrame {
+        return .{
+            .width = raw.width,
+            .height = raw.height,
+            .scale_factor = raw.scale_factor,
+            .slot = raw.slot,
+            .resource = raw.resource,
+            .device = raw.device,
+            .format = raw.format,
+            .state = raw.state,
+            .depth_resource = raw.depth_resource,
+            .depth_format = raw.depth_format,
+            .depth_state = raw.depth_state,
         };
     }
 };
@@ -4391,11 +4704,15 @@ pub const EglContextDescriptor = struct {
 ///   AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
 ///   `android_hardware_buffer_usage`. Get each frame's buffer with
 ///   `AcquiredFrame.getAndroidHardwareBuffer()`.
-/// - `GpuExportKind.dxgi_shared_handle`: D3D11 textures of the format
+/// - `GpuExportKind.dxgi_shared_handle`: textures of the format
 ///   DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
-///   resources and render targets. Open them on a D3D11 or D3D12 device of the
-///   same adapter, which you pick with `GpuDeviceOptions.adapter_luid`. Get
-///   each frame's texture with `AcquiredFrame.getDxgiSharedTexture()`.
+///   resources and render targets: D3D11 textures on a Vulkan device, and
+///   committed D3D12 resources in a shared heap on a D3D12 device, which each
+///   frame leaves in D3D12_RESOURCE_STATE_COMMON. Open them on a D3D11 or D3D12
+///   device of the same adapter, which you pick with
+///   `GpuDeviceOptions.adapter_luid`. Get each frame's texture with
+///   `AcquiredFrame.getDxgiSharedTexture()`, and on a D3D12 device its resource
+///   with `AcquiredFrame.getD3d12Texture()`.
 /// - `GpuExportKind.dma_buf`: dmabufs of a format and modifier from
 ///   `dma_buf_formats`. Get each frame's buffer with
 ///   `AcquiredFrame.getDmaBuf()`.
@@ -4412,10 +4729,11 @@ pub const EglContextDescriptor = struct {
 ///
 /// Each frame hands over with `GpuSyncKind.cpu_complete` or with the sync kind
 /// that crosses APIs on its platform: `GpuSyncKind.metal_shared_event` for an
-/// IOSurface, and `GpuSyncKind.sync_fd` for the others, where the device has
-/// them. For a reader that waits on neither, such as a Wayland compositor
-/// without explicit synchronization or Flutter's `copyPixelBuffer`, leave them
-/// out of `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
+/// IOSurface, `GpuSyncKind.d3d12_fence` for a DXGI shared texture, and
+/// `GpuSyncKind.sync_fd` for the others, where the device has them. For a
+/// reader that waits on neither, such as a Wayland compositor without explicit
+/// synchronization or Flutter's `copyPixelBuffer`, leave them out of
+/// `RenderSessionAttachOptions.producer_sync_kinds`, so that each frame
 /// finishes before you acquire it, and release each frame only once the reader
 /// is done with its texture. Give the ring 3 textures, so the session can
 /// render while you hold two frames.
@@ -4602,30 +4920,32 @@ pub const FrameDemandFlag = struct {
     pub const toNative = methods.toNative;
 };
 
-/// Options for creating a frame pacer, or for `FramePacer.setOptions()`.
+/// Options for `RenderSession.setFramePacing()`.
 ///
-/// See `mln_frame_pacer_options` in the
+/// See `mln_frame_pacing_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub const FramePacerOptions = struct {
-    /// Removes the frame rate limit, so the pacer can demand frames at every
-    /// display refresh, as it does by default.
-    unlimited_frames_per_second: bool = false,
-    /// The most frames per second that the pacer demands, greater than zero.
-    /// The pacer skips display refreshes to stay within it. By default, it can
-    /// demand frames at every refresh.
+pub const FramePacingOptions = struct {
+    /// The most frames per second that the library demands, greater than zero.
+    /// It skips display refreshes to stay within it. By default, it can demand
+    /// a frame at every refresh.
     maximum_frames_per_second: ?u32 = null,
-    pub fn toNative(self: FramePacerOptions) c.mln_frame_pacer_options {
-        var raw = std.mem.zeroes(c.mln_frame_pacer_options);
+    /// The `NSView*` on macOS, or the `UIView*` on iOS and tvOS, that shows the
+    /// session's frames, to pace them to its window's display rather than the
+    /// main one. On iOS and tvOS, set the pacing again when the scene moves to
+    /// another screen, as `windowScene:didUpdateEffectiveGeometry:` reports.
+    view: ??*anyopaque = null,
+    pub fn toNative(self: FramePacingOptions) c.mln_frame_pacing_options {
+        var raw = std.mem.zeroes(c.mln_frame_pacing_options);
         raw.fields = 0;
-        if (self.unlimited_frames_per_second) raw.fields |= c.MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
-        raw.size = @sizeOf(c.mln_frame_pacer_options);
-        marshal.present(&raw.fields, c.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND, &raw.maximum_frames_per_second, self.maximum_frames_per_second);
+        raw.size = @sizeOf(c.mln_frame_pacing_options);
+        marshal.present(&raw.fields, c.MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND, &raw.maximum_frames_per_second, self.maximum_frames_per_second);
+        marshal.present(&raw.fields, c.MLN_FRAME_PACING_OPTION_VIEW, &raw.view, self.view);
         return raw;
     }
-    pub fn fromNative(raw: c.mln_frame_pacer_options) FramePacerOptions {
+    pub fn fromNative(raw: c.mln_frame_pacing_options) FramePacingOptions {
         return .{
-            .unlimited_frames_per_second = raw.fields & c.MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND != 0,
-            .maximum_frames_per_second = if (raw.fields & c.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND != 0) raw.maximum_frames_per_second else null,
+            .maximum_frames_per_second = if (raw.fields & c.MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND != 0) raw.maximum_frames_per_second else null,
+            .view = if (raw.fields & c.MLN_FRAME_PACING_OPTION_VIEW != 0) raw.view else null,
         };
     }
 };
@@ -4796,69 +5116,511 @@ pub const GeoJsonSourceOptions = struct {
     }
 };
 
-/// How a gesture keeps moving the camera after the user lets go.
+/// The part of the camera that a notch is on.
 ///
-/// A part moves only when its velocity is set, and each part slows on its own.
-/// Every part defaults to `MomentumDecayModel.friction` with a half-life of 140
-/// ms, and these other defaults:
+/// See `mln_gesture_axis` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureAxis = enum(u32) {
+    zoom = 0,
+    bearing = 1,
+    pitch = 2,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// How gestures move the zoom, the bearing, or the pitch.
 ///
-/// - Pan stops at 10 logical pixels per second, needs a release of at least
-///   200, and counts a release faster than 10000 as 10000.
-/// - Zoom stops at 0.01 levels per second and moves at most 2.5 levels. Its
-///   snap settles on the nearest whole level.
-/// - Bearing stops at 1 degree per second and needs a release of at least 60.
-///   Its snap settles on north within 7 degrees.
-/// - Pitch stops at 1 degree per second and needs a release of at least 5. Its
-///   snap settles flat within 7 degrees.
-///
-/// See `mln_gesture_momentum` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const GestureMomentum = struct {
-    pan: PanMomentum = .{},
-    zoom: AnchoredMomentum = .{},
-    bearing: AnchoredMomentum = .{},
-    pitch: AnchoredMomentum = .{},
-    pub fn toNative(self: GestureMomentum) c.mln_gesture_momentum {
-        var raw = std.mem.zeroes(c.mln_gesture_momentum);
-        raw.pan = self.pan.toNative();
-        raw.zoom = self.zoom.toNative();
-        raw.bearing = self.bearing.toNative();
-        raw.pitch = self.pitch.toNative();
+/// See `mln_gesture_axis_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureAxisOptions = struct {
+    /// Whether gestures move the part.
+    enabled: ?bool = null,
+    /// Whether a release glides on.
+    glides: ?bool = null,
+    momentum: ?MomentumDecay = null,
+    /// Whether the part settles once its glide ends.
+    snaps: ?bool = null,
+    snap: ?MomentumSnap = null,
+    /// Where the part reports notches while gestures, their glides, and their
+    /// snaps move it, replacing the ones it had. Several notches at one value
+    /// report one event, with the kind of the first in the list.
+    notches: ?[]const GestureNotch = null,
+    pub fn toNative(self: GestureAxisOptions, allocator: std.mem.Allocator) status.Error!c.mln_gesture_axis_options {
+        var raw = std.mem.zeroes(c.mln_gesture_axis_options);
+        raw.fields = 0;
+        marshal.present(&raw.fields, c.MLN_GESTURE_AXIS_OPTION_ENABLED, &raw.enabled, self.enabled);
+        marshal.present(&raw.fields, c.MLN_GESTURE_AXIS_OPTION_GLIDES, &raw.glides, self.glides);
+        marshal.present(&raw.fields, c.MLN_GESTURE_AXIS_OPTION_MOMENTUM, &raw.momentum, self.momentum);
+        marshal.present(&raw.fields, c.MLN_GESTURE_AXIS_OPTION_SNAPS, &raw.snaps, self.snaps);
+        marshal.present(&raw.fields, c.MLN_GESTURE_AXIS_OPTION_SNAP, &raw.snap, self.snap);
+        if (self.notches) |item| {
+            raw.fields |= c.MLN_GESTURE_AXIS_OPTION_NOTCHES;
+            raw.notches = blk: {
+                const items = try allocator.alloc(c.mln_gesture_notch, item.len);
+                for (item, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+                break :blk items.ptr;
+            };
+        }
+        raw.notch_count = std.math.cast(@TypeOf(raw.notch_count), if (self.notches) |items| items.len else 0) orelse return error.InvalidArgument;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_gesture_momentum) GestureMomentum {
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_gesture_axis_options) status.Error!GestureAxisOptions {
         return .{
-            .pan = PanMomentum.fromNative(raw.pan),
-            .zoom = AnchoredMomentum.fromNative(raw.zoom),
-            .bearing = AnchoredMomentum.fromNative(raw.bearing),
-            .pitch = AnchoredMomentum.fromNative(raw.pitch),
+            .enabled = if (raw.fields & c.MLN_GESTURE_AXIS_OPTION_ENABLED != 0) raw.enabled else null,
+            .glides = if (raw.fields & c.MLN_GESTURE_AXIS_OPTION_GLIDES != 0) raw.glides else null,
+            .momentum = if (raw.fields & c.MLN_GESTURE_AXIS_OPTION_MOMENTUM != 0) MomentumDecay.fromNative(raw.momentum) else null,
+            .snaps = if (raw.fields & c.MLN_GESTURE_AXIS_OPTION_SNAPS != 0) raw.snaps else null,
+            .snap = if (raw.fields & c.MLN_GESTURE_AXIS_OPTION_SNAP != 0) MomentumSnap.fromNative(raw.snap) else null,
+            .notches = if (raw.fields & c.MLN_GESTURE_AXIS_OPTION_NOTCHES != 0) blk: {
+                const copied = try allocator.alloc(GestureNotch, raw.notch_count);
+                for (try marshal.nativeSlice(c.mln_gesture_notch, raw.notches, raw.notch_count), 0..) |item, index| copied[index] = GestureNotch.fromNative(item);
+                break :blk copied;
+            } else null,
         };
     }
 };
 
-/// Where a camera change falls in a gesture that the user makes.
+/// Camera movement from anything but a pointer, such as a wheel, a trackpad
+/// scroll, a dial, a crown, keys, or buttons, which the host converts into
+/// camera units. Zooms and turns hold `position` in place.
 ///
-/// `GesturePhase.begin` and `GesturePhase.update` mark a gesture in progress,
-/// and `GesturePhase.end` and `GesturePhase.cancel` end it.
+/// A continuous delta, such as a trackpad scroll, applies at once. A discrete
+/// one, such as a wheel detent or a key press, eases, and a quick run of them
+/// merges into one ease that speeds up. Deltas are one gesture until they idle.
+/// The recommended amounts are a third of a level per wheel detent, 1/300 of a
+/// level per pixel of trackpad scrolling, and, for keys, 100 logical pixels of
+/// pan, a level of zoom, 15 degrees of bearing, and 10 of pitch.
 ///
-/// See `mln_gesture_phase` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const GesturePhase = enum(u32) {
-    /// The change isn't part of a gesture.
+/// See `mln_gesture_delta` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureDelta = struct {
+    position: ScreenPoint = .{},
+    discrete: bool = false,
+    /// How far the map's content moves on the screen, in logical pixels.
+    pan: ScreenPoint = .{},
+    /// Zoom levels to add.
+    zoom: f64 = 0,
+    /// Degrees to turn clockwise.
+    bearing: f64 = 0,
+    /// Degrees to tilt.
+    pitch: f64 = 0,
+    pub fn toNative(self: GestureDelta) c.mln_gesture_delta {
+        var raw = std.mem.zeroes(c.mln_gesture_delta);
+        raw.position = self.position.toNative();
+        raw.discrete = self.discrete;
+        raw.pan = self.pan.toNative();
+        raw.zoom = self.zoom;
+        raw.bearing = self.bearing;
+        raw.pitch = self.pitch;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_gesture_delta) GestureDelta {
+        return .{
+            .position = ScreenPoint.fromNative(raw.position),
+            .discrete = raw.discrete,
+            .pan = ScreenPoint.fromNative(raw.pan),
+            .zoom = raw.zoom,
+            .bearing = raw.bearing,
+            .pitch = raw.pitch,
+        };
+    }
+};
+
+/// What a gesture means beyond moving the camera. Double taps and two-finger
+/// taps also zoom, as the options say.
+///
+/// See `mln_gesture_event` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureEvent = union(enum) {
+    tap: GestureTap,
+    double_tap: GestureTap,
+    two_finger_tap: GestureTap,
+    notch: GestureNotchEvent,
+    long_press: GestureTap,
+    unknown: u32,
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_gesture_event) status.Error!GestureEvent {
+        _ = allocator;
+        return switch (raw.type) {
+            c.MLN_GESTURE_EVENT_TAP => .{ .tap = GestureTap.fromNative(raw.data.tap) },
+            c.MLN_GESTURE_EVENT_DOUBLE_TAP => .{ .double_tap = GestureTap.fromNative(raw.data.double_tap) },
+            c.MLN_GESTURE_EVENT_TWO_FINGER_TAP => .{ .two_finger_tap = GestureTap.fromNative(raw.data.two_finger_tap) },
+            c.MLN_GESTURE_EVENT_NOTCH => .{ .notch = GestureNotchEvent.fromNative(raw.data.notch) },
+            c.MLN_GESTURE_EVENT_LONG_PRESS => .{ .long_press = GestureTap.fromNative(raw.data.long_press) },
+            else => |tag| .{ .unknown = @intCast(tag) },
+        };
+    }
+};
+
+/// One input, in logical pixels from the map's top-left corner.
+///
+/// When the view loses focus, the host cancels the pointers it sent and sends
+/// empty modes.
+///
+/// See `mln_gesture_input` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureInput = union(enum) {
+    pointer_down: GesturePointerDown,
+    pointer_move: GesturePointer,
+    pointer_up: GesturePointer,
+    pointer_cancel: GesturePointer,
+    modes: GestureMode,
+    delta: GestureDelta,
+    pinch: GesturePinch,
+
+    pub fn toNative(self: GestureInput) status.Error!c.mln_gesture_input {
+        var raw = std.mem.zeroes(c.mln_gesture_input);
+        raw.size = @sizeOf(c.mln_gesture_input);
+        switch (self) {
+            .pointer_down => |item| {
+                raw.type = c.MLN_GESTURE_INPUT_POINTER_DOWN;
+                raw.data.pointer_down = item.toNative();
+            },
+            .pointer_move => |item| {
+                raw.type = c.MLN_GESTURE_INPUT_POINTER_MOVE;
+                raw.data.pointer_move = item.toNative();
+            },
+            .pointer_up => |item| {
+                raw.type = c.MLN_GESTURE_INPUT_POINTER_UP;
+                raw.data.pointer_up = item.toNative();
+            },
+            .pointer_cancel => |item| {
+                raw.type = c.MLN_GESTURE_INPUT_POINTER_CANCEL;
+                raw.data.pointer_cancel = item.toNative();
+            },
+            .modes => |item| {
+                raw.type = c.MLN_GESTURE_INPUT_MODES;
+                raw.data.modes = item.toNative();
+            },
+            .delta => |item| {
+                raw.type = c.MLN_GESTURE_INPUT_DELTA;
+                raw.data.delta = item.toNative();
+            },
+            .pinch => |item| {
+                raw.type = c.MLN_GESTURE_INPUT_PINCH;
+                raw.data.pinch = item.toNative();
+            },
+        }
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_gesture_input) status.Error!GestureInput {
+        _ = allocator;
+        return switch (raw.type) {
+            c.MLN_GESTURE_INPUT_POINTER_DOWN => .{ .pointer_down = GesturePointerDown.fromNative(raw.data.pointer_down) },
+            c.MLN_GESTURE_INPUT_POINTER_MOVE => .{ .pointer_move = GesturePointer.fromNative(raw.data.pointer_move) },
+            c.MLN_GESTURE_INPUT_POINTER_UP => .{ .pointer_up = GesturePointer.fromNative(raw.data.pointer_up) },
+            c.MLN_GESTURE_INPUT_POINTER_CANCEL => .{ .pointer_cancel = GesturePointer.fromNative(raw.data.pointer_cancel) },
+            c.MLN_GESTURE_INPUT_MODES => .{ .modes = GestureMode.fromNative(raw.data.modes) },
+            c.MLN_GESTURE_INPUT_DELTA => .{ .delta = GestureDelta.fromNative(raw.data.delta) },
+            c.MLN_GESTURE_INPUT_PINCH => .{ .pinch = GesturePinch.fromNative(raw.data.pinch) },
+            else => return error.NativeError,
+        };
+    }
+};
+
+/// What a one-pointer drag or a double tap does instead of its default, from
+/// the pointer's held buttons or from held keys. A drag reads its modes when it
+/// starts and keeps them until it ends, and a double tap when it lifts;
+/// rotating wins over a box zoom.
+///
+/// See `mln_gesture_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureMode = struct {
+    /// Sideways turns the map and up and down tilts it.
+    rotate: bool = false,
+    /// Draws a box that the map zooms to when the pointer lifts.
+    box_zoom: bool = false,
+    /// A double tap zooms out instead of in.
+    zoom_out: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+};
+
+/// When a gesture recognizer next needs `GestureRecognizer.tick()`.
+///
+/// See `mln_gesture_next_tick` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureNextTick = enum(u32) {
+    /// Not until the next input.
     none = 0,
-    /// The gesture starts. This cancels every running camera animation before
-    /// the change applies.
-    begin = 1,
-    /// The gesture continues. To start a gesture that keeps the running camera
-    /// animations, start it with this phase instead of `GesturePhase.begin`.
-    update = 2,
-    end = 3,
-    /// The platform cancelled the gesture. This also cancels every running
-    /// camera animation after the change applies.
-    cancel = 4,
+    /// Every display frame, while a delta eases or a gesture, its glide, or its
+    /// snap may reach a notch.
+    frame = 1,
+    /// At `next_tick_ms`, on the inputs' clock: when a press becomes a long
+    /// press, or idle deltas end.
+    at = 2,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// Values every `spacing` from `offset`, in the part's unit, that report an
+/// `GestureEvent.notch` as a gesture moves the part to or across one, for the
+/// host to play as haptic feedback. Bearing notches lie within one turn from
+/// the offset.
+///
+/// See `mln_gesture_notch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureNotch = struct {
+    /// Positive.
+    spacing: f64 = 0,
+    /// Finite.
+    offset: f64 = 0,
+    /// The host's name for the feedback, which the notch's events carry.
+    kind: u32 = 0,
+    pub fn toNative(self: GestureNotch) c.mln_gesture_notch {
+        var raw = std.mem.zeroes(c.mln_gesture_notch);
+        raw.spacing = self.spacing;
+        raw.offset = self.offset;
+        raw.kind = self.kind;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_gesture_notch) GestureNotch {
+        return .{
+            .spacing = raw.spacing,
+            .offset = raw.offset,
+            .kind = raw.kind,
+        };
+    }
+};
+
+/// A notch that a part reached.
+///
+/// See `mln_gesture_notch_event` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureNotchEvent = struct {
+    axis: GestureAxis = .zoom,
+    /// The notch's kind, from the options.
+    kind: u32 = 0,
+    /// In the part's unit; a bearing from 0 up to 360 degrees.
+    value: f64 = 0,
+    pub fn fromNative(raw: c.mln_gesture_notch_event) GestureNotchEvent {
+        return .{
+            .axis = GestureAxis.fromNative(raw.axis),
+            .kind = raw.kind,
+            .value = raw.value,
+        };
+    }
+};
+
+/// How a gesture recognizer moves each part of the camera.
+///
+/// Settings whose bits aren't set keep their values. A new recognizer moves
+/// every part, and glides each by friction with a half-life of 140 ms, a
+/// minimum speed of 0, and no maximum speed or distance, with these exceptions:
+///
+/// - Pan stops at 10 logical pixels per second, needs a release of at least
+///   200, and counts a release faster than 10000 as 10000.
+/// - Zoom stops at 0.01 levels per second and glides at most 2.5 levels. Its
+///   snap, when on, settles on the nearest whole level within half a level.
+/// - Bearing stops at 1 degree per second and needs a release of at least 60.
+///   It snaps to north within 7 degrees, and has a notch of kind 0 at north.
+/// - Pitch stops at 1 degree per second and needs a release of at least 5. Its
+///   snap, when on, settles flat within 7 degrees.
+///
+/// Snaps take 300 ms. A double tap zooms in a level and a two-finger tap out.
+///
+/// See `mln_gesture_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureOptions = struct {
+    /// Zoom levels that a double tap zooms in, eased; with
+    /// `GestureMode.zoom_out` it zooms out instead. 0 leaves double taps to the
+    /// host. Finite.
+    double_tap_zoom: ?f64 = null,
+    /// Zoom levels that a two-finger tap zooms, eased; negative zooms out. 0
+    /// leaves two-finger taps to the host. Finite.
+    two_finger_tap_zoom: ?f64 = null,
+    pan: GesturePanOptions = .{},
+    zoom: GestureAxisOptions = .{},
+    bearing: GestureAxisOptions = .{},
+    pitch: GestureAxisOptions = .{},
+    pub fn toNative(self: GestureOptions, allocator: std.mem.Allocator) status.Error!c.mln_gesture_options {
+        var raw = std.mem.zeroes(c.mln_gesture_options);
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_gesture_options);
+        marshal.present(&raw.fields, c.MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM, &raw.double_tap_zoom, self.double_tap_zoom);
+        marshal.present(&raw.fields, c.MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM, &raw.two_finger_tap_zoom, self.two_finger_tap_zoom);
+        raw.pan = self.pan.toNative();
+        raw.zoom = try self.zoom.toNative(allocator);
+        raw.bearing = try self.bearing.toNative(allocator);
+        raw.pitch = try self.pitch.toNative(allocator);
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_gesture_options) status.Error!GestureOptions {
+        return .{
+            .double_tap_zoom = if (raw.fields & c.MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM != 0) raw.double_tap_zoom else null,
+            .two_finger_tap_zoom = if (raw.fields & c.MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM != 0) raw.two_finger_tap_zoom else null,
+            .pan = GesturePanOptions.fromNative(raw.pan),
+            .zoom = try GestureAxisOptions.fromNative(allocator, raw.zoom),
+            .bearing = try GestureAxisOptions.fromNative(allocator, raw.bearing),
+            .pitch = try GestureAxisOptions.fromNative(allocator, raw.pitch),
+        };
+    }
+};
+
+/// How gestures move the map's content.
+///
+/// See `mln_gesture_pan_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GesturePanOptions = struct {
+    /// Whether drags, two fingers moving together, and deltas pan.
+    enabled: ?bool = null,
+    /// Whether a release glides on.
+    glides: ?bool = null,
+    momentum: ?MomentumDecay = null,
+    pub fn toNative(self: GesturePanOptions) c.mln_gesture_pan_options {
+        var raw = std.mem.zeroes(c.mln_gesture_pan_options);
+        raw.fields = 0;
+        marshal.present(&raw.fields, c.MLN_GESTURE_PAN_OPTION_ENABLED, &raw.enabled, self.enabled);
+        marshal.present(&raw.fields, c.MLN_GESTURE_PAN_OPTION_GLIDES, &raw.glides, self.glides);
+        marshal.present(&raw.fields, c.MLN_GESTURE_PAN_OPTION_MOMENTUM, &raw.momentum, self.momentum);
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_gesture_pan_options) GesturePanOptions {
+        return .{
+            .enabled = if (raw.fields & c.MLN_GESTURE_PAN_OPTION_ENABLED != 0) raw.enabled else null,
+            .glides = if (raw.fields & c.MLN_GESTURE_PAN_OPTION_GLIDES != 0) raw.glides else null,
+            .momentum = if (raw.fields & c.MLN_GESTURE_PAN_OPTION_MOMENTUM != 0) MomentumDecay.fromNative(raw.momentum) else null,
+        };
+    }
+};
+
+/// A pinch the platform recognized, such as a macOS trackpad's magnify and
+/// rotate or a browser's Ctrl+wheel. Each update zooms by `scale` (above 1
+/// zooms in) and turns `rotation` degrees clockwise on the screen since the
+/// last, around `center`. It glides on when it ends, as a touch pinch does.
+///
+/// See `mln_gesture_pinch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GesturePinch = struct {
+    center: ScreenPoint = .{},
+    scale: f64 = 0,
+    rotation: f64 = 0,
+    phase: PinchPhase = .begin,
+    pub fn toNative(self: GesturePinch) c.mln_gesture_pinch {
+        var raw = std.mem.zeroes(c.mln_gesture_pinch);
+        raw.center = self.center.toNative();
+        raw.scale = self.scale;
+        raw.rotation = self.rotation;
+        raw.phase = self.phase.toNative();
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_gesture_pinch) GesturePinch {
+        return .{
+            .center = ScreenPoint.fromNative(raw.center),
+            .scale = raw.scale,
+            .rotation = raw.rotation,
+            .phase = PinchPhase.fromNative(raw.phase),
+        };
+    }
+};
+
+/// A pointer moved, went up, or was taken away.
+///
+/// See `mln_gesture_pointer` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GesturePointer = struct {
+    id: u32 = 0,
+    /// Unused for `GestureInput.pointer_cancel`.
+    position: ScreenPoint = .{},
+    pub fn toNative(self: GesturePointer) c.mln_gesture_pointer {
+        var raw = std.mem.zeroes(c.mln_gesture_pointer);
+        raw.id = self.id;
+        raw.position = self.position.toNative();
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_gesture_pointer) GesturePointer {
+        return .{
+            .id = raw.id,
+            .position = ScreenPoint.fromNative(raw.position),
+        };
+    }
+};
+
+/// A pointer went down. The host sends no pointer whose buttons mean nothing,
+/// such as a mouse's middle button.
+///
+/// See `mln_gesture_pointer_down` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GesturePointerDown = struct {
+    id: u32 = 0,
+    kind: PointerKind = .mouse,
+    position: ScreenPoint = .{},
+    /// The modes of the pointer's held buttons.
+    modes: GestureMode = .{},
+    pub fn toNative(self: GesturePointerDown) c.mln_gesture_pointer_down {
+        var raw = std.mem.zeroes(c.mln_gesture_pointer_down);
+        raw.id = self.id;
+        raw.kind = self.kind.toNative();
+        raw.position = self.position.toNative();
+        raw.modes = self.modes.toNative();
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_gesture_pointer_down) GesturePointerDown {
+        return .{
+            .id = raw.id,
+            .kind = PointerKind.fromNative(raw.kind),
+            .position = ScreenPoint.fromNative(raw.position),
+            .modes = GestureMode.fromNative(raw.modes),
+        };
+    }
+};
+
+/// What an input or a tick did.
+///
+/// See `mln_gesture_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureResult = struct {
+    /// Whether the recognizer used the input, so the host stops the platform's
+    /// default for it. Ticks report false.
+    handled: bool = false,
+    next_tick: GestureNextTick = .none,
+    /// For `GestureNextTick.at`.
+    next_tick_ms: f64 = 0,
+    /// Whether a box-zoom drag is drawing `box_zoom`, which the host shows, in
+    /// logical pixels corner to corner.
+    box_zoom_active: bool = false,
+    box_zoom: ScreenBox = .{},
+    events: []const GestureEvent = &.{},
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_gesture_result) status.Error!GestureResult {
+        return .{
+            .handled = raw.handled,
+            .next_tick = GestureNextTick.fromNative(raw.next_tick),
+            .next_tick_ms = raw.next_tick_ms,
+            .box_zoom_active = raw.box_zoom_active,
+            .box_zoom = ScreenBox.fromNative(raw.box_zoom),
+            .events = blk: {
+                const in_use = (if (raw.event_count <= 4) raw.events[0..raw.event_count] else return error.NativeError);
+                const copied = try allocator.alloc(GestureEvent, in_use.len);
+                for (in_use, 0..) |item, index| copied[index] = try GestureEvent.fromNative(allocator, item);
+                break :blk copied;
+            },
+        };
+    }
+};
+
+/// A tap, at `position`, by the pointer `id`.
+///
+/// See `mln_gesture_tap` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const GestureTap = struct {
+    /// Unused for `GestureEvent.two_finger_tap`.
+    id: u32 = 0,
+    position: ScreenPoint = .{},
+    pub fn fromNative(raw: c.mln_gesture_tap) GestureTap {
+        return .{
+            .id = raw.id,
+            .position = ScreenPoint.fromNative(raw.position),
+        };
+    }
 };
 
 /// What a GPU device can do.
@@ -4895,6 +5657,24 @@ pub const GpuDeviceCapabilities = struct {
     }
 };
 
+/// The D3D12 objects of a device, as `GpuDevice.getD3d12Context()` reports
+/// them.
+///
+/// See `mln_gpu_device_d3d12_context_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+pub const GpuDeviceD3d12ContextResult = struct {
+    /// The `ID3D12Device`.
+    device: ?*anyopaque = null,
+    /// The direct `ID3D12CommandQueue` that sessions on the device submit to.
+    command_queue: ?*anyopaque = null,
+    pub fn fromNative(raw: c.mln_gpu_device_d3d12_context_result) GpuDeviceD3d12ContextResult {
+        return .{
+            .device = raw.device,
+            .command_queue = raw.command_queue,
+        };
+    }
+};
+
 /// Options for `GpuDevice.create()`.
 ///
 /// Name the GPU by at most one of `adapter_index`, `adapter_uuid`, and
@@ -4905,9 +5685,9 @@ pub const GpuDeviceCapabilities = struct {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
 pub const GpuDeviceOptions = struct {
     /// The backend that the device renders with. By default, the platform's
-    /// own: Metal on Apple platforms, Vulkan elsewhere, or OpenGL where the
-    /// system has no Vulkan driver, and in a browser the build's one backend:
-    /// WebGPU or OpenGL (WebGL2).
+    /// own: Metal on Apple platforms, Vulkan elsewhere, then D3D12 on Windows,
+    /// or OpenGL where the system has neither, and in a browser the build's one
+    /// backend: WebGPU or OpenGL (WebGL2).
     backend: ?RenderBackend = null,
     /// The GPU to use, as an index into the backend's list of GPUs. OpenGL's
     /// list holds one GPU: the one that its display renders on.
@@ -4917,8 +5697,9 @@ pub const GpuDeviceOptions = struct {
     /// one.
     adapter_uuid: ?[]const u8 = null,
     /// The 8-byte LUID of the GPU to use: on Windows, its DXGI adapter LUID,
-    /// which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID`. Only
-    /// a Vulkan device takes one.
+    /// which Vulkan reports as `VkPhysicalDeviceIDProperties.deviceLUID` and
+    /// D3D12 as `ID3D12Device::GetAdapterLuid`. Only a Vulkan or D3D12 device
+    /// takes one.
     adapter_luid: ?[]const u8 = null,
     /// The OpenGL API that an OpenGL device renders with. An EGL device
     /// defaults to `OpenGlClientApi.gles`, and takes `OpenGlClientApi.gl` too
@@ -5606,21 +6387,28 @@ pub const MapOptions = struct {
     /// Whether the map keeps tiles in memory after they leave the view, so they
     /// show again without loading. Without it, the map keeps them.
     tile_cache_enabled: ?bool = null,
-    /// Fonts for the text that a style's own fonts don't draw, such as scripts
-    /// that need complex shaping, like Myanmar or Devanagari. A JSON array of
+    /// Fonts for the text that a style's own fonts don't draw. A JSON array of
     /// font files, each an object with a `url` and an optional `unicode-range`,
-    /// as in a font face of a style's `font-faces`, which every font stack uses
-    /// after the style's own font faces. Empty for the system's fonts, unless
-    /// `system_fonts_enabled` is false.
+    /// as in a font face of a style's `font-faces`. They shape, in order, the
+    /// text that glyph PBFs can't shape, such as Myanmar or Devanagari, or all
+    /// the text of a style without glyph PBFs, and draw the glyphs that come
+    /// from local fonts: those a style's PBFs lack, and CJK with
+    /// `local_ideographs_enabled`. Empty for the system's fonts alone.
     fallback_font_faces: []const u8 = &.{},
-    /// Whether the map falls back to the system's fonts for CJK and the scripts
-    /// that need complex shaping when `fallback_font_faces` is empty: fonts
-    /// that the platform's font matcher picks for the user's preferred
-    /// languages. Without it, the map does. The first map that uses them waits
-    /// for them to be found. In the browser, the browser draws CJK glyphs in
-    /// its sans-serif font instead, where `fallback_font_faces` doesn't cover
-    /// them.
+    /// Whether the map draws from the system's fonts what the style's fonts and
+    /// `fallback_font_faces` don't: fonts that the platform's font matcher
+    /// picks for the font stack's names, or for the character and the user's
+    /// preferred languages. It shapes with them the text that glyph PBFs can't
+    /// shape, and all the text of a style without glyph PBFs. Without it, the
+    /// map does. The first map that uses them waits for the matcher to load. In
+    /// the browser, the browser draws those glyphs in the font stack's
+    /// families, then its sans-serif font, one at a time.
     system_fonts_enabled: ?bool = null,
+    /// Whether CJK ideographs, kana and hangul come from local fonts
+    /// (`fallback_font_faces`, then the system's) before glyph PBFs, rather
+    /// than from a glyph PBF downloaded for every few characters. Without it,
+    /// they do.
+    local_ideographs_enabled: ?bool = null,
     pub fn toNative(self: MapOptions) status.Error!c.mln_map_options {
         var raw = std.mem.zeroes(c.mln_map_options);
         raw.fields = 0;
@@ -5632,6 +6420,7 @@ pub const MapOptions = struct {
         marshal.present(&raw.fields, c.MLN_MAP_OPTION_TILE_CACHE_ENABLED, &raw.tile_cache_enabled, self.tile_cache_enabled);
         raw.fallback_font_faces = marshal.view(self.fallback_font_faces);
         marshal.present(&raw.fields, c.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED, &raw.system_fonts_enabled, self.system_fonts_enabled);
+        marshal.present(&raw.fields, c.MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED, &raw.local_ideographs_enabled, self.local_ideographs_enabled);
         return raw;
     }
 
@@ -5644,6 +6433,7 @@ pub const MapOptions = struct {
             .tile_cache_enabled = if (raw.fields & c.MLN_MAP_OPTION_TILE_CACHE_ENABLED != 0) raw.tile_cache_enabled else null,
             .fallback_font_faces = try marshal.copyView(allocator, raw.fallback_font_faces),
             .system_fonts_enabled = if (raw.fields & c.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED != 0) raw.system_fonts_enabled else null,
+            .local_ideographs_enabled = if (raw.fields & c.MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED != 0) raw.local_ideographs_enabled else null,
         };
     }
 };
@@ -5672,6 +6462,8 @@ pub const MapSnapshot = struct {
     /// Whether the style and every resource that the view needs have loaded.
     fully_loaded: bool = false,
     rendering_stats_view_enabled: bool = false,
+    /// Whether a gesture recognizer's gesture, or the glide and snap after it,
+    /// moves the camera.
     gesture_in_progress: bool = false,
     transition_in_progress: bool = false,
     event_mask: RuntimeEventFlag = .{},
@@ -6115,41 +6907,41 @@ pub const MetalTextureFrame = struct {
     }
 };
 
-/// How one part of a gesture's momentum slows from its release speed.
+/// How one part of a gesture glides after release.
 ///
 /// Speeds and distances are in the part's unit: logical pixels for pan, zoom
-/// levels for zoom, and degrees for bearing and pitch. A setting whose bit
-/// isn't set takes the part's default, which `GestureMomentum` lists.
-/// `min_speed` is finite and not negative, and every other number is finite and
-/// positive. A friction decay can serve every release, as a preset that matches
-/// a platform's scrolling. An eased glide takes its direction from the part's
-/// velocity, and its distance and duration from the caller's plan.
+/// levels for zoom, and degrees for bearing and pitch, with speeds per second.
+/// A setting whose bit isn't set keeps its current value. A new `model` starts
+/// from its defaults: friction from the part's, which
+/// `Map.gestureRecognizerCreate()` lists, and a curve from Android's fling.
+/// Settings of the other model are an error. `min_speed` is finite and not
+/// negative, `duration_exponent` finite and above -1, and every other number
+/// positive; the maximums may be infinite.
 ///
 /// See `mln_momentum_decay` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
 pub const MomentumDecay = struct {
     model: ?MomentumDecayModel = null,
-    /// For `MomentumDecayModel.friction`, how long the speed takes to halve.
+    /// For `MomentumDecayModel.friction`.
     half_life_ms: ?f64 = null,
     /// For `MomentumDecayModel.friction`, the speed at which it ends.
     stop_speed: ?f64 = null,
-    /// Required for `MomentumDecayModel.ease`.
-    distance: ?f64 = null,
-    /// Required for `MomentumDecayModel.ease`.
+    /// For `MomentumDecayModel.curve`, the speed that lasts `duration_ms`.
+    reference_speed: ?f64 = null,
+    /// For `MomentumDecayModel.curve`.
     duration_ms: ?f64 = null,
-    /// For `MomentumDecayModel.ease`, the share of `distance` covered over the
-    /// share of `duration_ms`. Its control points are between 0 and 1, so the
-    /// glide never passes its distance. Defaults to (0, 0, 0.25, 1), the curve
-    /// that camera animations ease along by default. Android's scroll fling
-    /// follows (0.175, 0.5, 0.35, 1).
+    /// For `MomentumDecayModel.curve`, how the duration grows with the speed.
+    duration_exponent: ?f64 = null,
+    /// For `MomentumDecayModel.curve`, the share of the glide covered over the
+    /// share of its duration. Its control points are between 0 and 1, and `x1`
+    /// and `y1` above 0, so the glide starts moving and never passes its end.
     easing: ?UnitBezier = null,
-    /// A slower release starts no momentum.
+    /// A slower release doesn't glide.
     min_speed: ?f64 = null,
-    /// For `MomentumDecayModel.friction`, a faster release counts as this.
+    /// A faster release counts as this.
     max_speed: ?f64 = null,
-    /// The farthest the part moves. A friction release that would move farther
-    /// starts slower, so it ends sooner, and a planned glide moves at most this
-    /// far over its duration.
+    /// The farthest the part glides. A release that would glide farther counts
+    /// as the speed that glides this far.
     max_distance: ?f64 = null,
     pub fn toNative(self: MomentumDecay) c.mln_momentum_decay {
         var raw = std.mem.zeroes(c.mln_momentum_decay);
@@ -6157,8 +6949,9 @@ pub const MomentumDecay = struct {
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MODEL, &raw.model, self.model);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_HALF_LIFE_MS, &raw.half_life_ms, self.half_life_ms);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_STOP_SPEED, &raw.stop_speed, self.stop_speed);
-        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_DISTANCE, &raw.distance, self.distance);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_REFERENCE_SPEED, &raw.reference_speed, self.reference_speed);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_DURATION_MS, &raw.duration_ms, self.duration_ms);
+        marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_DURATION_EXPONENT, &raw.duration_exponent, self.duration_exponent);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_EASING, &raw.easing, self.easing);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MIN_SPEED, &raw.min_speed, self.min_speed);
         marshal.present(&raw.fields, c.MLN_MOMENTUM_DECAY_MAX_SPEED, &raw.max_speed, self.max_speed);
@@ -6170,8 +6963,9 @@ pub const MomentumDecay = struct {
             .model = if (raw.fields & c.MLN_MOMENTUM_DECAY_MODEL != 0) MomentumDecayModel.fromNative(raw.model) else null,
             .half_life_ms = if (raw.fields & c.MLN_MOMENTUM_DECAY_HALF_LIFE_MS != 0) raw.half_life_ms else null,
             .stop_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_STOP_SPEED != 0) raw.stop_speed else null,
-            .distance = if (raw.fields & c.MLN_MOMENTUM_DECAY_DISTANCE != 0) raw.distance else null,
+            .reference_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_REFERENCE_SPEED != 0) raw.reference_speed else null,
             .duration_ms = if (raw.fields & c.MLN_MOMENTUM_DECAY_DURATION_MS != 0) raw.duration_ms else null,
+            .duration_exponent = if (raw.fields & c.MLN_MOMENTUM_DECAY_DURATION_EXPONENT != 0) raw.duration_exponent else null,
             .easing = if (raw.fields & c.MLN_MOMENTUM_DECAY_EASING != 0) UnitBezier.fromNative(raw.easing) else null,
             .min_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_MIN_SPEED != 0) raw.min_speed else null,
             .max_speed = if (raw.fields & c.MLN_MOMENTUM_DECAY_MAX_SPEED != 0) raw.max_speed else null,
@@ -6180,19 +6974,22 @@ pub const MomentumDecay = struct {
     }
 };
 
-/// How a part of a gesture's momentum slows from its release speed.
+/// How a part's glide unfolds from its release speed.
 ///
 /// See `mln_momentum_decay_model` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
 pub const MomentumDecayModel = enum(u32) {
     /// The speed halves every `half_life_ms`, until it drops to `stop_speed`.
     /// UIScrollView's normal deceleration is a half-life of 346 ms, and its
     /// fast deceleration 69 ms.
     friction = 0,
-    /// The part eases `distance` over `duration_ms`, along `easing`, as a
-    /// camera animation does. The caller plans the glide, for example from the
-    /// platform's own fling physics, such as Android's OverScroller.
-    ease = 1,
+    /// The glide lasts `duration_ms` × (speed / `reference_speed`) to the power
+    /// of `duration_exponent`, and follows `easing`, starting at the release
+    /// speed. Its defaults are Android's OverScroller fling, in its
+    /// density-independent pixels: a reference speed of 1000, 555.182 ms, an
+    /// exponent of 0.7362676, the curve (0.175, 0.5, 0.35, 1), a minimum speed
+    /// of 50 and a maximum of 8000.
+    curve = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -6201,21 +6998,22 @@ pub const MomentumDecayModel = enum(u32) {
 /// Where a part settles after a gesture that changed it.
 ///
 /// The targets are every `spacing` from `offset`, in the part's unit. Bearing
-/// targets wrap around the circle. Once the part's glide ends, or right away
-/// when it doesn't move, the part eases to the nearest target if it is within
-/// `tolerance` of it, and otherwise stays where it is. A setting whose bit
-/// isn't set takes the part's default, which `GestureMomentum` lists.
+/// targets lie within one turn from `offset`, and the bearing takes the shorter
+/// way around to the nearest. Once the part's glide ends, or right away when it
+/// has none, the part eases to the nearest target if it is within `tolerance`
+/// of it, and otherwise stays where it is. A setting whose bit isn't set keeps
+/// its current value.
 ///
 /// See `mln_momentum_snap` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
 pub const MomentumSnap = struct {
     /// Positive.
     spacing: ?f64 = null,
-    /// Defaults to 0.
+    /// Finite.
     offset: ?f64 = null,
     /// Not negative.
     tolerance: ?f64 = null,
-    /// Zero settles without easing. Defaults to 300.
+    /// Zero settles without easing.
     duration_ms: ?f64 = null,
     pub fn toNative(self: MomentumSnap) c.mln_momentum_snap {
         var raw = std.mem.zeroes(c.mln_momentum_snap);
@@ -6344,6 +7142,35 @@ pub const OfflineRegionDownloadState = enum(u32) {
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// How long the resources that an offline region holds stay usable.
+///
+/// See `mln_offline_region_expiry` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const OfflineRegionExpiry = struct {
+    /// When the first of the region's resources goes stale, which may have
+    /// passed. Maps show a stale resource while they check it with the server,
+    /// unless it must be checked first, and the region's download refreshes it.
+    /// Without it, no resource ever goes stale.
+    stale_after_unix_ms: ?i64 = null,
+    /// When the first of the region's resources that the server requires
+    /// checking once stale stops being usable without the server, which may
+    /// have passed. Refresh the region before then to keep all of it usable
+    /// offline. Without it, every resource stays usable offline.
+    usable_offline_until_unix_ms: ?i64 = null,
+    /// The resources that are stale now, tiles included.
+    stale_resource_count: u64 = 0,
+    /// The stale resources that maps can't use now without the server.
+    unusable_resource_count: u64 = 0,
+    pub fn fromNative(raw: c.mln_offline_region_expiry) OfflineRegionExpiry {
+        return .{
+            .stale_after_unix_ms = if (raw.fields & c.MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER != 0) raw.stale_after_unix_ms else null,
+            .usable_offline_until_unix_ms = if (raw.fields & c.MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL != 0) raw.usable_offline_until_unix_ms else null,
+            .stale_resource_count = raw.stale_resource_count,
+            .unusable_resource_count = raw.unusable_resource_count,
+        };
+    }
 };
 
 /// An offline region in the runtime's cache file.
@@ -6791,28 +7618,35 @@ pub const OpenGlTextureFrame = struct {
     }
 };
 
-/// How a gesture's pan keeps moving the map's content after release.
+/// Where a platform-recognized pinch is.
 ///
-/// See `mln_pan_momentum` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const PanMomentum = struct {
-    /// How fast the map's content moved on the screen at release, in logical
-    /// pixels per second. The pan moves only when this is set.
-    velocity: ?ScreenPoint = null,
-    decay: MomentumDecay = .{},
-    pub fn toNative(self: PanMomentum) c.mln_pan_momentum {
-        var raw = std.mem.zeroes(c.mln_pan_momentum);
-        raw.fields = 0;
-        marshal.present(&raw.fields, c.MLN_PAN_MOMENTUM_VELOCITY, &raw.velocity, self.velocity);
-        raw.decay = self.decay.toNative();
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_pan_momentum) PanMomentum {
-        return .{
-            .velocity = if (raw.fields & c.MLN_PAN_MOMENTUM_VELOCITY != 0) ScreenPoint.fromNative(raw.velocity) else null,
-            .decay = MomentumDecay.fromNative(raw.decay),
-        };
-    }
+/// See `mln_pinch_phase` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const PinchPhase = enum(u32) {
+    begin = 0,
+    update = 1,
+    /// The fingers lifted: the pinch glides on.
+    end = 2,
+    /// The platform took the pinch away: nothing continues, and the camera's
+    /// animations stop.
+    cancel = 3,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// What kind of device a pointer is.
+///
+/// See `mln_pointer_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+pub const PointerKind = enum(u32) {
+    mouse = 0,
+    /// Two touches pinch, twist, and tilt, and a held second tap zooms.
+    touch = 1,
+    pen = 2,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 /// An image of 8-bit RGBA pixels whose colors are multiplied by their alpha.
@@ -7119,6 +7953,12 @@ pub const RenderBackend = enum(u32) {
     vulkan = 2,
     open_gl = 3,
     web_gpu = 4,
+    /// D3D12, on Windows. It compiles its shaders at run time with DXC, which
+    /// your app ships: `dxcompiler.dll`, 1.8.2502 or later, beside your app's
+    /// executable or in another directory of the DLL search path, which doesn't
+    /// take the library's own directory. Without it, the library renders on
+    /// another backend.
+    d3d12 = 5,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -7133,8 +7973,9 @@ pub const RenderBackendFlag = struct {
     vulkan: bool = false,
     open_gl: bool = false,
     web_gpu: bool = false,
+    d3d12: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8 };
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -7234,15 +8075,17 @@ pub const RenderSessionAttachOptions = struct {
     ///
     /// - `RenderDriverKind.caller_graphics_thread` for a borrowed ring of
     ///   WebGPU textures.
-    /// - `RenderDriverKind.core_worker` for an offscreen target, a window, or
-    ///   an exported ring.
+    /// - `RenderDriverKind.core_worker` for an offscreen target, a window, a
+    ///   DirectComposition visual, or an exported ring.
+    /// - `RenderDriverKind.caller_graphics_thread` for a XAML `SwapChainPanel`,
+    ///   on the panel's UI thread.
     /// - Either one for a web canvas. In a browser both run on the thread that
     ///   loaded the library: `RenderDriverKind.core_worker` in the library's
     ///   own tasks, and `RenderDriverKind.caller_graphics_thread` when you
     ///   service the session.
     /// - Either one for a Metal layer, a Vulkan surface, an OpenGL surface, or
-    ///   a borrowed ring of Metal, Vulkan, or OpenGL textures. A build may
-    ///   drive these on `RenderDriverKind.core_worker` only, and fails an
+    ///   a borrowed ring of Metal, Vulkan, D3D12, or OpenGL textures. A build
+    ///   may drive these on `RenderDriverKind.core_worker` only, and fails an
     ///   attach with `RenderDriverKind.caller_graphics_thread` then.
     ///
     /// An attach with another driver fails with `error.Unsupported`.
@@ -7428,6 +8271,8 @@ pub const RenderTarget = union(enum) {
     web_gpu_borrowed_textures: WebGpuBorrowedTexturesTarget,
     exported_ring: ExportedRingTarget,
     web_canvas: WebCanvasTarget,
+    d3d12_borrowed_textures: D3d12BorrowedTexturesTarget,
+    d3d12_composition: D3d12CompositionTarget,
 
     pub fn toNative(self: RenderTarget, allocator: std.mem.Allocator) status.Error!c.mln_render_target {
         var raw = std.mem.zeroes(c.mln_render_target);
@@ -7493,6 +8338,14 @@ pub const RenderTarget = union(enum) {
                 raw.kind = c.MLN_RENDER_TARGET_KIND_WEB_CANVAS;
                 raw.data.web_canvas = try item.toNative();
             },
+            .d3d12_borrowed_textures => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES;
+                raw.data.d3d12_borrowed_textures = try item.toNative(allocator);
+            },
+            .d3d12_composition => |item| {
+                raw.kind = c.MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION;
+                raw.data.d3d12_composition = item.toNative();
+            },
         }
         return raw;
     }
@@ -7514,6 +8367,8 @@ pub const RenderTarget = union(enum) {
             c.MLN_RENDER_TARGET_KIND_WEB_GPU_BORROWED_TEXTURES => .{ .web_gpu_borrowed_textures = try WebGpuBorrowedTexturesTarget.fromNative(allocator, raw.data.web_gpu_borrowed_textures) },
             c.MLN_RENDER_TARGET_KIND_EXPORTED_RING => .{ .exported_ring = try ExportedRingTarget.fromNative(allocator, raw.data.exported_ring) },
             c.MLN_RENDER_TARGET_KIND_WEB_CANVAS => .{ .web_canvas = try WebCanvasTarget.fromNative(allocator, raw.data.web_canvas) },
+            c.MLN_RENDER_TARGET_KIND_D3D12_BORROWED_TEXTURES => .{ .d3d12_borrowed_textures = try D3d12BorrowedTexturesTarget.fromNative(allocator, raw.data.d3d12_borrowed_textures) },
+            c.MLN_RENDER_TARGET_KIND_D3D12_COMPOSITION => .{ .d3d12_composition = D3d12CompositionTarget.fromNative(raw.data.d3d12_composition) },
             else => return error.NativeError,
         };
     }
@@ -7539,8 +8394,10 @@ pub const RenderTargetKindFlag = struct {
     web_gpu_borrowed_textures: bool = false,
     exported_ring: bool = false,
     web_canvas: bool = false,
+    d3d12_borrowed_textures: bool = false,
+    d3d12_composition: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536 };
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -7954,15 +8811,20 @@ pub const ResourceResponse = struct {
     bytes: []const u8 = &.{},
     /// A description of the error, for `ResourceResponseStatus.@"error"`.
     error_message: []const u8 = &.{},
-    /// Whether the library must request the resource again before it reuses
-    /// this copy.
+    /// Whether the library must not use this copy once it expires until it
+    /// requests the resource again, not even while the server can't be reached,
+    /// as `Cache-Control: must-revalidate` or `no-cache` says.
     must_revalidate: bool = false,
     modified_unix_ms: ?i64 = null,
+    /// When this copy stops being fresh. Without it, the copy never expires.
     expires_unix_ms: ?i64 = null,
     /// Empty when the resource has no ETag.
     etag: []const u8 = &.{},
     /// When to retry, for `ResourceResponseStatus.@"error"`.
     retry_after_unix_ms: ?i64 = null,
+    /// Whether the library must not store this copy, as `Cache-Control:
+    /// no-store` says.
+    no_store: bool = false,
     pub fn toNative(self: ResourceResponse) status.Error!c.mln_resource_response {
         var raw = std.mem.zeroes(c.mln_resource_response);
         raw.fields = 0;
@@ -7977,6 +8839,7 @@ pub const ResourceResponse = struct {
         marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_EXPIRES, &raw.expires_unix_ms, self.expires_unix_ms);
         raw.etag = marshal.view(self.etag);
         marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_RETRY_AFTER, &raw.retry_after_unix_ms, self.retry_after_unix_ms);
+        raw.no_store = self.no_store;
         return raw;
     }
 
@@ -7991,6 +8854,7 @@ pub const ResourceResponse = struct {
             .expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_EXPIRES != 0) raw.expires_unix_ms else null,
             .etag = try marshal.copyView(allocator, raw.etag),
             .retry_after_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_RETRY_AFTER != 0) raw.retry_after_unix_ms else null,
+            .no_store = raw.no_store,
         };
     }
 };

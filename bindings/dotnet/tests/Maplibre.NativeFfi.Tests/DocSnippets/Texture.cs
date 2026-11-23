@@ -24,6 +24,10 @@ internal static class Texture
     // The host's draw, which samples the image view.
     private static void DrawMap(ulong imageView) { }
 
+    // The host's wait for a GPU sync, as for an acquired frame's producer
+    // sync.
+    private static void WaitForSync(GpuSync sync) { }
+
     private static void DestroyTextures(
         ulong[] images,
         ulong[] views
@@ -132,7 +136,12 @@ internal static class Texture
             }
         );
 
-        await session.SetTargetAsync(resized);
+        var sync = await session.SetTargetAsync(resized);
+        // Wait for its sync before you destroy the old textures.
+        if (sync is { } replaced)
+        {
+            WaitForSync(replaced);
+        }
         // vkDestroyImageView and vkDestroyImage
         DestroyTextures(images, views);
         // #endregion resize-borrowed

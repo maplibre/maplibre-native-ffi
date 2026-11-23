@@ -522,7 +522,9 @@ def lower(api: Api | BoundApi) -> Lowered:
             f"        NativeHandleState<{native_type}>.Adopt(handle, () => new {owner}({argument}handle{extra_argument}), Abandon);\n"
             f"\n    private static mln_status Abandon({native_type} live, mln_diagnostic* diagnostic) {abandon}\n"
             f"\n    NativeHandleState<{native_type}> INativeOwner<{native_type}>.State => state;\n"
-            f"    internal {native_type} Handle => state.Handle;\n"
+            # Not `Handle`, which an operation such as
+            # mln_gesture_recognizer_handle() names.
+            f"    internal {native_type} NativeHandle => state.Handle;\n"
             + (
                 "    /// <summary>\n"
                 "    /// The native handle value, which runtime events report as their\n"

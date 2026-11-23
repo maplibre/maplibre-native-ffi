@@ -31,6 +31,58 @@ public final class AndroidHardwareBufferFrameView {
   }
 }
 
+public final class D3d12TextureFrameView {
+  private let snapshot: D3d12TextureFrame
+  private let scope: NativeViewScope
+  init(_ value: D3d12TextureFrame, scope: NativeViewScope) {
+    snapshot = value; self.scope = scope
+  }
+
+  public var width: UInt32 {
+    snapshot.width
+  }
+
+  public var height: UInt32 {
+    snapshot.height
+  }
+
+  public var scaleFactor: Double {
+    snapshot.scaleFactor
+  }
+
+  public var slot: UInt32 {
+    snapshot.slot
+  }
+
+  public var resource: NativePointer {
+    get throws { try scope.check(); return snapshot.resource }
+  }
+
+  public var device: NativePointer {
+    get throws { try scope.check(); return snapshot.device }
+  }
+
+  public var format: UInt32 {
+    snapshot.format
+  }
+
+  public var state: UInt32 {
+    snapshot.state
+  }
+
+  public var depthResource: NativePointer {
+    get throws { try scope.check(); return snapshot.depthResource }
+  }
+
+  public var depthFormat: UInt32 {
+    snapshot.depthFormat
+  }
+
+  public var depthState: UInt32 {
+    snapshot.depthState
+  }
+}
+
 public final class DmaBufFrameView {
   private let snapshot: DmaBufFrame
   private let scope: NativeViewScope

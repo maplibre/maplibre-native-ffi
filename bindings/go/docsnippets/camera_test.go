@@ -14,35 +14,55 @@ func useCamera(camera maplibre.Camera) {}
 func flyEnded(completed bool) {}
 
 // #region gesture
-func beginGesture(m *maplibre.MapHandle) error {
-	return m.Discarding().ApplyCameraDelta(maplibre.CameraDelta{
-		GesturePhase: maplibre.GesturePhaseBegin,
-	})
+func createRecognizer(
+	m *maplibre.MapHandle,
+) (*maplibre.GestureRecognizerHandle, error) {
+	return m.GestureRecognizerCreate(nil)
 }
 
-func applyDrag(
-	m *maplibre.MapHandle, movement maplibre.ScreenPoint,
+func scheduleTick(result maplibre.GestureResult) {
+	// On the next frame, or at the result's NextTickMs.
+}
+
+func pointerDown(
+	recognizer *maplibre.GestureRecognizerHandle,
+	id uint32, position maplibre.ScreenPoint, timeMs float64,
 ) error {
-	return m.Discarding().ApplyCameraDelta(maplibre.CameraDelta{
-		Offset:       &movement,
-		GesturePhase: maplibre.GesturePhaseUpdate,
-	})
+	result, err := recognizer.Handle(maplibre.GestureInputPointerDownVariant{
+		Value: maplibre.GesturePointerDown{
+			ID: id, Kind: maplibre.PointerKindTouch, Position: position,
+		},
+	}, timeMs)
+	if err != nil {
+		return err
+	}
+	scheduleTick(result)
+	return nil
 }
 
-func applyPinch(
-	m *maplibre.MapHandle, scale float64, center maplibre.ScreenPoint,
+func pointerMove(
+	recognizer *maplibre.GestureRecognizerHandle,
+	id uint32, position maplibre.ScreenPoint, timeMs float64,
 ) error {
-	return m.Discarding().ApplyCameraDelta(maplibre.CameraDelta{
-		Scale:        &scale,
-		Anchor:       &center,
-		GesturePhase: maplibre.GesturePhaseUpdate,
-	})
+	result, err := recognizer.Handle(maplibre.GestureInputPointerMoveVariant{
+		Value: maplibre.GesturePointer{ID: id, Position: position},
+	}, timeMs)
+	if err != nil {
+		return err
+	}
+	scheduleTick(result)
+	return nil
 }
 
-func endGesture(m *maplibre.MapHandle) error {
-	return m.Discarding().ApplyCameraDelta(maplibre.CameraDelta{
-		GesturePhase: maplibre.GesturePhaseEnd,
-	})
+func tick(
+	recognizer *maplibre.GestureRecognizerHandle, timeMs float64,
+) error {
+	result, err := recognizer.Tick(timeMs)
+	if err != nil {
+		return err
+	}
+	scheduleTick(result)
+	return nil
 }
 
 // #endregion gesture
@@ -128,11 +148,15 @@ func camera(ctx context.Context, m *maplibre.MapHandle) error {
 	}
 	// #endregion limit
 
+	recognizer, err := createRecognizer(m)
+	if err != nil {
+		return err
+	}
 	err = errors.Join(
-		beginGesture(m),
-		applyDrag(m, maplibre.ScreenPoint{X: 12, Y: -4}),
-		applyPinch(m, 1.1, maplibre.ScreenPoint{X: 200, Y: 150}),
-		endGesture(m),
+		pointerDown(recognizer, 1, maplibre.ScreenPoint{X: 100, Y: 100}, 0),
+		pointerMove(recognizer, 1, maplibre.ScreenPoint{X: 112, Y: 96}, 16),
+		tick(recognizer, 32),
+		recognizer.Release(),
 	)
 	if err != nil {
 		return err

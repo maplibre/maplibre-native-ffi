@@ -48,7 +48,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         NativeMethods.mln_map_dispose(live, diagnostic);
 
     NativeHandleState<MlnMap> INativeOwner<MlnMap>.State => state;
-    internal MlnMap Handle => state.Handle;
+    internal MlnMap NativeHandle => state.Handle;
 
     /// <summary>
     /// The native handle value, which runtime events report as their
@@ -82,6 +82,41 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Creates a gesture recognizer that moves <c>map</c>'s camera.
+    /// </summary>
+    /// <remarks>
+    /// <para>Its moves go to the map as camera commands, which apply
+    /// asynchronously, and the map's snapshot and camera events report them as
+    /// gestures. After the map is released, its moves do nothing.
+    /// <c>options</c> may be null for every default.</para>
+    /// <para>See <c>mln_gesture_recognizer_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c> when an option is out
+    /// of range.</description></item>
+    /// </list>
+    /// </remarks>
+    public GestureRecognizerHandle GestureRecognizerCreate(GestureOptions? options = null)
+    {
+        using var scope = new NativeCallScope(this);
+        var nativeOptions = options is null
+            ? default(mln_gesture_options)
+            : NativeGestureOptions(options, scope);
+        MlnGestureRecognizer outRecognizer = default;
+        Check(
+            NativeMethods.mln_gesture_recognizer_create(
+                NativeHandle,
+                options is null ? null : &nativeOptions,
+                &outRecognizer,
+                Diagnostic
+            )
+        );
+        scope.Accept();
+        return GestureRecognizerHandle.Adopt(outRecognizer);
+    }
+
+    /// <summary>
     /// Adds a source whose GeoJSON tiles come from callbacks.
     /// </summary>
     /// <remarks>
@@ -105,7 +140,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeOptions = NativeCustomGeometrySourceOptions(options, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_custom_geometry_source(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             &nativeOptions,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -153,7 +188,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeHost = NativeCustomLayerHost(host, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_custom_layer(
-            Handle,
+            NativeHandle,
             scope.Utf8(layerId),
             beforeLayerId is null ? default : scope.Utf8(beforeLayerId),
             &nativeHost,
@@ -187,7 +222,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeOptions = NativeCustomVectorSourceOptions(options, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_custom_vector_source(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             &nativeOptions,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -231,7 +266,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             : NativeGeoJsonSourceOptions(options, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_geo_json_source(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             options is null ? null : &nativeOptions,
             attribution is null ? default : scope.Utf8(attribution),
@@ -268,7 +303,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeImage = NativePremultipliedRgba8Image(image, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_image_source_image(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             scope.Array<mln_lat_lng, LatLng>(
                 coordinates,
@@ -312,7 +347,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_style_layer_json(
-            Handle,
+            NativeHandle,
             scope.Utf8(layerJson),
             beforeLayerId is null ? default : scope.Utf8(beforeLayerId),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -344,7 +379,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_add_style_source_json(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             scope.Utf8(sourceJson),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -354,7 +389,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Moves the camera relative to where it is, as a gesture does.
+    /// Moves the camera relative to where it is.
     /// </summary>
     /// <remarks>
     /// <para><c>delta</c> can pan the map's content by an offset on the screen,
@@ -367,19 +402,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// animation left the camera, so the rest of the replaced change never
     /// happens. To reach an exact camera, use
     /// <c>MapHandle.UpdateCameraAsync()</c>.</para>
-    /// <para>A delta in the end phase can carry momentum, which keeps the
-    /// camera moving from the gesture's release velocities and slows it on each
-    /// rendered frame. The gesture lasts until the momentum ends: the snapshot
-    /// keeps <c>gesture_in_progress</c> set, and camera events report
-    /// <c>CameraChangeSource.Momentum</c>. With momentum, <c>animation</c> sets
-    /// only <c>transition_id</c> and the end handler, which runs when the
-    /// gesture ends.</para>
-    /// <para>A delta in the begin phase,
-    /// <c>MapHandle.CancelCameraTransitionsAsync()</c>, or a cancellation by
-    /// that ID stops the momentum. A later command that sets a field stops only
-    /// the parts of the momentum that move that field. On a tilted map, the pan
-    /// moves the map's content the same distance on the screen in every
-    /// direction.</para>
     /// <para>See <c>mln_map_apply_camera_delta</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
     /// </remarks>
@@ -389,7 +411,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeDelta = NativeCameraDelta(delta, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_apply_camera_delta(
-            Handle,
+            NativeHandle,
             &nativeDelta,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -443,7 +465,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         MlnRenderSession outSession = default;
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_attach(
-            Handle,
+            NativeHandle,
             &nativeTarget,
             scope.UseOptional(device),
             &nativeOptions,
@@ -471,7 +493,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_begin_command_group(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -505,7 +527,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             : NativeCameraFitOptions(fitOptions);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_camera_for_geometry(
-            Handle,
+            NativeHandle,
             scope.Utf8(geometry),
             fitOptions is null ? null : &nativeFitOptions,
             NativeCompletion.Start<CameraOptions>(
@@ -548,7 +570,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             : NativeCameraFitOptions(fitOptions);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_camera_for_lat_lng_bounds(
-            Handle,
+            NativeHandle,
             NativeLatLngBounds(bounds),
             fitOptions is null ? null : &nativeFitOptions,
             NativeCompletion.Start<CameraOptions>(
@@ -591,7 +613,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             : NativeCameraFitOptions(fitOptions);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_camera_for_lat_lngs(
-            Handle,
+            NativeHandle,
             scope.Array<mln_lat_lng, LatLng>(
                 coordinates,
                 static (item, scope) => NativeLatLng(item)
@@ -626,7 +648,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_cancel_camera_transitions(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -648,7 +670,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_cancel_camera_transitions_with_id(
-            Handle,
+            NativeHandle,
             transitionId,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -668,7 +690,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_dump_debug_logs(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -687,7 +709,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_end_command_group(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -719,7 +741,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeUpdate = NativeCameraFitUpdate(update, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_fit_camera_to_geometry(
-            Handle,
+            NativeHandle,
             scope.Utf8(geometry),
             &nativeUpdate,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -755,7 +777,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeUpdate = NativeCameraFitUpdate(update, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_fit_camera_to_lat_lng_bounds(
-            Handle,
+            NativeHandle,
             NativeLatLngBounds(bounds),
             &nativeUpdate,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -791,7 +813,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeUpdate = NativeCameraFitUpdate(update, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_fit_camera_to_lat_lngs(
-            Handle,
+            NativeHandle,
             scope.Array<mln_lat_lng, LatLng>(
                 coordinates,
                 static (item, scope) => NativeLatLng(item)
@@ -818,7 +840,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_camera(
-            Handle,
+            NativeHandle,
             NativeCompletion.Start<CameraQueryResult>(
                 &nativeCompletion,
                 static nativeResult =>
@@ -849,7 +871,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeSelector = NativeFeatureStateSelector(selector, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_feature_state(
-            Handle,
+            NativeHandle,
             &nativeSelector,
             NativeCompletion.Start<string>(
                 &nativeCompletion,
@@ -877,7 +899,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_global_state(
-            Handle,
+            NativeHandle,
             NativeCompletion.Start<string>(
                 &nativeCompletion,
                 static nativeResult =>
@@ -912,7 +934,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_image_source_coordinates(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             NativeCompletion.Start<LatLng[]>(
                 &nativeCompletion,
@@ -939,7 +961,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_loaded_style_json(
-            Handle,
+            NativeHandle,
             NativeCompletion.Start<string>(
                 &nativeCompletion,
                 static nativeResult =>
@@ -973,7 +995,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     {
         using var call = Enter(this);
         var outSnapshot = new mln_map_snapshot { size = (uint)sizeof(mln_map_snapshot) };
-        Check(NativeMethods.mln_map_get_snapshot(Handle, &outSnapshot, Diagnostic));
+        Check(NativeMethods.mln_map_get_snapshot(NativeHandle, &outSnapshot, Diagnostic));
         return CopyMapSnapshot(outSnapshot);
     }
 
@@ -991,7 +1013,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_image(
-            Handle,
+            NativeHandle,
             scope.Utf8(imageId),
             NativeCompletion.Start<StyleImageInfo?>(
                 &nativeCompletion,
@@ -1021,7 +1043,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_layer(
-            Handle,
+            NativeHandle,
             scope.Utf8(layerId),
             NativeCompletion.Start<StyleLayerInfo?>(
                 &nativeCompletion,
@@ -1052,7 +1074,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_layer_json(
-            Handle,
+            NativeHandle,
             scope.Utf8(layerId),
             NativeCompletion.Start<string?>(
                 &nativeCompletion,
@@ -1090,7 +1112,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_layer_property(
-            Handle,
+            NativeHandle,
             scope.Utf8(layerId),
             scope.Utf8(propertyName),
             NativeCompletion.Start<string?>(
@@ -1124,7 +1146,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_light_property(
-            Handle,
+            NativeHandle,
             scope.Utf8(propertyName),
             NativeCompletion.Start<string?>(
                 &nativeCompletion,
@@ -1165,7 +1187,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_root_property(
-            Handle,
+            NativeHandle,
             scope.Utf8(propertyName),
             NativeCompletion.Start<string?>(
                 &nativeCompletion,
@@ -1198,7 +1220,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_source(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             NativeCompletion.Start<StyleSourceInfo?>(
                 &nativeCompletion,
@@ -1226,7 +1248,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_transition_options(
-            Handle,
+            NativeHandle,
             NativeCompletion.Start<StyleTransitionOptions>(
                 &nativeCompletion,
                 static nativeResult =>
@@ -1255,7 +1277,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_get_style_url(
-            Handle,
+            NativeHandle,
             NativeCompletion.Start<string>(
                 &nativeCompletion,
                 static nativeResult =>
@@ -1294,7 +1316,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_invalidate_custom_geometry_source_region(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             NativeLatLngBounds(bounds),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -1327,7 +1349,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_invalidate_custom_geometry_source_tile(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -1360,7 +1382,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_invalidate_custom_vector_source_region(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             NativeLatLngBounds(bounds),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -1392,7 +1414,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_invalidate_custom_vector_source_tile(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -1417,7 +1439,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeCamera = NativeCameraOptions(camera);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_lat_lng_bounds_for_camera(
-            Handle,
+            NativeHandle,
             &nativeCamera,
             NativeCompletion.Start<LatLngBounds>(
                 &nativeCompletion,
@@ -1445,7 +1467,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_list_style_layers(
-            Handle,
+            NativeHandle,
             NativeCompletion.Start<StyleLayerInfo[]>(
                 &nativeCompletion,
                 static nativeResult =>
@@ -1472,7 +1494,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_list_style_sources(
-            Handle,
+            NativeHandle,
             NativeCompletion.Start<StyleSourceInfo[]>(
                 &nativeCompletion,
                 static nativeResult =>
@@ -1509,7 +1531,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_move_style_layer(
-            Handle,
+            NativeHandle,
             scope.Utf8(layerId),
             beforeLayerId is null ? default : scope.Utf8(beforeLayerId),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -1559,7 +1581,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeSelector = NativeFeatureStateSelector(selector, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_remove_feature_state(
-            Handle,
+            NativeHandle,
             &nativeSelector,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -1587,7 +1609,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_remove_style_image(
-            Handle,
+            NativeHandle,
             scope.Utf8(imageId),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -1615,7 +1637,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_remove_style_layer(
-            Handle,
+            NativeHandle,
             scope.Utf8(layerId),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -1643,7 +1665,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_remove_style_source(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -1663,7 +1685,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_request_repaint(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -1711,7 +1733,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_request_still_image(
-            Handle,
+            NativeHandle,
             NativeCompletion.StartUnit(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -1740,7 +1762,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_resize(
-            Handle,
+            NativeHandle,
             NativeLogicalExtent(extent),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -1756,6 +1778,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// When the camera is outside the new limits, it moves inside them.</para>
     /// <para>See <c>mln_map_set_bounds</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidArgument</c>, changing nothing, when
+    /// the minimum zoom would be above the maximum zoom, the minimum pitch
+    /// above the maximum pitch, or the maximum zoom below the lowest zoom the
+    /// map can show at its size.</description></item>
+    /// </list>
     /// </remarks>
     public Task<CommandCompletion> SetBoundsAsync(BoundOptions options)
     {
@@ -1763,7 +1792,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeOptions = NativeBoundOptions(options);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_bounds(
-            Handle,
+            NativeHandle,
             &nativeOptions,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -1798,7 +1827,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_custom_geometry_source_tile_data(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
             scope.Utf8(data),
@@ -1832,7 +1861,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_custom_geometry_source_tile_error(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
             scope.Utf8(message),
@@ -1871,7 +1900,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             using var scope = new NativeCallScope(this);
             mln_completion nativeCompletion;
             var nativeStatus = NativeMethods.mln_map_set_custom_vector_source_tile_data(
-                Handle,
+                NativeHandle,
                 scope.Utf8(sourceId),
                 NativeCanonicalTileId(tileId),
                 (mln_style_vector_tile_encoding)encoding,
@@ -1906,7 +1935,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_custom_vector_source_tile_error(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
             scope.Utf8(message),
@@ -1929,7 +1958,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_debug_flags(
-            Handle,
+            NativeHandle,
             (uint)flags,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -1949,7 +1978,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_event_mask(
-            Handle,
+            NativeHandle,
             (ulong)mask,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -1980,7 +2009,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeSelector = NativeFeatureStateSelector(selector, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_feature_state(
-            Handle,
+            NativeHandle,
             &nativeSelector,
             scope.Utf8(state),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2005,7 +2034,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeOptions = NativeFreeCameraOptions(options);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_free_camera_options(
-            Handle,
+            NativeHandle,
             &nativeOptions,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2051,7 +2080,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_geo_json_source_data(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             scope.Utf8(data),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2090,7 +2119,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_geo_json_source_synchronous_tiling(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             (byte)(enabled ? 1 : 0),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2121,7 +2150,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_geo_json_source_url(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             scope.Utf8(url),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2150,7 +2179,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_global_state_property(
-            Handle,
+            NativeHandle,
             scope.Utf8(propertyName),
             scope.Utf8(value),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2176,7 +2205,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_globe_free_bearing_enabled(
-            Handle,
+            NativeHandle,
             (byte)(enabled ? 1 : 0),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2211,7 +2240,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_image_source_coordinates(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             scope.Array<mln_lat_lng, LatLng>(
                 coordinates,
@@ -2250,7 +2279,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeImage = NativePremultipliedRgba8Image(image, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_image_source_image(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             &nativeImage,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2281,7 +2310,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_image_source_url(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             scope.Utf8(url),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2306,7 +2335,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeOptions = NativeProjectionModeOptions(options);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_projection_mode(
-            Handle,
+            NativeHandle,
             &nativeOptions,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2326,7 +2355,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_rendering_stats_view_enabled(
-            Handle,
+            NativeHandle,
             (byte)(enabled ? 1 : 0),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2361,7 +2390,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             : NativeStyleImageOptions(options, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_image(
-            Handle,
+            NativeHandle,
             scope.Utf8(imageId),
             &nativeImage,
             options is null ? null : &nativeOptions,
@@ -2391,7 +2420,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_json(
-            Handle,
+            NativeHandle,
             scope.Utf8(json),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2428,7 +2457,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_layer_property(
-            Handle,
+            NativeHandle,
             scope.Utf8(layerId),
             scope.Utf8(propertyName),
             scope.Utf8(value),
@@ -2456,7 +2485,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_light_property(
-            Handle,
+            NativeHandle,
             scope.Utf8(propertyName),
             scope.Utf8(value),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2496,7 +2525,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_root_property(
-            Handle,
+            NativeHandle,
             scope.Utf8(propertyName),
             scope.Utf8(value),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2527,7 +2556,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_source_volatile(
-            Handle,
+            NativeHandle,
             scope.Utf8(sourceId),
             (byte)(isVolatile ? 1 : 0),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
@@ -2555,7 +2584,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeOptions = NativeStyleTransitionOptions(options);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_transition_options(
-            Handle,
+            NativeHandle,
             &nativeOptions,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2591,7 +2620,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         using var scope = new NativeCallScope(this);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_style_url(
-            Handle,
+            NativeHandle,
             scope.Utf8(url),
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2614,7 +2643,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeOptions = NativeMapTileOptions(options);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_tile_options(
-            Handle,
+            NativeHandle,
             &nativeOptions,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2637,7 +2666,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeOptions = NativeMapViewportOptions(options);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_set_viewport_options(
-            Handle,
+            NativeHandle,
             &nativeOptions,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2663,7 +2692,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         var nativeUpdate = NativeCameraUpdate(update, scope);
         mln_completion nativeCompletion;
         var nativeStatus = NativeMethods.mln_map_update_camera(
-            Handle,
+            NativeHandle,
             &nativeUpdate,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
@@ -2692,7 +2721,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void AddCustomGeometrySource(string sourceId, CustomGeometrySourceOptions options)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeOptions = NativeCustomGeometrySourceOptions(options, scope);
             Check(
@@ -2709,7 +2738,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void AddCustomLayer(string layerId, string? beforeLayerId, CustomLayerHost host)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeHost = NativeCustomLayerHost(host, scope);
             Check(
@@ -2727,7 +2756,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void AddCustomVectorSource(string sourceId, CustomVectorSourceOptions options)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeOptions = NativeCustomVectorSourceOptions(options, scope);
             Check(
@@ -2748,7 +2777,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             string? attribution = null
         )
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeOptions = options is null
                 ? default(mln_geo_json_source_options)
@@ -2772,7 +2801,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             PremultipliedRgba8Image image
         )
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeImage = NativePremultipliedRgba8Image(image, scope);
             Check(
@@ -2794,7 +2823,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void AddStyleLayerJson(string layerJson, string? beforeLayerId = null)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_add_style_layer_json(
@@ -2810,7 +2839,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void AddStyleSourceJson(string sourceId, string sourceJson)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_add_style_source_json(
@@ -2826,7 +2855,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void ApplyCameraDelta(CameraDelta delta)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeDelta = NativeCameraDelta(delta, scope);
             Check(
@@ -2842,7 +2871,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void BeginCommandGroup()
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(NativeMethods.mln_map_begin_command_group(receiverHandle, null, Diagnostic));
             scope.Accept();
@@ -2850,7 +2879,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void CancelCameraTransitions()
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_cancel_camera_transitions(receiverHandle, null, Diagnostic)
@@ -2860,7 +2889,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void CancelCameraTransitionsWithId(ulong transitionId)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_cancel_camera_transitions_with_id(
@@ -2875,7 +2904,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void DumpDebugLogs()
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(NativeMethods.mln_map_dump_debug_logs(receiverHandle, null, Diagnostic));
             scope.Accept();
@@ -2883,7 +2912,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void EndCommandGroup()
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(NativeMethods.mln_map_end_command_group(receiverHandle, null, Diagnostic));
             scope.Accept();
@@ -2891,7 +2920,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void FitCameraToGeometry(string geometry, CameraFitUpdate update)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeUpdate = NativeCameraFitUpdate(update, scope);
             Check(
@@ -2908,7 +2937,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void FitCameraToLatLngBounds(LatLngBounds bounds, CameraFitUpdate update)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeUpdate = NativeCameraFitUpdate(update, scope);
             Check(
@@ -2925,7 +2954,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void FitCameraToLatLngs(LatLng[] coordinates, CameraFitUpdate update)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeUpdate = NativeCameraFitUpdate(update, scope);
             Check(
@@ -2946,7 +2975,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void InvalidateCustomGeometrySourceRegion(string sourceId, LatLngBounds bounds)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_invalidate_custom_geometry_source_region(
@@ -2962,7 +2991,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void InvalidateCustomGeometrySourceTile(string sourceId, CanonicalTileId tileId)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_invalidate_custom_geometry_source_tile(
@@ -2978,7 +3007,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void InvalidateCustomVectorSourceRegion(string sourceId, LatLngBounds bounds)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_invalidate_custom_vector_source_region(
@@ -2994,7 +3023,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void InvalidateCustomVectorSourceTile(string sourceId, CanonicalTileId tileId)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_invalidate_custom_vector_source_tile(
@@ -3010,7 +3039,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void MoveStyleLayer(string layerId, string? beforeLayerId = null)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_move_style_layer(
@@ -3026,7 +3055,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void RemoveFeatureState(FeatureStateSelector selector)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeSelector = NativeFeatureStateSelector(selector, scope);
             Check(
@@ -3042,7 +3071,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void RemoveStyleImage(string imageId)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_remove_style_image(
@@ -3057,7 +3086,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void RemoveStyleLayer(string layerId)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_remove_style_layer(
@@ -3072,7 +3101,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void RemoveStyleSource(string sourceId)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_remove_style_source(
@@ -3087,7 +3116,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void RequestRepaint()
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(NativeMethods.mln_map_request_repaint(receiverHandle, null, Diagnostic));
             scope.Accept();
@@ -3095,7 +3124,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void Resize(LogicalExtent extent)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_resize(
@@ -3110,7 +3139,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetBounds(BoundOptions options)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeOptions = NativeBoundOptions(options);
             Check(
@@ -3125,7 +3154,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             string data
         )
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_custom_geometry_source_tile_data(
@@ -3146,7 +3175,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             string message
         )
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_custom_geometry_source_tile_error(
@@ -3170,7 +3199,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         {
             fixed (byte* pinnedData = data)
             {
-                var receiverHandle = owner.Handle;
+                var receiverHandle = owner.NativeHandle;
                 using var scope = new NativeCallScope(owner);
                 Check(
                     NativeMethods.mln_map_set_custom_vector_source_tile_data(
@@ -3193,7 +3222,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             string message
         )
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_custom_vector_source_tile_error(
@@ -3210,7 +3239,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetDebugFlags(MapDebugFlag flags)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_debug_flags(receiverHandle, (uint)flags, null, Diagnostic)
@@ -3220,7 +3249,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetEventMask(RuntimeEventFlag mask)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_event_mask(receiverHandle, (ulong)mask, null, Diagnostic)
@@ -3230,7 +3259,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetFeatureState(FeatureStateSelector selector, string state)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeSelector = NativeFeatureStateSelector(selector, scope);
             Check(
@@ -3247,7 +3276,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetFreeCameraOptions(FreeCameraOptions options)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeOptions = NativeFreeCameraOptions(options);
             Check(
@@ -3263,7 +3292,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetGeoJsonSourceData(string sourceId, string data)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_geo_json_source_data(
@@ -3279,7 +3308,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetGeoJsonSourceSynchronousTiling(string sourceId, bool enabled)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_geo_json_source_synchronous_tiling(
@@ -3295,7 +3324,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetGeoJsonSourceUrl(string sourceId, string url)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_geo_json_source_url(
@@ -3311,7 +3340,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetGlobalStateProperty(string propertyName, string value)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_global_state_property(
@@ -3327,7 +3356,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetGlobeFreeBearingEnabled(bool enabled)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_globe_free_bearing_enabled(
@@ -3342,7 +3371,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetImageSourceCoordinates(string sourceId, LatLng[] coordinates)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_image_source_coordinates(
@@ -3362,7 +3391,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetImageSourceImage(string sourceId, PremultipliedRgba8Image image)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeImage = NativePremultipliedRgba8Image(image, scope);
             Check(
@@ -3379,7 +3408,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetImageSourceUrl(string sourceId, string url)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_image_source_url(
@@ -3395,7 +3424,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetProjectionMode(ProjectionModeOptions options)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeOptions = NativeProjectionModeOptions(options);
             Check(
@@ -3411,7 +3440,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetRenderingStatsViewEnabled(bool enabled)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_rendering_stats_view_enabled(
@@ -3430,7 +3459,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             StyleImageOptions? options = null
         )
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeImage = NativePremultipliedRgba8Image(image, scope);
             var nativeOptions = options is null
@@ -3451,7 +3480,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetStyleJson(string json)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_style_json(
@@ -3466,7 +3495,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetStyleLayerProperty(string layerId, string propertyName, string value)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_style_layer_property(
@@ -3483,7 +3512,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetStyleLightProperty(string propertyName, string value)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_style_light_property(
@@ -3499,7 +3528,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetStyleRootProperty(string propertyName, string value)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_style_root_property(
@@ -3515,7 +3544,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetStyleSourceVolatile(string sourceId, bool isVolatile)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_style_source_volatile(
@@ -3531,7 +3560,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetStyleTransitionOptions(StyleTransitionOptions options)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeOptions = NativeStyleTransitionOptions(options);
             Check(
@@ -3547,7 +3576,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetStyleUrl(string url)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             Check(
                 NativeMethods.mln_map_set_style_url(
@@ -3562,7 +3591,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetTileOptions(MapTileOptions options)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeOptions = NativeMapTileOptions(options);
             Check(
@@ -3578,7 +3607,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void SetViewportOptions(MapViewportOptions options)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeOptions = NativeMapViewportOptions(options);
             Check(
@@ -3594,7 +3623,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
         public void UpdateCamera(CameraUpdate update)
         {
-            var receiverHandle = owner.Handle;
+            var receiverHandle = owner.NativeHandle;
             using var scope = new NativeCallScope(owner);
             var nativeUpdate = NativeCameraUpdate(update, scope);
             Check(

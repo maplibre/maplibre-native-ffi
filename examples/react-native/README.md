@@ -30,6 +30,8 @@ which installs the binding in the runtime and draws on a native view,
 `MaplibreSurfaceView`.
 
 `src/MapController.ts` attaches a render session to the view's surface, gives
-the session each new surface, and runs the frame loop, as the browser demo in
-`examples/browser` does. Both sessions render on a library thread, and on
-Android the library makes the OpenGL ES context for the window.
+the session each new surface, and paces its frames to the display, as the ArkUI
+example in `examples/arkui` does. Both sessions render on a library thread, and
+on Android the library makes the OpenGL ES context for the window.
+`src/gestures.ts` passes the view's touches to the map's gesture recognizer,
+which moves the camera.

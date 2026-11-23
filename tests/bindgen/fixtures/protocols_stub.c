@@ -11,6 +11,7 @@
 #define MLN_PROTOCOL_DEFAULTS
 #define MLN_PROTOCOL_ABSENT_HANDLE
 #define MLN_PROTOCOL_STRIDED_RECORDS
+#define MLN_PROTOCOL_COUNTED_INLINE_ARRAY
 #include <stdlib.h>
 #include <string.h>
 
@@ -234,5 +235,36 @@ mln_status mln_probe_zeros_text(
     out_text[index] = '0';
   }
   out_text[count] = 0;
+  return MLN_STATUS_OK;
+}
+
+mln_status mln_probe_tracker_open(
+  mln_probe_tracker* out_tracker, mln_diagnostic* out_diagnostic
+) {
+  if (out_tracker == NULL) {
+    return fail(out_diagnostic, "missing tracker output");
+  }
+  *out_tracker = 7;
+  return MLN_STATUS_OK;
+}
+
+void mln_probe_tracker_release(mln_probe_tracker tracker) { (void)tracker; }
+
+// Fills every slot but counts only a tap and a level as in use, so a binding
+// that reads past the count sees a third mark.
+mln_status mln_probe_tracker_poll(
+  mln_probe_tracker tracker, mln_probe_marks* out_marks,
+  mln_diagnostic* out_diagnostic
+) {
+  if (tracker != 7 || out_marks == NULL) {
+    return fail(out_diagnostic, "missing tracker or marks");
+  }
+  for (size_t index = 0; index < 4; ++index) {
+    out_marks->marks[index].type = MLN_PROBE_MARK_LEVEL;
+    out_marks->marks[index].data.level = (double)index;
+  }
+  out_marks->marks[0].type = MLN_PROBE_MARK_TAP;
+  out_marks->marks[0].data.tap.id = 9;
+  out_marks->mark_count = 2;
   return MLN_STATUS_OK;
 }

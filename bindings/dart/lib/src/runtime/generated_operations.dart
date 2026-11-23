@@ -11,6 +11,21 @@ AndroidHardwareBufferFrame _readAndroidHardwareBufferFrame(
   buffer: NativePointer(source.buffer.address),
 );
 
+D3d12TextureFrame _readD3d12TextureFrame(raw.mln_d3d12_texture_frame source) =>
+    D3d12TextureFrame(
+      width: source.width,
+      height: source.height,
+      scaleFactor: source.scale_factor,
+      slot: source.slot,
+      resource: NativePointer(source.resource.address),
+      device: NativePointer(source.device.address),
+      format: source.format,
+      state: source.state,
+      depthResource: NativePointer(source.depth_resource.address),
+      depthFormat: source.depth_format,
+      depthState: source.depth_state,
+    );
+
 DmaBufPlane _readDmaBufPlane(raw.mln_dma_buf_plane source) =>
     DmaBufPlane(fd: source.fd, offset: source.offset, stride: source.stride);
 
@@ -444,26 +459,346 @@ Pointer<raw.mln_logical_size> _writeLogicalSize(
   return result;
 }
 
-Pointer<raw.mln_frame_pacer_options> _writeFramePacerOptions(
-  FramePacerOptions value,
+Pointer<raw.mln_unit_bezier> _writeUnitBezier(
+  UnitBezier value,
   Allocator arena, {
-  Pointer<raw.mln_frame_pacer_options>? into,
+  Pointer<raw.mln_unit_bezier>? into,
 }) {
-  final result = into ?? arena<raw.mln_frame_pacer_options>();
-  result.ref.size = sizeOf<raw.mln_frame_pacer_options>();
-  if (value.unlimitedFramesPerSecond) {
-    result.ref.fields |= raw.MLN_FRAME_PACER_OPTION_UNLIMITED_FRAMES_PER_SECOND;
+  final result = into ?? arena<raw.mln_unit_bezier>();
+  result.ref.x1 = value.x1;
+  result.ref.y1 = value.y1;
+  result.ref.x2 = value.x2;
+  result.ref.y2 = value.y2;
+  return result;
+}
+
+Pointer<raw.mln_momentum_decay> _writeMomentumDecay(
+  MomentumDecay value,
+  Allocator arena, {
+  Pointer<raw.mln_momentum_decay>? into,
+}) {
+  final result = into ?? arena<raw.mln_momentum_decay>();
+  if (value.model != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MODEL;
+    result.ref.model = value.model!.rawValue;
   }
-  if (value.maximumFramesPerSecond != null) {
-    result.ref.fields |= raw.MLN_FRAME_PACER_OPTION_MAXIMUM_FRAMES_PER_SECOND;
-    result.ref.maximum_frames_per_second = _nativeInteger(
-      value.maximumFramesPerSecond!,
-      0,
-      4294967295,
-    );
+  if (value.halfLifeMs != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
+    result.ref.half_life_ms = value.halfLifeMs!;
+  }
+  if (value.stopSpeed != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_STOP_SPEED;
+    result.ref.stop_speed = value.stopSpeed!;
+  }
+  if (value.referenceSpeed != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_REFERENCE_SPEED;
+    result.ref.reference_speed = value.referenceSpeed!;
+  }
+  if (value.durationMs != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_DURATION_MS;
+    result.ref.duration_ms = value.durationMs!;
+  }
+  if (value.durationExponent != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_DURATION_EXPONENT;
+    result.ref.duration_exponent = value.durationExponent!;
+  }
+  if (value.easing != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_EASING;
+    result.ref.easing = _writeUnitBezier(value.easing!, arena).ref;
+  }
+  if (value.minSpeed != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MIN_SPEED;
+    result.ref.min_speed = value.minSpeed!;
+  }
+  if (value.maxSpeed != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MAX_SPEED;
+    result.ref.max_speed = value.maxSpeed!;
+  }
+  if (value.maxDistance != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MAX_DISTANCE;
+    result.ref.max_distance = value.maxDistance!;
   }
   return result;
 }
+
+Pointer<raw.mln_gesture_pan_options> _writeGesturePanOptions(
+  GesturePanOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_gesture_pan_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_gesture_pan_options>();
+  if (value.enabled != null) {
+    result.ref.fields |= raw.MLN_GESTURE_PAN_OPTION_ENABLED;
+    result.ref.enabled = value.enabled!;
+  }
+  if (value.glides != null) {
+    result.ref.fields |= raw.MLN_GESTURE_PAN_OPTION_GLIDES;
+    result.ref.glides = value.glides!;
+  }
+  if (value.momentum != null) {
+    result.ref.fields |= raw.MLN_GESTURE_PAN_OPTION_MOMENTUM;
+    result.ref.momentum = _writeMomentumDecay(value.momentum!, arena).ref;
+  }
+  return result;
+}
+
+Pointer<raw.mln_momentum_snap> _writeMomentumSnap(
+  MomentumSnap value,
+  Allocator arena, {
+  Pointer<raw.mln_momentum_snap>? into,
+}) {
+  final result = into ?? arena<raw.mln_momentum_snap>();
+  if (value.spacing != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_SPACING;
+    result.ref.spacing = value.spacing!;
+  }
+  if (value.offset != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_OFFSET;
+    result.ref.offset = value.offset!;
+  }
+  if (value.tolerance != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_TOLERANCE;
+    result.ref.tolerance = value.tolerance!;
+  }
+  if (value.durationMs != null) {
+    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_DURATION_MS;
+    result.ref.duration_ms = value.durationMs!;
+  }
+  return result;
+}
+
+Pointer<raw.mln_gesture_notch> _writeGestureNotch(
+  GestureNotch value,
+  Allocator arena, {
+  Pointer<raw.mln_gesture_notch>? into,
+}) {
+  final result = into ?? arena<raw.mln_gesture_notch>();
+  result.ref.spacing = value.spacing;
+  result.ref.offset = value.offset;
+  result.ref.kind = _nativeInteger(value.kind, 0, 4294967295);
+  return result;
+}
+
+Pointer<raw.mln_gesture_axis_options> _writeGestureAxisOptions(
+  GestureAxisOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_gesture_axis_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_gesture_axis_options>();
+  if (value.enabled != null) {
+    result.ref.fields |= raw.MLN_GESTURE_AXIS_OPTION_ENABLED;
+    result.ref.enabled = value.enabled!;
+  }
+  if (value.glides != null) {
+    result.ref.fields |= raw.MLN_GESTURE_AXIS_OPTION_GLIDES;
+    result.ref.glides = value.glides!;
+  }
+  if (value.momentum != null) {
+    result.ref.fields |= raw.MLN_GESTURE_AXIS_OPTION_MOMENTUM;
+    result.ref.momentum = _writeMomentumDecay(value.momentum!, arena).ref;
+  }
+  if (value.snaps != null) {
+    result.ref.fields |= raw.MLN_GESTURE_AXIS_OPTION_SNAPS;
+    result.ref.snaps = value.snaps!;
+  }
+  if (value.snap != null) {
+    result.ref.fields |= raw.MLN_GESTURE_AXIS_OPTION_SNAP;
+    result.ref.snap = _writeMomentumSnap(value.snap!, arena).ref;
+  }
+  if (value.notches != null) {
+    result.ref.fields |= raw.MLN_GESTURE_AXIS_OPTION_NOTCHES;
+    result.ref.notches = arena<raw.mln_gesture_notch>(
+      value.notches!.isEmpty ? 1 : value.notches!.length,
+    );
+    result.ref.notch_count = value.notches!.length;
+    for (var index = 0; index < value.notches!.length; index++) {
+      _writeGestureNotch(
+        value.notches![index],
+        arena,
+        into: result.ref.notches + index,
+      );
+    }
+  }
+  return result;
+}
+
+Pointer<raw.mln_gesture_options> _writeGestureOptions(
+  GestureOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_gesture_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_gesture_options>();
+  result.ref.size = sizeOf<raw.mln_gesture_options>();
+  if (value.doubleTapZoom != null) {
+    result.ref.fields |= raw.MLN_GESTURE_OPTION_DOUBLE_TAP_ZOOM;
+    result.ref.double_tap_zoom = value.doubleTapZoom!;
+  }
+  if (value.twoFingerTapZoom != null) {
+    result.ref.fields |= raw.MLN_GESTURE_OPTION_TWO_FINGER_TAP_ZOOM;
+    result.ref.two_finger_tap_zoom = value.twoFingerTapZoom!;
+  }
+  result.ref.pan = _writeGesturePanOptions(value.pan, arena).ref;
+  result.ref.zoom = _writeGestureAxisOptions(value.zoom, arena).ref;
+  result.ref.bearing = _writeGestureAxisOptions(value.bearing, arena).ref;
+  result.ref.pitch = _writeGestureAxisOptions(value.pitch, arena).ref;
+  return result;
+}
+
+Pointer<raw.mln_gesture_pointer_down> _writeGesturePointerDown(
+  GesturePointerDown value,
+  Allocator arena, {
+  Pointer<raw.mln_gesture_pointer_down>? into,
+}) {
+  final result = into ?? arena<raw.mln_gesture_pointer_down>();
+  result.ref.id = _nativeInteger(value.id, 0, 4294967295);
+  result.ref.kind = value.kind.rawValue;
+  result.ref.position = _writeScreenPoint(value.position, arena).ref;
+  result.ref.modes = value.modes.rawValue;
+  return result;
+}
+
+Pointer<raw.mln_gesture_pointer> _writeGesturePointer(
+  GesturePointer value,
+  Allocator arena, {
+  Pointer<raw.mln_gesture_pointer>? into,
+}) {
+  final result = into ?? arena<raw.mln_gesture_pointer>();
+  result.ref.id = _nativeInteger(value.id, 0, 4294967295);
+  result.ref.position = _writeScreenPoint(value.position, arena).ref;
+  return result;
+}
+
+Pointer<raw.mln_gesture_delta> _writeGestureDelta(
+  GestureDelta value,
+  Allocator arena, {
+  Pointer<raw.mln_gesture_delta>? into,
+}) {
+  final result = into ?? arena<raw.mln_gesture_delta>();
+  result.ref.position = _writeScreenPoint(value.position, arena).ref;
+  result.ref.discrete = value.discrete;
+  result.ref.pan = _writeScreenPoint(value.pan, arena).ref;
+  result.ref.zoom = value.zoom;
+  result.ref.bearing = value.bearing;
+  result.ref.pitch = value.pitch;
+  return result;
+}
+
+Pointer<raw.mln_gesture_pinch> _writeGesturePinch(
+  GesturePinch value,
+  Allocator arena, {
+  Pointer<raw.mln_gesture_pinch>? into,
+}) {
+  final result = into ?? arena<raw.mln_gesture_pinch>();
+  result.ref.center = _writeScreenPoint(value.center, arena).ref;
+  result.ref.scale = value.scale;
+  result.ref.rotation = value.rotation;
+  result.ref.phase = value.phase.rawValue;
+  return result;
+}
+
+Pointer<raw.mln_gesture_input> _writeGestureInput(
+  GestureInput value,
+  Allocator arena, {
+  Pointer<raw.mln_gesture_input>? into,
+}) {
+  final result = into ?? arena<raw.mln_gesture_input>();
+  result.ref.size = sizeOf<raw.mln_gesture_input>();
+  switch (value) {
+    case GestureInputPointerDown():
+      result.ref.type = 1;
+      result.ref.data.pointer_down = _writeGesturePointerDown(
+        value.value,
+        arena,
+      ).ref;
+    case GestureInputPointerMove():
+      result.ref.type = 2;
+      result.ref.data.pointer_move = _writeGesturePointer(
+        value.value,
+        arena,
+      ).ref;
+    case GestureInputPointerUp():
+      result.ref.type = 3;
+      result.ref.data.pointer_up = _writeGesturePointer(value.value, arena).ref;
+    case GestureInputPointerCancel():
+      result.ref.type = 4;
+      result.ref.data.pointer_cancel = _writeGesturePointer(
+        value.value,
+        arena,
+      ).ref;
+    case GestureInputModes():
+      result.ref.type = 5;
+      result.ref.data.modes = value.value.rawValue;
+    case GestureInputDelta():
+      result.ref.type = 6;
+      result.ref.data.delta = _writeGestureDelta(value.value, arena).ref;
+    case GestureInputPinch():
+      result.ref.type = 7;
+      result.ref.data.pinch = _writeGesturePinch(value.value, arena).ref;
+  }
+  return result;
+}
+
+Pointer<raw.mln_screen_box> _writeScreenBox(
+  ScreenBox value,
+  Allocator arena, {
+  Pointer<raw.mln_screen_box>? into,
+}) {
+  final result = into ?? arena<raw.mln_screen_box>();
+  result.ref.min = _writeScreenPoint(value.min, arena).ref;
+  result.ref.max = _writeScreenPoint(value.max, arena).ref;
+  return result;
+}
+
+ScreenBox _readScreenBox(raw.mln_screen_box source) => ScreenBox(
+  min: _readScreenPoint(source.min),
+  max: _readScreenPoint(source.max),
+);
+
+GestureTap _readGestureTap(raw.mln_gesture_tap source) =>
+    GestureTap(id: source.id, position: _readScreenPoint(source.position));
+
+GestureNotchEvent _readGestureNotchEvent(raw.mln_gesture_notch_event source) =>
+    GestureNotchEvent(
+      axis: GestureAxis.fromRawValue(source.axis),
+      kind: source.kind,
+      value: source.value,
+    );
+
+GestureEvent _readGestureEvent(
+  raw.mln_gesture_event source, {
+  Uint8List Function()? rawRecord,
+}) => switch (source.type) {
+  1 => GestureEvent.tap(_readGestureTap(source.data.tap)),
+  2 => GestureEvent.doubleTap(_readGestureTap(source.data.double_tap)),
+  3 => GestureEvent.twoFingerTap(_readGestureTap(source.data.two_finger_tap)),
+  4 => GestureEvent.notch(_readGestureNotchEvent(source.data.notch)),
+  5 => GestureEvent.longPress(_readGestureTap(source.data.long_press)),
+  final tag => GestureEventUnknown(
+    tag,
+    rawRecord?.call() ??
+        withNativeArena((arena) {
+          final copy = arena<raw.mln_gesture_event>()..ref = source;
+          return Uint8List.fromList(
+            copy.cast<Uint8>().asTypedList(sizeOf<raw.mln_gesture_event>()),
+          );
+        }),
+  ),
+};
+
+GestureResult _readGestureResult(raw.mln_gesture_result source) =>
+    GestureResult(
+      handled: source.handled,
+      nextTick: GestureNextTick.fromRawValue(source.next_tick),
+      nextTickMs: source.next_tick_ms,
+      boxZoomActive: source.box_zoom_active,
+      boxZoom: _readScreenBox(source.box_zoom),
+      events: List<GestureEvent>.unmodifiable(
+        List.generate(
+          source.event_count,
+          (index) => _readGestureEvent(source.events[index]),
+        ),
+      ),
+    );
 
 _NativeRegistration<raw.mln_queue_lock> _prepareQueueLock(QueueLock value) {
   final native = _takeNativeRegistration(value)!;
@@ -535,6 +870,13 @@ GpuDeviceCapabilities _readGpuDeviceCapabilities(
   depthExportKinds: GpuExportKindFlag.fromRawValue(source.depth_export_kinds),
 );
 
+GpuDeviceD3d12ContextResult _readGpuDeviceD3d12ContextResult(
+  raw.mln_gpu_device_d3d12_context_result source,
+) => GpuDeviceD3d12ContextResult(
+  device: NativePointer(source.device.address),
+  commandQueue: NativePointer(source.command_queue.address),
+);
+
 Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
   VulkanContextDescriptor value,
   Allocator arena, {
@@ -582,6 +924,20 @@ GpuDeviceVulkanContextResult _readGpuDeviceVulkanContextResult(
 ) => GpuDeviceVulkanContextResult(
   context: _readVulkanContextDescriptor(source.context),
 );
+
+Pointer<raw.mln_d3d12_device_descriptor> _writeD3d12DeviceDescriptor(
+  D3d12DeviceDescriptor value,
+  Allocator arena, {
+  Pointer<raw.mln_d3d12_device_descriptor>? into,
+}) {
+  final result = into ?? arena<raw.mln_d3d12_device_descriptor>();
+  result.ref.size = sizeOf<raw.mln_d3d12_device_descriptor>();
+  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
+  result.ref.command_queue = Pointer<Void>.fromAddress(
+    value.commandQueue.address,
+  ).cast();
+  return result;
+}
 
 Pointer<raw.mln_metal_device_descriptor> _writeMetalDeviceDescriptor(
   MetalDeviceDescriptor value,
@@ -1027,152 +1383,11 @@ Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
   return result;
 }
 
-Pointer<raw.mln_unit_bezier> _writeUnitBezier(
-  UnitBezier value,
-  Allocator arena, {
-  Pointer<raw.mln_unit_bezier>? into,
-}) {
-  final result = into ?? arena<raw.mln_unit_bezier>();
-  result.ref.x1 = value.x1;
-  result.ref.y1 = value.y1;
-  result.ref.x2 = value.x2;
-  result.ref.y2 = value.y2;
-  return result;
-}
-
-Pointer<raw.mln_momentum_decay> _writeMomentumDecay(
-  MomentumDecay value,
-  Allocator arena, {
-  Pointer<raw.mln_momentum_decay>? into,
-}) {
-  final result = into ?? arena<raw.mln_momentum_decay>();
-  if (value.model != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MODEL;
-    result.ref.model = value.model!.rawValue;
-  }
-  if (value.halfLifeMs != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_HALF_LIFE_MS;
-    result.ref.half_life_ms = value.halfLifeMs!;
-  }
-  if (value.stopSpeed != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_STOP_SPEED;
-    result.ref.stop_speed = value.stopSpeed!;
-  }
-  if (value.distance != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_DISTANCE;
-    result.ref.distance = value.distance!;
-  }
-  if (value.durationMs != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_DURATION_MS;
-    result.ref.duration_ms = value.durationMs!;
-  }
-  if (value.easing != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_EASING;
-    result.ref.easing = _writeUnitBezier(value.easing!, arena).ref;
-  }
-  if (value.minSpeed != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MIN_SPEED;
-    result.ref.min_speed = value.minSpeed!;
-  }
-  if (value.maxSpeed != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MAX_SPEED;
-    result.ref.max_speed = value.maxSpeed!;
-  }
-  if (value.maxDistance != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_DECAY_MAX_DISTANCE;
-    result.ref.max_distance = value.maxDistance!;
-  }
-  return result;
-}
-
-Pointer<raw.mln_pan_momentum> _writePanMomentum(
-  PanMomentum value,
-  Allocator arena, {
-  Pointer<raw.mln_pan_momentum>? into,
-}) {
-  final result = into ?? arena<raw.mln_pan_momentum>();
-  if (value.velocity != null) {
-    result.ref.fields |= raw.MLN_PAN_MOMENTUM_VELOCITY;
-    result.ref.velocity = _writeScreenPoint(value.velocity!, arena).ref;
-  }
-  result.ref.decay = _writeMomentumDecay(value.decay, arena).ref;
-  return result;
-}
-
-Pointer<raw.mln_momentum_snap> _writeMomentumSnap(
-  MomentumSnap value,
-  Allocator arena, {
-  Pointer<raw.mln_momentum_snap>? into,
-}) {
-  final result = into ?? arena<raw.mln_momentum_snap>();
-  if (value.spacing != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_SPACING;
-    result.ref.spacing = value.spacing!;
-  }
-  if (value.offset != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_OFFSET;
-    result.ref.offset = value.offset!;
-  }
-  if (value.tolerance != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_TOLERANCE;
-    result.ref.tolerance = value.tolerance!;
-  }
-  if (value.durationMs != null) {
-    result.ref.fields |= raw.MLN_MOMENTUM_SNAP_DURATION_MS;
-    result.ref.duration_ms = value.durationMs!;
-  }
-  return result;
-}
-
-Pointer<raw.mln_anchored_momentum> _writeAnchoredMomentum(
-  AnchoredMomentum value,
-  Allocator arena, {
-  Pointer<raw.mln_anchored_momentum>? into,
-}) {
-  final result = into ?? arena<raw.mln_anchored_momentum>();
-  if (value.velocity != null) {
-    result.ref.fields |= raw.MLN_ANCHORED_MOMENTUM_VELOCITY;
-    result.ref.velocity = value.velocity!;
-  }
-  if (value.anchor != null) {
-    result.ref.fields |= raw.MLN_ANCHORED_MOMENTUM_ANCHOR;
-    result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
-  }
-  result.ref.decay = _writeMomentumDecay(value.decay, arena).ref;
-  if (value.snap != null) {
-    result.ref.fields |= raw.MLN_ANCHORED_MOMENTUM_SNAP;
-    result.ref.snap = _writeMomentumSnap(value.snap!, arena).ref;
-  }
-  return result;
-}
-
-Pointer<raw.mln_gesture_momentum> _writeGestureMomentum(
-  GestureMomentum value,
-  Allocator arena, {
-  Pointer<raw.mln_gesture_momentum>? into,
-}) {
-  final result = into ?? arena<raw.mln_gesture_momentum>();
-  result.ref.pan = _writePanMomentum(value.pan, arena).ref;
-  result.ref.zoom = _writeAnchoredMomentum(value.zoom, arena).ref;
-  result.ref.bearing = _writeAnchoredMomentum(value.bearing, arena).ref;
-  result.ref.pitch = _writeAnchoredMomentum(value.pitch, arena).ref;
-  return result;
-}
-
-CameraVelocity _readCameraVelocity(raw.mln_camera_velocity source) =>
-    CameraVelocity(
-      pan: _readScreenPoint(source.pan),
-      zoom: source.zoom,
-      bearing: source.bearing,
-      pitch: source.pitch,
-    );
-
 CameraTransitionEnd _readCameraTransitionEnd(
   raw.mln_camera_transition_end source,
 ) => CameraTransitionEnd(
   outcome: CameraTransitionOutcome.fromRawValue(source.outcome),
   generation: source.generation,
-  velocity: _readCameraVelocity(source.velocity),
 );
 
 final raw.mln_camera_transition_end_callback
@@ -1287,16 +1502,11 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
     result.ref.fields |= raw.MLN_CAMERA_DELTA_ANCHOR;
     result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
   }
-  if (value.momentum != null) {
-    result.ref.fields |= raw.MLN_CAMERA_DELTA_MOMENTUM;
-    result.ref.momentum = _writeGestureMomentum(value.momentum!, arena).ref;
-  }
   result.ref.animation = _writeAnimationOptions(
     value.animation,
     arena,
     registrations,
   ).ref;
-  result.ref.gesture_phase = value.gesturePhase.rawValue;
   return result;
 }
 
@@ -1672,6 +1882,75 @@ Pointer<raw.mln_web_canvas_target> _writeWebCanvasTarget(
   return result;
 }
 
+Pointer<raw.mln_d3d12_borrowed_texture> _writeD3d12BorrowedTexture(
+  D3d12BorrowedTexture value,
+  Allocator arena, {
+  Pointer<raw.mln_d3d12_borrowed_texture>? into,
+}) {
+  final result = into ?? arena<raw.mln_d3d12_borrowed_texture>();
+  result.ref.resource = Pointer<Void>.fromAddress(
+    value.resource.address,
+  ).cast();
+  return result;
+}
+
+Pointer<raw.mln_d3d12_borrowed_textures_target>
+_writeD3d12BorrowedTexturesTarget(
+  D3d12BorrowedTexturesTarget value,
+  Allocator arena, {
+  Pointer<raw.mln_d3d12_borrowed_textures_target>? into,
+}) {
+  final result = into ?? arena<raw.mln_d3d12_borrowed_textures_target>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.textures = arena<raw.mln_d3d12_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    _writeD3d12BorrowedTexture(
+      value.textures[index],
+      arena,
+      into: result.ref.textures + index,
+    );
+  }
+  result.ref.state = _nativeInteger(value.state, 0, 4294967295);
+  result.ref.depth_textures = arena<raw.mln_d3d12_borrowed_texture>(
+    value.depthTextures.isEmpty ? 1 : value.depthTextures.length,
+  );
+  result.ref.depth_texture_count = value.depthTextures.length;
+  for (var index = 0; index < value.depthTextures.length; index++) {
+    _writeD3d12BorrowedTexture(
+      value.depthTextures[index],
+      arena,
+      into: result.ref.depth_textures + index,
+    );
+  }
+  result.ref.depth_state = _nativeInteger(value.depthState, 0, 4294967295);
+  return result;
+}
+
+Pointer<raw.mln_d3d12_composition_target> _writeD3d12CompositionTarget(
+  D3d12CompositionTarget value,
+  Allocator arena, {
+  Pointer<raw.mln_d3d12_composition_target>? into,
+}) {
+  final result = into ?? arena<raw.mln_d3d12_composition_target>();
+  result.ref.logical_size = _writeLogicalSize(value.logicalSize, arena).ref;
+  result.ref.kind = value.kind.rawValue;
+  result.ref.object = Pointer<Void>.fromAddress(value.object.address).cast();
+  return result;
+}
+
 Pointer<raw.mln_render_target> _writeRenderTarget(
   RenderTarget value,
   Allocator arena, {
@@ -1756,6 +2035,16 @@ Pointer<raw.mln_render_target> _writeRenderTarget(
     case RenderTargetWebCanvas():
       result.ref.kind = 17;
       result.ref.data.web_canvas = _writeWebCanvasTarget(
+        value.value,
+        arena,
+      ).ref;
+    case RenderTargetD3d12BorrowedTextures():
+      result.ref.kind = 18;
+      result.ref.data.d3d12_borrowed_textures =
+          _writeD3d12BorrowedTexturesTarget(value.value, arena).ref;
+    case RenderTargetD3d12Composition():
+      result.ref.kind = 19;
+      result.ref.data.d3d12_composition = _writeD3d12CompositionTarget(
         value.value,
         arena,
       ).ref;
@@ -2399,7 +2688,6 @@ Pointer<raw.mln_camera_update> _writeCameraUpdate(
     arena,
     registrations,
   ).ref;
-  result.ref.gesture_phase = value.gesturePhase.rawValue;
   return result;
 }
 
@@ -2462,17 +2750,6 @@ RenderSessionSnapshot _readRenderSessionSnapshot(
   failureStatus: Status.fromRawValue(source.failure_status),
   hasTarget: source.has_target,
 );
-
-Pointer<raw.mln_screen_box> _writeScreenBox(
-  ScreenBox value,
-  Allocator arena, {
-  Pointer<raw.mln_screen_box>? into,
-}) {
-  final result = into ?? arena<raw.mln_screen_box>();
-  result.ref.min = _writeScreenPoint(value.min, arena).ref;
-  result.ref.max = _writeScreenPoint(value.max, arena).ref;
-  return result;
-}
 
 Pointer<raw.mln_screen_line_string> _writeScreenLineString(
   ScreenLineString value,
@@ -2597,6 +2874,28 @@ TextureReadbackResult _readTextureReadbackResult(
   info: _readTextureImageInfo(source.info),
 );
 
+Pointer<raw.mln_frame_pacing_options> _writeFramePacingOptions(
+  FramePacingOptions value,
+  Allocator arena, {
+  Pointer<raw.mln_frame_pacing_options>? into,
+}) {
+  final result = into ?? arena<raw.mln_frame_pacing_options>();
+  result.ref.size = sizeOf<raw.mln_frame_pacing_options>();
+  if (value.maximumFramesPerSecond != null) {
+    result.ref.fields |= raw.MLN_FRAME_PACING_OPTION_MAXIMUM_FRAMES_PER_SECOND;
+    result.ref.maximum_frames_per_second = _nativeInteger(
+      value.maximumFramesPerSecond!,
+      0,
+      4294967295,
+    );
+  }
+  if (value.view != null) {
+    result.ref.fields |= raw.MLN_FRAME_PACING_OPTION_VIEW;
+    result.ref.view = Pointer<Void>.fromAddress(value.view!.address).cast();
+  }
+  return result;
+}
+
 Pointer<raw.mln_resource_response> _writeResourceResponse(
   ResourceResponse value,
   Allocator arena, {
@@ -2624,6 +2923,7 @@ Pointer<raw.mln_resource_response> _writeResourceResponse(
     result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_RETRY_AFTER;
     result.ref.retry_after_unix_ms = value.retryAfterUnixMs!;
   }
+  result.ref.no_store = value.noStore;
   return result;
 }
 
@@ -2725,6 +3025,10 @@ Pointer<raw.mln_map_options> _writeMapOptions(
   if (value.systemFontsEnabled != null) {
     result.ref.fields |= raw.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED;
     result.ref.system_fonts_enabled = value.systemFontsEnabled!;
+  }
+  if (value.localIdeographsEnabled != null) {
+    result.ref.fields |= raw.MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED;
+    result.ref.local_ideographs_enabled = value.localIdeographsEnabled!;
   }
   return result;
 }
@@ -2842,6 +3146,21 @@ OfflineRegionInfo _readOfflineRegionInfo(raw.mln_offline_region_info source) =>
         source.metadata.cast<Uint8>().asTypedList(source.metadata_size),
       ),
     );
+
+OfflineRegionExpiry _readOfflineRegionExpiry(
+  raw.mln_offline_region_expiry source,
+) => OfflineRegionExpiry(
+  staleAfterUnixMs:
+      (source.fields & raw.MLN_OFFLINE_REGION_EXPIRY_STALE_AFTER) != 0
+      ? source.stale_after_unix_ms
+      : null,
+  usableOfflineUntilUnixMs:
+      (source.fields & raw.MLN_OFFLINE_REGION_EXPIRY_USABLE_OFFLINE_UNTIL) != 0
+      ? source.usable_offline_until_unix_ms
+      : null,
+  staleResourceCount: source.stale_resource_count,
+  unusableResourceCount: source.unusable_resource_count,
+);
 
 OfflineRegionStatus _readOfflineRegionStatus(
   raw.mln_offline_region_status source,
@@ -3436,6 +3755,10 @@ final _resultCameraQueryResult = _CompletionValue(
   (element) =>
       _readCameraQueryResult(element.cast<raw.mln_camera_query_result>().ref),
 );
+final _resultGpuSync = _CompletionValue(
+  sizeOf<raw.mln_gpu_sync>(),
+  (element) => _readGpuSync(element.cast<raw.mln_gpu_sync>().ref),
+);
 final _resultLatLng = _CompletionValue(
   sizeOf<raw.mln_lat_lng>(),
   (element) => _readLatLng(element.cast<raw.mln_lat_lng>().ref),
@@ -3447,6 +3770,12 @@ final _resultLatLngBounds = _CompletionValue(
 final _resultObjectOrNull = _CompletionValue(
   sizeOf<raw.mln_buffer_view>(),
   (element) => _decodeJsonView(element.cast<raw.mln_buffer_view>().ref),
+);
+final _resultOfflineRegionExpiry = _CompletionValue(
+  sizeOf<raw.mln_offline_region_expiry>(),
+  (element) => _readOfflineRegionExpiry(
+    element.cast<raw.mln_offline_region_expiry>().ref,
+  ),
 );
 final _resultOfflineRegionInfo = _CompletionValue(
   sizeOf<raw.mln_offline_region_info>(),
@@ -3803,6 +4132,43 @@ final class AcquiredFrameHandle implements Finalizable {
         return _readAndroidHardwareBufferFrame(outFrame.ref);
       });
 
+  /// Gets the D3D12 texture of an acquired frame.
+  ///
+  /// It gets a borrowed ring's texture, or an exported ring's on a D3D12
+  /// device: the resource whose memory the ring shares, and the frame's depth
+  /// resource with `RenderSessionAttachOptions.keepDepth`. Wait for
+  /// `AcquiredFrameHandle.withProducerSync()` before you use them.
+  ///
+  /// See `mln_acquired_frame_get_d3d12_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the frame isn't of a D3D12 device.
+  /// - `Status.targetLost` when the session failed, or you detached, abandoned,
+  ///   or disposed it.
+  T withD3d12Texture<T>(T Function(ScopedD3d12TextureFrame view) use) =>
+      _NativeViewScope(
+        _state,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
+      ).use(
+        (scope) => use(ScopedD3d12TextureFrame._(scope, _getD3d12Texture())),
+      );
+
+  D3d12TextureFrame _getD3d12Texture() => withNativeArena((arena) {
+    final outFrame = arena<raw.mln_d3d12_texture_frame>();
+    outFrame.ref.size = sizeOf<raw.mln_d3d12_texture_frame>();
+    _check(
+      raw.mln_acquired_frame_get_d3d12_texture(
+        _handle.raw,
+        outFrame,
+        nativeDiagnostic,
+      ),
+    );
+    return _readD3d12TextureFrame(outFrame.ref);
+  });
+
   /// Gets the dmabuf of an exported ring's acquired frame.
   ///
   /// Wait for `AcquiredFrameHandle.withProducerSync()` before you read the
@@ -4156,19 +4522,20 @@ final class AcquiredFrameHandle implements Finalizable {
 }
 
 /// Issued native handle id.
-extension type const _NativeFramePacer(int raw) implements NativeHandle {}
+extension type const _NativeGestureRecognizer(int raw)
+    implements NativeHandle {}
 
 /// Owner of one native handle.
 ///
-/// Demands render sessions' frames at a display's refreshes.
+/// A gesture recognizer that moves a map's camera.
 ///
-/// See `mln_frame_pacer` in the
+/// See `mln_gesture_recognizer` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class FramePacerHandle implements Finalizable {
-  FramePacerHandle._(_NativeFramePacer handle)
-    : _state = NativeHandleState(handle, 'FramePacerHandle');
-  final NativeHandleState<_NativeFramePacer> _state;
-  _NativeFramePacer get _handle => _state.handle;
+final class GestureRecognizerHandle implements Finalizable {
+  GestureRecognizerHandle._(_NativeGestureRecognizer handle)
+    : _state = NativeHandleState(handle, 'GestureRecognizerHandle');
+  final NativeHandleState<_NativeGestureRecognizer> _state;
+  _NativeGestureRecognizer get _handle => _state.handle;
 
   /// The native handle id.
   int get id => _state.handleId;
@@ -4179,101 +4546,80 @@ final class FramePacerHandle implements Finalizable {
 
   @override
   String toString() =>
-      'FramePacerHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
+      'GestureRecognizerHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
-  /// Creates a frame pacer that follows the platform's display.
+  /// Handles one input at `timeMs`, in milliseconds on any clock that only goes
+  /// forward, the same for every input and frame.
   ///
-  /// On iOS, macOS, and tvOS, the pacer follows the display through a
-  /// `CADisplayLink`. You can call it on any thread, and the pacer needs no run
-  /// loop of yours. On macOS, it follows the main display, the one with the
-  /// menu bar. With `FramePacerOptions.maximumFramesPerSecond`, the pacer also
-  /// asks the system for that refresh rate. On iPhone, a rate above 60 needs
-  /// `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
-  ///
-  /// On Android, the pacer follows the display through the calling thread's
-  /// `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
-  /// main thread, and keep that thread running its looper while sessions use
-  /// the pacer. `AChoreographer` can stop while the phone's display is off,
-  /// even while a Surface on another display, such as an Android Auto
-  /// projection, still shows the map. The pacer then keeps demanding frames
-  /// from a timer on the looper, within the frame rate limit, until vsyncs
-  /// arrive again.
-  ///
-  /// On OpenHarmony, the pacer follows the display through `OH_NativeVSync`.
-  /// You can call it on any thread, and the pacer needs no event loop of yours.
-  ///
-  /// See `mln_frame_pacer_create` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  /// See `mln_gesture_recognizer_handle` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
   ///
   /// Errors:
   ///
-  /// - `Status.unsupported` on the other platforms, such as visionOS, Linux,
-  ///   and Windows, where the library has no source of display refreshes.
-  /// - `Status.invalidState` on Android when the calling thread has no
-  ///   `ALooper`.
-  /// - `Status.nativeError` on iOS, macOS, and tvOS when the system has no
-  ///   display to follow, and on OpenHarmony when the system can't report the
-  ///   display's refreshes to the process.
-  static FramePacerHandle create({FramePacerOptions? options}) =>
+  /// - `Status.invalidArgument` when `input` isn't a valid input.
+  GestureResult handle(GestureInput input, double timeMs) =>
       withNativeArena((arena) {
-        ensureAbiVersion();
-        final outPacer = arena<Uint64>();
+        final outResult = arena<raw.mln_gesture_result>();
+        outResult.ref.size = sizeOf<raw.mln_gesture_result>();
         _check(
-          raw.mln_frame_pacer_create(
-            options == null ? nullptr : _writeFramePacerOptions(options, arena),
-            outPacer,
+          raw.mln_gesture_recognizer_handle(
+            _handle.raw,
+            _writeGestureInput(input, arena),
+            timeMs,
+            outResult,
             nativeDiagnostic,
           ),
         );
-        return _adoptOwned(
-          outPacer.value,
-          () => FramePacerHandle._(_NativeFramePacer(outPacer.value)),
-          (handle) {
-            raw.mln_frame_pacer_release(handle);
-          },
-        );
+        return _readGestureResult(outResult.ref);
       });
 
-  /// Releases a frame pacer.
+  /// Releases a gesture recognizer. A glide it started keeps going.
   ///
-  /// Render sessions that use the pacer stay paced until you release them or
-  /// set another pacer.
-  ///
-  /// See `mln_frame_pacer_release` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  /// See `mln_gesture_recognizer_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
   void release() => _state.close((handle) {
-    raw.mln_frame_pacer_release(handle.raw);
+    raw.mln_gesture_recognizer_release(handle.raw);
     return nativeStatusOk;
   });
 
-  /// Changes a frame pacer's settings.
+  /// Changes the settings whose bits are set, from the next input on.
   ///
-  /// Settings that `options` doesn't set keep their current values. To remove
-  /// the frame rate limit, set `FramePacerOptions.unlimitedFramesPerSecond`.
-  /// You can call it on any thread.
-  ///
-  /// The sessions that the pacer serves follow the new settings from the next
-  /// display refresh, including a refresh that they already wait for. The pacer
-  /// counts a new limit from the last frames it demanded, so a higher limit can
-  /// demand the next frames sooner. On iOS, macOS, and tvOS, the pacer also
-  /// asks the system for the new limit's refresh rate, or for the display's own
-  /// rate once the limit is removed.
-  ///
-  /// See `mln_frame_pacer_set_options` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  /// See `mln_gesture_recognizer_set_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
   ///
   /// Errors:
   ///
-  /// - `Status.invalidState` when you released `pacer`, even while sessions
-  ///   still use it.
-  void setOptions(FramePacerOptions options) => withNativeArena((arena) {
+  /// - `Status.invalidArgument` when an option is out of range.
+  void setOptions(GestureOptions options) => withNativeArena((arena) {
     _check(
-      raw.mln_frame_pacer_set_options(
+      raw.mln_gesture_recognizer_set_options(
         _handle.raw,
-        _writeFramePacerOptions(options, arena),
+        _writeGestureOptions(options, arena),
         nativeDiagnostic,
       ),
     );
+  });
+
+  /// Times long presses, steps the eases of discrete deltas, ends deltas once
+  /// they idle, and samples the camera for notches, at `timeMs` on the inputs'
+  /// clock. Call it when the last result's `next_tick` says: on the next
+  /// display frame, or at its time with a frame or a timer. A tick at any other
+  /// time does no harm.
+  ///
+  /// See `mln_gesture_recognizer_tick` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+  GestureResult tick(double timeMs) => withNativeArena((arena) {
+    final outResult = arena<raw.mln_gesture_result>();
+    outResult.ref.size = sizeOf<raw.mln_gesture_result>();
+    _check(
+      raw.mln_gesture_recognizer_tick(
+        _handle.raw,
+        timeMs,
+        outResult,
+        nativeDiagnostic,
+      ),
+    );
+    return _readGestureResult(outResult.ref);
   });
 }
 
@@ -4320,12 +4666,12 @@ final class GpuDeviceHandle implements Finalizable {
   /// - `Status.unsupported` when this build or platform lacks `backend`, when
   ///   the device can't render with `open_gl_client_api`, when options name a
   ///   GPU that the backend can't select (an OpenGL device takes no
-  ///   `adapter_index`, `adapter_uuid`, or `adapter_luid`, and only a Vulkan
-  ///   device takes `adapter_uuid` or `adapter_luid`), when a device that
-  ///   doesn't render with Vulkan gets a `queue_lock`, or in a browser for
-  ///   every backend: WebGPU makes devices asynchronously, and a WebGL2 context
-  ///   needs a canvas. Attach without a device, which the session makes itself,
-  ///   or wrap your WebGL2 context.
+  ///   `adapter_index`, `adapter_uuid`, or `adapter_luid`, only a Vulkan device
+  ///   takes `adapter_uuid`, and only a Vulkan or D3D12 device `adapter_luid`),
+  ///   when a device that doesn't render with Vulkan gets a `queue_lock`, or in
+  ///   a browser for every backend: WebGPU makes devices asynchronously, and a
+  ///   WebGL2 context needs a canvas. Attach without a device, which the
+  ///   session makes itself, or wrap your WebGL2 context.
   /// - `Status.notFound` when no GPU matches `adapter_index`, `adapter_uuid`,
   ///   or `adapter_luid`.
   /// - `Status.nativeError` when the platform can't create the device.
@@ -4376,6 +4722,31 @@ final class GpuDeviceHandle implements Finalizable {
     return _readGpuDeviceCapabilities(outCapabilities.ref);
   });
 
+  /// Gets the D3D12 device and direct command queue of a D3D12 device.
+  ///
+  /// Use them to make the textures of a borrowed ring that sessions on the
+  /// device render into, and to submit your reads of them, which the queue
+  /// orders after the frames submitted before them.
+  ///
+  /// See `mln_gpu_device_get_d3d12_context` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when the device doesn't render with D3D12.
+  GpuDeviceD3d12ContextResult getD3d12Context() => withNativeArena((arena) {
+    final outResult = arena<raw.mln_gpu_device_d3d12_context_result>();
+    outResult.ref.size = sizeOf<raw.mln_gpu_device_d3d12_context_result>();
+    _check(
+      raw.mln_gpu_device_get_d3d12_context(
+        _handle.raw,
+        outResult,
+        nativeDiagnostic,
+      ),
+    );
+    return _readGpuDeviceD3d12ContextResult(outResult.ref);
+  });
+
   /// Gets the Vulkan instance, device, and graphics queue of a Vulkan device.
   ///
   /// Use them to make the images of a borrowed ring, or a surface, that
@@ -4413,6 +4784,42 @@ final class GpuDeviceHandle implements Finalizable {
     raw.mln_gpu_device_release(handle.raw);
     return nativeStatusOk;
   });
+
+  /// Wraps your D3D12 device and direct command queue, so that sessions render
+  /// on them.
+  ///
+  /// Sessions on the device render into your textures and submit to your queue.
+  ///
+  /// See `mln_gpu_device_wrap_d3d12` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.unsupported` when `supportedRenderBackendMask()` lacks
+  ///   `RenderBackendFlag.d3d12`, when the device runs no shader model 6.0,
+  ///   when `command_queue` isn't a direct queue of `device`, or when the
+  ///   library can't load DXC (`dxcompiler.dll`) to compile its shaders.
+  /// - `Status.invalidArgument` when `device` or `command_queue` isn't of its
+  ///   interface.
+  static GpuDeviceHandle wrapD3d12(D3d12DeviceDescriptor descriptor) =>
+      withNativeArena((arena) {
+        ensureAbiVersion();
+        final outDevice = arena<Uint64>();
+        _check(
+          raw.mln_gpu_device_wrap_d3d12(
+            _writeD3d12DeviceDescriptor(descriptor, arena),
+            outDevice,
+            nativeDiagnostic,
+          ),
+        );
+        return _adoptOwned(
+          outDevice.value,
+          () => GpuDeviceHandle._(_NativeGpuDevice(outDevice.value)),
+          (handle) {
+            raw.mln_gpu_device_release(handle);
+          },
+        );
+      });
 
   /// Wraps your Metal device and command queue, so that sessions render on
   /// them.
@@ -5188,6 +5595,41 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   String toString() =>
       'MapHandle(id=0x${id.toRadixString(16)}, closed=$isClosed)';
 
+  /// Creates a gesture recognizer that moves `map`'s camera.
+  ///
+  /// Its moves go to the map as camera commands, which apply asynchronously,
+  /// and the map's snapshot and camera events report them as gestures. After
+  /// the map is released, its moves do nothing. `options` may be null for every
+  /// default.
+  ///
+  /// See `mln_gesture_recognizer_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument` when an option is out of range.
+  GestureRecognizerHandle gestureRecognizerCreate({GestureOptions? options}) =>
+      withNativeArena((arena) {
+        final outRecognizer = arena<Uint64>();
+        _check(
+          raw.mln_gesture_recognizer_create(
+            _handle.raw,
+            options == null ? nullptr : _writeGestureOptions(options, arena),
+            outRecognizer,
+            nativeDiagnostic,
+          ),
+        );
+        return _adoptOwned(
+          outRecognizer.value,
+          () => GestureRecognizerHandle._(
+            _NativeGestureRecognizer(outRecognizer.value),
+          ),
+          (handle) {
+            raw.mln_gesture_recognizer_release(handle);
+          },
+        );
+      });
+
   /// Adds a source whose GeoJSON tiles come from callbacks.
   ///
   /// See `mln_map_add_custom_geometry_source` in the
@@ -5421,7 +5863,7 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Moves the camera relative to where it is, as a gesture does.
+  /// Moves the camera relative to where it is.
   ///
   /// `delta` can pan the map's content by an offset on the screen, scale the
   /// zoom, and add to the bearing and pitch. An anchor keeps one screen point
@@ -5433,19 +5875,6 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   /// A delta that replaces an animated one starts from where that animation
   /// left the camera, so the rest of the replaced change never happens. To
   /// reach an exact camera, use `MapHandle.updateCamera()`.
-  ///
-  /// A delta in the end phase can carry momentum, which keeps the camera moving
-  /// from the gesture's release velocities and slows it on each rendered frame.
-  /// The gesture lasts until the momentum ends: the snapshot keeps
-  /// `gesture_in_progress` set, and camera events report
-  /// `CameraChangeSource.momentum`. With momentum, `animation` sets only
-  /// `transition_id` and the end handler, which runs when the gesture ends.
-  ///
-  /// A delta in the begin phase, `MapHandle.cancelCameraTransitions()`, or a
-  /// cancellation by that ID stops the momentum. A later command that sets a
-  /// field stops only the parts of the momentum that move that field. On a
-  /// tilted map, the pan moves the map's content the same distance on the
-  /// screen in every direction.
   ///
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -6369,6 +6798,12 @@ final class MapHandle implements Finalizable, _CallbackRootOwner {
   ///
   /// See `mln_map_set_bounds` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.invalidArgument`, changing nothing, when the minimum zoom would
+  ///   be above the maximum zoom, the minimum pitch above the maximum pitch, or
+  ///   the maximum zoom below the lowest zoom the map can show at its size.
   Future<CommandCompletion> setBounds(BoundOptions options) => _command(
     (arena, completion) => raw.mln_map_set_bounds(
       _handle.raw,
@@ -7538,7 +7973,10 @@ final class RenderSessionHandle implements Finalizable {
   /// Asks the session to render a frame.
   ///
   /// The frame shows the map commands that you sent before the call, except the
-  /// changes that an open command group holds back.
+  /// changes that an open command group holds back, and the map's camera
+  /// animations as they are at the time of the call. Demand each frame when the
+  /// display is ready for it, so that animations move evenly.
+  /// `RenderSessionHandle.setFramePacing()` does that for you.
   ///
   /// You can call it once the attach call returns. While the attach runs, the
   /// demand waits for it to complete. Every demand finishes with one frame
@@ -7932,19 +8370,21 @@ final class RenderSessionHandle implements Finalizable {
   /// Use it when the platform takes a surface away, such as when your app goes
   /// to the background. Release every acquired frame first. Frame demands that
   /// are still pending, and later ones until you give the session a new target,
-  /// finish with `RenderResult.targetNotReady`. Once the release completes, you
-  /// can destroy the old target. An Android or OpenHarmony window can go away
-  /// sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
+  /// finish with `RenderResult.targetNotReady`. Once the release of a window or
+  /// surface completes, you can destroy it. An Android or OpenHarmony window
+  /// can go away sooner, as `AndroidWindowTarget` and `OhosWindowTarget` say.
   ///
-  /// For a borrowed ring, a completed release also means that the session has
-  /// stopped waiting on the consumer sync that you released its frames with, so
-  /// you can reuse or destroy the textures. The session waits about a second at
-  /// most for that sync, and logs a warning when the wait runs out. It checks
-  /// the sync without blocking a thread: keep servicing a session driven by
-  /// `RenderDriverKind.callerGraphicsThread` until the release completes. The
-  /// session keeps nothing of the released textures: a texture that a later
-  /// target gives it again is a new one, even one that you discarded a frame
-  /// of.
+  /// For a borrowed ring, the release completes with an `GpuSync` of
+  /// `RenderSessionCapabilities.producerSyncKind`, or `GpuSyncKind.cpuComplete`
+  /// when the session has no textures since an earlier release. Wait for it
+  /// before you reuse or destroy the textures, as you wait for an acquired
+  /// frame's producer sync: for `GpuSyncKind.queueOrder`, destroy them once
+  /// work that you submit to the queue after the completion has finished. The
+  /// session's GPU work on the textures, and its waits for the consumer syncs
+  /// that you released its frames with, end there, so keep those syncs until
+  /// then too. The session keeps nothing of the released textures: a texture
+  /// that a later target gives it again is a new one, even one that you
+  /// discarded a frame of. For another target, the completion has no value.
   ///
   /// See `mln_render_session_release_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -7955,7 +8395,10 @@ final class RenderSessionHandle implements Finalizable {
   ///   exported ring.
   /// - `Status.targetLost` when the session loses its target before the release
   ///   runs.
-  Future<void> releaseTarget() => _run(
+  /// - `Status.nativeError` when the session can't submit its work on a
+  ///   borrowed ring's textures. It keeps them then.
+  Future<GpuSync?> releaseTarget() => _queryOptional(
+    _resultGpuSync,
     (arena, completion) => raw.mln_render_session_release_target(
       _handle.raw,
       completion,
@@ -7993,30 +8436,61 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
-  /// Sets the frame pacer that demands the session's frames.
+  /// Paces the session's frames to the display.
   ///
   /// At the first display refresh after the session has something new to draw,
-  /// `pacer` demands a frame without flags and with token 0. One pacer can
-  /// serve many sessions. A null `pacer` stops pacing the session. You can call
-  /// it once the attach call returns.
+  /// the library demands a frame without flags and with token 0, unless you
+  /// demanded one first. Each call replaces the session's pacing, and a null
+  /// `options` stops it. You can call it once the attach call returns.
   ///
-  /// See `mln_render_session_set_frame_pacer` in the
+  /// On iOS, macOS, and tvOS, the library uses a `CADisplayLink` on a thread of
+  /// its own. With `FramePacingOptions.view`, call it on the main thread. The
+  /// library asks the system for the frame rate limit's refresh rate. On
+  /// iPhone, a rate above 60 needs `CADisableMinimumFrameDurationOnPhone` in
+  /// the app's `Info.plist`.
+  ///
+  /// On Android, the library follows the display through the calling thread's
+  /// `AChoreographer`. Call it on a thread with an `ALooper`, such as the app's
+  /// main thread, and keep that thread running its looper while the session is
+  /// paced. `AChoreographer` can stop while the phone's display is off, even
+  /// while a Surface on another display, such as an Android Auto projection,
+  /// still shows the map. The library then keeps demanding frames from a timer
+  /// on the looper, within the frame rate limit, until vsyncs arrive again.
+  ///
+  /// On OpenHarmony, the library uses `OH_NativeVSync`, from any thread.
+  ///
+  /// See `mln_render_session_set_frame_pacing` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   ///
   /// Errors:
   ///
+  /// - `Status.invalidArgument` when `options` sets `maximum_frames_per_second`
+  ///   to 0, or sets `view` to null.
+  /// - `Status.unsupported` on the other platforms, such as visionOS, Linux,
+  ///   and Windows, where the library has no source of display refreshes, on
+  ///   macOS before 14, and when `options` sets `view` on a platform other than
+  ///   macOS, iOS, and tvOS.
   /// - `Status.targetLost` or `Status.nativeError`, as
   ///   `RenderSessionSnapshot.failureStatus` reports, when the session has
   ///   failed.
   /// - `Status.invalidState` when you attached the session with a redraw wake,
-  ///   or detached, abandoned, released, or disposed it.
-  void setFramePacer({FramePacerHandle? pacer}) => _check(
-    raw.mln_render_session_set_frame_pacer(
-      _handle.raw,
-      (pacer?._handle.raw ?? 0),
-      nativeDiagnostic,
-    ),
-  );
+  ///   or detached, abandoned, released, or disposed it, on Android when the
+  ///   calling thread has no `ALooper`, and when `options` sets `view` off the
+  ///   main thread or, on iOS and tvOS, to a view in no window.
+  /// - `Status.nativeError` on iOS, macOS, and tvOS when the system has no
+  ///   display to follow, and on OpenHarmony when the system can't report the
+  ///   display's refreshes to the process.
+  void setFramePacing({FramePacingOptions? options}) => withNativeArena((
+    arena,
+  ) {
+    _check(
+      raw.mln_render_session_set_frame_pacing(
+        _handle.raw,
+        options == null ? nullptr : _writeFramePacingOptions(options, arena),
+        nativeDiagnostic,
+      ),
+    );
+  });
 
   /// Replaces the window, surface, or borrowed ring that the session renders
   /// to, and resizes the map to it.
@@ -8029,10 +8503,12 @@ final class RenderSessionHandle implements Finalizable {
   /// A borrowed ring takes only a ring of the kind it attached with, with as
   /// many textures, with depth textures only when it attached with them, and
   /// with the same formats, final layouts, and owner. Release every acquired
-  /// frame of a borrowed ring first. Once the replacement completes, the
-  /// session has also stopped waiting on the consumer sync of the textures that
-  /// the new ring doesn't have, as `RenderSessionHandle.releaseTarget()` says,
-  /// so you can reuse or destroy them.
+  /// frame of a borrowed ring first. For a borrowed ring, the replacement
+  /// completes with an `GpuSync`: wait for it before you reuse or destroy the
+  /// textures that the new ring doesn't have, as
+  /// `RenderSessionHandle.releaseTarget()` says. When it lets go of no
+  /// textures, such as after a release, the sync is `GpuSyncKind.cpuComplete`.
+  /// For another target, the completion has no value.
   ///
   /// See `mln_render_session_set_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -8058,7 +8534,8 @@ final class RenderSessionHandle implements Finalizable {
   ///   ones in their formats, final layouts, or owner, or in having depth
   ///   textures. Attach a new session instead.
   /// - `Status.nativeError` when the library can't render to the new target.
-  Future<void> setTarget(RenderTarget target) => _run(
+  Future<GpuSync?> setTarget(RenderTarget target) => _queryOptional(
+    _resultGpuSync,
     (arena, completion) => raw.mln_render_session_set_target(
       _handle.raw,
       _writeRenderTarget(target, arena),
@@ -8579,6 +9056,24 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
+  /// Reads how long the resources of the offline region `regionId` stay usable.
+  ///
+  /// See `mln_runtime_get_offline_region_expiry` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  ///
+  /// Errors:
+  ///
+  /// - `Status.notFound` when the cache file has no region `regionId`.
+  Future<OfflineRegionExpiry> getOfflineRegionExpiry(int regionId) => _query(
+    _resultOfflineRegionExpiry,
+    (arena, completion) => raw.mln_runtime_get_offline_region_expiry(
+      _handle.raw,
+      regionId,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Reads the download progress of the offline region `regionId`.
   ///
   /// While the download is active, the counts cover what it has visited. Once
@@ -8602,14 +9097,16 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
     ),
   );
 
-  /// Makes maps check each resource of the offline region `regionId` with the
-  /// server before they use it.
+  /// Makes each resource of the offline region `regionId` stale, so maps check
+  /// it with the server when they next use it.
   ///
-  /// The region keeps its resources. Starting its download again fetches the
-  /// invalidated resources for offline use. If the style or a TileJSON document
-  /// is then missing or invalid, the download reports an offline region
-  /// response error and goes on from the stored copy. Resources that the
-  /// current style no longer lists stay in the region until it's deleted.
+  /// The region keeps its resources, and maps show them while they check them,
+  /// except those that the server requires checking first. Starting the
+  /// region's download again checks every resource with the server. If the
+  /// style or a TileJSON document is then missing or invalid, the download
+  /// reports an offline region response error and goes on from the stored copy.
+  /// Resources that the current style no longer lists stay in the region until
+  /// it's deleted.
   ///
   /// See `mln_runtime_invalidate_offline_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -8757,8 +9254,10 @@ final class RuntimeHandle implements Finalizable, _CallbackRootOwner {
 
   /// Starts or pauses the download of the offline region `regionId`.
   ///
-  /// Setting the state that the download already has does nothing. A download
-  /// stops when the runtime closes.
+  /// A download fetches the resources that the region lacks, and checks those
+  /// that are stale with the server, keeping each stored copy until its refresh
+  /// arrives. Setting the state that the download already has does nothing. A
+  /// download stops when the runtime closes.
   ///
   /// See `mln_runtime_set_offline_region_download_state` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -9013,6 +9512,38 @@ final class ScopedAndroidHardwareBufferFrame {
     checkValid: _scope.checkActive,
     debugName: 'AndroidHardwareBufferFrame.buffer',
   );
+}
+
+/// A `D3d12TextureFrame` whose native objects are readable only while the
+/// callback of `AcquiredFrameHandle.withD3d12Texture` runs. Its
+/// other members stay readable after the callback returns.
+final class ScopedD3d12TextureFrame {
+  ScopedD3d12TextureFrame._(this._scope, this._value);
+  final D3d12TextureFrame _value;
+  final _NativeViewScope _scope;
+  int get width => _value.width;
+  int get height => _value.height;
+  double get scaleFactor => _value.scaleFactor;
+  int get slot => _value.slot;
+  ScopedNativePointer get resource => ScopedNativePointer(
+    _value.resource.address,
+    checkValid: _scope.checkActive,
+    debugName: 'D3d12TextureFrame.resource',
+  );
+  ScopedNativePointer get device => ScopedNativePointer(
+    _value.device.address,
+    checkValid: _scope.checkActive,
+    debugName: 'D3d12TextureFrame.device',
+  );
+  int get format => _value.format;
+  int get state => _value.state;
+  ScopedNativePointer get depthResource => ScopedNativePointer(
+    _value.depthResource.address,
+    checkValid: _scope.checkActive,
+    debugName: 'D3d12TextureFrame.depthResource',
+  );
+  int get depthFormat => _value.depthFormat;
+  int get depthState => _value.depthState;
 }
 
 /// A `DmaBufFrame` whose native objects are readable only while the

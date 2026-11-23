@@ -113,7 +113,8 @@ Release every acquired frame before you release the session.
 The session renders at the size of your textures, so to resize, give it new
 ones. First, release every acquired frame. Then create as many textures as
 before at the new size, on the same device and in the same format, and set them
-as the session's target. Once the replacement completes, destroy the old
-textures.
+as the session's target. The replacement completes with a [](api:mln_gpu_sync)
+that the session's last use of the old textures signals. Wait for it, then
+destroy the old textures.
 
 <Snippet page="texture" region="resize-borrowed" />

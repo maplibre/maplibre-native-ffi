@@ -40,17 +40,11 @@ b.installDirectory(.{
 
 ## Choose a backend
 
-The package uses your platform's
-[default backend](/maplibre-native-ffi/install/#choose-a-backend). To choose
-another, pass `.backend` to the dependency: `.opengl`, `.metal`, or `.vulkan`.
-
-```zig title="build.zig"
-const maplibre = b.dependency("maplibre_native_ffi", .{
-    .target = target,
-    .optimize = optimize,
-    .backend = .opengl,
-});
-```
+The C library carries every
+[backend](/maplibre-native-ffi/install/#choose-a-backend) of your platform. A
+render session draws with the backend of its GPU device: create one with
+`GpuDevice.create(.{ .backend = .open_gl }, null)` to choose a backend, or
+attach without a device to take the platform's default.
 
 ## Windows
 

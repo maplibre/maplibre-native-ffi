@@ -22,7 +22,8 @@
   defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS) ||       \
   defined(MLN_PROTOCOL_NESTED_REGISTRATION) ||                                 \
   defined(MLN_PROTOCOL_STRIDED_RECORDS) || defined(MLN_PROTOCOL_VERSIONING) || \
-  defined(MLN_PROTOCOL_VALUE_UNION)
+  defined(MLN_PROTOCOL_VALUE_UNION) ||                                         \
+  defined(MLN_PROTOCOL_COUNTED_INLINE_ARRAY)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
@@ -769,6 +770,46 @@ mln_status mln_map_set_window(
 BIND("execution=query;result=mln_probe_survey")
 mln_status mln_map_survey(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+#endif
+
+// A result that holds up to a fixed number of tagged records in place and
+// counts the ones in use, which a handle's immediate method fills, as a gesture
+// recognizer reports its events. A summary names a variant by its tag.
+#ifdef MLN_PROTOCOL_COUNTED_INLINE_ARRAY
+typedef enum mln_probe_mark_type : uint32_t {
+  MLN_PROBE_MARK_TAP = 1,
+  MLN_PROBE_MARK_LEVEL = 2,
+} mln_probe_mark_type;
+/** A tap that an MLN_PROBE_MARK_TAP reports. */
+typedef struct mln_probe_tap {
+  uint32_t id;
+} mln_probe_tap;
+typedef union mln_probe_mark_data {
+  mln_probe_tap tap BIND("variant=MLN_PROBE_MARK_TAP");
+  double level BIND("variant=MLN_PROBE_MARK_LEVEL");
+} mln_probe_mark_data;
+typedef struct mln_probe_mark {
+  mln_probe_mark_type type;
+  mln_probe_mark_data data BIND("tag=type");
+} mln_probe_mark;
+typedef struct mln_probe_marks {
+  uint32_t size;
+  size_t mark_count;
+  mln_probe_mark marks[4] BIND("length=mark_count");
+} mln_probe_marks;
+typedef unsigned long long mln_probe_tracker BIND(
+  "kind=handle;release=mln_probe_tracker_release;"
+  "dispose=mln_probe_tracker_release"
+);
+void mln_probe_tracker_release(mln_probe_tracker tracker);
+mln_status mln_probe_tracker_open(
+  mln_probe_tracker* out_tracker BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+mln_status mln_probe_tracker_poll(
+  mln_probe_tracker tracker, mln_probe_marks* out_marks BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
 );
 #endif
 

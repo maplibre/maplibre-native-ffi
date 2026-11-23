@@ -10,32 +10,49 @@ private func flyEnded(_: Bool) {}
 
 // #region gesture
 
-private func beginGesture(_ map: MapHandle) throws {
-  try map.discarding
-    .applyCameraDelta(CameraDelta(gesturePhase: .begin))
+private func createRecognizer(
+  _ map: MapHandle
+) throws -> GestureRecognizerHandle {
+  try map.gestureRecognizerCreate()
 }
 
-private func applyDrag(
-  _ map: MapHandle,
-  movement: ScreenPoint
+private func scheduleTick(_: GestureResult) {
+  // On the next frame, or at the result's nextTickMs.
+}
+
+private func pointerDown(
+  _ recognizer: GestureRecognizerHandle,
+  id: UInt32,
+  position: ScreenPoint,
+  timeMs: Double
 ) throws {
-  try map.discarding.applyCameraDelta(
-    CameraDelta(offset: movement, gesturePhase: .update)
+  let result = try recognizer.handle(
+    input: .pointerDown(
+      GesturePointerDown(id: id, kind: .touch, position: position)
+    ),
+    timeMs: timeMs
   )
+  scheduleTick(result)
 }
 
-private func applyPinch(
-  _ map: MapHandle,
-  scale: Double,
-  center: ScreenPoint
+private func pointerMove(
+  _ recognizer: GestureRecognizerHandle,
+  id: UInt32,
+  position: ScreenPoint,
+  timeMs: Double
 ) throws {
-  try map.discarding.applyCameraDelta(
-    CameraDelta(scale: scale, anchor: center, gesturePhase: .update)
+  let result = try recognizer.handle(
+    input: .pointerMove(GesturePointer(id: id, position: position)),
+    timeMs: timeMs
   )
+  scheduleTick(result)
 }
 
-private func endGesture(_ map: MapHandle) throws {
-  try map.discarding.applyCameraDelta(CameraDelta(gesturePhase: .end))
+private func tick(
+  _ recognizer: GestureRecognizerHandle,
+  timeMs: Double
+) throws {
+  try scheduleTick(recognizer.tick(timeMs: timeMs))
 }
 
 // #endregion gesture
@@ -96,10 +113,21 @@ private func camera(_ map: MapHandle) async throws {
   )
   // #endregion limit
 
-  try beginGesture(map)
-  try applyDrag(map, movement: ScreenPoint(x: 12, y: -4))
-  try applyPinch(map, scale: 1.1, center: ScreenPoint(x: 200, y: 150))
-  try endGesture(map)
+  let recognizer = try createRecognizer(map)
+  try pointerDown(
+    recognizer,
+    id: 1,
+    position: ScreenPoint(x: 100, y: 100),
+    timeMs: 0
+  )
+  try pointerMove(
+    recognizer,
+    id: 1,
+    position: ScreenPoint(x: 112, y: 96),
+    timeMs: 16
+  )
+  try tick(recognizer, timeMs: 32)
+  recognizer.release()
 
   // #region convert
   let projection = try MapProjectionHandle.create(

@@ -348,6 +348,66 @@ static void a_bulk_projection_returns_every_result(void) {
   release_runtime(runtime);
 }
 
+/** Presses or lifts the mouse at (20, 10), at `time_ms`. */
+static MaplibreNativeFfiGestureResult* click(
+  MaplibreNativeFfiGestureRecognizer* recognizer, gboolean down, double time_ms
+) {
+  const MaplibreNativeFfiScreenPoint position = {.x = 20, .y = 10};
+  g_autoptr(MaplibreNativeFfiGestureInput) input = NULL;
+  if (down) {
+    const MaplibreNativeFfiGesturePointerDown pointer = {
+      .id = 1,
+      .kind = MAPLIBRE_NATIVE_FFI_POINTER_KIND_MOUSE,
+      .position = position,
+    };
+    input = maplibre_native_ffi_gesture_input_new_pointer_down(&pointer);
+  } else {
+    const MaplibreNativeFfiGesturePointer pointer = {
+      .id = 1, .position = position
+    };
+    input = maplibre_native_ffi_gesture_input_new_pointer_up(&pointer);
+  }
+  g_autoptr(GError) error = NULL;
+  MaplibreNativeFfiGestureResult* result =
+    maplibre_native_ffi_gesture_recognizer_handle(
+      recognizer, input, time_ms, &error
+    );
+  g_assert_no_error(error);
+  return result;
+}
+
+static void a_gesture_result_lists_its_events_in_order(void) {
+  MaplibreNativeFfiRuntime* runtime = create_runtime();
+  MaplibreNativeFfiMap* map = create_map(runtime, 0, 64, 64);
+  g_autoptr(GError) error = NULL;
+  MaplibreNativeFfiGestureRecognizer* recognizer =
+    maplibre_native_ffi_map_gesture_recognizer_create(map, NULL, &error);
+  g_assert_no_error(error);
+  const double times[] = {0, 50, 150};
+  for (guint index = 0; index < G_N_ELEMENTS(times); index++) {
+    g_autoptr(MaplibreNativeFfiGestureResult) result =
+      click(recognizer, index % 2 == 0, times[index]);
+  }
+
+  // The second click's lift reports a tap, then a double tap.
+  g_autoptr(MaplibreNativeFfiGestureResult) result =
+    click(recognizer, FALSE, 200);
+  GPtrArray* events = maplibre_native_ffi_gesture_result_get_events(result);
+  g_assert_cmpuint(events->len, ==, 2);
+  g_assert_true(maplibre_native_ffi_gesture_event_is_tap(events->pdata[0]));
+  g_assert_true(
+    maplibre_native_ffi_gesture_event_is_double_tap(events->pdata[1])
+  );
+  const MaplibreNativeFfiGestureTap* tap =
+    maplibre_native_ffi_gesture_event_get_double_tap(events->pdata[1]);
+  g_assert_cmpuint(tap->id, ==, 1);
+  g_assert_cmpfloat(tap->position.x, ==, 20);
+  g_assert_cmpfloat(tap->position.y, ==, 10);
+  g_object_unref(recognizer);
+  release_map(map);
+  release_runtime(runtime);
+}
+
 static void caller_sized_text_returns_all_of_a_long_result(void) {
   GString* text = g_string_new(NULL);
   for (int index = 0; index < 600; index++) g_string_append_c(text, 'a');
@@ -1034,6 +1094,10 @@ int main(int argc, char** argv) {
   g_test_add_func(
     "/values/a-bulk-projection-returns-every-result",
     a_bulk_projection_returns_every_result
+  );
+  g_test_add_func(
+    "/values/a-gesture-result-lists-its-events-in-order",
+    a_gesture_result_lists_its_events_in_order
   );
   g_test_add_func(
     "/values/caller-sized-text-returns-all-of-a-long-result",

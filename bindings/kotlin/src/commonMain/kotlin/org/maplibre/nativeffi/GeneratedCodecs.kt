@@ -45,22 +45,6 @@ internal fun NativeArena.writeLogicalSize(value: LogicalSize): Long =
   allocate(8, 4).also { putLogicalSize(it, value) }
 
 @JvmSynthetic
-internal fun NativeArena.putFramePacerOptions(target: Long, value: FramePacerOptions) {
-  writeU32(target, 12.toUInt())
-  var fields = 0u
-  if (value.unlimitedFramesPerSecond) fields = fields or 2u
-  value.maximumFramesPerSecond?.let {
-    fields = fields or 1u
-    writeU32(target + 8, it)
-  }
-  writeU32(target + 4, fields)
-}
-
-@JvmSynthetic
-internal fun NativeArena.writeFramePacerOptions(value: FramePacerOptions): Long =
-  allocate(12, 4).also { putFramePacerOptions(it, value) }
-
-@JvmSynthetic
 internal fun NativeCall.putGpuDeviceOptions(target: Long, value: GpuDeviceOptions) {
   writeU32(target, w(56, 88).toUInt())
   var fields = 0u
@@ -95,6 +79,17 @@ internal fun NativeCall.putGpuDeviceOptions(target: Long, value: GpuDeviceOption
 @JvmSynthetic
 internal fun NativeCall.writeGpuDeviceOptions(value: GpuDeviceOptions): Long =
   allocate(w(56, 88), w(4, 8)).also { putGpuDeviceOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putD3d12DeviceDescriptor(target: Long, value: D3d12DeviceDescriptor) {
+  writeU32(target, w(12, 24).toUInt())
+  writeAddress(target + w(4, 8), value.device.address)
+  writeAddress(target + w(8, 16), value.commandQueue.address)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeD3d12DeviceDescriptor(value: D3d12DeviceDescriptor): Long =
+  allocate(w(12, 24), w(4, 8)).also { putD3d12DeviceDescriptor(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putMetalDeviceDescriptor(target: Long, value: MetalDeviceDescriptor) {
@@ -242,6 +237,29 @@ internal fun NativeArena.putStyleExpressionOptions(target: Long, value: StyleExp
 @JvmSynthetic
 internal fun NativeArena.writeStyleExpressionOptions(value: StyleExpressionOptions): Long =
   allocate(20, 4).also { putStyleExpressionOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGestureOptions(target: Long, value: GestureOptions) {
+  writeU32(target, w(640, 664, 616).toUInt())
+  var fields = 0u
+  value.doubleTapZoom?.let {
+    fields = fields or 1u
+    writeF64(target + 8, it)
+  }
+  value.twoFingerTapZoom?.let {
+    fields = fields or 2u
+    writeF64(target + 16, it)
+  }
+  putGesturePanOptions(target + 24, value.pan)
+  putGestureAxisOptions(target + 136, value.zoom)
+  putGestureAxisOptions(target + w(304, 312, 296), value.bearing)
+  putGestureAxisOptions(target + w(472, 488, 456), value.pitch)
+  writeU32(target + 4, fields)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeGestureOptions(value: GestureOptions): Long =
+  allocate(w(640, 664, 616), w(8, 8, 4)).also { putGestureOptions(it, value) }
 
 @JvmSynthetic
 internal fun NativeCall.putCustomGeometrySourceOptions(
@@ -432,7 +450,7 @@ internal fun NativeArena.writePremultipliedRgba8Image(value: PremultipliedRgba8I
 
 @JvmSynthetic
 internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
-  writeU32(target, w(800, 808, 764).toUInt())
+  writeU32(target, w(168, 176, 160).toUInt())
   var fields = 0u
   value.offset?.let {
     fields = fields or 1u
@@ -454,18 +472,13 @@ internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
     fields = fields or 16u
     putScreenPoint(target + 48, it)
   }
-  value.momentum?.let {
-    fields = fields or 32u
-    putGestureMomentum(target + 64, it)
-  }
-  putAnimationOptions(target + w(688, 688, 660), value.animation)
-  writeU32(target + w(792, 800, 756), value.gesturePhase.rawValue)
+  putAnimationOptions(target + 64, value.animation)
   writeU32(target + 4, fields)
 }
 
 @JvmSynthetic
 internal fun NativeCall.writeCameraDelta(value: CameraDelta): Long =
-  allocate(w(800, 808, 764), w(8, 8, 4)).also { putCameraDelta(it, value) }
+  allocate(w(168, 176, 160), w(8, 8, 4)).also { putCameraDelta(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putRenderTarget(target: Long, value: RenderTarget) {
@@ -530,6 +543,14 @@ internal fun NativeArena.putRenderTarget(target: Long, value: RenderTarget) {
     is RenderTarget.WebCanvas -> {
       writeU32(target + 4, 17u)
       putWebCanvasTarget(target + 8, variant.value)
+    }
+    is RenderTarget.D3d12BorrowedTextures -> {
+      writeU32(target + 4, 18u)
+      putD3d12BorrowedTexturesTarget(target + 8, variant.value)
+    }
+    is RenderTarget.D3d12Composition -> {
+      writeU32(target + 4, 19u)
+      putD3d12CompositionTarget(target + 8, variant.value)
     }
   }
 }
@@ -872,16 +893,54 @@ internal fun NativeArena.writeMapViewportOptions(value: MapViewportOptions): Lon
 
 @JvmSynthetic
 internal fun NativeCall.putCameraUpdate(target: Long, value: CameraUpdate) {
-  writeU32(target, w(240, 248, 232).toUInt())
+  writeU32(target, w(232, 240, 224).toUInt())
   writeU32(target + 4, value.mode.rawValue)
   putCameraOptions(target + 8, value.camera)
   putAnimationOptions(target + 128, value.animation)
-  writeU32(target + w(232, 240, 224), value.gesturePhase.rawValue)
 }
 
 @JvmSynthetic
 internal fun NativeCall.writeCameraUpdate(value: CameraUpdate): Long =
-  allocate(w(240, 248, 232), w(8, 8, 4)).also { putCameraUpdate(it, value) }
+  allocate(w(232, 240, 224), w(8, 8, 4)).also { putCameraUpdate(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGestureInput(target: Long, value: GestureInput) {
+  writeU32(target, w(72, 72, 68).toUInt())
+  when (val variant = value) {
+    is GestureInput.PointerDown -> {
+      writeU32(target + 4, 1u)
+      putGesturePointerDown(target + 8, variant.value)
+    }
+    is GestureInput.PointerMove -> {
+      writeU32(target + 4, 2u)
+      putGesturePointer(target + 8, variant.value)
+    }
+    is GestureInput.PointerUp -> {
+      writeU32(target + 4, 3u)
+      putGesturePointer(target + 8, variant.value)
+    }
+    is GestureInput.PointerCancel -> {
+      writeU32(target + 4, 4u)
+      putGesturePointer(target + 8, variant.value)
+    }
+    is GestureInput.Modes -> {
+      writeU32(target + 4, 5u)
+      writeU32(target + 8, variant.value.rawValue)
+    }
+    is GestureInput.Delta -> {
+      writeU32(target + 4, 6u)
+      putGestureDelta(target + 8, variant.value)
+    }
+    is GestureInput.Pinch -> {
+      writeU32(target + 4, 7u)
+      putGesturePinch(target + 8, variant.value)
+    }
+  }
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeGestureInput(value: GestureInput): Long =
+  allocate(w(72, 72, 68), w(8, 8, 4)).also { putGestureInput(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putScreenPoint(target: Long, value: ScreenPoint) {
@@ -979,8 +1038,27 @@ internal fun NativeArena.writeSourceFeatureQueryOptions(value: SourceFeatureQuer
   allocate(w(24, 40), w(4, 8)).also { putSourceFeatureQueryOptions(it, value) }
 
 @JvmSynthetic
+internal fun NativeArena.putFramePacingOptions(target: Long, value: FramePacingOptions) {
+  writeU32(target, w(16, 24).toUInt())
+  var fields = 0u
+  value.maximumFramesPerSecond?.let {
+    fields = fields or 1u
+    writeU32(target + 8, it)
+  }
+  value.view?.let {
+    fields = fields or 2u
+    writeAddress(target + w(12, 16), it.address)
+  }
+  writeU32(target + 4, fields)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeFramePacingOptions(value: FramePacingOptions): Long =
+  allocate(w(16, 24), w(4, 8)).also { putFramePacingOptions(it, value) }
+
+@JvmSynthetic
 internal fun NativeArena.putResourceResponse(target: Long, value: ResourceResponse) {
-  writeU32(target, w(72, 96, 68).toUInt())
+  writeU32(target, w(80, 104, 72).toUInt())
   var fields = 0u
   writeU32(target + 8, value.status.rawValue)
   writeU32(target + 12, value.errorReason.rawValue)
@@ -1001,12 +1079,13 @@ internal fun NativeArena.putResourceResponse(target: Long, value: ResourceRespon
     fields = fields or 4u
     writeI64(target + w(64, 88, 60), it)
   }
+  writeBool(target + w(72, 96, 68), value.noStore)
   writeU32(target + 4, fields)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeResourceResponse(value: ResourceResponse): Long =
-  allocate(w(72, 96, 68), w(8, 8, 4)).also { putResourceResponse(it, value) }
+  allocate(w(80, 104, 72), w(8, 8, 4)).also { putResourceResponse(it, value) }
 
 @JvmSynthetic
 internal fun NativeCall.putResourceRequestCancelHandler(
@@ -1061,6 +1140,10 @@ internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
   value.systemFontsEnabled?.let {
     fields = fields or 4u
     writeBool(target + w(52, 64), it)
+  }
+  value.localIdeographsEnabled?.let {
+    fields = fields or 8u
+    writeBool(target + w(53, 65), it)
   }
   writeU32(target + 4, fields)
 }
@@ -1205,6 +1288,32 @@ internal fun readAndroidHardwareBufferFrame(
         readAddress(source + w(28, 32, 24)).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
+    )
+    .also { it.bindingScope = scope }
+
+@JvmSynthetic
+internal fun readD3d12TextureFrame(source: Long, scope: ViewScope? = null): D3d12TextureFrame =
+  D3d12TextureFrame(
+      width = readU32(source + 4),
+      height = readU32(source + 8),
+      scaleFactor = readF64(source + w(16, 16, 12)),
+      slot = readU32(source + w(24, 24, 20)),
+      resource =
+        readAddress(source + w(28, 32, 24)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+      device =
+        readAddress(source + w(32, 40, 28)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+      format = readU32(source + w(36, 48, 32)),
+      state = readU32(source + w(40, 52, 36)),
+      depthResource =
+        readAddress(source + w(44, 56, 40)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+      depthFormat = readU32(source + w(48, 64, 44)),
+      depthState = readU32(source + w(52, 68, 48)),
     )
     .also { it.bindingScope = scope }
 
@@ -1401,21 +1510,6 @@ internal fun readProjectedMeters(source: Long): ProjectedMeters =
   ProjectedMeters(northing = readF64(source), easting = readF64(source + 8))
 
 @JvmSynthetic
-internal fun readGpuDeviceCapabilities(source: Long): GpuDeviceCapabilities =
-  GpuDeviceCapabilities(
-    backend = RenderBackend.of(readU32(source + 4)),
-    targetKinds = RenderTargetKindFlag.of(readU32(source + 8)),
-    exportKinds = GpuExportKindFlag.of(readU32(source + 12)),
-    syncKinds = GpuSyncKindFlag.of(readU32(source + 16)),
-    depthStencilFormats = DepthStencilFormatFlag.of(readU32(source + 20)),
-    depthExportKinds = GpuExportKindFlag.of(readU32(source + 24)),
-  )
-
-@JvmSynthetic
-internal fun readGpuDeviceVulkanContextResult(source: Long): GpuDeviceVulkanContextResult =
-  GpuDeviceVulkanContextResult(context = readVulkanContextDescriptor(source + w(4, 8)))
-
-@JvmSynthetic
 internal fun readCameraQueryResult(source: Long): CameraQueryResult =
   CameraQueryResult(generation = readU64(source), camera = readCamera(source + 8))
 
@@ -1514,6 +1608,48 @@ internal fun readLatLngBounds(source: Long): LatLngBounds =
   LatLngBounds(southwest = readLatLng(source), northeast = readLatLng(source + 16))
 
 @JvmSynthetic
+internal fun readGestureResult(source: Long): GestureResult =
+  GestureResult(
+    handled = readBool(source + 4),
+    nextTick = GestureNextTick.of(readU32(source + 8)),
+    nextTickMs = readF64(source + w(16, 16, 12)),
+    boxZoomActive = readBool(source + w(24, 24, 20)),
+    boxZoom = readScreenBox(source + w(32, 32, 24)),
+    events =
+      readArray(
+        source + w(72, 72, 60),
+        readSize(source + w(64, 64, 56)).also {
+          check(it.toLong() in 0L..4L) { "native count exceeds its array" }
+        },
+        w(32, 32, 24).toLong(),
+      ) { item ->
+        readGestureEvent(item)
+      },
+  )
+
+@JvmSynthetic
+internal fun readGpuDeviceCapabilities(source: Long): GpuDeviceCapabilities =
+  GpuDeviceCapabilities(
+    backend = RenderBackend.of(readU32(source + 4)),
+    targetKinds = RenderTargetKindFlag.of(readU32(source + 8)),
+    exportKinds = GpuExportKindFlag.of(readU32(source + 12)),
+    syncKinds = GpuSyncKindFlag.of(readU32(source + 16)),
+    depthStencilFormats = DepthStencilFormatFlag.of(readU32(source + 20)),
+    depthExportKinds = GpuExportKindFlag.of(readU32(source + 24)),
+  )
+
+@JvmSynthetic
+internal fun readGpuDeviceD3d12ContextResult(source: Long): GpuDeviceD3d12ContextResult =
+  GpuDeviceD3d12ContextResult(
+    device = NativePointer.ofAddress(readAddress(source + w(4, 8))),
+    commandQueue = NativePointer.ofAddress(readAddress(source + w(8, 16))),
+  )
+
+@JvmSynthetic
+internal fun readGpuDeviceVulkanContextResult(source: Long): GpuDeviceVulkanContextResult =
+  GpuDeviceVulkanContextResult(context = readVulkanContextDescriptor(source + w(4, 8)))
+
+@JvmSynthetic
 internal fun readMapProjectionCameraResult(source: Long): MapProjectionCameraResult =
   MapProjectionCameraResult(camera = readCamera(source + w(8, 8, 4)))
 
@@ -1587,6 +1723,17 @@ internal fun readOfflineRegionInfo(source: Long): OfflineRegionInfo =
     definition = readOfflineRegionDefinition(source + 8),
     metadata = readBytes(readAddress(source + w(80, 88)), readSize(source + w(84, 96))),
   )
+
+@JvmSynthetic
+internal fun readOfflineRegionExpiry(source: Long): OfflineRegionExpiry {
+  val fields = readU32(source)
+  return OfflineRegionExpiry(
+    staleAfterUnixMs = if ((fields and 1u) != 0u) readI64(source + w(8, 8, 4)) else null,
+    usableOfflineUntilUnixMs = if ((fields and 2u) != 0u) readI64(source + w(16, 16, 12)) else null,
+    staleResourceCount = readU64(source + w(24, 24, 20)),
+    unusableResourceCount = readU64(source + w(32, 32, 28)),
+  )
+}
 
 @JvmSynthetic
 internal fun readOfflineRegionStatus(source: Long): OfflineRegionStatus =
@@ -1740,16 +1887,64 @@ internal fun NativeArena.writeStyleExpressionType(value: StyleExpressionType): L
   allocate(12, 4).also { putStyleExpressionType(it, value) }
 
 @JvmSynthetic
-internal fun NativeArena.putGestureMomentum(target: Long, value: GestureMomentum) {
-  putPanMomentum(target, value.pan)
-  putAnchoredMomentum(target + w(120, 120, 116), value.zoom)
-  putAnchoredMomentum(target + w(288, 288, 276), value.bearing)
-  putAnchoredMomentum(target + w(456, 456, 436), value.pitch)
+internal fun NativeArena.putGesturePanOptions(target: Long, value: GesturePanOptions) {
+  var fields = 0u
+  value.enabled?.let {
+    fields = fields or 1u
+    writeBool(target + 4, it)
+  }
+  value.glides?.let {
+    fields = fields or 2u
+    writeBool(target + 5, it)
+  }
+  value.momentum?.let {
+    fields = fields or 4u
+    putMomentumDecay(target + 8, it)
+  }
+  writeU32(target, fields)
 }
 
 @JvmSynthetic
-internal fun NativeArena.writeGestureMomentum(value: GestureMomentum): Long =
-  allocate(w(624, 624, 596), w(8, 8, 4)).also { putGestureMomentum(it, value) }
+internal fun NativeArena.writeGesturePanOptions(value: GesturePanOptions): Long =
+  allocate(112, w(8, 8, 4)).also { putGesturePanOptions(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGestureAxisOptions(target: Long, value: GestureAxisOptions) {
+  var fields = 0u
+  value.enabled?.let {
+    fields = fields or 1u
+    writeBool(target + 4, it)
+  }
+  value.glides?.let {
+    fields = fields or 2u
+    writeBool(target + 5, it)
+  }
+  value.momentum?.let {
+    fields = fields or 4u
+    putMomentumDecay(target + 8, it)
+  }
+  value.snaps?.let {
+    fields = fields or 8u
+    writeBool(target + 112, it)
+  }
+  value.snap?.let {
+    fields = fields or 16u
+    putMomentumSnap(target + w(120, 120, 116), it)
+  }
+  value.notches?.let {
+    fields = fields or 32u
+    writeAddress(
+      target + w(160, 160, 152),
+      array(it, w(24, 24, 20), w(8, 8, 4)) { at, item -> putGestureNotch(at, item) },
+    )
+    writeSize(target + w(164, 168, 156), it.size.toULong())
+  }
+  writeU32(target, fields)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeGestureAxisOptions(value: GestureAxisOptions): Long =
+  allocate(w(168, 176, 160), w(8, 8, 4)).also { putGestureAxisOptions(it, value) }
 
 @JvmSynthetic
 internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOptions) {
@@ -2014,6 +2209,44 @@ internal fun NativeArena.writeWebCanvasTarget(value: WebCanvasTarget): Long =
   allocate(w(20, 32), w(4, 8)).also { putWebCanvasTarget(it, value) }
 
 @JvmSynthetic
+internal fun NativeArena.putD3d12BorrowedTexturesTarget(
+  target: Long,
+  value: D3d12BorrowedTexturesTarget,
+) {
+  putLogicalSize(target, value.logicalSize)
+  writeU32(target + 8, value.physicalWidth)
+  writeU32(target + 12, value.physicalHeight)
+  writeAddress(
+    target + 16,
+    array(value.textures, w(4, 8), w(4, 8)) { at, item -> putD3d12BorrowedTexture(at, item) },
+  )
+  writeSize(target + w(20, 24), value.textures.size.toULong())
+  writeU32(target + w(24, 32), value.state)
+  writeAddress(
+    target + w(28, 40),
+    array(value.depthTextures, w(4, 8), w(4, 8)) { at, item -> putD3d12BorrowedTexture(at, item) },
+  )
+  writeSize(target + w(32, 48), value.depthTextures.size.toULong())
+  writeU32(target + w(36, 56), value.depthState)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeD3d12BorrowedTexturesTarget(
+  value: D3d12BorrowedTexturesTarget,
+): Long = allocate(w(40, 64), w(4, 8)).also { putD3d12BorrowedTexturesTarget(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putD3d12CompositionTarget(target: Long, value: D3d12CompositionTarget) {
+  putLogicalSize(target, value.logicalSize)
+  writeU32(target + 8, value.kind.rawValue)
+  writeAddress(target + w(12, 16), value.`object`.address)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeD3d12CompositionTarget(value: D3d12CompositionTarget): Long =
+  allocate(w(16, 24), w(4, 8)).also { putD3d12CompositionTarget(it, value) }
+
+@JvmSynthetic
 internal fun NativeCall.putWake(target: Long, value: Wake) {
   val native = value.bindingNative
   if (native != null) {
@@ -2116,6 +2349,54 @@ internal fun NativeArena.putImageContent(target: Long, value: ImageContent) {
 @JvmSynthetic
 internal fun NativeArena.writeImageContent(value: ImageContent): Long =
   allocate(16, 4).also { putImageContent(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGesturePointerDown(target: Long, value: GesturePointerDown) {
+  writeU32(target, value.id)
+  writeU32(target + 4, value.kind.rawValue)
+  putScreenPoint(target + 8, value.position)
+  writeU32(target + 24, value.modes.rawValue)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeGesturePointerDown(value: GesturePointerDown): Long =
+  allocate(w(32, 32, 28), w(8, 8, 4)).also { putGesturePointerDown(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGesturePointer(target: Long, value: GesturePointer) {
+  writeU32(target, value.id)
+  putScreenPoint(target + w(8, 8, 4), value.position)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeGesturePointer(value: GesturePointer): Long =
+  allocate(w(24, 24, 20), w(8, 8, 4)).also { putGesturePointer(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGestureDelta(target: Long, value: GestureDelta) {
+  putScreenPoint(target, value.position)
+  writeBool(target + 16, value.discrete)
+  putScreenPoint(target + w(24, 24, 20), value.pan)
+  writeF64(target + w(40, 40, 36), value.zoom)
+  writeF64(target + w(48, 48, 44), value.bearing)
+  writeF64(target + w(56, 56, 52), value.pitch)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeGestureDelta(value: GestureDelta): Long =
+  allocate(w(64, 64, 60), w(8, 8, 4)).also { putGestureDelta(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGesturePinch(target: Long, value: GesturePinch) {
+  putScreenPoint(target, value.center)
+  writeF64(target + 16, value.scale)
+  writeF64(target + 24, value.rotation)
+  writeU32(target + 32, value.phase.rawValue)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeGesturePinch(value: GesturePinch): Long =
+  allocate(w(40, 40, 36), w(8, 8, 4)).also { putGesturePinch(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putScreenBox(target: Long, value: ScreenBox) {
@@ -2227,6 +2508,7 @@ internal fun readCustomLayerPrerenderParameters(source: Long): CustomLayerPreren
             CustomLayerPrerenderParametersEncoder.Vulkan(readVulkanCustomLayerEncoder(source + 8))
           4u ->
             CustomLayerPrerenderParametersEncoder.WebGpu(readWebGpuCustomLayerEncoder(source + 8))
+          5u -> CustomLayerPrerenderParametersEncoder.D3d12(readD3d12CustomLayerEncoder(source + 8))
           3u -> CustomLayerPrerenderParametersEncoder.None
           else ->
             CustomLayerPrerenderParametersEncoder.Unknown(
@@ -2248,6 +2530,7 @@ internal fun readCustomLayerRenderParameters(source: Long): CustomLayerRenderPar
           2u -> CustomLayerRenderParametersPass.Vulkan(readVulkanCustomLayerPass(source + 8))
           3u -> CustomLayerRenderParametersPass.OpenGl(readOpenGlCustomLayerPass(source + 8))
           4u -> CustomLayerRenderParametersPass.WebGpu(readWebGpuCustomLayerPass(source + 8))
+          5u -> CustomLayerRenderParametersPass.D3d12(readD3d12CustomLayerPass(source + 8))
           else ->
             CustomLayerRenderParametersPass.Unknown(
               tag,
@@ -2321,18 +2604,6 @@ internal fun readEdgeInsets(source: Long): EdgeInsets =
     left = readF64(source + 8),
     bottom = readF64(source + 16),
     right = readF64(source + 24),
-  )
-
-@JvmSynthetic
-internal fun readVulkanContextDescriptor(source: Long): VulkanContextDescriptor =
-  VulkanContextDescriptor(
-    instance = NativePointer.ofAddress(readAddress(source)),
-    physicalDevice = NativePointer.ofAddress(readAddress(source + w(4, 8))),
-    device = NativePointer.ofAddress(readAddress(source + w(8, 16))),
-    graphicsQueue = NativePointer.ofAddress(readAddress(source + w(12, 24))),
-    graphicsQueueFamilyIndex = readU32(source + w(16, 32)),
-    getInstanceProcAddr = NativePointer.ofAddress(readAddress(source + w(20, 40))),
-    getDeviceProcAddr = NativePointer.ofAddress(readAddress(source + w(24, 48))),
   )
 
 @JvmSynthetic
@@ -2421,6 +2692,35 @@ internal fun readGeoJsonSourceOptions(source: Long): GeoJsonSourceOptions {
 }
 
 @JvmSynthetic
+internal fun readScreenBox(source: Long): ScreenBox =
+  ScreenBox(min = readScreenPoint(source), max = readScreenPoint(source + 16))
+
+@JvmSynthetic
+internal fun readGestureEvent(source: Long): GestureEvent =
+  readU32(source).let { tag ->
+    when (tag) {
+      1u -> GestureEvent.Tap(readGestureTap(source + w(8, 8, 4)))
+      2u -> GestureEvent.DoubleTap(readGestureTap(source + w(8, 8, 4)))
+      3u -> GestureEvent.TwoFingerTap(readGestureTap(source + w(8, 8, 4)))
+      4u -> GestureEvent.Notch(readGestureNotchEvent(source + w(8, 8, 4)))
+      5u -> GestureEvent.LongPress(readGestureTap(source + w(8, 8, 4)))
+      else -> GestureEvent.Unknown(tag, NativeMemory.getBytes(source + w(8, 8, 4), w(24, 24, 20)))
+    }
+  }
+
+@JvmSynthetic
+internal fun readVulkanContextDescriptor(source: Long): VulkanContextDescriptor =
+  VulkanContextDescriptor(
+    instance = NativePointer.ofAddress(readAddress(source)),
+    physicalDevice = NativePointer.ofAddress(readAddress(source + w(4, 8))),
+    device = NativePointer.ofAddress(readAddress(source + w(8, 16))),
+    graphicsQueue = NativePointer.ofAddress(readAddress(source + w(12, 24))),
+    graphicsQueueFamilyIndex = readU32(source + w(16, 32)),
+    getInstanceProcAddr = NativePointer.ofAddress(readAddress(source + w(20, 40))),
+    getDeviceProcAddr = NativePointer.ofAddress(readAddress(source + w(24, 48))),
+  )
+
+@JvmSynthetic
 internal fun readLogicalExtent(source: Long): LogicalExtent =
   LogicalExtent(
     width = readU32(source),
@@ -2448,42 +2748,91 @@ internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition 
   }
 
 @JvmSynthetic
-internal fun NativeArena.putPanMomentum(target: Long, value: PanMomentum) {
+internal fun NativeArena.putMomentumDecay(target: Long, value: MomentumDecay) {
   var fields = 0u
-  value.velocity?.let {
+  value.model?.let {
     fields = fields or 1u
-    putScreenPoint(target + w(8, 8, 4), it)
+    writeU32(target + 4, it.rawValue)
   }
-  putMomentumDecay(target + w(24, 24, 20), value.decay)
+  value.halfLifeMs?.let {
+    fields = fields or 2u
+    writeF64(target + 8, it)
+  }
+  value.stopSpeed?.let {
+    fields = fields or 4u
+    writeF64(target + 16, it)
+  }
+  value.referenceSpeed?.let {
+    fields = fields or 8u
+    writeF64(target + 24, it)
+  }
+  value.durationMs?.let {
+    fields = fields or 16u
+    writeF64(target + 32, it)
+  }
+  value.durationExponent?.let {
+    fields = fields or 32u
+    writeF64(target + 40, it)
+  }
+  value.easing?.let {
+    fields = fields or 64u
+    putUnitBezier(target + 48, it)
+  }
+  value.minSpeed?.let {
+    fields = fields or 128u
+    writeF64(target + 80, it)
+  }
+  value.maxSpeed?.let {
+    fields = fields or 256u
+    writeF64(target + 88, it)
+  }
+  value.maxDistance?.let {
+    fields = fields or 512u
+    writeF64(target + 96, it)
+  }
   writeU32(target, fields)
 }
 
 @JvmSynthetic
-internal fun NativeArena.writePanMomentum(value: PanMomentum): Long =
-  allocate(w(120, 120, 116), w(8, 8, 4)).also { putPanMomentum(it, value) }
+internal fun NativeArena.writeMomentumDecay(value: MomentumDecay): Long =
+  allocate(104, w(8, 8, 4)).also { putMomentumDecay(it, value) }
 
 @JvmSynthetic
-internal fun NativeArena.putAnchoredMomentum(target: Long, value: AnchoredMomentum) {
+internal fun NativeArena.putMomentumSnap(target: Long, value: MomentumSnap) {
   var fields = 0u
-  value.velocity?.let {
+  value.spacing?.let {
     fields = fields or 1u
     writeF64(target + w(8, 8, 4), it)
   }
-  value.anchor?.let {
+  value.offset?.let {
     fields = fields or 2u
-    putScreenPoint(target + w(16, 16, 12), it)
+    writeF64(target + w(16, 16, 12), it)
   }
-  putMomentumDecay(target + w(32, 32, 28), value.decay)
-  value.snap?.let {
+  value.tolerance?.let {
     fields = fields or 4u
-    putMomentumSnap(target + w(128, 128, 124), it)
+    writeF64(target + w(24, 24, 20), it)
+  }
+  value.durationMs?.let {
+    fields = fields or 8u
+    writeF64(target + w(32, 32, 28), it)
   }
   writeU32(target, fields)
 }
 
 @JvmSynthetic
-internal fun NativeArena.writeAnchoredMomentum(value: AnchoredMomentum): Long =
-  allocate(w(168, 168, 160), w(8, 8, 4)).also { putAnchoredMomentum(it, value) }
+internal fun NativeArena.writeMomentumSnap(value: MomentumSnap): Long =
+  allocate(w(40, 40, 36), w(8, 8, 4)).also { putMomentumSnap(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putGestureNotch(target: Long, value: GestureNotch) {
+  writeF64(target, value.spacing)
+  writeF64(target + 8, value.offset)
+  writeU32(target + 16, value.kind)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeGestureNotch(value: GestureNotch): Long =
+  allocate(w(24, 24, 20), w(8, 8, 4)).also { putGestureNotch(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putUnitBezier(target: Long, value: UnitBezier) {
@@ -2558,6 +2907,15 @@ internal fun NativeArena.writeDmaBufFormat(value: DmaBufFormat): Long =
   allocate(w(16, 16, 12), w(8, 8, 4)).also { putDmaBufFormat(it, value) }
 
 @JvmSynthetic
+internal fun NativeArena.putD3d12BorrowedTexture(target: Long, value: D3d12BorrowedTexture) {
+  writeAddress(target, value.resource.address)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeD3d12BorrowedTexture(value: D3d12BorrowedTexture): Long =
+  allocate(w(4, 8), w(4, 8)).also { putD3d12BorrowedTexture(it, value) }
+
+@JvmSynthetic
 internal fun NativeArena.putUrlQueryParameter(target: Long, value: UrlQueryParameter) {
   putView(target, value.name)
   putView(target + w(8, 16), value.value)
@@ -2581,6 +2939,13 @@ internal fun readVulkanCustomLayerEncoder(source: Long): VulkanCustomLayerEncode
 @JvmSynthetic
 internal fun readWebGpuCustomLayerEncoder(source: Long): WebGpuCustomLayerEncoder =
   WebGpuCustomLayerEncoder(device = readU32(source), encoder = readU32(source + 4))
+
+@JvmSynthetic
+internal fun readD3d12CustomLayerEncoder(source: Long): D3d12CustomLayerEncoder =
+  D3d12CustomLayerEncoder(
+    device = NativePointer.ofAddress(readAddress(source)),
+    commandList = NativePointer.ofAddress(readAddress(source + w(4, 8))),
+  )
 
 @JvmSynthetic
 internal fun readCustomLayerFrame(source: Long): CustomLayerFrame =
@@ -2626,6 +2991,17 @@ internal fun readWebGpuCustomLayerPass(source: Long): WebGpuCustomLayerPass =
     colorFormat = readViewString(source + 8),
     depthStencilFormat = readViewString(source + w(16, 24)),
     sampleCount = readU32(source + w(24, 40)),
+  )
+
+@JvmSynthetic
+internal fun readD3d12CustomLayerPass(source: Long): D3d12CustomLayerPass =
+  D3d12CustomLayerPass(
+    device = NativePointer.ofAddress(readAddress(source)),
+    commandList = NativePointer.ofAddress(readAddress(source + w(4, 8))),
+    renderTargetView = readU64(source + w(8, 16)),
+    colorFormat = readU32(source + w(16, 24)),
+    depthStencilView = readU64(source + w(24, 32, 20)),
+    depthStencilFormat = readU32(source + w(32, 40, 28)),
   )
 
 @JvmSynthetic
@@ -2720,6 +3096,18 @@ internal fun readQuaternion(source: Long): Quaternion =
   )
 
 @JvmSynthetic
+internal fun readGestureTap(source: Long): GestureTap =
+  GestureTap(id = readU32(source), position = readScreenPoint(source + w(8, 8, 4)))
+
+@JvmSynthetic
+internal fun readGestureNotchEvent(source: Long): GestureNotchEvent =
+  GestureNotchEvent(
+    axis = GestureAxis.of(readU32(source)),
+    kind = readU32(source + 4),
+    value = readF64(source + 8),
+  )
+
+@JvmSynthetic
 internal fun readOfflineTilePyramidRegionDefinition(
   source: Long,
 ): OfflineTilePyramidRegionDefinition =
@@ -2744,83 +3132,10 @@ internal fun readOfflineGeometryRegionDefinition(source: Long): OfflineGeometryR
   )
 
 @JvmSynthetic
-internal fun NativeArena.putMomentumDecay(target: Long, value: MomentumDecay) {
-  var fields = 0u
-  value.model?.let {
-    fields = fields or 1u
-    writeU32(target + 4, it.rawValue)
-  }
-  value.halfLifeMs?.let {
-    fields = fields or 2u
-    writeF64(target + 8, it)
-  }
-  value.stopSpeed?.let {
-    fields = fields or 4u
-    writeF64(target + 16, it)
-  }
-  value.distance?.let {
-    fields = fields or 8u
-    writeF64(target + 24, it)
-  }
-  value.durationMs?.let {
-    fields = fields or 16u
-    writeF64(target + 32, it)
-  }
-  value.easing?.let {
-    fields = fields or 32u
-    putUnitBezier(target + 40, it)
-  }
-  value.minSpeed?.let {
-    fields = fields or 64u
-    writeF64(target + 72, it)
-  }
-  value.maxSpeed?.let {
-    fields = fields or 128u
-    writeF64(target + 80, it)
-  }
-  value.maxDistance?.let {
-    fields = fields or 256u
-    writeF64(target + 88, it)
-  }
-  writeU32(target, fields)
-}
-
-@JvmSynthetic
-internal fun NativeArena.writeMomentumDecay(value: MomentumDecay): Long =
-  allocate(96, w(8, 8, 4)).also { putMomentumDecay(it, value) }
-
-@JvmSynthetic
-internal fun NativeArena.putMomentumSnap(target: Long, value: MomentumSnap) {
-  var fields = 0u
-  value.spacing?.let {
-    fields = fields or 1u
-    writeF64(target + w(8, 8, 4), it)
-  }
-  value.offset?.let {
-    fields = fields or 2u
-    writeF64(target + w(16, 16, 12), it)
-  }
-  value.tolerance?.let {
-    fields = fields or 4u
-    writeF64(target + w(24, 24, 20), it)
-  }
-  value.durationMs?.let {
-    fields = fields or 8u
-    writeF64(target + w(32, 32, 28), it)
-  }
-  writeU32(target, fields)
-}
-
-@JvmSynthetic
-internal fun NativeArena.writeMomentumSnap(value: MomentumSnap): Long =
-  allocate(w(40, 40, 36), w(8, 8, 4)).also { putMomentumSnap(it, value) }
-
-@JvmSynthetic
 internal fun readCameraTransitionEnd(source: Long): CameraTransitionEnd =
   CameraTransitionEnd(
     outcome = CameraTransitionOutcome.of(readU32(source + 4)),
     generation = readU64(source + 8),
-    velocity = readCameraVelocity(source + 16),
   )
 
 @JvmSynthetic
@@ -2902,15 +3217,6 @@ internal fun readVec4(source: Long): Vec4 =
     y = readF64(source + 8),
     z = readF64(source + 16),
     w = readF64(source + 24),
-  )
-
-@JvmSynthetic
-internal fun readCameraVelocity(source: Long): CameraVelocity =
-  CameraVelocity(
-    pan = readScreenPoint(source),
-    zoom = readF64(source + 16),
-    bearing = readF64(source + 24),
-    pitch = readF64(source + 32),
   )
 
 @JvmSynthetic

@@ -5,9 +5,10 @@
 // everything else is shared.
 
 import {
-  type CameraDelta,
   type CameraOptions,
-  GesturePhase,
+  type GestureInput,
+  GestureMode,
+  PointerKind,
   type ScreenPoint,
 } from "@maplibre/native-ffi";
 
@@ -46,8 +47,10 @@ class RemoteMap {
     this.#post({ type: "resize", size });
   }
 
-  applyCameraDelta(delta: CameraDelta): void {
-    this.#post({ type: "cameraDelta", delta });
+  /** Sends the inputs of `event` to the map's gesture recognizer. */
+  gesture(event: Event, ...inputs: GestureInput[]): void {
+    const time = performance.timeOrigin + event.timeStamp;
+    this.#post({ type: "gesture", inputs, time });
   }
 
   setStyle(style: Style): void {
@@ -249,152 +252,89 @@ function scheduleHashUpdate(map: RemoteMap): void {
   }, 250);
 }
 
-// Gestures. A drag pans, a right or Ctrl drag rotates and pitches, two
-// pointers pinch, rotate, and pan, the wheel zooms, and a double click zooms
-// in, or out with Shift. A drag or pinch keeps moving after release at the
-// speed it moved just before, and a press stops it.
-
-/** How far a gesture has moved the camera since it began, at `time`. */
-interface Motion {
-  readonly time: number;
-  readonly pan: ScreenPoint;
-  readonly zoom: number;
-  readonly bearing: number;
-  readonly pitch: number;
-}
-
-// The browser reports no pointer velocity, so the release velocities average
-// the gesture's motion over this window.
-const velocityWindowMs = 100;
+// Gestures. The map's gesture recognizer turns the canvas's input into camera
+// movement: a drag pans, a right or Ctrl drag rotates and pitches, two fingers
+// pinch, rotate, and pitch, the wheel and the keys zoom and pan, and a double
+// click zooms in, or out with Shift. A flick keeps the map gliding.
 
 function addGestures(map: RemoteMap): void {
-  const pointers = new Map<number, ScreenPoint>();
-  let rotating = false;
-  // The gesture's motion over the window before its latest move, oldest first.
-  let motion: Motion[] = [];
-  // The latest pinch's center, which its zoom and turn keep in place.
-  let anchor: ScreenPoint | undefined;
-
-  const apply = (delta: CameraDelta) => map.applyCameraDelta(delta);
+  // The pointers that the recognizer tracks.
+  const pointers = new Set<number>();
 
   const point = (event: MouseEvent): ScreenPoint => {
     const bounds = canvas.getBoundingClientRect();
     return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
   };
 
-  // Drops the motion before the window that ends at `time`, but keeps where
-  // the window starts.
-  const trim = (time: number) => {
-    while (motion.length > 1 && motion[1]!.time <= time - velocityWindowMs) {
-      motion.shift();
-    }
-  };
-
-  const move = (event: PointerEvent, delta: CameraDelta) => {
-    apply({ ...delta, gesturePhase: GesturePhase.update });
-    const last = motion.at(-1)!;
-    motion.push({
-      time: event.timeStamp,
-      pan: {
-        x: last.pan.x + (delta.offset?.x ?? 0),
-        y: last.pan.y + (delta.offset?.y ?? 0),
-      },
-      zoom: last.zoom + Math.log2(delta.scale ?? 1),
-      bearing: last.bearing + (delta.bearing ?? 0),
-      pitch: last.pitch + (delta.pitch ?? 0),
-    });
-    trim(event.timeStamp);
-  };
+  // What the held keys do: Ctrl rotates, and Shift zooms out.
+  const modes = (event: MouseEvent | KeyboardEvent): GestureInput => ({
+    kind: "modes",
+    value:
+      (event.ctrlKey ? GestureMode.rotate : 0) |
+      (event.shiftKey ? GestureMode.zoomOut : 0),
+  });
 
   canvas.addEventListener("pointerdown", (event) => {
+    // The middle button does nothing, and the right one rotates.
+    if (event.button !== 0 && event.button !== 2) return;
     canvas.setPointerCapture(event.pointerId);
-    if (pointers.size === 0) {
-      rotating =
-        event.pointerType === "mouse" && (event.button === 2 || event.ctrlKey);
-      motion = [
-        {
-          time: event.timeStamp,
-          pan: { x: 0, y: 0 },
-          zoom: 0,
-          bearing: 0,
-          pitch: 0,
-        },
-      ];
-      anchor = undefined;
-      apply({ gesturePhase: GesturePhase.begin });
-    }
-    pointers.set(event.pointerId, point(event));
+    pointers.add(event.pointerId);
+    const kind =
+      event.pointerType === "touch"
+        ? PointerKind.touch
+        : event.pointerType === "pen"
+          ? PointerKind.pen
+          : PointerKind.mouse;
+    map.gesture(event, modes(event), {
+      kind: "pointerDown",
+      value: {
+        id: event.pointerId,
+        kind,
+        position: point(event),
+        modes: event.button === 2 ? GestureMode.rotate : 0,
+      },
+    });
   });
 
   canvas.addEventListener("pointermove", (event) => {
-    const previous = pointers.get(event.pointerId);
-    if (previous === undefined) return;
-    const current = point(event);
-    const others = [...pointers].filter(([id]) => id !== event.pointerId);
-    pointers.set(event.pointerId, current);
-
-    const dx = current.x - previous.x;
-    const dy = current.y - previous.y;
-    const other = others[0]?.[1];
-    if (other !== undefined) {
-      // The pointers' midpoint moves by half of this pointer's movement, and
-      // the span between them scales and turns about the other pointer.
-      const before = { x: previous.x - other.x, y: previous.y - other.y };
-      const after = { x: current.x - other.x, y: current.y - other.y };
-      const scale =
-        Math.hypot(after.x, after.y) / Math.hypot(before.x, before.y);
-      const turn =
-        (Math.atan2(after.y, after.x) - Math.atan2(before.y, before.x)) *
-        (180 / Math.PI);
-      anchor = { x: (current.x + other.x) / 2, y: (current.y + other.y) / 2 };
-      move(event, {
-        offset: { x: dx / 2, y: dy / 2 },
-        scale: Number.isFinite(scale) && scale > 0 ? scale : 1,
-        bearing: -wrapDegrees(turn),
-        anchor,
-      });
-    } else if (rotating) {
-      move(event, { bearing: dx * 0.5, pitch: -dy * 0.5 });
-    } else {
-      move(event, { offset: { x: dx, y: dy } });
-    }
-  });
-
-  canvas.addEventListener("pointerup", (event) => {
-    if (!pointers.delete(event.pointerId) || pointers.size > 0) return;
-    trim(event.timeStamp);
-    const start = motion[0]!;
-    const end = motion.at(-1)!;
-    const seconds =
-      Math.min(event.timeStamp - start.time, velocityWindowMs) / 1000;
-    const speed = (from: number, to: number) =>
-      seconds > 0 ? (to - from) / seconds : 0;
-    apply({
-      momentum: {
-        pan: {
-          velocity: {
-            x: speed(start.pan.x, end.pan.x),
-            y: speed(start.pan.y, end.pan.y),
-          },
-        },
-        zoom: { velocity: speed(start.zoom, end.zoom), anchor },
-        // The snap settles the bearing on north even when the gesture didn't
-        // turn the map, so only a turn asks for it.
-        bearing: {
-          velocity: speed(start.bearing, end.bearing),
-          anchor,
-          snap: end.bearing === 0 ? undefined : {},
-        },
-        pitch: { velocity: speed(start.pitch, end.pitch) },
-      },
-      gesturePhase: GesturePhase.end,
+    if (!pointers.has(event.pointerId)) return;
+    map.gesture(event, {
+      kind: "pointerMove",
+      value: { id: event.pointerId, position: point(event) },
     });
   });
 
-  canvas.addEventListener("pointercancel", (event) => {
-    if (pointers.delete(event.pointerId) && pointers.size === 0) {
-      apply({ gesturePhase: GesturePhase.cancel });
-    }
+  canvas.addEventListener("pointerup", (event) => {
+    if (!pointers.delete(event.pointerId)) return;
+    map.gesture(event, {
+      kind: "pointerUp",
+      value: { id: event.pointerId, position: point(event) },
+    });
+  });
+
+  // A pointer that the canvas loses without a release ends with no tap or
+  // glide. One that it released is already gone from `pointers`.
+  const cancelPointer = (event: PointerEvent) => {
+    if (!pointers.delete(event.pointerId)) return;
+    map.gesture(event, {
+      kind: "pointerCancel",
+      value: { id: event.pointerId },
+    });
+  };
+  canvas.addEventListener("pointercancel", cancelPointer);
+  canvas.addEventListener("lostpointercapture", cancelPointer);
+
+  canvas.addEventListener("blur", (event) => {
+    const ids = [...pointers];
+    pointers.clear();
+    map.gesture(
+      event,
+      { kind: "modes", value: 0 },
+      ...ids.map((id): GestureInput => ({
+        kind: "pointerCancel",
+        value: { id },
+      })),
+    );
   });
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
@@ -410,40 +350,41 @@ function addGestures(map: RemoteMap): void {
           : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
             ? event.deltaY * canvas.clientHeight
             : event.deltaY;
-      const rate = event.ctrlKey ? 1 / 100 : 1 / 300;
-      apply({ scale: 2 ** (-pixels * rate), anchor: point(event) });
+      map.gesture(event, {
+        kind: "delta",
+        value: {
+          position: point(event),
+          zoom: -pixels / (event.ctrlKey ? 100 : 300),
+        },
+      });
     },
     { passive: false },
   );
 
-  canvas.addEventListener("dblclick", (event) => {
-    apply({
-      scale: event.shiftKey ? 0.5 : 2,
-      anchor: point(event),
-      animation: { durationMs: 300 },
+  const keys: Record<string, { pan?: ScreenPoint; zoom?: number }> = {
+    ArrowLeft: { pan: { x: 100, y: 0 } },
+    ArrowRight: { pan: { x: -100, y: 0 } },
+    ArrowUp: { pan: { x: 0, y: 100 } },
+    ArrowDown: { pan: { x: 0, y: -100 } },
+    "+": { zoom: 1 },
+    "=": { zoom: 1 },
+    "-": { zoom: -1 },
+  };
+  const keyChanged = (event: KeyboardEvent) => {
+    if (event.key === "Control" || event.key === "Shift") {
+      map.gesture(event, modes(event));
+    }
+  };
+  canvas.addEventListener("keyup", keyChanged);
+  canvas.addEventListener("keydown", (event) => {
+    keyChanged(event);
+    const key = keys[event.key];
+    if (key === undefined) return;
+    event.preventDefault();
+    const center = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 };
+    map.gesture(event, {
+      kind: "delta",
+      value: { position: center, discrete: true, ...key },
     });
   });
-
-  canvas.addEventListener("keydown", (event) => {
-    const step = 100;
-    const animation = { durationMs: 300 };
-    const deltas: Record<string, CameraDelta> = {
-      ArrowLeft: { offset: { x: step, y: 0 }, animation },
-      ArrowRight: { offset: { x: -step, y: 0 }, animation },
-      ArrowUp: { offset: { x: 0, y: step }, animation },
-      ArrowDown: { offset: { x: 0, y: -step }, animation },
-      "+": { scale: 2, animation },
-      "=": { scale: 2, animation },
-      "-": { scale: 0.5, animation },
-    };
-    const delta = deltas[event.key];
-    if (delta === undefined) return;
-    event.preventDefault();
-    apply(delta);
-  });
-}
-
-/** An angle in degrees, wrapped to [-180, 180). */
-function wrapDegrees(degrees: number): number {
-  return ((((degrees + 180) % 360) + 360) % 360) - 180;
 }

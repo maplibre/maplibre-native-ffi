@@ -5,7 +5,7 @@
 #MISE shell="bash"
 set -euo pipefail
 
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" python
 
 # The default interpreter is the newest Python. This runs the suite against the
 # same wheels on the oldest Python that requires-python admits.

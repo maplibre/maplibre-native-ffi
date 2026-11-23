@@ -13,14 +13,20 @@ import type {
   CustomGeometrySourceOptions,
   CustomLayerHost,
   CustomVectorSourceOptions,
+  D3d12DeviceDescriptor,
+  D3d12TextureFrame,
   DmaBufFrame,
   DxgiSharedTextureFrame,
   FeatureStateSelector,
   FrameDemand,
-  FramePacerOptions,
+  FramePacingOptions,
   FreeCameraOptions,
   GeoJsonSourceOptions,
+  GestureInput,
+  GestureOptions,
+  GestureResult,
   GpuDeviceCapabilities,
+  GpuDeviceD3d12ContextResult,
   GpuDeviceOptions,
   GpuDeviceVulkanContextResult,
   GpuSync,
@@ -89,6 +95,7 @@ export interface NativeOperations {
   mln_acquired_frame_get_android_hardware_buffer(
     frame: bigint,
   ): AndroidHardwareBufferFrame;
+  mln_acquired_frame_get_d3d12_texture(frame: bigint): D3d12TextureFrame;
   mln_acquired_frame_get_dma_buf(frame: bigint): DmaBufFrame;
   mln_acquired_frame_get_dxgi_shared_texture(
     frame: bigint,
@@ -112,15 +119,35 @@ export interface NativeOperations {
     tile: CanonicalTileId,
     logicalSize: LogicalSize,
   ): CameraOptions;
-  mln_frame_pacer_create(options: FramePacerOptions | undefined): bigint;
-  mln_frame_pacer_release(pacer: bigint, token: object | undefined): void;
-  mln_frame_pacer_set_options(pacer: bigint, options: FramePacerOptions): void;
+  mln_gesture_recognizer_create(
+    map: bigint,
+    options: GestureOptions | undefined,
+  ): bigint;
+  mln_gesture_recognizer_handle(
+    recognizer: bigint,
+    input: GestureInput,
+    timeMs: number,
+  ): GestureResult;
+  mln_gesture_recognizer_release(
+    recognizer: bigint,
+    token: object | undefined,
+  ): void;
+  mln_gesture_recognizer_set_options(
+    recognizer: bigint,
+    options: GestureOptions,
+  ): void;
+  mln_gesture_recognizer_tick(
+    recognizer: bigint,
+    timeMs: number,
+  ): GestureResult;
   mln_gpu_device_create(options: GpuDeviceOptions | undefined): bigint;
   mln_gpu_device_get_capabilities(device: bigint): GpuDeviceCapabilities;
+  mln_gpu_device_get_d3d12_context(device: bigint): GpuDeviceD3d12ContextResult;
   mln_gpu_device_get_vulkan_context(
     device: bigint,
   ): GpuDeviceVulkanContextResult;
   mln_gpu_device_release(device: bigint, token: object | undefined): void;
+  mln_gpu_device_wrap_d3d12(descriptor: D3d12DeviceDescriptor): bigint;
   mln_gpu_device_wrap_metal(descriptor: MetalDeviceDescriptor): bigint;
   mln_gpu_device_wrap_open_gl(context: OpenGlContextDescriptor): bigint;
   mln_gpu_device_wrap_vulkan(descriptor: VulkanDeviceDescriptor): bigint;
@@ -681,9 +708,9 @@ export interface NativeOperations {
     completion: NativeCompletion | undefined,
   ): void;
   mln_render_session_service_driver_work(session: bigint): void;
-  mln_render_session_set_frame_pacer(
+  mln_render_session_set_frame_pacing(
     session: bigint,
-    pacer: bigint | undefined,
+    options: FramePacingOptions | undefined,
   ): void;
   mln_render_session_set_target(
     session: bigint,
@@ -754,6 +781,11 @@ export interface NativeOperations {
   ): void;
   mln_runtime_dispose(runtime: bigint, token: object | undefined): void;
   mln_runtime_get_offline_region(
+    runtime: bigint,
+    regionId: bigint,
+    completion: NativeCompletion,
+  ): void;
+  mln_runtime_get_offline_region_expiry(
     runtime: bigint,
     regionId: bigint,
     completion: NativeCompletion,

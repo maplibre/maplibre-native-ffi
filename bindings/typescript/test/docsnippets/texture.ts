@@ -3,6 +3,7 @@
 
 import {
   GpuDeviceHandle,
+  type GpuSync,
   GpuSyncKind,
   type MapHandle,
   QueueLock,
@@ -24,6 +25,9 @@ function drawMap(_imageView: bigint): void {}
 type Pair = readonly [bigint, bigint];
 
 function destroyTextures(_images: Pair, _views: Pair): void {}
+
+// Waits for the GPU work that a sync names, as your renderer does.
+function waitForSync(_sync: GpuSync | undefined): void {}
 
 export function drawFrame(): void {
   // #region acquire
@@ -118,7 +122,8 @@ export async function renderToTexture(
     },
   };
 
-  await session.setTarget(resized);
+  // The session's last work on the old textures ends at the sync.
+  waitForSync(await session.setTarget(resized));
   // vkDestroyImageView and vkDestroyImage
   destroyTextures(images, views);
   // #endregion resize-borrowed

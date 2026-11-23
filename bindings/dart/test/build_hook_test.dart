@@ -90,42 +90,29 @@ void main() {
   Future<String> bundled(BuildOutput output) =>
       File.fromUri(output.assets.code.first.file!).readAsString();
 
-  /// Writes an Android arm64 install named [name] under the build root, in the
-  /// CMake layout, that carries [backends].
-  void build(String name, List<String> backends) {
+  /// Writes an install for [platform] named [name] under the build root, in
+  /// the CMake layout.
+  void build(String name, {String platform = 'android-arm64'}) {
     _writePrefix(
       temporary.uri.resolve('build/$name/install/'),
       label: name,
-      backends: backends,
+      platform: platform,
     );
   }
 
   group('a directory of installs', () {
-    test('serves the install that carries the default backend', () async {
-      build('gl', ['opengl']);
-      build('vk', ['vulkan']);
+    test('serves the install for the target platform', () async {
+      build('arm64');
+      build('x64', platform: 'android-x64');
       expect(
         await bundled(await runHook(_android, {'local_build': 'build'})),
-        'gl',
+        'arm64',
       );
     });
 
-    test(
-      'serves the install that carries the backend selected for the OS',
-      () async {
-        build('gl', ['opengl']);
-        build('vk', ['vulkan']);
-        final output = await runHook(_android, {
-          'local_build': 'build',
-          'backend': {'android': 'vulkan'},
-        });
-        expect(await bundled(output), 'vk');
-      },
-    );
-
-    test('rejects two installs for the same request', () async {
-      build('android-arm64', ['opengl', 'vulkan']);
-      build('copy', ['opengl']);
+    test('rejects two installs for the same platform', () async {
+      build('android-arm64');
+      build('copy');
       await expectLater(
         runHook(_android, {'local_build': 'build'}),
         throwsA(
@@ -133,60 +120,9 @@ void main() {
             (error) => error.message,
             'message',
             allOf(
-              contains('several installs'),
-              contains('android-arm64 with its default backend'),
+              contains('several installs for android-arm64'),
               contains('copy'),
             ),
-          ),
-        ),
-      );
-    });
-
-    test('rejects a selected backend that no install carries', () async {
-      build('android-arm64', ['opengl', 'vulkan']);
-      await expectLater(
-        runHook(_android, {
-          'local_build': 'build',
-          'backend': {'android': 'metal'},
-        }),
-        throwsA(
-          isStateError.having(
-            (error) => error.message,
-            'message',
-            contains('no install for android-arm64 with metal'),
-          ),
-        ),
-      );
-    });
-  });
-
-  group('an install prefix', () {
-    test('serves unless it lacks the selected backend', () async {
-      build('android-arm64', ['opengl', 'vulkan']);
-      const prefix = 'build/android-arm64/install';
-      expect(
-        await bundled(await runHook(_android, {'local_build': prefix})),
-        'android-arm64',
-      );
-      expect(
-        await bundled(
-          await runHook(_android, {
-            'local_build': prefix,
-            'backend': {'android': 'vulkan'},
-          }),
-        ),
-        'android-arm64',
-      );
-      await expectLater(
-        runHook(_android, {
-          'local_build': prefix,
-          'backend': {'android': 'metal'},
-        }),
-        throwsA(
-          isStateError.having(
-            (error) => error.message,
-            'message',
-            contains('built for android-arm64 with opengl, vulkan'),
           ),
         ),
       );
@@ -198,8 +134,6 @@ void main() {
       _writePrefix(
         temporary.uri.resolve('build/mingw-$architecture/install/'),
         platform: 'windows-mingw-$architecture',
-        backends: ['vulkan', 'opengl'],
-        defaultBackend: 'vulkan',
         libraries: [
           'maplibre-native-c.dll',
           if (architecture == 'arm64') ...[
@@ -231,38 +165,18 @@ void main() {
       });
     }
 
-    test(
-      'serves the default or a requested backend from a build root',
-      () async {
-        mingw('x64');
-        expect(
-          await bundled(await runHook(_windows, {'local_build': 'build'})),
-          'windows-mingw-x64',
-        );
-        expect(
-          await bundled(
-            await runHook(_windows, {
-              'local_build': 'build',
-              'backend': {'windows': 'opengl'},
-            }),
-          ),
-          'windows-mingw-x64',
-        );
-      },
-    );
+    test('serves the prefix from a build root', () async {
+      mingw('x64');
+      expect(
+        await bundled(await runHook(_windows, {'local_build': 'build'})),
+        'windows-mingw-x64',
+      );
+    });
 
-    test('rejects another architecture or a backend it lacks', () async {
+    test('rejects another architecture', () async {
       mingw('arm64');
       await expectLater(
         runHook(_windows, {'local_build': 'build/mingw-arm64/install'}),
-        throwsStateError,
-      );
-      mingw('x64');
-      await expectLater(
-        runHook(_windows, {
-          'local_build': 'build/mingw-x64/install',
-          'backend': {'windows': 'metal'},
-        }),
         throwsStateError,
       );
     });
@@ -272,8 +186,6 @@ void main() {
     _writePrefix(
       temporary.uri.resolve('build/windows-x64/install/'),
       platform: 'windows-x64',
-      backends: ['vulkan', 'opengl'],
-      defaultBackend: 'vulkan',
       libraries: ['maplibre-native-c.dll', 'msvcp140.dll', 'vcruntime140.dll'],
     );
     final output = await runHook(_windows, {
@@ -302,29 +214,22 @@ void main() {
       addTearDown(() => server.close(force: true));
     });
 
-    /// Serves an archive for each of [archives], given as the archive's name,
-    /// its platform, and the backends it carries, in the release [tag] and
-    /// pins them in the package. An archive is pinned under [digest] when
-    /// given and its own digest otherwise.
-    void release(
-      String tag,
-      List<(String, String, List<String>)> archives, {
-      String? digest,
-    }) {
-      final platforms = <String, Map<String, Object?>>{};
+    /// Serves an archive for each of [platforms], which holds the platform's
+    /// name, in the release [tag] and pins them in the package. An archive is
+    /// pinned under [digest] when given and its own digest otherwise.
+    void release(String tag, List<String> platforms, {String? digest}) {
       final artifacts = <Map<String, Object?>>[];
-      for (final (name, platform, backends) in archives) {
-        final root = 'maplibre-native-c-$name';
+      for (final platform in platforms) {
+        final root = 'maplibre-native-c-$platform';
         final archive = Archive()
           ..addFile(
-            ArchiveFile.string('$root/lib/libmaplibre-native-c.so', name),
+            ArchiveFile.string('$root/lib/libmaplibre-native-c.so', platform),
           );
         final bytes = GZipEncoder().encode(TarEncoder().encode(archive));
         served['/$tag/$root.tar.gz'] = bytes;
-        platforms[platform] = {'id': platform, 'defaultBackend': 'opengl'};
         artifacts.add({
           'platform': platform,
-          'backends': backends,
+          'backends': ['vulkan', 'opengl'],
           'archive': '$root.tar.gz',
           'sha256': digest ?? sha256.convert(bytes).toString(),
         });
@@ -334,7 +239,10 @@ void main() {
         ..writeAsStringSync(
           jsonEncode({
             'tag': tag,
-            'platforms': platforms.values.toList(),
+            'platforms': [
+              for (final platform in platforms)
+                {'id': platform, 'defaultBackend': 'vulkan'},
+            ],
             'artifacts': artifacts,
           }),
         );
@@ -345,10 +253,7 @@ void main() {
     };
 
     test('downloads its pinned archive once', () async {
-      release('v0.202610.2', [
-        ('android-arm64', 'android-arm64', ['opengl', 'vulkan']),
-        ('android-x64', 'android-x64', ['opengl', 'vulkan']),
-      ]);
+      release('v0.202610.2', ['android-arm64', 'android-x64']);
       final output = await runHook(_android, mirror());
       expect(await bundled(output), 'android-arm64');
       // The files that the build unpacked would read as changed during it.
@@ -364,34 +269,8 @@ void main() {
       expect(await bundled(again), 'android-arm64');
     });
 
-    test('downloads the archive that carries the selected backend', () async {
-      release('v0.202610.2', [
-        ('gl', 'android-arm64', ['opengl']),
-        ('vk', 'android-arm64', ['vulkan']),
-      ]);
-      expect(await bundled(await runHook(_android, mirror())), 'gl');
-      expect(
-        await bundled(
-          await runHook(_android, {
-            ...mirror(),
-            'backend': {'android': 'vulkan'},
-          }),
-        ),
-        'vk',
-      );
-      await expectLater(
-        runHook(_android, {
-          ...mirror(),
-          'backend': {'android': 'metal'},
-        }),
-        throwsUnsupportedError,
-      );
-    });
-
     test('rejects an archive that differs from its pinned digest', () async {
-      release('v0.202610.2', [
-        ('android-arm64', 'android-arm64', ['opengl', 'vulkan']),
-      ], digest: '0' * 64);
+      release('v0.202610.2', ['android-arm64'], digest: '0' * 64);
       await expectLater(runHook(_android, mirror()), throwsStateError);
     });
   });
@@ -404,8 +283,6 @@ List<File> _writePrefix(
   Uri prefix, {
   String? label,
   String platform = 'android-arm64',
-  List<String> backends = const ['opengl', 'vulkan'],
-  String defaultBackend = 'opengl',
   List<String> libraries = const ['libmaplibre-native-c.so'],
 }) {
   File write(String name, String content) => File.fromUri(prefix.resolve(name))
@@ -415,8 +292,8 @@ List<File> _writePrefix(
     write(
       'share/maplibre-native-c/artifact.json',
       jsonEncode({
-        'platform': {'id': platform, 'defaultBackend': defaultBackend},
-        'backends': backends,
+        'platform': {'id': platform, 'defaultBackend': 'vulkan'},
+        'backends': ['vulkan', 'opengl'],
       }),
     ),
     // An MSVC install carries its runtime DLLs beside the library in bin, and

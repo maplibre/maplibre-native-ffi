@@ -14,7 +14,7 @@ const title = "MapLibre Native";
 var window: ?*c.SDL_Window = null;
 var view: MapView = undefined;
 var view_started = false;
-var gestures: Gestures = undefined;
+var gestures: ?Gestures = null;
 /// The status that the window's title shows.
 var shown_status: ?std.meta.Tag(MapView.Status) = null;
 
@@ -65,13 +65,14 @@ fn start() !void {
 
     try view.init(window.?, wake);
     view_started = true;
-    gestures = .{ .view = &view };
+    gestures = try .init(&view);
     showStatus();
 }
 
 fn iterate(_: ?*anyopaque) callconv(.c) c.SDL_AppResult {
     // A wake after this point sends another event.
     woken.store(false, .release);
+    gestures.?.update();
     view.update();
     showStatus();
     return c.SDL_APP_CONTINUE;
@@ -84,12 +85,13 @@ fn handle(_: ?*anyopaque, event: [*c]c.SDL_Event) callconv(.c) c.SDL_AppResult {
         // The window shows again, or, on Wayland, the compositor waits for a
         // frame of the window's new size before it resizes it again.
         c.SDL_EVENT_WINDOW_EXPOSED, c.SDL_EVENT_WINDOW_RESTORED => view.redraw(),
-        else => gestures.handle(event),
+        else => gestures.?.handle(event),
     }
     return c.SDL_APP_CONTINUE;
 }
 
 fn quit(_: ?*anyopaque, _: c.SDL_AppResult) callconv(.c) void {
+    if (gestures) |*recognizer| recognizer.deinit();
     // The session lets go of the window before it goes.
     if (view_started) view.deinit();
     if (window) |w| c.SDL_DestroyWindow(w);

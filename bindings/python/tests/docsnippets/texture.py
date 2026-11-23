@@ -17,6 +17,11 @@ def draw_map(image_view: int) -> None:
     pass
 
 
+# The host's wait for a GPU sync, as for a frame's producer sync.
+def wait_for_sync(sync: mln.GpuSync | None) -> None:
+    pass
+
+
 def destroy_textures(
     images: tuple[int, int], views: tuple[int, int]
 ) -> None:
@@ -120,7 +125,8 @@ def render_to_texture(
         )
     )
 
-    session.set_target(resized).result()
+    # The session's last work on the old textures.
+    wait_for_sync(session.set_target(resized).result())
     # vkDestroyImageView and vkDestroyImage
     destroy_textures(images, views)
     # #endregion resize-borrowed

@@ -25,12 +25,16 @@ namespace Maplibre.NativeFfi;
 /// AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE, and the bits of
 /// <c>android_hardware_buffer_usage</c>. Get each frame's buffer with
 /// <c>AcquiredFrameHandle.WithAndroidHardwareBuffer()</c>.</description></item>
-/// <item><description><c>GpuExportKind.DxgiSharedHandle</c>: D3D11 textures of
-/// the format DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as
-/// shader resources and render targets. Open them on a D3D11 or D3D12 device of
-/// the same adapter, which you pick with <c>GpuDeviceOptions.AdapterLuid</c>.
-/// Get each frame's texture with
-/// <c>AcquiredFrameHandle.WithDxgiSharedTexture()</c>.</description></item>
+/// <item><description><c>GpuExportKind.DxgiSharedHandle</c>: textures of the
+/// format DXGI_FORMAT_B8G8R8A8_UNORM on the device's GPU, which bind as shader
+/// resources and render targets: D3D11 textures on a Vulkan device, and
+/// committed D3D12 resources in a shared heap on a D3D12 device, which each
+/// frame leaves in D3D12_RESOURCE_STATE_COMMON. Open them on a D3D11 or D3D12
+/// device of the same adapter, which you pick with
+/// <c>GpuDeviceOptions.AdapterLuid</c>. Get each frame's texture with
+/// <c>AcquiredFrameHandle.WithDxgiSharedTexture()</c>, and on a D3D12 device
+/// its resource with
+/// <c>AcquiredFrameHandle.WithD3d12Texture()</c>.</description></item>
 /// <item><description><c>GpuExportKind.DmaBuf</c>: dmabufs of a format and
 /// modifier from <c>dma_buf_formats</c>. Get each frame's buffer with
 /// <c>AcquiredFrameHandle.WithDmaBuf()</c>.</description></item>
@@ -47,7 +51,8 @@ namespace Maplibre.NativeFfi;
 /// device exports one of <c>export_kinds</c>.</para>
 /// <para>Each frame hands over with <c>GpuSyncKind.CpuComplete</c> or with the
 /// sync kind that crosses APIs on its platform:
-/// <c>GpuSyncKind.MetalSharedEvent</c> for an IOSurface, and
+/// <c>GpuSyncKind.MetalSharedEvent</c> for an IOSurface,
+/// <c>GpuSyncKind.D3d12Fence</c> for a DXGI shared texture, and
 /// <c>GpuSyncKind.SyncFd</c> for the others, where the device has them. For a
 /// reader that waits on neither, such as a Wayland compositor without explicit
 /// synchronization or Flutter's <c>copyPixelBuffer</c>, leave them out of

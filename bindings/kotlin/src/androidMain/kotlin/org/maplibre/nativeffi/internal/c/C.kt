@@ -19,6 +19,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_acquired_frame_get_d3d12_texture(
+    frame: Long,
+    outFrame: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_acquired_frame_get_dma_buf(
     frame: Long,
     outFrame: Long,
@@ -129,18 +136,36 @@ internal actual object C {
   @JvmStatic actual external fun mln_delivery_queue_release(queue: Long): Unit
 
   @JvmStatic
-  actual external fun mln_frame_pacer_create(
+  actual external fun mln_gesture_recognizer_create(
+    map: Long,
     options: Long,
-    outPacer: Long,
+    outRecognizer: Long,
     outDiagnostic: Long,
   ): Int
 
-  @JvmStatic actual external fun mln_frame_pacer_release(pacer: Long): Unit
+  @JvmStatic
+  actual external fun mln_gesture_recognizer_handle(
+    recognizer: Long,
+    input: Long,
+    timeMs: Double,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic actual external fun mln_gesture_recognizer_release(recognizer: Long): Unit
 
   @JvmStatic
-  actual external fun mln_frame_pacer_set_options(
-    pacer: Long,
+  actual external fun mln_gesture_recognizer_set_options(
+    recognizer: Long,
     options: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_gesture_recognizer_tick(
+    recognizer: Long,
+    timeMs: Double,
+    outResult: Long,
     outDiagnostic: Long,
   ): Int
 
@@ -159,6 +184,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_gpu_device_get_d3d12_context(
+    device: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_gpu_device_get_vulkan_context(
     device: Long,
     outResult: Long,
@@ -166,6 +198,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic actual external fun mln_gpu_device_release(device: Long): Unit
+
+  @JvmStatic
+  actual external fun mln_gpu_device_wrap_d3d12(
+    descriptor: Long,
+    outDevice: Long,
+    outDiagnostic: Long,
+  ): Int
 
   @JvmStatic
   actual external fun mln_gpu_device_wrap_metal(
@@ -1169,9 +1208,9 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_render_session_set_frame_pacer(
+  actual external fun mln_render_session_set_frame_pacing(
     session: Long,
-    pacer: Long,
+    options: Long,
     outDiagnostic: Long,
   ): Int
 
@@ -1288,6 +1327,14 @@ internal actual object C {
 
   @JvmStatic
   actual external fun mln_runtime_get_offline_region(
+    runtime: Long,
+    regionId: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_runtime_get_offline_region_expiry(
     runtime: Long,
     regionId: Long,
     completion: Long,

@@ -28,7 +28,6 @@ def preset(name: str, inherits=None, hidden=False, vendor=None, **variables) -> 
 TARGET = {
     "MLN_FFI_TARGET_PLATFORM": "linux-gnu-x64",
     "MLN_FFI_RENDER_BACKENDS": "vulkan",
-    "MLN_FFI_DEFAULT_RENDER_BACKEND": "vulkan",
 }
 RUNS = {"unit": "linux-x64", "runner": "linux"}
 
@@ -66,7 +65,6 @@ class ResolverTest(unittest.TestCase):
                     vendor={"unit": "second", "runner": "shallow"},
                     MLN_FFI_TARGET_PLATFORM="second-arm64",
                     MLN_FFI_RENDER_BACKENDS="metal",
-                    MLN_FFI_DEFAULT_RENDER_BACKEND="metal",
                 ),
                 preset("child", inherits=["_first", "_second"]),
             )
@@ -95,36 +93,25 @@ class ResolverTest(unittest.TestCase):
             ("arm64", "linux-x64", "own"),
         )
 
-    def test_a_target_carries_a_list_of_backends_and_its_opengl_provider(self):
-        target = self.only(
-            presets(
-                preset(
-                    "child",
-                    vendor=RUNS,
-                    **{
-                        **TARGET,
-                        "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl",
-                        "MLN_FFI_OPENGL_CONTEXT_PROVIDER": "egl",
-                    },
-                )
-            )
-        )
-        self.assertEqual(target.backends, ("vulkan", "opengl"))
-        self.assertEqual(
-            [target.driver(backend) for backend in target.backends], ["vulkan", "egl"]
-        )
-
-    def test_a_default_backend_that_the_target_lacks_fails(self):
-        with self.assertRaisesRegex(SystemExit, "defaults to metal"):
-            plan.targets(
-                presets(
-                    preset(
-                        "child",
-                        vendor=RUNS,
-                        **{**TARGET, "MLN_FFI_DEFAULT_RENDER_BACKEND": "metal"},
+    def test_a_target_prefers_its_first_backend_and_takes_its_platforms_opengl(self):
+        for platform, provider in (("linux-gnu-x64", "egl"), ("windows-x64", "wgl")):
+            with self.subTest(platform=platform):
+                target = self.only(
+                    presets(
+                        preset(
+                            "child",
+                            vendor=RUNS,
+                            MLN_FFI_TARGET_PLATFORM=platform,
+                            MLN_FFI_RENDER_BACKENDS="vulkan;opengl",
+                        )
                     )
                 )
-            )
+                self.assertEqual(target.backends, ("vulkan", "opengl"))
+                self.assertEqual(target.default_backend, "vulkan")
+                self.assertEqual(
+                    [target.driver(backend) for backend in target.backends],
+                    ["vulkan", provider],
+                )
 
     def test_a_missing_parent_fails(self):
         with self.assertRaisesRegex(SystemExit, "unknown preset '_gone'"):
@@ -240,8 +227,8 @@ class PresetTest(unittest.TestCase):
             drivers = {
                 "linux-gnu": "vulkan,egl",
                 "linux-musl": "vulkan,egl",
-                "windows": "vulkan,wgl",
-                "windows-mingw": "vulkan,wgl",
+                "windows": "vulkan,d3d12,wgl",
+                "windows-mingw": "vulkan,d3d12,wgl",
             }
             expected[name] = (
                 mise_env,
@@ -381,8 +368,8 @@ class PresetTest(unittest.TestCase):
                     f"android-{arch}": ("vulkan", "opengl")
                     for arch in ("arm", "arm64", "x86", "x64")
                 },
-                "windows-x64": ("vulkan", "opengl"),
-                "windows-arm64": ("vulkan", "opengl"),
+                "windows-x64": ("vulkan", "d3d12", "opengl"),
+                "windows-arm64": ("vulkan", "d3d12", "opengl"),
                 "macos-arm64": ("metal",),
                 "macos-x64": ("metal",),
             },

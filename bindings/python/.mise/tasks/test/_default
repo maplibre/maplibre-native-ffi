@@ -6,7 +6,7 @@
 #MISE shell="bash"
 set -euo pipefail
 
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" python
 if [[ "$usage_preset" == android-* ]]; then
   exec mise run :_test-android "$usage_preset"
 fi

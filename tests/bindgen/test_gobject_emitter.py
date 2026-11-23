@@ -48,6 +48,12 @@ mln_status mln_widen(mln_wide_flags flags, mln_diagnostic *out_diagnostic);
             "G_DEFINE_FLAGS_TYPE", lowered["src/maplibre-native-ffi-enums.c"]
         )
 
+    def test_a_tag_names_the_accessor_of_its_variant(self):
+        # A record of only a tag and its union presents the union's accessors.
+        header = emitted(gobject, real_api())["src/maplibre-native-ffi-values.h"]
+        self.assertIn("`maplibre_native_ffi_gesture_event_get_notch`", header)
+        self.assertNotIn("maplibre_native_ffi_gesture_event_data_get_", header)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,7 +5,7 @@
 #MISE shell="bash"
 set -euo pipefail
 
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" kotlin-native
 gradle_tasks=()
 case "$usage_preset" in
   linux-gnu-x64) kotlin_target=linuxX64 ;;

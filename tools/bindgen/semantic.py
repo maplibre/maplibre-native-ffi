@@ -185,6 +185,8 @@ class ValuePlan:
     lifetime: str = "call"
     nullable: bool = False
     length: str | None = None
+    # The fixed extent of an array that its record holds in place.
+    extent: int | None = None
     stride: str | None = None
     fields: tuple[FieldPlan, ...] = ()
     element: ValuePlan | None = None
@@ -214,6 +216,12 @@ class ValuePlan:
             return self
         assert self.element is not None
         return self.element
+
+    @property
+    def counted_inline(self) -> bool:
+        """An array that its record holds in place, whose sibling field counts
+        the elements in use, up to its extent."""
+        return self.extent is not None and self.length != str(self.extent)
 
     @property
     def union_member(self) -> FieldPlan | None:
@@ -1104,9 +1112,12 @@ class Binder:
         if resolved.kind == "array":
             if resolved.element is None or resolved.length is None:
                 raise ModelError([f"{context}: array requires a fixed extent"])
-            common["length"] = str(resolved.length)
+            # A fixed array fills its extent unless a sibling counts the
+            # elements in use.
+            common["length"] = common["length"] or str(resolved.length)
             return ValuePlan(
                 kind="array",
+                extent=resolved.length,
                 element=self.value(resolved.element, {}, context + " element"),
                 **common,
             )

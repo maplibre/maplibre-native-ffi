@@ -4,6 +4,7 @@
 
 #include "maplibre_native_c/base.h"
 #include "maplibre_native_c/camera.h"
+#include "maplibre_native_c/gesture.h"
 #include "maplibre_native_c/gpu_device.h"
 #include "maplibre_native_c/logging.h"
 #include "maplibre_native_c/map.h"
@@ -48,10 +49,16 @@ napi_value mln_ts_decode_camera_options(
 napi_value mln_ts_decode_camera_query_result(
   napi_env env, const mln_completion_result* result
 );
+napi_value mln_ts_decode_gpu_sync_optional(
+  napi_env env, const mln_completion_result* result
+);
 napi_value mln_ts_decode_lat_lng_bounds(
   napi_env env, const mln_completion_result* result
 );
 napi_value mln_ts_decode_lat_lng_list(
+  napi_env env, const mln_completion_result* result
+);
+napi_value mln_ts_decode_offline_region_expiry(
   napi_env env, const mln_completion_result* result
 );
 napi_value mln_ts_decode_offline_region_info(
@@ -144,11 +151,11 @@ napi_value mln_ts_read_camera_query_result(
 napi_value mln_ts_read_camera_transition_end(
   napi_env env, const mln_camera_transition_end* source, size_t size
 );
-napi_value mln_ts_read_camera_velocity(
-  napi_env env, const mln_camera_velocity* source, size_t size
-);
 napi_value mln_ts_read_canonical_tile_id(
   napi_env env, const mln_canonical_tile_id* source, size_t size
+);
+napi_value mln_ts_read_d3d12_texture_frame(
+  napi_env env, const mln_d3d12_texture_frame* source, size_t size
 );
 napi_value mln_ts_read_dma_buf_frame(
   napi_env env, const mln_dma_buf_frame* source, size_t size
@@ -180,8 +187,29 @@ napi_value mln_ts_read_free_camera(
 napi_value mln_ts_read_geo_json_source_options(
   napi_env env, const mln_geo_json_source_options* source, size_t size
 );
+napi_value mln_ts_read_gesture_event(
+  napi_env env, const mln_gesture_event* source, size_t size
+);
+napi_value mln_ts_read_gesture_event_data(
+  napi_env env, const mln_gesture_event* source, size_t size
+);
+napi_value mln_ts_read_gesture_notch_event(
+  napi_env env, const mln_gesture_notch_event* source, size_t size
+);
+napi_value mln_ts_read_gesture_result(
+  napi_env env, const mln_gesture_result* source, size_t size
+);
+napi_value mln_ts_read_gesture_result_events(
+  napi_env env, const mln_gesture_result* source
+);
+napi_value mln_ts_read_gesture_tap(
+  napi_env env, const mln_gesture_tap* source, size_t size
+);
 napi_value mln_ts_read_gpu_device_capabilities(
   napi_env env, const mln_gpu_device_capabilities* source, size_t size
+);
+napi_value mln_ts_read_gpu_device_d3d12_context_result(
+  napi_env env, const mln_gpu_device_d3d12_context_result* source, size_t size
 );
 napi_value mln_ts_read_gpu_device_vulkan_context_result(
   napi_env env, const mln_gpu_device_vulkan_context_result* source, size_t size
@@ -241,6 +269,9 @@ napi_value mln_ts_read_offline_region_definition(
 );
 napi_value mln_ts_read_offline_region_definition_data(
   napi_env env, const mln_offline_region_definition* source, size_t size
+);
+napi_value mln_ts_read_offline_region_expiry(
+  napi_env env, const mln_offline_region_expiry* source, size_t size
 );
 napi_value mln_ts_read_offline_region_info(
   napi_env env, const mln_offline_region_info* source, size_t size
@@ -341,6 +372,9 @@ napi_value mln_ts_read_runtime_event_style_image(
 napi_value mln_ts_read_runtime_event_tile_action(
   napi_env env, const mln_runtime_event_tile_action* source, size_t size
 );
+napi_value mln_ts_read_screen_box(
+  napi_env env, const mln_screen_box* source, size_t size
+);
 napi_value mln_ts_read_screen_point(
   napi_env env, const mln_screen_point* source, size_t size
 );
@@ -394,10 +428,6 @@ napi_value mln_ts_read_vulkan_texture_frame(
 napi_value mln_ts_read_web_gpu_texture_frame(
   napi_env env, const mln_web_gpu_texture_frame* source, size_t size
 );
-bool mln_ts_write_anchored_momentum(
-  mln_ts_call* call, napi_value value, mln_anchored_momentum* out,
-  const char* path
-);
 bool mln_ts_write_android_window_target(
   mln_ts_call* call, napi_value value, mln_android_window_target* out,
   const char* path
@@ -445,6 +475,22 @@ bool mln_ts_write_custom_vector_source_options(
   mln_ts_call* call, napi_value value, mln_custom_vector_source_options* out,
   const char* path
 );
+bool mln_ts_write_d3d12_borrowed_texture(
+  mln_ts_call* call, napi_value value, mln_d3d12_borrowed_texture* out,
+  const char* path
+);
+bool mln_ts_write_d3d12_borrowed_textures_target(
+  mln_ts_call* call, napi_value value, mln_d3d12_borrowed_textures_target* out,
+  const char* path
+);
+bool mln_ts_write_d3d12_composition_target(
+  mln_ts_call* call, napi_value value, mln_d3d12_composition_target* out,
+  const char* path
+);
+bool mln_ts_write_d3d12_device_descriptor(
+  mln_ts_call* call, napi_value value, mln_d3d12_device_descriptor* out,
+  const char* path
+);
 bool mln_ts_write_dma_buf_format(
   mln_ts_call* call, napi_value value, mln_dma_buf_format* out, const char* path
 );
@@ -469,8 +515,8 @@ bool mln_ts_write_feature_state_selector(
 bool mln_ts_write_frame_demand(
   mln_ts_call* call, napi_value value, mln_frame_demand* out, const char* path
 );
-bool mln_ts_write_frame_pacer_options(
-  mln_ts_call* call, napi_value value, mln_frame_pacer_options* out,
+bool mln_ts_write_frame_pacing_options(
+  mln_ts_call* call, napi_value value, mln_frame_pacing_options* out,
   const char* path
 );
 bool mln_ts_write_free_camera_options(
@@ -481,8 +527,36 @@ bool mln_ts_write_geo_json_source_options(
   mln_ts_call* call, napi_value value, mln_geo_json_source_options* out,
   const char* path
 );
-bool mln_ts_write_gesture_momentum(
-  mln_ts_call* call, napi_value value, mln_gesture_momentum* out,
+bool mln_ts_write_gesture_axis_options(
+  mln_ts_call* call, napi_value value, mln_gesture_axis_options* out,
+  const char* path
+);
+bool mln_ts_write_gesture_delta(
+  mln_ts_call* call, napi_value value, mln_gesture_delta* out, const char* path
+);
+bool mln_ts_write_gesture_input(
+  mln_ts_call* call, napi_value value, mln_gesture_input* out, const char* path
+);
+bool mln_ts_write_gesture_notch(
+  mln_ts_call* call, napi_value value, mln_gesture_notch* out, const char* path
+);
+bool mln_ts_write_gesture_options(
+  mln_ts_call* call, napi_value value, mln_gesture_options* out,
+  const char* path
+);
+bool mln_ts_write_gesture_pan_options(
+  mln_ts_call* call, napi_value value, mln_gesture_pan_options* out,
+  const char* path
+);
+bool mln_ts_write_gesture_pinch(
+  mln_ts_call* call, napi_value value, mln_gesture_pinch* out, const char* path
+);
+bool mln_ts_write_gesture_pointer(
+  mln_ts_call* call, napi_value value, mln_gesture_pointer* out,
+  const char* path
+);
+bool mln_ts_write_gesture_pointer_down(
+  mln_ts_call* call, napi_value value, mln_gesture_pointer_down* out,
   const char* path
 );
 bool mln_ts_write_gpu_device_options(
@@ -519,8 +593,16 @@ bool mln_ts_write_list_buffer_view(
   mln_ts_call* call, napi_value value, size_t maximum, mln_buffer_view** out,
   size_t* out_count, const char* path
 );
+bool mln_ts_write_list_d3d12_borrowed_texture(
+  mln_ts_call* call, napi_value value, size_t maximum,
+  mln_d3d12_borrowed_texture** out, size_t* out_count, const char* path
+);
 bool mln_ts_write_list_dma_buf_format(
   mln_ts_call* call, napi_value value, size_t maximum, mln_dma_buf_format** out,
+  size_t* out_count, const char* path
+);
+bool mln_ts_write_list_gesture_notch(
+  mln_ts_call* call, napi_value value, size_t maximum, mln_gesture_notch** out,
   size_t* out_count, const char* path
 );
 bool mln_ts_write_list_http_header(
@@ -654,9 +736,6 @@ bool mln_ts_write_open_gl_context_descriptor(
 bool mln_ts_write_open_gl_surface_target(
   mln_ts_call* call, napi_value value, mln_open_gl_surface_target* out,
   const char* path
-);
-bool mln_ts_write_pan_momentum(
-  mln_ts_call* call, napi_value value, mln_pan_momentum* out, const char* path
 );
 bool mln_ts_write_premultiplied_rgba8_image(
   mln_ts_call* call, napi_value value, mln_premultiplied_rgba8_image* out,

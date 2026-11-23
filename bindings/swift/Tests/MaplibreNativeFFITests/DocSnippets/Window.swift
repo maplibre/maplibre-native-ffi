@@ -97,7 +97,7 @@ private func onDriverWorkWake() {
 
 @MainActor private func surfaceLost() async throws {
   // #region lost-surface
-  try await session.releaseTarget()
+  _ = try await session.releaseTarget()
   // #endregion lost-surface
 }
 
@@ -106,11 +106,12 @@ private func onDriverWorkWake() {
   newSurface: NativePointer
 ) async throws {
   // #region lost-surface
-  try await session.setTarget(.waylandSurface(WaylandSurfaceTarget(
-    logicalSize: LogicalSize(width: 800, height: 600),
-    display: display,
-    surface: newSurface
-  )))
+  _ = try await session
+    .setTarget(.waylandSurface(WaylandSurfaceTarget(
+      logicalSize: LogicalSize(width: 800, height: 600),
+      display: display,
+      surface: newSurface
+    )))
   // #endregion lost-surface
 }
 

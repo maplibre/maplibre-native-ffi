@@ -66,6 +66,6 @@ description = "Run the Hermes TypeScript suite, graphics readback, and runtime t
 extends = "ffi:test"
 depends = [{ task = ":build:hermes", args = ["{{usage.preset}}"] }]
 run = '''
-source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend"
+source "$MISE_MONOREPO_ROOT/tools/env/test-backend.sh" "$usage_preset" "$usage_backend" typescript
 python scripts/hermes.py test "$usage_preset"
 '''

@@ -49,7 +49,8 @@ test("a failed command rejects with its status and generation", async () => {
       error instanceof MaplibreError &&
       error.status === Status.notFound &&
       error.diagnostic.length > 0 &&
-      error.generation > committed.generation,
+      // A failed command changes nothing, so it reports the map's generation.
+      error.generation >= committed.generation,
   );
 });
 

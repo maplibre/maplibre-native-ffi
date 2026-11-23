@@ -1,17 +1,16 @@
 // A continuous map on a MaplibreSurfaceView. The view lends its surface when the
 // platform provides one, and the controller attaches a session to it, or gives
-// an attached session the new surface. Everything else matches the browser
-// example in examples/browser.
+// an attached session the new surface. The session paces its frames to the
+// display. Everything else matches the ArkUI example in examples/arkui.
 
 import {
   CameraUpdateMode,
-  FrameDemandFlag,
+  type GestureRecognizerHandle,
   type LogicalSize,
   type MapHandle,
   MapMode,
   RenderDriverKind,
   RenderResult,
-  type RenderSessionAttachOptions,
   type RenderSessionHandle,
   type RenderTarget,
   RuntimeEventFlag,
@@ -39,6 +38,7 @@ export class MapController {
 
   #runtime: RuntimeHandle | undefined;
   #map: MapHandle | undefined;
+  #recognizer: GestureRecognizerHandle | undefined;
   #session: RenderSessionHandle | undefined;
 
   // The view's latest size, its latest surface, and the surface that the
@@ -53,8 +53,8 @@ export class MapController {
     this.#onStatus = onStatus;
   }
 
-  get map(): MapHandle | undefined {
-    return this.#map;
+  get recognizer(): GestureRecognizerHandle | undefined {
+    return this.#recognizer;
   }
 
   start(): void {
@@ -66,15 +66,18 @@ export class MapController {
     this.#disposed = true;
     this.#epoch++;
     const session = this.#session;
+    const recognizer = this.#recognizer;
     const map = this.#map;
     const runtime = this.#runtime;
     const target = this.#target;
-    this.#session = this.#map = this.#runtime = this.#target = undefined;
+    this.#session = this.#recognizer = undefined;
+    this.#map = this.#runtime = this.#target = undefined;
     // After any target change in flight, release the session while its wakes
     // still service it, and only then let go of the surface it used.
     this.#targets = this.#targets.then(async () => {
       try {
         await session?.release();
+        recognizer?.release();
         map?.dispose();
         runtime?.dispose();
       } catch (error) {
@@ -166,6 +169,7 @@ export class MapController {
       },
     });
     map.discarding.setStyleUrl(styleUrl);
+    this.#recognizer = map.gestureRecognizerCreate();
     this.#showStatus("Loading the style…");
     this.#retarget();
   }
@@ -194,17 +198,21 @@ export class MapController {
       const previous = this.#target;
       this.#target = surface;
       if (this.#session === undefined) {
-        const session = attach(map, size, handles, {
+        // The session renders on a library thread. On Android, the library
+        // also makes the graphics context for the window.
+        const session = map.attach(target(size, handles), undefined, {
           driver: RenderDriverKind.coreWorker,
           frameWake: { callback: () => this.#drainFrameResults() },
         });
         this.#session = session;
+        // The session demands each frame at the display's next refresh after
+        // the map changes.
+        session.setFramePacing({});
         await session.ready;
       } else {
-        await setTarget(this.#session, size, handles);
+        await this.#session.setTarget(target(size, handles));
       }
       if (previous !== undefined) surfaces.release(previous);
-      this.#demandFrame();
     });
   }
 
@@ -214,20 +222,13 @@ export class MapController {
       .catch((error: unknown) => this.#fail(error));
   }
 
-  #demandFrame = (): void => {
-    if (this.#target === undefined) return;
-    this.#session?.demandFrame({ flags: FrameDemandFlag.waitForUpdate });
-  };
-
+  // The session demands the frames, and the frame wake reports how they went.
   #drainFrameResults(): void {
     const results = this.#session?.drainFrameResults() ?? [];
-    if (results.length === 0) return;
     if (
       results.some(({ disposition }) => disposition === RenderResult.failed)
     ) {
       this.#fail(new Error("The map failed to render a frame."));
-    } else {
-      requestAnimationFrame(this.#demandFrame);
     }
   }
 
@@ -246,25 +247,6 @@ export class MapController {
       error: true,
     });
   }
-}
-
-// Both sessions render on a library thread. On Android, the library also makes
-// the graphics context for the window.
-function attach(
-  map: MapHandle,
-  logicalSize: LogicalSize,
-  handles: SurfaceHandles,
-  options: RenderSessionAttachOptions,
-): RenderSessionHandle {
-  return map.attach(target(logicalSize, handles), undefined, options);
-}
-
-function setTarget(
-  session: RenderSessionHandle,
-  logicalSize: LogicalSize,
-  handles: SurfaceHandles,
-): Promise<void> {
-  return session.setTarget(target(logicalSize, handles));
 }
 
 function target(

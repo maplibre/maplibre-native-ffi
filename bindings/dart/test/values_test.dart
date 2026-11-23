@@ -234,6 +234,36 @@ void main() {
     expect(await pending, expected);
   });
 
+  // A double tap reports a tap and then a double tap, so the events read back
+  // as those two variants in order, and none of the array's unused slots.
+  test('a counted inline array reads only the elements it counts', () async {
+    final fixture = await openRuntime();
+    final map = await fixture.openMap();
+    final recognizer = map.gestureRecognizerCreate();
+    addTearDown(recognizer.release);
+    const position = ScreenPoint(x: 30, y: 16);
+
+    GestureResult tap(double timeMs) {
+      recognizer.handle(
+        const GestureInput.pointerDown(
+          GesturePointerDown(id: 2, position: position),
+        ),
+        timeMs,
+      );
+      return recognizer.handle(
+        const GestureInput.pointerUp(GesturePointer(id: 2, position: position)),
+        timeMs + 50,
+      );
+    }
+
+    const event = GestureTap(id: 2, position: position);
+    expect(tap(0).events, [const GestureEvent.tap(event)]);
+    expect(tap(100).events, [
+      const GestureEvent.tap(event),
+      const GestureEvent.doubleTap(event),
+    ]);
+  });
+
   test('byte-backed values own their storage and compare by content', () {
     final pixels = Uint8List.fromList([1, 2, 3, 4]);
     final image = PremultipliedRgba8Image(

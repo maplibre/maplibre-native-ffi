@@ -24,14 +24,20 @@ from ._generated_values import (
     CustomGeometrySourceOptions,
     CustomLayerHost,
     CustomVectorSourceOptions,
+    D3d12DeviceDescriptor,
+    D3d12TextureFrame,
     DmaBufFrame,
     DxgiSharedTextureFrame,
     FeatureStateSelector,
     FrameDemand,
-    FramePacerOptions,
+    FramePacingOptions,
     FreeCameraOptions,
     GeoJsonSourceOptions,
+    GestureInput,
+    GestureOptions,
+    GestureResult,
     GpuDeviceCapabilities,
+    GpuDeviceD3d12ContextResult,
     GpuDeviceOptions,
     GpuDeviceVulkanContextResult,
     GpuSync,
@@ -56,6 +62,7 @@ from ._generated_values import (
     NetworkStatus,
     OfflineRegionDefinition,
     OfflineRegionDownloadState,
+    OfflineRegionExpiry,
     OfflineRegionInfo,
     OfflineRegionStatus,
     OpaqueFdFrame,
@@ -105,7 +112,7 @@ from ._operation import GeneratedOperations, _adopt_value, _answer, _view
 if TYPE_CHECKING:
     from ._generated_owners import (
         AcquiredFrameHandle,
-        FramePacerHandle,
+        GestureRecognizerHandle,
         GpuDeviceHandle,
         MapHandle,
         MapProjectionHandle,
@@ -167,6 +174,31 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
             self,
             lambda: self._native.android_hardware_buffer(),
             lambda raw: AndroidHardwareBufferFrame._from_native(raw),
+        )
+
+    def d3d12_texture(self) -> AbstractContextManager[D3d12TextureFrame]:
+        """Gets the D3D12 texture of an acquired frame.
+
+        It gets a borrowed ring's texture, or an exported ring's on a D3D12
+        device: the resource whose memory the ring shares, and the frame's
+        depth resource with `RenderSessionAttachOptions.keep_depth`. Wait for
+        `AcquiredFrameHandle.producer_sync()` before you use them.
+
+        Native resources remain valid only inside the `with` block.
+
+        See `mln_acquired_frame_get_d3d12_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the frame isn't of a D3D12 device.
+        - `Status.TARGET_LOST` when the session failed, or you detached,
+          abandoned, or disposed it.
+        """
+        return _view(
+            self,
+            lambda: self._native.d3d12_texture(),
+            lambda raw: D3d12TextureFrame._from_native(raw),
         )
 
     def dma_buf(self) -> AbstractContextManager[DmaBufFrame]:
@@ -423,87 +455,53 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         return self._native.release(consumer_completion)
 
 
-class _FramePacerHandleOperations(GeneratedOperations):
-    _native: _native._FramePacerHandle
+class _GestureRecognizerHandleOperations(GeneratedOperations):
+    _native: _native._GestureRecognizerHandle
 
-    @classmethod
-    def create(cls, options: FramePacerOptions | None = None) -> FramePacerHandle:
-        """Creates a frame pacer that follows the platform's display.
+    def handle(self, input: GestureInput, time_ms: float) -> GestureResult:
+        """Handles one input at `time_ms`, in milliseconds on any clock that
+        only goes forward, the same for every input and frame.
 
-        On iOS, macOS, and tvOS, the pacer follows the display through a
-        `CADisplayLink`. You can call it on any thread, and the pacer needs
-        no run loop of yours. On macOS, it follows the main display, the one
-        with the menu bar. With
-        `FramePacerOptions.maximum_frames_per_second`, the pacer also asks
-        the system for that refresh rate. On iPhone, a rate above 60 needs
-        `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
-
-        On Android, the pacer follows the display through the calling
-        thread's `AChoreographer`. Call it on a thread with an `ALooper`,
-        such as the app's main thread, and keep that thread running its
-        looper while sessions use the pacer. `AChoreographer` can stop while
-        the phone's display is off, even while a Surface on another display,
-        such as an Android Auto projection, still shows the map. The pacer
-        then keeps demanding frames from a timer on the looper, within the
-        frame rate limit, until vsyncs arrive again.
-
-        On OpenHarmony, the pacer follows the display through
-        `OH_NativeVSync`. You can call it on any thread, and the pacer needs
-        no event loop of yours.
-
-        See `mln_frame_pacer_create` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        See `mln_gesture_recognizer_handle` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
 
         Errors:
 
-        - `Status.UNSUPPORTED` on the other platforms, such as visionOS,
-          Linux, and Windows, where the library has no source of display
-          refreshes.
-        - `Status.INVALID_STATE` on Android when the calling thread has no
-          `ALooper`.
-        - `Status.NATIVE_ERROR` on iOS, macOS, and tvOS when the system has
-          no display to follow, and on OpenHarmony when the system can't
-          report the display's refreshes to the process.
+        - `Status.INVALID_ARGUMENT` when `input` isn't a valid input.
         """
-        return _adopt_value(
-            _native._FramePacerHandle.create(options), "FramePacerHandle", None
-        )
+        return GestureResult._from_native(self._native.handle(input, time_ms))
 
     def release(self) -> None:
-        """Releases a frame pacer.
+        """Releases a gesture recognizer. A glide it started keeps going.
 
-        Render sessions that use the pacer stay paced until you release them
-        or set another pacer.
-
-        See `mln_frame_pacer_release` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        See `mln_gesture_recognizer_release` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
         """
         return self._native.release()
 
-    def set_options(self, options: FramePacerOptions) -> None:
-        """Changes a frame pacer's settings.
+    def set_options(self, options: GestureOptions) -> None:
+        """Changes the settings whose bits are set, from the next input on.
 
-        Settings that `options` doesn't set keep their current values. To
-        remove the frame rate limit, set
-        `FramePacerOptions.unlimited_frames_per_second`. You can call it on
-        any thread.
-
-        The sessions that the pacer serves follow the new settings from the
-        next display refresh, including a refresh that they already wait for.
-        The pacer counts a new limit from the last frames it demanded, so a
-        higher limit can demand the next frames sooner. On iOS, macOS, and
-        tvOS, the pacer also asks the system for the new limit's refresh
-        rate, or for the display's own rate once the limit is removed.
-
-        See `mln_frame_pacer_set_options` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        See `mln_gesture_recognizer_set_options` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
 
         Errors:
 
-        - `Status.INVALID_STATE` when you released `pacer`, even while
-          sessions still use it.
+        - `Status.INVALID_ARGUMENT` when an option is out of range.
         """
         return self._native.set_options(options)
+
+    def tick(self, time_ms: float) -> GestureResult:
+        """Times long presses, steps the eases of discrete deltas, ends deltas
+        once they idle, and samples the camera for notches, at `time_ms` on
+        the inputs' clock. Call it when the last result's `next_tick` says:
+        on the next display frame, or at its time with a frame or a timer. A
+        tick at any other time does no harm.
+
+        See `mln_gesture_recognizer_tick` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+        """
+        return GestureResult._from_native(self._native.tick(time_ms))
 
 
 class _GpuDeviceHandleOperations(GeneratedOperations):
@@ -530,12 +528,13 @@ class _GpuDeviceHandleOperations(GeneratedOperations):
         - `Status.UNSUPPORTED` when this build or platform lacks `backend`,
           when the device can't render with `open_gl_client_api`, when
           options name a GPU that the backend can't select (an OpenGL device
-          takes no `adapter_index`, `adapter_uuid`, or `adapter_luid`, and
-          only a Vulkan device takes `adapter_uuid` or `adapter_luid`), when
-          a device that doesn't render with Vulkan gets a `queue_lock`, or in
-          a browser for every backend: WebGPU makes devices asynchronously,
-          and a WebGL2 context needs a canvas. Attach without a device, which
-          the session makes itself, or wrap your WebGL2 context.
+          takes no `adapter_index`, `adapter_uuid`, or `adapter_luid`, only a
+          Vulkan device takes `adapter_uuid`, and only a Vulkan or D3D12
+          device `adapter_luid`), when a device that doesn't render with
+          Vulkan gets a `queue_lock`, or in a browser for every backend:
+          WebGPU makes devices asynchronously, and a WebGL2 context needs a
+          canvas. Attach without a device, which the session makes itself, or
+          wrap your WebGL2 context.
         - `Status.NOT_FOUND` when no GPU matches `adapter_index`,
           `adapter_uuid`, or `adapter_luid`.
         - `Status.NATIVE_ERROR` when the platform can't create the device.
@@ -554,6 +553,24 @@ class _GpuDeviceHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
         """
         return GpuDeviceCapabilities._from_native(self._native.get_capabilities())
+
+    def get_d3d12_context(self) -> GpuDeviceD3d12ContextResult:
+        """Gets the D3D12 device and direct command queue of a D3D12 device.
+
+        Use them to make the textures of a borrowed ring that sessions on the
+        device render into, and to submit your reads of them, which the queue
+        orders after the frames submitted before them.
+
+        See `mln_gpu_device_get_d3d12_context` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when the device doesn't render with D3D12.
+        """
+        return GpuDeviceD3d12ContextResult._from_native(
+            self._native.get_d3d12_context()
+        )
 
     def get_vulkan_context(self) -> GpuDeviceVulkanContextResult:
         """Gets the Vulkan instance, device, and graphics queue of a Vulkan
@@ -585,6 +602,31 @@ class _GpuDeviceHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
         """
         return self._native.release()
+
+    @classmethod
+    def wrap_d3d12(cls, descriptor: D3d12DeviceDescriptor) -> GpuDeviceHandle:
+        """Wraps your D3D12 device and direct command queue, so that sessions
+        render on them.
+
+        Sessions on the device render into your textures and submit to your
+        queue.
+
+        See `mln_gpu_device_wrap_d3d12` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gpu__device_8h.html).
+
+        Errors:
+
+        - `Status.UNSUPPORTED` when `supported_render_backend_mask()` lacks
+          `RenderBackendFlag.D3D12`, when the device runs no shader model
+          6.0, when `command_queue` isn't a direct queue of `device`, or when
+          the library can't load DXC (`dxcompiler.dll`) to compile its
+          shaders.
+        - `Status.INVALID_ARGUMENT` when `device` or `command_queue` isn't of
+          its interface.
+        """
+        return _adopt_value(
+            _native._GpuDeviceHandle.wrap_d3d12(descriptor), "GpuDeviceHandle", None
+        )
 
     @classmethod
     def wrap_metal(cls, descriptor: MetalDeviceDescriptor) -> GpuDeviceHandle:
@@ -658,6 +700,29 @@ class _GpuDeviceHandleOperations(GeneratedOperations):
 
 class _MapHandleOperations(GeneratedOperations):
     _native: _native._MapHandle
+
+    def gesture_recognizer_create(
+        self, options: GestureOptions | None = None
+    ) -> GestureRecognizerHandle:
+        """Creates a gesture recognizer that moves `map`'s camera.
+
+        Its moves go to the map as camera commands, which apply
+        asynchronously, and the map's snapshot and camera events report them
+        as gestures. After the map is released, its moves do nothing.
+        `options` may be null for every default.
+
+        See `mln_gesture_recognizer_create` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/gesture_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT` when an option is out of range.
+        """
+        return _adopt_value(
+            self._native.gesture_recognizer_create(options),
+            "GestureRecognizerHandle",
+            None,
+        )
 
     def add_custom_geometry_source(
         self, source_id: str, options: CustomGeometrySourceOptions
@@ -824,7 +889,7 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.add_style_source_json(source_id, source_json)
 
     def apply_camera_delta(self, delta: CameraDelta) -> Future[CommandCompletion]:
-        """Moves the camera relative to where it is, as a gesture does.
+        """Moves the camera relative to where it is.
 
         `delta` can pan the map's content by an offset on the screen, scale
         the zoom, and add to the bearing and pitch. An anchor keeps one
@@ -836,20 +901,6 @@ class _MapHandleOperations(GeneratedOperations):
         A delta that replaces an animated one starts from where that
         animation left the camera, so the rest of the replaced change never
         happens. To reach an exact camera, use `MapHandle.update_camera()`.
-
-        A delta in the end phase can carry momentum, which keeps the camera
-        moving from the gesture's release velocities and slows it on each
-        rendered frame. The gesture lasts until the momentum ends: the
-        snapshot keeps `gesture_in_progress` set, and camera events report
-        `CameraChangeSource.MOMENTUM`. With momentum, `animation` sets only
-        `transition_id` and the end handler, which runs when the gesture
-        ends.
-
-        A delta in the begin phase, `MapHandle.cancel_camera_transitions()`,
-        or a cancellation by that ID stops the momentum. A later command that
-        sets a field stops only the parts of the momentum that move that
-        field. On a tilted map, the pan moves the map's content the same
-        distance on the screen in every direction.
 
         See `mln_map_apply_camera_delta` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -1543,6 +1594,13 @@ class _MapHandleOperations(GeneratedOperations):
 
         See `mln_map_set_bounds` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_ARGUMENT`, changing nothing, when the minimum zoom
+          would be above the maximum zoom, the minimum pitch above the
+          maximum pitch, or the maximum zoom below the lowest zoom the map
+          can show at its size.
         """
         return self._native.set_bounds(options)
 
@@ -2311,7 +2369,10 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """Asks the session to render a frame.
 
         The frame shows the map commands that you sent before the call,
-        except the changes that an open command group holds back.
+        except the changes that an open command group holds back, and the
+        map's camera animations as they are at the time of the call. Demand
+        each frame when the display is ready for it, so that animations move
+        evenly. `RenderSessionHandle.set_frame_pacing()` does that for you.
 
         You can call it once the attach call returns. While the attach runs,
         the demand waits for it to complete. Every demand finishes with one
@@ -2582,7 +2643,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.release()
 
-    def release_target(self) -> Future[None]:
+    def release_target(self) -> Future[GpuSync | None]:
         """Lets go of the session's surface or textures, and keeps the rest of
         the session.
 
@@ -2590,20 +2651,23 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         goes to the background. Release every acquired frame first. Frame
         demands that are still pending, and later ones until you give the
         session a new target, finish with `RenderResult.TARGET_NOT_READY`.
-        Once the release completes, you can destroy the old target. An
-        Android or OpenHarmony window can go away sooner, as
+        Once the release of a window or surface completes, you can destroy
+        it. An Android or OpenHarmony window can go away sooner, as
         `AndroidWindowTarget` and `OhosWindowTarget` say.
 
-        For a borrowed ring, a completed release also means that the session
-        has stopped waiting on the consumer sync that you released its frames
-        with, so you can reuse or destroy the textures. The session waits
-        about a second at most for that sync, and logs a warning when the
-        wait runs out. It checks the sync without blocking a thread: keep
-        servicing a session driven by
-        `RenderDriverKind.CALLER_GRAPHICS_THREAD` until the release
-        completes. The session keeps nothing of the released textures: a
-        texture that a later target gives it again is a new one, even one
-        that you discarded a frame of.
+        For a borrowed ring, the release completes with an `GpuSync` of
+        `RenderSessionCapabilities.producer_sync_kind`, or
+        `GpuSyncKind.CPU_COMPLETE` when the session has no textures since an
+        earlier release. Wait for it before you reuse or destroy the
+        textures, as you wait for an acquired frame's producer sync: for
+        `GpuSyncKind.QUEUE_ORDER`, destroy them once work that you submit to
+        the queue after the completion has finished. The session's GPU work
+        on the textures, and its waits for the consumer syncs that you
+        released its frames with, end there, so keep those syncs until then
+        too. The session keeps nothing of the released textures: a texture
+        that a later target gives it again is a new one, even one that you
+        discarded a frame of. For another target, the completion has no
+        value.
 
         See `mln_render_session_release_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2614,8 +2678,13 @@ class _RenderSessionHandleOperations(GeneratedOperations):
           exported ring.
         - `Status.TARGET_LOST` when the session loses its target before the
           release runs.
+        - `Status.NATIVE_ERROR` when the session can't submit its work on a
+          borrowed ring's textures. It keeps them then.
         """
-        return self._native.release_target()
+        return map_future(
+            self._native.release_target(),
+            lambda value: _maybe(GpuSync._from_native, value),
+        )
 
     def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
         """Resizes the session's target and its map, and sets the map's scale
@@ -2667,28 +2736,58 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.service_driver_work()
 
-    def set_frame_pacer(self, pacer: FramePacerHandle | None = None) -> None:
-        """Sets the frame pacer that demands the session's frames.
+    def set_frame_pacing(self, options: FramePacingOptions | None = None) -> None:
+        """Paces the session's frames to the display.
 
         At the first display refresh after the session has something new to
-        draw, `pacer` demands a frame without flags and with token 0. One
-        pacer can serve many sessions. A null `pacer` stops pacing the
-        session. You can call it once the attach call returns.
+        draw, the library demands a frame without flags and with token 0,
+        unless you demanded one first. Each call replaces the session's
+        pacing, and a null `options` stops it. You can call it once the
+        attach call returns.
 
-        See `mln_render_session_set_frame_pacer` in the
+        On iOS, macOS, and tvOS, the library uses a `CADisplayLink` on a
+        thread of its own. With `FramePacingOptions.view`, call it on the
+        main thread. The library asks the system for the frame rate limit's
+        refresh rate. On iPhone, a rate above 60 needs
+        `CADisableMinimumFrameDurationOnPhone` in the app's `Info.plist`.
+
+        On Android, the library follows the display through the calling
+        thread's `AChoreographer`. Call it on a thread with an `ALooper`,
+        such as the app's main thread, and keep that thread running its
+        looper while the session is paced. `AChoreographer` can stop while
+        the phone's display is off, even while a Surface on another display,
+        such as an Android Auto projection, still shows the map. The library
+        then keeps demanding frames from a timer on the looper, within the
+        frame rate limit, until vsyncs arrive again.
+
+        On OpenHarmony, the library uses `OH_NativeVSync`, from any thread.
+
+        See `mln_render_session_set_frame_pacing` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 
         Errors:
 
+        - `Status.INVALID_ARGUMENT` when `options` sets
+          `maximum_frames_per_second` to 0, or sets `view` to null.
+        - `Status.UNSUPPORTED` on the other platforms, such as visionOS,
+          Linux, and Windows, where the library has no source of display
+          refreshes, on macOS before 14, and when `options` sets `view` on a
+          platform other than macOS, iOS, and tvOS.
         - `Status.TARGET_LOST` or `Status.NATIVE_ERROR`, as
           `RenderSessionSnapshot.failure_status` reports, when the session
           has failed.
         - `Status.INVALID_STATE` when you attached the session with a redraw
-          wake, or detached, abandoned, released, or disposed it.
+          wake, or detached, abandoned, released, or disposed it, on Android
+          when the calling thread has no `ALooper`, and when `options` sets
+          `view` off the main thread or, on iOS and tvOS, to a view in no
+          window.
+        - `Status.NATIVE_ERROR` on iOS, macOS, and tvOS when the system has
+          no display to follow, and on OpenHarmony when the system can't
+          report the display's refreshes to the process.
         """
-        return self._native.set_frame_pacer(None if pacer is None else pacer._native)
+        return self._native.set_frame_pacing(options)
 
-    def set_target(self, target: RenderTarget) -> Future[None]:
+    def set_target(self, target: RenderTarget) -> Future[GpuSync | None]:
         """Replaces the window, surface, or borrowed ring that the session
         renders to, and resizes the map to it.
 
@@ -2700,11 +2799,13 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         uses the old target. A borrowed ring takes only a ring of the kind it
         attached with, with as many textures, with depth textures only when
         it attached with them, and with the same formats, final layouts, and
-        owner. Release every acquired frame of a borrowed ring first. Once
-        the replacement completes, the session has also stopped waiting on
-        the consumer sync of the textures that the new ring doesn't have, as
-        `RenderSessionHandle.release_target()` says, so you can reuse or
-        destroy them.
+        owner. Release every acquired frame of a borrowed ring first. For a
+        borrowed ring, the replacement completes with an `GpuSync`: wait for
+        it before you reuse or destroy the textures that the new ring doesn't
+        have, as `RenderSessionHandle.release_target()` says. When it lets go
+        of no textures, such as after a release, the sync is
+        `GpuSyncKind.CPU_COMPLETE`. For another target, the completion has no
+        value.
 
         See `mln_render_session_set_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2733,7 +2834,10 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         - `Status.NATIVE_ERROR` when the library can't render to the new
           target.
         """
-        return self._native.set_target(target)
+        return map_future(
+            self._native.set_target(target),
+            lambda value: _maybe(GpuSync._from_native, value),
+        )
 
     @property
     def discarding(self) -> RenderSessionHandleDiscarding:
@@ -2972,6 +3076,22 @@ class _RuntimeHandleOperations(GeneratedOperations):
             lambda value: _maybe(OfflineRegionInfo._from_native, value),
         )
 
+    def get_offline_region_expiry(self, region_id: int) -> Future[OfflineRegionExpiry]:
+        """Reads how long the resources of the offline region `region_id` stay
+        usable.
+
+        See `mln_runtime_get_offline_region_expiry` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+
+        Errors:
+
+        - `Status.NOT_FOUND` when the cache file has no region `region_id`.
+        """
+        return map_future(
+            self._native.get_offline_region_expiry(region_id),
+            lambda value: OfflineRegionExpiry._from_native(value),
+        )
+
     def get_offline_region_status(self, region_id: int) -> Future[OfflineRegionStatus]:
         """Reads the download progress of the offline region `region_id`.
 
@@ -2993,15 +3113,16 @@ class _RuntimeHandleOperations(GeneratedOperations):
         )
 
     def invalidate_offline_region(self, region_id: int) -> Future[None]:
-        """Makes maps check each resource of the offline region `region_id` with
-        the server before they use it.
+        """Makes each resource of the offline region `region_id` stale, so maps
+        check it with the server when they next use it.
 
-        The region keeps its resources. Starting its download again fetches
-        the invalidated resources for offline use. If the style or a TileJSON
-        document is then missing or invalid, the download reports an offline
-        region response error and goes on from the stored copy. Resources
-        that the current style no longer lists stay in the region until it's
-        deleted.
+        The region keeps its resources, and maps show them while they check
+        them, except those that the server requires checking first. Starting
+        the region's download again checks every resource with the server. If
+        the style or a TileJSON document is then missing or invalid, the
+        download reports an offline region response error and goes on from
+        the stored copy. Resources that the current style no longer lists
+        stay in the region until it's deleted.
 
         See `mln_runtime_invalidate_offline_region` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3113,8 +3234,10 @@ class _RuntimeHandleOperations(GeneratedOperations):
     ) -> Future[None]:
         """Starts or pauses the download of the offline region `region_id`.
 
-        Setting the state that the download already has does nothing. A
-        download stops when the runtime closes.
+        A download fetches the resources that the region lacks, and checks
+        those that are stale with the server, keeping each stored copy until
+        its refresh arrives. Setting the state that the download already has
+        does nothing. A download stops when the runtime closes.
 
         See `mln_runtime_set_offline_region_download_state` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -3541,7 +3664,7 @@ class MapHandleDiscarding:
         return self._native._discard_add_style_source_json(source_id, source_json)
 
     def apply_camera_delta(self, delta: CameraDelta) -> None:
-        """Moves the camera relative to where it is, as a gesture does.
+        """Moves the camera relative to where it is.
 
         `delta` can pan the map's content by an offset on the screen, scale
         the zoom, and add to the bearing and pitch. An anchor keeps one
@@ -3553,20 +3676,6 @@ class MapHandleDiscarding:
         A delta that replaces an animated one starts from where that
         animation left the camera, so the rest of the replaced change never
         happens. To reach an exact camera, use `MapHandle.update_camera()`.
-
-        A delta in the end phase can carry momentum, which keeps the camera
-        moving from the gesture's release velocities and slows it on each
-        rendered frame. The gesture lasts until the momentum ends: the
-        snapshot keeps `gesture_in_progress` set, and camera events report
-        `CameraChangeSource.MOMENTUM`. With momentum, `animation` sets only
-        `transition_id` and the end handler, which runs when the gesture
-        ends.
-
-        A delta in the begin phase, `MapHandle.cancel_camera_transitions()`,
-        or a cancellation by that ID stops the momentum. A later command that
-        sets a field stops only the parts of the momentum that move that
-        field. On a tilted map, the pan moves the map's content the same
-        distance on the screen in every direction.
 
         See `mln_map_apply_camera_delta` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

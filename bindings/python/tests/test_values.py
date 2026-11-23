@@ -248,3 +248,25 @@ def test_inputs_take_any_sequence_or_byte_buffer_and_require_their_subject(
     # The logical extent is the subject of a resize, which has no default.
     with pytest.raises(TypeError):
         typing.cast(typing.Any, map_handle).resize()
+
+
+def test_a_gesture_result_decodes_only_the_events_that_its_count_covers(
+    map_handle: mln.MapHandle,
+) -> None:
+    at = mln.ScreenPoint(x=30, y=16)
+    tap = mln.GestureTap(id=2, position=at)
+
+    def tap_at(
+        recognizer: mln.GestureRecognizerHandle, time_ms: float
+    ) -> tuple[mln.GestureEvent, ...]:
+        down = mln.GesturePointerDown(id=2, kind=mln.PointerKind.MOUSE, position=at)
+        recognizer.handle(mln.GestureInputPointerDownVariant(down), time_ms)
+        up = mln.GestureInputPointerUpVariant(mln.GesturePointer(id=2, position=at))
+        return recognizer.handle(up, time_ms + 50).events
+
+    with map_handle.gesture_recognizer_create() as recognizer:
+        assert tap_at(recognizer, 0) == (mln.GestureEventTapVariant(tap),)
+        assert tap_at(recognizer, 100) == (
+            mln.GestureEventTapVariant(tap),
+            mln.GestureEventDoubleTapVariant(tap),
+        )

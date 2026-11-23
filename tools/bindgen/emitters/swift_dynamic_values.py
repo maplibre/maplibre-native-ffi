@@ -37,7 +37,7 @@ def encode_throws(value):
         return encode_throws(value.element)
     if value.kind == "array":
         return (
-            value.ctype.kind != "array" and value.length and value.length.isdigit()
+            value.extent is None and value.length and value.length.isdigit()
         ) or encode_throws(value.element)
     return value.kind not in {"scalar", "enum", "native_pointer"} and dynamic(value)
 
@@ -79,9 +79,19 @@ def encode(values, value, source):
     if value.kind == "reference":
         return f"arena.store({encode(values, value.element, source)})"
     if value.kind == "array":
-        if value.ctype.kind == "array":
+        if value.counted_inline:
+            # The elements in use, then zeroed storage up to the extent.
+            native = value.element.native
+            throws = encode_throws(value.element)
+            items = f"{'try ' if throws else ''}{source}.map {{ {encode(values, value.element, '$0')} }}"
+            slots = ", ".join(
+                f"{i} < items.count ? items[{i}] : {native}()"
+                for i in range(value.extent)
+            )
+            return f"{'try ' if throws else ''}{{ () {'throws ' if throws else ''}-> ({', '.join([native] * value.extent)}) in let items = {items}; return ({slots}) }}()"
+        if value.extent is not None:
             # Swift's imported fixed C arrays use tuples rather than Array.
-            count = int(value.length)
+            count = value.extent
             return (
                 "("
                 + ", ".join(
@@ -197,7 +207,18 @@ def decode(values, value, source, context="raw"):
         )
         return f"try NativeInputArena.copyStrided({source}, count: {context}.{identifier(value.length)}, stride: {context}.{identifier(value.stride)}) {{ {item} }}"
     if value.kind == "array":
-        if value.ctype.kind == "array":
+        if value.counted_inline:
+            # The count selects the elements in use, never past the extent.
+            count = f"Int({context}.{identifier(value.length)})"
+            items = ", ".join(f"{source}.{i}" for i in range(value.extent))
+            element = values.public(value.element)
+            copied = decode(values, value.element, "$0", context)
+            return (
+                f"try {{ () throws -> [{element}] in guard {count} <= {value.extent} else "
+                '{ throw MaplibreError.invalidState("native count exceeds its array") }; '
+                f"return {'try ' if 'try ' in copied else ''}[{items}].prefix({count}).map {{ {copied} }} }}()"
+            )
+        if value.extent is not None:
             return (
                 "["
                 + ", ".join(
@@ -295,7 +316,11 @@ def declaration(values, value):
             decode_lines.append(f"    self.{local} = {decode(values, union, raw)}")
             encode_lines.append(union_encode(values, value, f, f"self.{local}"))
             continue
-        if f.value.kind == "array" and f.value.ctype.kind == "array":
+        if f.value.counted_inline:
+            encode_lines.append(
+                f'    guard self.{local}.count <= {f.value.extent} else {{ throw MaplibreError.invalidArgument("too many elements for a fixed array") }}'
+            )
+        elif f.value.extent is not None:
             encode_lines.append(
                 f'    guard self.{local}.count == {f.value.length} else {{ throw MaplibreError.invalidArgument("incorrect fixed array length") }}'
             )

@@ -113,7 +113,7 @@ public sealed class CompletionTests
         );
         Assert.Equal(Status.NotFound, failed.Status);
         Assert.NotEmpty(failed.Diagnostic);
-        Assert.True(failed.Generation > committed.Generation);
+        Assert.True(failed.Generation >= committed.Generation);
 
         var cancelled = await Assert.ThrowsAsync<MaplibreException>(DeliverCancelledCommand);
         Assert.Equal(Status.Cancelled, cancelled.Status);

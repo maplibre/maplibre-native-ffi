@@ -356,7 +356,9 @@ class KotlinLayoutTests(unittest.TestCase):
         values = emitted(kotlin, real_api())[f"{GENERATED}/GeneratedValues.kt"]
         self.assertIn("`MapHandle.cancelCameraTransitions()`", values)
         self.assertIn("`MapHandle.cancelCameraTransitionsWithId()`", values)
-        self.assertIn("`GesturePhase.BEGIN` or `GesturePhase.CANCEL`", values)
+        self.assertIn("For `MomentumDecayModel.FRICTION`.", values)
+        # A tag that only its union uses names the variant it selects.
+        self.assertIn("`GestureEvent.Notch`", values)
         self.assertNotIn("`mln_map_cancel_camera_transitions()`", values)
 
     def test_split_registrations_take_a_form_per_target(self):

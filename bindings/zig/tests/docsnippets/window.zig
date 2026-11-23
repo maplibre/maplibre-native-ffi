@@ -91,7 +91,8 @@ fn onDriverWorkWake(_: ?*anyopaque) anyerror!void {
 
 fn surfaceLost() !void {
     // #region lost-surface
-    try (try session.releaseTarget(null)).await(null);
+    // Only a borrowed ring's release completes with a sync.
+    _ = try (try session.releaseTarget(null)).await(null);
     // #endregion lost-surface
 }
 
@@ -102,7 +103,7 @@ fn surfaceRestored(display: ?*anyopaque, new_surface: ?*anyopaque) !void {
         .display = display,
         .surface = new_surface,
     } }, null);
-    try replaced.await(null);
+    _ = try replaced.await(null);
     // #endregion lost-surface
 }
 

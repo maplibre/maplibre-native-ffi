@@ -11,6 +11,10 @@ void onFrameWake() {}
 // The host's draw, which samples the image view.
 void drawMap(int imageView) {}
 
+// The host's wait for a GPU sync, as for an acquired frame's producer
+// sync.
+void waitForSync(GpuSync sync) {}
+
 void destroyTextures(List<int> images, List<int> views) {}
 
 void drawFrame() {
@@ -108,7 +112,9 @@ Future<void> renderToTexture(
     ),
   );
 
-  await session.setTarget(resized);
+  final sync = await session.setTarget(resized);
+  // Wait for its sync before you destroy the old textures.
+  if (sync != null) waitForSync(sync);
   // vkDestroyImageView and vkDestroyImage
   destroyTextures(images, views);
   // #endregion resize-borrowed

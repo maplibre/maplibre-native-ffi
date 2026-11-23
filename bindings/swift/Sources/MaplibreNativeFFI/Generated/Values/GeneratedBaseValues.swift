@@ -19,12 +19,19 @@ public struct RenderBackend: RawRepresentable, CustomStringConvertible,
   public static let vulkan: RenderBackend = .init(rawValue: 2)
   public static let openGl: RenderBackend = .init(rawValue: 3)
   public static let webGpu: RenderBackend = .init(rawValue: 4)
+  /// D3D12, on Windows. It compiles its shaders at run time with DXC, which
+  /// your app ships: `dxcompiler.dll`, 1.8.2502 or later, beside your app's
+  /// executable or in another directory of the DLL search path, which doesn't
+  /// take the library's own directory. Without it, the library renders on
+  /// another backend.
+  public static let d3d12: RenderBackend = .init(rawValue: 5)
   public var description: String {
     switch rawValue {
     case 1: return "metal"
     case 2: return "vulkan"
     case 3: return "openGl"
     case 4: return "webGpu"
+    case 5: return "d3d12"
     default: return "RenderBackend(\(rawValue))"
     }
   }
@@ -47,6 +54,7 @@ public struct RenderBackendFlag: OptionSet, NativeOpenValue, Equatable,
   public static let vulkan: RenderBackendFlag = .init(rawValue: 2)
   public static let openGl: RenderBackendFlag = .init(rawValue: 4)
   public static let webGpu: RenderBackendFlag = .init(rawValue: 8)
+  public static let d3d12: RenderBackendFlag = .init(rawValue: 16)
 }
 
 /// The result of a call or of asynchronous work.

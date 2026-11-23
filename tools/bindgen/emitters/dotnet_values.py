@@ -331,6 +331,12 @@ class Values:
                 raise Unsupported(f"{plan.native}: array needs a count expression")
             native = self.raw_type(plan.element)
             public = self.public_type(plan.element)
+            if plan.extent is not None:
+                # An inline array's elements start at the field itself.
+                expression = f"({native}*)&{expression}"
+            if plan.counted_inline:
+                # The count selects the elements in use, never past the extent.
+                length = f'(nuint)({length}) <= {plan.extent} ? {length} : throw new InvalidOperationException("Native count exceeds its array.")'
             if plan.element.kind == "scalar" and native == public:
                 return f"NativeCallScope.CopyArray<{native}>({expression}, (nuint)({length}))"
             element = self.copy(plan.element, "item")
@@ -935,12 +941,13 @@ class Values:
     def put(self, plan: ValuePlan, presence, field, expression: str) -> str | None:
         """One line that stores a present member and marks its bit.
 
-        A union or a counted buffer keeps its explicit branch.
+        A union, a counted buffer, or a native pointer, which no generic
+        argument can be, keeps its explicit branch.
         """
         value = field.value
         if (
             not self.mask_enum(plan, presence.mask)
-            or value.kind in {"union", "array", "callback"}
+            or value.kind in {"union", "array", "callback", "native_pointer"}
             or (value.kind == "buffer" and value.ctype.pointee)
         ):
             return None

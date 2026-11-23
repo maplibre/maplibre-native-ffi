@@ -13,38 +13,52 @@ def fly_ended(completed: bool) -> None:
 
 
 # #region gesture
-def begin_gesture(map_handle: mln.MapHandle) -> None:
-    map_handle.discarding.apply_camera_delta(
-        mln.CameraDelta(gesture_phase=mln.GesturePhase.BEGIN)
-    )
+def create_recognizer(
+    map_handle: mln.MapHandle,
+) -> mln.GestureRecognizerHandle:
+    return map_handle.gesture_recognizer_create()
 
 
-def apply_drag(
-    map_handle: mln.MapHandle, movement: mln.ScreenPoint
+def schedule_tick(result: mln.GestureResult) -> None:
+    pass  # On the next frame, or at result.next_tick_ms.
+
+
+def pointer_down(
+    recognizer: mln.GestureRecognizerHandle,
+    id: int,
+    position: mln.ScreenPoint,
+    time_ms: float,
 ) -> None:
-    map_handle.discarding.apply_camera_delta(
-        mln.CameraDelta(
-            offset=movement, gesture_phase=mln.GesturePhase.UPDATE
-        )
+    result = recognizer.handle(
+        mln.GestureInputPointerDownVariant(
+            mln.GesturePointerDown(
+                id=id, kind=mln.PointerKind.TOUCH, position=position
+            )
+        ),
+        time_ms,
     )
+    schedule_tick(result)
 
 
-def apply_pinch(
-    map_handle: mln.MapHandle, scale: float, center: mln.ScreenPoint
+def pointer_move(
+    recognizer: mln.GestureRecognizerHandle,
+    id: int,
+    position: mln.ScreenPoint,
+    time_ms: float,
 ) -> None:
-    map_handle.discarding.apply_camera_delta(
-        mln.CameraDelta(
-            scale=scale,
-            anchor=center,
-            gesture_phase=mln.GesturePhase.UPDATE,
-        )
+    result = recognizer.handle(
+        mln.GestureInputPointerMoveVariant(
+            mln.GesturePointer(id=id, position=position)
+        ),
+        time_ms,
     )
+    schedule_tick(result)
 
 
-def end_gesture(map_handle: mln.MapHandle) -> None:
-    map_handle.discarding.apply_camera_delta(
-        mln.CameraDelta(gesture_phase=mln.GesturePhase.END)
-    )
+def tick(
+    recognizer: mln.GestureRecognizerHandle, time_ms: float
+) -> None:
+    schedule_tick(recognizer.tick(time_ms))
 
 
 # #endregion gesture
@@ -115,10 +129,10 @@ def camera(map_handle: mln.MapHandle) -> None:
     )
     # #endregion limit
 
-    begin_gesture(map_handle)
-    apply_drag(map_handle, mln.ScreenPoint(x=12, y=-4))
-    apply_pinch(map_handle, 1.1, mln.ScreenPoint(x=200, y=150))
-    end_gesture(map_handle)
+    with create_recognizer(map_handle) as recognizer:
+        pointer_down(recognizer, 1, mln.ScreenPoint(x=100, y=100), 0)
+        pointer_move(recognizer, 1, mln.ScreenPoint(x=112, y=96), 16)
+        tick(recognizer, 32)
 
     # #region convert
     with mln.MapProjectionHandle.create(
