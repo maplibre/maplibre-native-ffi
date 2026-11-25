@@ -22,7 +22,7 @@ jobs:
       - uses: useblacksmith/checkout@75c49b6ed30ce59336e9252425796cfcfac155f8 # v1.8.3
         with:
           persist-credentials: false
-      - uses: useblacksmith/begin-testbox@22ff2ea5697369864347140857d218e42815b33c # v2
+      - uses: useblacksmith/begin-testbox@d5b883fecd6a7581c3f7467543b819abf8b80bbf # v2
         with:
           testbox_id: ${{ inputs.testbox_id }}
       # Matches the linux-gnu-arm64 target job. Covers the ARM64 GNU and musl
