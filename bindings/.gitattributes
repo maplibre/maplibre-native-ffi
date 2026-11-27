@@ -78,7 +78,6 @@
 /dotnet/src/Maplibre.NativeFfi/Map/LatLngBounds.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/LogicalExtent.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/LogicalSize.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Map/MapDebugFlag.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MapHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MapMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/MapOptions.g.cs linguist-generated=true
@@ -102,6 +101,7 @@
 /dotnet/src/Maplibre.NativeFfi/Map/ProjectionType.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/Quaternion.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ScreenPoint.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/TerrainSkirtLength.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/TileLodMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/UnitBezier.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/Vec3.g.cs linguist-generated=true
@@ -109,6 +109,7 @@
 /dotnet/src/Maplibre.NativeFfi/Map/ViewportMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Projection/MapProjectionCameraResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Projection/MapProjectionHandle.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Projection/MapProjectionTerrainElevationResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Projection/MaplibreNative.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/RenderedFeature.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Query/RenderedFeatureQueryOptions.g.cs linguist-generated=true
@@ -385,6 +386,7 @@
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedMapMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedMapRuntimeOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedProjectionGlobalsOperations.swift linguist-generated=true
+/swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedProjectionMapOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedProjectionMapProjectionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedQueryRenderSessionOperations.swift linguist-generated=true
 /swift/Sources/MaplibreNativeFFI/Generated/Operations/GeneratedRenderSessionAcquiredFrameOperations.swift linguist-generated=true

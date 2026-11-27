@@ -848,6 +848,8 @@ typedef struct {
  * @constrain_mode: constrain_mode
  * @viewport_mode: viewport_mode
  * @frustum_offset: frustum_offset
+ * @center_clamped_to_ground: center_clamped_to_ground
+ * @globe_free_bearing: globe_free_bearing
  *
  * A map's whole viewport.
  *
@@ -861,6 +863,8 @@ typedef struct {
   MaplibreNativeFfiConstrainMode constrain_mode;
   MaplibreNativeFfiViewportMode viewport_mode;
   MaplibreNativeFfiEdgeInsets frustum_offset;
+  gboolean center_clamped_to_ground;
+  gboolean globe_free_bearing;
 } MaplibreNativeFfiMapViewport;
 
 /**
@@ -1411,6 +1415,22 @@ typedef struct {
 } MaplibreNativeFfiMapProjectionCameraResult;
 
 /**
+ * MaplibreNativeFfiMapProjectionTerrainElevationResult:
+ * @has_elevation: Whether the map drew terrain at the coordinate.
+ * @elevation_meters: Meters above sea level, with the terrain's exaggeration. 0
+ *   without `has_elevation`.
+ *
+ * The height of the ground at a coordinate.
+ *
+ * See `mln_map_projection_terrain_elevation_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+ */
+typedef struct {
+  gboolean has_elevation;
+  gdouble elevation_meters;
+} MaplibreNativeFfiMapProjectionTerrainElevationResult;
+
+/**
  * MaplibreNativeFfiMapTileSettings:
  * @prefetch_zoom_delta: prefetch_zoom_delta
  * @lod_min_radius: lod_min_radius
@@ -1438,11 +1458,9 @@ typedef struct {
 
 /**
  * MaplibreNativeFfiMapSnapshot:
- * @debug_flags: debug_flags
  * @generation: Grows with each change to the map's state.
  * @fully_loaded: Whether the style and every resource that the view needs have
  *   loaded.
- * @rendering_stats_view_enabled: rendering_stats_view_enabled
  * @gesture_in_progress: Whether a gesture recognizer's gesture, or the glide
  *   and snap after it, moves the camera.
  * @transition_in_progress: transition_in_progress
@@ -1455,8 +1473,6 @@ typedef struct {
  * @view: view
  * @globe_rendering: Whether the map draws as a globe, alone or blending into
  *   Mercator.
- * @globe_free_bearing_enabled: The setting from
- *   `maplibre_native_ffi_map_set_globe_free_bearing_enabled_async()`.
  *
  * A map's state, as `maplibre_native_ffi_map_get_snapshot()` reads it.
  *
@@ -1464,10 +1480,8 @@ typedef struct {
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 typedef struct {
-  MaplibreNativeFfiMapDebugFlag debug_flags;
   guint64 generation;
   gboolean fully_loaded;
-  gboolean rendering_stats_view_enabled;
   gboolean gesture_in_progress;
   gboolean transition_in_progress;
   MaplibreNativeFfiRuntimeEventFlag event_mask;
@@ -1477,7 +1491,6 @@ typedef struct {
   MaplibreNativeFfiFreeCamera free_camera;
   MaplibreNativeFfiMapView view;
   gboolean globe_rendering;
-  gboolean globe_free_bearing_enabled;
 } MaplibreNativeFfiMapSnapshot;
 
 /**
@@ -11574,6 +11587,82 @@ void maplibre_native_ffi_map_options_set_local_ideographs_enabled(
   MaplibreNativeFfiMapOptions* self, gboolean value
 );
 
+/**
+ * MaplibreNativeFfiMapOptions:terrain-skirt-length: (setter set_terrain_skirt_length) (getter get_terrain_skirt_length)
+ *
+ * The terrain's skirts. Without it,
+ * `MAPLIBRE_NATIVE_FFI_TERRAIN_SKIRT_LENGTH_AUTO`.
+ */
+/**
+ * maplibre_native_ffi_map_options_get_terrain_skirt_length: (get-property terrain-skirt-length)
+ *
+ * Gets `MaplibreNativeFfiMapOptions:terrain-skirt-length`.
+ *
+ * Returns: the value
+ */
+MaplibreNativeFfiTerrainSkirtLength
+maplibre_native_ffi_map_options_get_terrain_skirt_length(
+  MaplibreNativeFfiMapOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_options_has_terrain_skirt_length:
+ *
+ * Whether `MaplibreNativeFfiMapOptions:terrain-skirt-length` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_map_options_has_terrain_skirt_length(
+  MaplibreNativeFfiMapOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_options_set_terrain_skirt_length: (set-property terrain-skirt-length)
+ *
+ * Sets `MaplibreNativeFfiMapOptions:terrain-skirt-length`.
+ */
+void maplibre_native_ffi_map_options_set_terrain_skirt_length(
+  MaplibreNativeFfiMapOptions* self, MaplibreNativeFfiTerrainSkirtLength value
+);
+
+/**
+ * MaplibreNativeFfiMapOptions:terrain-drape-memory-limit: (setter set_terrain_drape_memory_limit) (getter get_terrain_drape_memory_limit)
+ *
+ * The most GPU memory, in bytes, for the layers drawn over the terrain. Past
+ * it, the terrain farthest from the center of the view looks blurrier. Without
+ * it, there's no limit.
+ */
+/**
+ * maplibre_native_ffi_map_options_get_terrain_drape_memory_limit: (get-property terrain-drape-memory-limit)
+ *
+ * Gets `MaplibreNativeFfiMapOptions:terrain-drape-memory-limit`.
+ *
+ * Returns: the value
+ */
+guint64 maplibre_native_ffi_map_options_get_terrain_drape_memory_limit(
+  MaplibreNativeFfiMapOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_options_has_terrain_drape_memory_limit:
+ *
+ * Whether `MaplibreNativeFfiMapOptions:terrain-drape-memory-limit` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_map_options_has_terrain_drape_memory_limit(
+  MaplibreNativeFfiMapOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_options_set_terrain_drape_memory_limit: (set-property terrain-drape-memory-limit)
+ *
+ * Sets `MaplibreNativeFfiMapOptions:terrain-drape-memory-limit`.
+ */
+void maplibre_native_ffi_map_options_set_terrain_drape_memory_limit(
+  MaplibreNativeFfiMapOptions* self, guint64 value
+);
+
 GType maplibre_native_ffi_map_projection_camera_result_get_type(
   void
 ) G_GNUC_CONST;
@@ -11605,6 +11694,39 @@ void maplibre_native_ffi_map_projection_camera_result_free(
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(
   MaplibreNativeFfiMapProjectionCameraResult,
   maplibre_native_ffi_map_projection_camera_result_free
+)
+
+GType maplibre_native_ffi_map_projection_terrain_elevation_result_get_type(
+  void
+) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_PROJECTION_TERRAIN_ELEVATION_RESULT \
+  (maplibre_native_ffi_map_projection_terrain_elevation_result_get_type())
+
+/**
+ * maplibre_native_ffi_map_projection_terrain_elevation_result_copy:
+ *
+ * Copies the value.
+ *
+ * Returns: (transfer full): the copy
+ */
+MaplibreNativeFfiMapProjectionTerrainElevationResult*
+maplibre_native_ffi_map_projection_terrain_elevation_result_copy(
+  const MaplibreNativeFfiMapProjectionTerrainElevationResult* self
+);
+
+/**
+ * maplibre_native_ffi_map_projection_terrain_elevation_result_free:
+ * @self: (transfer full) (nullable): the value
+ *
+ * Frees the value.
+ */
+void maplibre_native_ffi_map_projection_terrain_elevation_result_free(
+  MaplibreNativeFfiMapProjectionTerrainElevationResult* self
+);
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC(
+  MaplibreNativeFfiMapProjectionTerrainElevationResult,
+  maplibre_native_ffi_map_projection_terrain_elevation_result_free
 )
 
 GType maplibre_native_ffi_map_tile_settings_get_type(void) G_GNUC_CONST;
@@ -12074,6 +12196,80 @@ gboolean maplibre_native_ffi_map_viewport_options_has_frustum_offset(
 void maplibre_native_ffi_map_viewport_options_set_frustum_offset(
   MaplibreNativeFfiMapViewportOptions* self,
   const MaplibreNativeFfiEdgeInsets* value
+);
+
+/**
+ * MaplibreNativeFfiMapViewportOptions:center-clamped-to-ground: (setter set_center_clamped_to_ground) (getter get_center_clamped_to_ground)
+ *
+ * Whether the camera's center stands on the terrain, in place of the center
+ * altitude it's given, the style's included. On by default.
+ */
+/**
+ * maplibre_native_ffi_map_viewport_options_get_center_clamped_to_ground: (get-property center-clamped-to-ground)
+ *
+ * Gets `MaplibreNativeFfiMapViewportOptions:center-clamped-to-ground`.
+ *
+ * Returns: the value
+ */
+gboolean maplibre_native_ffi_map_viewport_options_get_center_clamped_to_ground(
+  MaplibreNativeFfiMapViewportOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_viewport_options_has_center_clamped_to_ground:
+ *
+ * Whether `MaplibreNativeFfiMapViewportOptions:center-clamped-to-ground` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_map_viewport_options_has_center_clamped_to_ground(
+  MaplibreNativeFfiMapViewportOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_viewport_options_set_center_clamped_to_ground: (set-property center-clamped-to-ground)
+ *
+ * Sets `MaplibreNativeFfiMapViewportOptions:center-clamped-to-ground`.
+ */
+void maplibre_native_ffi_map_viewport_options_set_center_clamped_to_ground(
+  MaplibreNativeFfiMapViewportOptions* self, gboolean value
+);
+
+/**
+ * MaplibreNativeFfiMapViewportOptions:globe-free-bearing: (setter set_globe_free_bearing) (getter get_globe_free_bearing)
+ *
+ * Whether drags and zooms on a globe turn the bearing to keep the planet's
+ * orientation, which lets a drag carry the camera over a pole. Off by default.
+ */
+/**
+ * maplibre_native_ffi_map_viewport_options_get_globe_free_bearing: (get-property globe-free-bearing)
+ *
+ * Gets `MaplibreNativeFfiMapViewportOptions:globe-free-bearing`.
+ *
+ * Returns: the value
+ */
+gboolean maplibre_native_ffi_map_viewport_options_get_globe_free_bearing(
+  MaplibreNativeFfiMapViewportOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_viewport_options_has_globe_free_bearing:
+ *
+ * Whether `MaplibreNativeFfiMapViewportOptions:globe-free-bearing` is set.
+ *
+ * Returns: whether the member is set
+ */
+gboolean maplibre_native_ffi_map_viewport_options_has_globe_free_bearing(
+  MaplibreNativeFfiMapViewportOptions* self
+);
+
+/**
+ * maplibre_native_ffi_map_viewport_options_set_globe_free_bearing: (set-property globe-free-bearing)
+ *
+ * Sets `MaplibreNativeFfiMapViewportOptions:globe-free-bearing`.
+ */
+void maplibre_native_ffi_map_viewport_options_set_globe_free_bearing(
+  MaplibreNativeFfiMapViewportOptions* self, gboolean value
 );
 
 /**
@@ -15567,6 +15763,12 @@ void maplibre_native_ffi_web_gpu_borrowed_textures_target_set_depth_format(
  * WebGPU build asks the browser for a device, and attaches once it has one. For
  * an OpenGL device that wraps your WebGL2 context, the canvas must be the
  * context's own.
+ *
+ * When the browser loses a WebGPU session's device, the session fails with
+ * `MAPLIBRE_NATIVE_FFI_ERROR_TARGET_LOST`, and once you release it, you can
+ * attach a new session to the canvas. After Chromium's GPU process restarts,
+ * though, an `OffscreenCanvas` in a Web Worker shows no new frames, and the
+ * worker gets no more animation frames: the page has to load again.
  *
  * See `mln_web_canvas_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

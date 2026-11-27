@@ -2,7 +2,6 @@
 package org.maplibre.nativeffi
 
 import kotlin.jvm.JvmName
-import kotlin.jvm.JvmStatic
 import org.maplibre.nativeffi.internal.JvmSynthetic
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.call.*
@@ -48,6 +47,26 @@ private constructor(
       val out = sized(w(104, 104, 100), w(8, 8, 4))
       check(C.mln_map_projection_get_camera(handle, out, diagnostic))
       readMapProjectionCameraResult(out)
+    }
+
+  /**
+   * Reads the height of the terrain that the map drew at a coordinate.
+   *
+   * See `mln_map_projection_get_terrain_elevation` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  public fun getTerrainElevation(coordinate: LatLng): MapProjectionTerrainElevationResult =
+    nativeCall(this, binding) {
+      val out = sized(16, w(8, 8, 4))
+      check(
+        C.mln_map_projection_get_terrain_elevation(
+          handle,
+          writeLatLng(coordinate),
+          out,
+          diagnostic,
+        ),
+      )
+      readMapProjectionTerrainElevationResult(out)
     }
 
   /**
@@ -229,30 +248,7 @@ private constructor(
   override fun toString(): String =
     "MapProjectionHandle(id=0x${binding.handle.toString(16)}, closed=$isClosed)"
 
-  public companion object {
-    /**
-     * Creates a projection that converts coordinates for one view of a map.
-     *
-     * Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`. The projection
-     * doesn't follow the map, so create a new one after the map's camera, size, or style projection
-     * changes.
-     *
-     * See `mln_map_projection_create` in the
-     * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-     *
-     * Errors:
-     *
-     * - `Status.UNSUPPORTED` when the view's style projection draws a globe and the library can't
-     *   project one.
-     */
-    @JvmStatic
-    public fun create(view: MapView): MapProjectionHandle =
-      nativeCall(null, null) {
-        val out = allocate(8, w(8, 8, 4))
-        check(C.mln_map_projection_create(writeMapView(view), out, diagnostic))
-        adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle.wrap(it) }
-      }
-
+  internal companion object {
     /** Creates the owner of `handle`. */
     @JvmSynthetic internal fun wrap(handle: Long): MapProjectionHandle = MapProjectionHandle(handle)
   }

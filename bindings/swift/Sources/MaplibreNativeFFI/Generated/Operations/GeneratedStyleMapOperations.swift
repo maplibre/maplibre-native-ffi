@@ -1095,10 +1095,10 @@ public extension MapHandle {
   /// Sets a property of a layer in the map's style.
   ///
   /// `propertyName` is one of the layer's layout or paint
-  /// \[properties\](https://maplibre.org/maplibre-style-spec/layers/), or
-  /// `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null
-  /// `value` resets any of these but `source` and `source-layer` to its
-  /// default.
+  /// \[properties\](https://maplibre.org/maplibre-style-spec/layers/),
+  /// `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`, or an
+  /// extension's member, named `<namespace>:<name>`. A null `value` resets any
+  /// of these but `source` and `source-layer` to its default.
   ///
   /// See `mln_map_set_style_layer_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1156,8 +1156,9 @@ public extension MapHandle {
   /// without reloading the style.
   ///
   /// `propertyName` is a root property other than `sources` and `layers`, which
-  /// the source and layer calls change. A null `value` resets the property to
-  /// its default, as if the style didn't set it.
+  /// the source and layer calls change, or an extension's member, named
+  /// `<namespace>:<name>`. A null `value` resets the property to its default,
+  /// as if the style didn't set it.
   ///
   /// See `mln_map_set_style_root_property` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

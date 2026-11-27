@@ -112,9 +112,7 @@ import Testing
 
 @Test func synchronousCallsFillCallerSizedOutputsInInputOrder() async throws {
   try await withMapFixture { fixture in
-    let projection = try MapProjectionHandle.create(
-      view: fixture.map.getSnapshot().view
-    )
+    let projection = try fixture.map.projectionCreate()
     defer { projection.release() }
     let coordinates = [
       LatLng(latitude: 0, longitude: 0),

@@ -1117,27 +1117,6 @@ public struct LogicalSize: Equatable, Hashable, Sendable {
   }
 }
 
-/// A debug overlay that the map draws.
-///
-/// See `mln_map_debug_flag` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct MapDebugFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
-  Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let tileBorders: MapDebugFlag = .init(rawValue: 2)
-  public static let parseStatus: MapDebugFlag = .init(rawValue: 4)
-  public static let timestamps: MapDebugFlag = .init(rawValue: 8)
-  public static let collision: MapDebugFlag = .init(rawValue: 16)
-  public static let overdraw: MapDebugFlag = .init(rawValue: 32)
-  public static let stencilClip: MapDebugFlag = .init(rawValue: 64)
-  public static let depthBuffer: MapDebugFlag = .init(rawValue: 128)
-}
-
 /// When a map renders.
 ///
 /// See `mln_map_mode` in the
@@ -1205,6 +1184,12 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   /// (`fallback_font_faces`, then the system's) before glyph PBFs, rather than
   /// from a glyph PBF downloaded for every few characters. Without it, they do.
   public var localIdeographsEnabled: Bool?
+  /// The terrain's skirts. Without it, `TerrainSkirtLength.auto`.
+  public var terrainSkirtLength: TerrainSkirtLength?
+  /// The most GPU memory, in bytes, for the layers drawn over the terrain. Past
+  /// it, the terrain farthest from the center of the view looks blurrier.
+  /// Without it, there's no limit.
+  public var terrainDrapeMemoryLimit: UInt64?
   public init(
     initialExtent: LogicalExtent,
     mapMode: MapMode = .init(rawValue: 0),
@@ -1213,7 +1198,9 @@ public struct MapOptions: Equatable, Hashable, Sendable {
     tileCacheEnabled: Bool? = nil,
     fallbackFontFaces: String = "",
     systemFontsEnabled: Bool? = nil,
-    localIdeographsEnabled: Bool? = nil
+    localIdeographsEnabled: Bool? = nil,
+    terrainSkirtLength: TerrainSkirtLength? = nil,
+    terrainDrapeMemoryLimit: UInt64? = nil
   ) {
     self.initialExtent = initialExtent
     self.mapMode = mapMode
@@ -1223,6 +1210,8 @@ public struct MapOptions: Equatable, Hashable, Sendable {
     self.fallbackFontFaces = fallbackFontFaces
     self.systemFontsEnabled = systemFontsEnabled
     self.localIdeographsEnabled = localIdeographsEnabled
+    self.terrainSkirtLength = terrainSkirtLength
+    self.terrainDrapeMemoryLimit = terrainDrapeMemoryLimit
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_map_options {
@@ -1249,6 +1238,15 @@ public struct MapOptions: Equatable, Hashable, Sendable {
       raw.fields |= MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED.rawValue; raw
         .local_ideographs_enabled = item
     }
+    if let item = terrainSkirtLength {
+      raw.fields |= MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH.rawValue; raw
+        .terrain_skirt_length = mln_terrain_skirt_length(rawValue: item
+          .rawValue)
+    }
+    if let item = terrainDrapeMemoryLimit {
+      raw.fields |= MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT.rawValue; raw
+        .terrain_drape_memory_limit = item
+    }
     return raw
   }
 }
@@ -1258,12 +1256,10 @@ public struct MapOptions: Equatable, Hashable, Sendable {
 /// See `mln_map_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapSnapshot: Equatable, Hashable, Sendable {
-  public var debugFlags: MapDebugFlag
   /// Grows with each change to the map's state.
   public var generation: UInt64
   /// Whether the style and every resource that the view needs have loaded.
   public var fullyLoaded: Bool
-  public var renderingStatsViewEnabled: Bool
   /// Whether a gesture recognizer's gesture, or the glide and snap after it,
   /// moves the camera.
   public var gestureInProgress: Bool
@@ -1277,13 +1273,9 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   public var view: MapView
   /// Whether the map draws as a globe, alone or blending into Mercator.
   public var globeRendering: Bool
-  /// The setting from `MapHandle.setGlobeFreeBearingEnabled()`.
-  public var globeFreeBearingEnabled: Bool
   public init(
-    debugFlags: MapDebugFlag = .init(rawValue: 0),
     generation: UInt64 = 0,
     fullyLoaded: Bool = false,
-    renderingStatsViewEnabled: Bool = false,
     gestureInProgress: Bool = false,
     transitionInProgress: Bool = false,
     eventMask: RuntimeEventFlag = .init(rawValue: 0),
@@ -1292,13 +1284,10 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     bounds: CameraBounds = .init(),
     freeCamera: FreeCamera = .init(),
     view: MapView = .init(),
-    globeRendering: Bool = false,
-    globeFreeBearingEnabled: Bool = false
+    globeRendering: Bool = false
   ) {
-    self.debugFlags = debugFlags
     self.generation = generation
     self.fullyLoaded = fullyLoaded
-    self.renderingStatsViewEnabled = renderingStatsViewEnabled
     self.gestureInProgress = gestureInProgress
     self.transitionInProgress = transitionInProgress
     self.eventMask = eventMask
@@ -1308,14 +1297,11 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     self.freeCamera = freeCamera
     self.view = view
     self.globeRendering = globeRendering
-    self.globeFreeBearingEnabled = globeFreeBearingEnabled
   }
 
   init(raw: mln_map_snapshot) {
-    debugFlags = MapDebugFlag(rawValue: raw.debug_flags)
     generation = raw.generation
     fullyLoaded = raw.fully_loaded
-    renderingStatsViewEnabled = raw.rendering_stats_view_enabled
     gestureInProgress = raw.gesture_in_progress
     transitionInProgress = raw.transition_in_progress
     eventMask = RuntimeEventFlag(rawValue: raw.event_mask)
@@ -1325,7 +1311,6 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
     freeCamera = FreeCamera(raw: raw.free_camera)
     view = MapView(raw: raw.view)
     globeRendering = raw.globe_rendering
-    globeFreeBearingEnabled = raw.globe_free_bearing_enabled
   }
 }
 
@@ -1509,16 +1494,22 @@ public struct MapViewport: Equatable, Hashable, Sendable {
   public var constrainMode: ConstrainMode
   public var viewportMode: ViewportMode
   public var frustumOffset: EdgeInsets
+  public var centerClampedToGround: Bool
+  public var globeFreeBearing: Bool
   public init(
     northOrientation: NorthOrientation = .init(rawValue: 0),
     constrainMode: ConstrainMode = .init(rawValue: 0),
     viewportMode: ViewportMode = .init(rawValue: 0),
-    frustumOffset: EdgeInsets = .init()
+    frustumOffset: EdgeInsets = .init(),
+    centerClampedToGround: Bool = false,
+    globeFreeBearing: Bool = false
   ) {
     self.northOrientation = northOrientation
     self.constrainMode = constrainMode
     self.viewportMode = viewportMode
     self.frustumOffset = frustumOffset
+    self.centerClampedToGround = centerClampedToGround
+    self.globeFreeBearing = globeFreeBearing
   }
 
   init(raw: mln_map_viewport) {
@@ -1527,6 +1518,8 @@ public struct MapViewport: Equatable, Hashable, Sendable {
     constrainMode = ConstrainMode(rawValue: raw.constrain_mode.rawValue)
     viewportMode = ViewportMode(rawValue: raw.viewport_mode.rawValue)
     frustumOffset = EdgeInsets(raw: raw.frustum_offset)
+    centerClampedToGround = raw.center_clamped_to_ground
+    globeFreeBearing = raw.globe_free_bearing
   }
 
   func nativeValue() -> mln_map_viewport {
@@ -1537,6 +1530,8 @@ public struct MapViewport: Equatable, Hashable, Sendable {
     raw.constrain_mode = mln_constrain_mode(rawValue: constrainMode.rawValue)
     raw.viewport_mode = mln_viewport_mode(rawValue: viewportMode.rawValue)
     raw.frustum_offset = frustumOffset.nativeValue()
+    raw.center_clamped_to_ground = centerClampedToGround
+    raw.globe_free_bearing = globeFreeBearing
     return raw
   }
 }
@@ -1550,16 +1545,27 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
   public var constrainMode: ConstrainMode?
   public var viewportMode: ViewportMode?
   public var frustumOffset: EdgeInsets?
+  /// Whether the camera's center stands on the terrain, in place of the center
+  /// altitude it's given, the style's included. On by default.
+  public var centerClampedToGround: Bool?
+  /// Whether drags and zooms on a globe turn the bearing to keep the planet's
+  /// orientation, which lets a drag carry the camera over a pole. Off by
+  /// default.
+  public var globeFreeBearing: Bool?
   public init(
     northOrientation: NorthOrientation? = nil,
     constrainMode: ConstrainMode? = nil,
     viewportMode: ViewportMode? = nil,
-    frustumOffset: EdgeInsets? = nil
+    frustumOffset: EdgeInsets? = nil,
+    centerClampedToGround: Bool? = nil,
+    globeFreeBearing: Bool? = nil
   ) {
     self.northOrientation = northOrientation
     self.constrainMode = constrainMode
     self.viewportMode = viewportMode
     self.frustumOffset = frustumOffset
+    self.centerClampedToGround = centerClampedToGround
+    self.globeFreeBearing = globeFreeBearing
   }
 
   init(raw: mln_map_viewport_options) {
@@ -1573,6 +1579,11 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
       .rawValue != 0 ? ViewportMode(rawValue: raw.viewport_mode.rawValue) : nil
     frustumOffset = raw.fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET
       .rawValue != 0 ? EdgeInsets(raw: raw.frustum_offset) : nil
+    centerClampedToGround = raw
+      .fields & MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND
+      .rawValue != 0 ? raw.center_clamped_to_ground : nil
+    globeFreeBearing = raw.fields & MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING
+      .rawValue != 0 ? raw.globe_free_bearing : nil
   }
 
   func nativeValue() -> mln_map_viewport_options {
@@ -1594,6 +1605,14 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
     if let item = frustumOffset {
       raw.fields |= MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET.rawValue; raw
         .frustum_offset = item.nativeValue()
+    }
+    if let item = centerClampedToGround {
+      raw.fields |= MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND
+        .rawValue; raw.center_clamped_to_ground = item
+    }
+    if let item = globeFreeBearing {
+      raw.fields |= MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING.rawValue; raw
+        .globe_free_bearing = item
     }
     return raw
   }
@@ -2135,6 +2154,31 @@ public struct ScreenPoint: Equatable, Hashable, Sendable {
     raw.x = x
     raw.y = y
     return raw
+  }
+}
+
+/// How far the skirts that hide the cracks between terrain tiles reach down.
+///
+/// See `mln_terrain_skirt_length` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct TerrainSkirtLength: RawRepresentable, CustomStringConvertible,
+  NativeOpenValue, Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// Far enough to hide the cracks.
+  public static let auto: TerrainSkirtLength = .init(rawValue: 0)
+  /// No skirts, so they don't show through translucent layers over the terrain.
+  public static let none: TerrainSkirtLength = .init(rawValue: 1)
+  public var description: String {
+    switch rawValue {
+    case 0: return "auto"
+    case 1: return "none"
+    default: return "TerrainSkirtLength(\(rawValue))"
+    }
   }
 }
 

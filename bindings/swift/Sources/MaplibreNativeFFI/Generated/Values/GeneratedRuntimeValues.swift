@@ -1651,6 +1651,10 @@ public struct RuntimeEventType: RawRepresentable, CustomStringConvertible,
   /// The map rendered a complete frame and has nothing left to load, animate,
   /// or redraw.
   public static let mapIdle: RuntimeEventType = .init(rawValue: 8)
+  /// Rendering a frame failed on the GPU, as when the device runs out of memory
+  /// or the driver rejects a shader. The frame shows what did render. A map in
+  /// `MapMode.continuous` raises it once for a run of failed frames, and
+  /// renders again shortly in case the failure passes.
   public static let mapRenderError: RuntimeEventType = .init(rawValue: 9)
   public static let mapRenderFrameStarted: RuntimeEventType =
     .init(rawValue: 10)

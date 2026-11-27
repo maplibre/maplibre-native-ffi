@@ -1283,6 +1283,27 @@ pub const Map = struct {
         return call.submit("mln_map_move_style_layer", .handle, self, call.command, null, diagnostic, .{ layer_id, before_layer_id });
     }
 
+    /// Creates a projection that converts coordinates as a map does, for one view
+    /// of it.
+    ///
+    /// `view` is the view to convert for, such as a frame result's, or null for the
+    /// map's current view. Over terrain, coordinates convert on the ground that the
+    /// map drew. The projection doesn't follow the map, so create a new one after
+    /// the map's view or terrain changes.
+    ///
+    /// See `mln_map_projection_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    ///
+    /// Errors:
+    ///
+    /// - `error.InvalidState` until `Runtime.createMap()` completes with
+    ///   `Status.ok`.
+    /// - `error.Unsupported` when the view's style projection draws a globe and the
+    ///   library can't project one.
+    pub fn projectionCreate(self: Map, view: ?MapView, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
+        return call.invoke("mln_map_projection_create", .handle, self, null, diagnostic, .{ view, call.adopt(MapProjection) });
+    }
+
     /// Releases the map.
     ///
     /// Detach the map's render session first.
@@ -1379,7 +1400,7 @@ pub const Map = struct {
     ///
     /// - `error.Cancelled` when the map is released before the image is done.
     /// - `error.NativeError` when the style or a resource that the image needs
-    ///   fails to load.
+    ///   fails to load, or rendering the image fails on the GPU.
     pub fn requestStillImage(self: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
         return call.submit("mln_map_request_still_image", .handle, self, call.unit, null, diagnostic, .{});
     }
@@ -1479,16 +1500,6 @@ pub const Map = struct {
     ///   vector source.
     pub fn setCustomVectorSourceTileError(self: Map, source_id: []const u8, tile_id: CanonicalTileId, message: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
         return call.submit("mln_map_set_custom_vector_source_tile_error", .handle, self, call.command, null, diagnostic, .{ source_id, tile_id, message });
-    }
-
-    /// Draws debugging overlays, such as tile borders, on the map.
-    ///
-    /// `flags` replaces the overlays set before.
-    ///
-    /// See `mln_map_set_debug_flags` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn setDebugFlags(self: Map, flags: MapDebugFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_debug_flags", .handle, self, call.command, null, diagnostic, .{flags});
     }
 
     /// Selects the events that the map reports.
@@ -1609,20 +1620,6 @@ pub const Map = struct {
         return call.submit("mln_map_set_global_state_property", .handle, self, call.command, null, diagnostic, .{ property_name, value });
     }
 
-    /// Sets whether drags and zooms on a globe turn the bearing.
-    ///
-    /// When it's on, a drag or a zoom around a point on the globe turns the bearing
-    /// so the planet keeps its orientation, and a drag can carry the camera over a
-    /// pole. When it's off, the default, they keep the bearing, as MapLibre GL JS
-    /// does. Turn it on for a map whose users can rotate it. It changes nothing
-    /// while the map draws Mercator.
-    ///
-    /// See `mln_map_set_globe_free_bearing_enabled` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn setGlobeFreeBearingEnabled(self: Map, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_globe_free_bearing_enabled", .handle, self, call.command, null, diagnostic, .{enabled});
-    }
-
     /// Moves the image of an image source.
     ///
     /// `coordinates` are the image's four corners, clockwise from the top left.
@@ -1684,14 +1681,6 @@ pub const Map = struct {
         return call.submit("mln_map_set_projection_mode", .handle, self, call.command, null, diagnostic, .{options});
     }
 
-    /// Shows or hides an overlay of rendering statistics on the map.
-    ///
-    /// See `mln_map_set_rendering_stats_view_enabled` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn setRenderingStatsViewEnabled(self: Map, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-        return call.submit("mln_map_set_rendering_stats_view_enabled", .handle, self, call.command, null, diagnostic, .{enabled});
-    }
-
     /// Adds an image to the map's style, or replaces the image named `image_id`.
     ///
     /// See `mln_map_set_style_image` in the
@@ -1725,9 +1714,10 @@ pub const Map = struct {
     /// Sets a property of a layer in the map's style.
     ///
     /// `property_name` is one of the layer's layout or paint
-    /// \[properties\](https://maplibre.org/maplibre-style-spec/layers/), or
-    /// `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null `value`
-    /// resets any of these but `source` and `source-layer` to its default.
+    /// \[properties\](https://maplibre.org/maplibre-style-spec/layers/), `filter`,
+    /// `minzoom`, `maxzoom`, `source`, or `source-layer`, or an extension's member,
+    /// named `<namespace>:<name>`. A null `value` resets any of these but `source`
+    /// and `source-layer` to its default.
     ///
     /// See `mln_map_set_style_layer_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1759,8 +1749,9 @@ pub const Map = struct {
     /// reloading the style.
     ///
     /// `property_name` is a root property other than `sources` and `layers`, which
-    /// the source and layer calls change. A null `value` resets the property to its
-    /// default, as if the style didn't set it.
+    /// the source and layer calls change, or an extension's member, named
+    /// `<namespace>:<name>`. A null `value` resets the property to its default, as
+    /// if the style didn't set it.
     ///
     /// See `mln_map_set_style_root_property` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1884,29 +1875,20 @@ pub const MapProjection = struct {
     pub const isClosed = methods.isClosed;
     pub const format = methods.format;
     pub const deinit = methods.deinit;
-    /// Creates a projection that converts coordinates for one view of a map.
-    ///
-    /// Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`. The
-    /// projection doesn't follow the map, so create a new one after the map's
-    /// camera, size, or style projection changes.
-    ///
-    /// See `mln_map_projection_create` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-    ///
-    /// Errors:
-    ///
-    /// - `error.Unsupported` when the view's style projection draws a globe and the
-    ///   library can't project one.
-    pub fn create(view: MapView, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
-        return call.invoke("mln_map_projection_create", .none, {}, null, diagnostic, .{ view, call.adopt(MapProjection) });
-    }
-
     /// Reads the projection's camera.
     ///
     /// See `mln_map_projection_get_camera` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
     pub fn getCamera(self: MapProjection, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjectionCameraResult {
         return call.invoke("mln_map_projection_get_camera", .handle, self, null, diagnostic, .{call.sizedOut(MapProjectionCameraResult)});
+    }
+
+    /// Reads the height of the terrain that the map drew at a coordinate.
+    ///
+    /// See `mln_map_projection_get_terrain_elevation` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    pub fn getTerrainElevation(self: MapProjection, coordinate: LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjectionTerrainElevationResult {
+        return call.invoke("mln_map_projection_get_terrain_elevation", .handle, self, null, diagnostic, .{ coordinate, call.sizedOut(MapProjectionTerrainElevationResult) });
     }
 
     /// Reports whether the globe hides a coordinate from the camera.
@@ -6319,25 +6301,6 @@ pub const LogicalSize = struct {
     }
 };
 
-/// A debug overlay that the map draws.
-///
-/// See `mln_map_debug_flag` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const MapDebugFlag = struct {
-    tile_borders: bool = false,
-    parse_status: bool = false,
-    timestamps: bool = false,
-    collision: bool = false,
-    overdraw: bool = false,
-    stencil_clip: bool = false,
-    depth_buffer: bool = false,
-    unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 2, 4, 8, 16, 32, 64, 128 };
-    const methods = marshal.FlagMethods(@This());
-    pub const fromNative = methods.fromNative;
-    pub const toNative = methods.toNative;
-};
-
 /// Why a map failed to load a style.
 ///
 /// See `mln_map_load_error` in the
@@ -6409,6 +6372,12 @@ pub const MapOptions = struct {
     /// than from a glyph PBF downloaded for every few characters. Without it,
     /// they do.
     local_ideographs_enabled: ?bool = null,
+    /// The terrain's skirts. Without it, `TerrainSkirtLength.auto`.
+    terrain_skirt_length: ?TerrainSkirtLength = null,
+    /// The most GPU memory, in bytes, for the layers drawn over the terrain.
+    /// Past it, the terrain farthest from the center of the view looks
+    /// blurrier. Without it, there's no limit.
+    terrain_drape_memory_limit: ?u64 = null,
     pub fn toNative(self: MapOptions) status.Error!c.mln_map_options {
         var raw = std.mem.zeroes(c.mln_map_options);
         raw.fields = 0;
@@ -6421,6 +6390,8 @@ pub const MapOptions = struct {
         raw.fallback_font_faces = marshal.view(self.fallback_font_faces);
         marshal.present(&raw.fields, c.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED, &raw.system_fonts_enabled, self.system_fonts_enabled);
         marshal.present(&raw.fields, c.MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED, &raw.local_ideographs_enabled, self.local_ideographs_enabled);
+        marshal.present(&raw.fields, c.MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH, &raw.terrain_skirt_length, self.terrain_skirt_length);
+        marshal.present(&raw.fields, c.MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT, &raw.terrain_drape_memory_limit, self.terrain_drape_memory_limit);
         return raw;
     }
 
@@ -6434,6 +6405,8 @@ pub const MapOptions = struct {
             .fallback_font_faces = try marshal.copyView(allocator, raw.fallback_font_faces),
             .system_fonts_enabled = if (raw.fields & c.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED != 0) raw.system_fonts_enabled else null,
             .local_ideographs_enabled = if (raw.fields & c.MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED != 0) raw.local_ideographs_enabled else null,
+            .terrain_skirt_length = if (raw.fields & c.MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH != 0) TerrainSkirtLength.fromNative(raw.terrain_skirt_length) else null,
+            .terrain_drape_memory_limit = if (raw.fields & c.MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT != 0) raw.terrain_drape_memory_limit else null,
         };
     }
 };
@@ -6451,17 +6424,33 @@ pub const MapProjectionCameraResult = struct {
     }
 };
 
+/// The height of the ground at a coordinate.
+///
+/// See `mln_map_projection_terrain_elevation_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub const MapProjectionTerrainElevationResult = struct {
+    /// Whether the map drew terrain at the coordinate.
+    has_elevation: bool = false,
+    /// Meters above sea level, with the terrain's exaggeration. 0 without
+    /// `has_elevation`.
+    elevation_meters: f64 = 0,
+    pub fn fromNative(raw: c.mln_map_projection_terrain_elevation_result) MapProjectionTerrainElevationResult {
+        return .{
+            .has_elevation = raw.has_elevation,
+            .elevation_meters = raw.elevation_meters,
+        };
+    }
+};
+
 /// A map's state, as `Map.getSnapshot()` reads it.
 ///
 /// See `mln_map_snapshot` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapSnapshot = struct {
-    debug_flags: MapDebugFlag = .{},
     /// Grows with each change to the map's state.
     generation: u64 = 0,
     /// Whether the style and every resource that the view needs have loaded.
     fully_loaded: bool = false,
-    rendering_stats_view_enabled: bool = false,
     /// Whether a gesture recognizer's gesture, or the glide and snap after it,
     /// moves the camera.
     gesture_in_progress: bool = false,
@@ -6475,14 +6464,10 @@ pub const MapSnapshot = struct {
     view: MapView = .{},
     /// Whether the map draws as a globe, alone or blending into Mercator.
     globe_rendering: bool = false,
-    /// The setting from `Map.setGlobeFreeBearingEnabled()`.
-    globe_free_bearing_enabled: bool = false,
     pub fn fromNative(raw: c.mln_map_snapshot) MapSnapshot {
         return .{
-            .debug_flags = MapDebugFlag.fromNative(raw.debug_flags),
             .generation = raw.generation,
             .fully_loaded = raw.fully_loaded,
-            .rendering_stats_view_enabled = raw.rendering_stats_view_enabled,
             .gesture_in_progress = raw.gesture_in_progress,
             .transition_in_progress = raw.transition_in_progress,
             .event_mask = RuntimeEventFlag.fromNative(raw.event_mask),
@@ -6492,7 +6477,6 @@ pub const MapSnapshot = struct {
             .free_camera = FreeCamera.fromNative(raw.free_camera),
             .view = MapView.fromNative(raw.view),
             .globe_rendering = raw.globe_rendering,
-            .globe_free_bearing_enabled = raw.globe_free_bearing_enabled,
         };
     }
 };
@@ -6612,12 +6596,16 @@ pub const MapViewport = struct {
     constrain_mode: ConstrainMode = .none,
     viewport_mode: ViewportMode = .default,
     frustum_offset: EdgeInsets = .{},
+    center_clamped_to_ground: bool = false,
+    globe_free_bearing: bool = false,
     pub fn toNative(self: MapViewport) c.mln_map_viewport {
         var raw = std.mem.zeroes(c.mln_map_viewport);
         raw.north_orientation = self.north_orientation.toNative();
         raw.constrain_mode = self.constrain_mode.toNative();
         raw.viewport_mode = self.viewport_mode.toNative();
         raw.frustum_offset = self.frustum_offset.toNative();
+        raw.center_clamped_to_ground = self.center_clamped_to_ground;
+        raw.globe_free_bearing = self.globe_free_bearing;
         return raw;
     }
     pub fn fromNative(raw: c.mln_map_viewport) MapViewport {
@@ -6626,6 +6614,8 @@ pub const MapViewport = struct {
             .constrain_mode = ConstrainMode.fromNative(raw.constrain_mode),
             .viewport_mode = ViewportMode.fromNative(raw.viewport_mode),
             .frustum_offset = EdgeInsets.fromNative(raw.frustum_offset),
+            .center_clamped_to_ground = raw.center_clamped_to_ground,
+            .globe_free_bearing = raw.globe_free_bearing,
         };
     }
 };
@@ -6639,6 +6629,13 @@ pub const MapViewportOptions = struct {
     constrain_mode: ?ConstrainMode = null,
     viewport_mode: ?ViewportMode = null,
     frustum_offset: ?EdgeInsets = null,
+    /// Whether the camera's center stands on the terrain, in place of the
+    /// center altitude it's given, the style's included. On by default.
+    center_clamped_to_ground: ?bool = null,
+    /// Whether drags and zooms on a globe turn the bearing to keep the planet's
+    /// orientation, which lets a drag carry the camera over a pole. Off by
+    /// default.
+    globe_free_bearing: ?bool = null,
     pub fn toNative(self: MapViewportOptions) c.mln_map_viewport_options {
         var raw = std.mem.zeroes(c.mln_map_viewport_options);
         raw.fields = 0;
@@ -6647,6 +6644,8 @@ pub const MapViewportOptions = struct {
         marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, &raw.constrain_mode, self.constrain_mode);
         marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE, &raw.viewport_mode, self.viewport_mode);
         marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET, &raw.frustum_offset, self.frustum_offset);
+        marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND, &raw.center_clamped_to_ground, self.center_clamped_to_ground);
+        marshal.present(&raw.fields, c.MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING, &raw.globe_free_bearing, self.globe_free_bearing);
         return raw;
     }
     pub fn fromNative(raw: c.mln_map_viewport_options) MapViewportOptions {
@@ -6655,6 +6654,8 @@ pub const MapViewportOptions = struct {
             .constrain_mode = if (raw.fields & c.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE != 0) ConstrainMode.fromNative(raw.constrain_mode) else null,
             .viewport_mode = if (raw.fields & c.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE != 0) ViewportMode.fromNative(raw.viewport_mode) else null,
             .frustum_offset = if (raw.fields & c.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET != 0) EdgeInsets.fromNative(raw.frustum_offset) else null,
+            .center_clamped_to_ground = if (raw.fields & c.MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND != 0) raw.center_clamped_to_ground else null,
+            .globe_free_bearing = if (raw.fields & c.MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING != 0) raw.globe_free_bearing else null,
         };
     }
 };
@@ -9449,6 +9450,10 @@ pub const RuntimeEventType = enum(u32) {
     /// The map rendered a complete frame and has nothing left to load, animate,
     /// or redraw.
     map_idle = 8,
+    /// Rendering a frame failed on the GPU, as when the device runs out of
+    /// memory or the driver rejects a shader. The frame shows what did render.
+    /// A map in `MapMode.continuous` raises it once for a run of failed frames,
+    /// and renders again shortly in case the failure passes.
     map_render_error = 9,
     map_render_frame_started = 10,
     map_render_frame_finished = 11,
@@ -10123,6 +10128,21 @@ pub const StyleTransitionOptions = struct {
 pub const StyleVectorTileEncoding = enum(u32) {
     mvt = 0,
     mlt = 1,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// How far the skirts that hide the cracks between terrain tiles reach down.
+///
+/// See `mln_terrain_skirt_length` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const TerrainSkirtLength = enum(u32) {
+    /// Far enough to hide the cracks.
+    auto = 0,
+    /// No skirts, so they don't show through translucent layers over the
+    /// terrain.
+    none = 1,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
@@ -10816,6 +10836,12 @@ pub const WaylandSurfaceTarget = struct {
 /// has one. For an OpenGL device that wraps your WebGL2 context, the canvas
 /// must be the context's own.
 ///
+/// When the browser loses a WebGPU session's device, the session fails with
+/// `error.TargetLost`, and once you release it, you can attach a new session to
+/// the canvas. After Chromium's GPU process restarts, though, an
+/// `OffscreenCanvas` in a Web Worker shows no new frames, and the worker gets
+/// no more animation frames: the page has to load again.
+///
 /// See `mln_web_canvas_target` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const WebCanvasTarget = struct {
@@ -11413,11 +11439,6 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_set_custom_vector_source_tile_error", .handle, map, null, diagnostic, .{ source_id, tile_id, message });
     }
 
-    pub fn setDebugFlags(self: MapDiscarding, flags: MapDebugFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_set_debug_flags", .handle, map, null, diagnostic, .{flags});
-    }
-
     pub fn setEventMask(self: MapDiscarding, mask: RuntimeEventFlag, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_set_event_mask", .handle, map, null, diagnostic, .{mask});
@@ -11453,11 +11474,6 @@ pub const MapDiscarding = struct {
         return call.discard("mln_map_set_global_state_property", .handle, map, null, diagnostic, .{ property_name, value });
     }
 
-    pub fn setGlobeFreeBearingEnabled(self: MapDiscarding, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_set_globe_free_bearing_enabled", .handle, map, null, diagnostic, .{enabled});
-    }
-
     pub fn setImageSourceCoordinates(self: MapDiscarding, allocator: std.mem.Allocator, source_id: []const u8, coordinates: []const LatLng, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_set_image_source_coordinates", .handle, map, allocator, diagnostic, .{ source_id, coordinates, coordinates.len });
@@ -11476,11 +11492,6 @@ pub const MapDiscarding = struct {
     pub fn setProjectionMode(self: MapDiscarding, options: ProjectionModeOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
         const map = self.receiver;
         return call.discard("mln_map_set_projection_mode", .handle, map, null, diagnostic, .{options});
-    }
-
-    pub fn setRenderingStatsViewEnabled(self: MapDiscarding, enabled: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-        const map = self.receiver;
-        return call.discard("mln_map_set_rendering_stats_view_enabled", .handle, map, null, diagnostic, .{enabled});
     }
 
     pub fn setStyleImage(self: MapDiscarding, allocator: std.mem.Allocator, image_id: []const u8, image: PremultipliedRgba8Image, options: ?StyleImageOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {

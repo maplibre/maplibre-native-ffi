@@ -68,7 +68,7 @@ function(mln_ffi_add_web_package target)
 
   # mln-rs's task script, which reads its arguments from mise's `usage_`
   # variables, writes the package into <target dir>/c-web/<feature>.
-  set(script "${MLN_FFI_MLN_RS_DIR}/mise-tasks/c-web/build")
+  set(script "${MLN_FFI_MLN_RS_DIR}/.config/mise/tasks/c-web/build")
   set(package "${MLN_FFI_CARGO_TARGET_DIR}/c-web/${feature}")
   file(
     GLOB_RECURSE

@@ -68,4 +68,16 @@ public sealed record MapOptions
     /// Without it, they do.
     /// </summary>
     public bool? LocalIdeographsEnabled { get; init; }
+
+    /// <summary>
+    /// The terrain's skirts. Without it, <c>TerrainSkirtLength.Auto</c>.
+    /// </summary>
+    public TerrainSkirtLength? TerrainSkirtLength { get; init; }
+
+    /// <summary>
+    /// The most GPU memory, in bytes, for the layers drawn over the terrain.
+    /// Past it, the terrain farthest from the center of the view looks
+    /// blurrier. Without it, there's no limit.
+    /// </summary>
+    public ulong? TerrainDrapeMemoryLimit { get; init; }
 }

@@ -2,7 +2,7 @@
 # [MISE] description="Copy the C headers from third_party/mln-rs into include/."
 # [MISE] shell="python"
 
-"""Replace include/'s headers with mln-rs's, from the submodule as patched.
+"""Replace include/'s headers with mln-rs's, from the submodule.
 
 mln-rs's crates/mln_c/include defines the C API. include/ keeps a copy because
 the Go module and git dependencies read the headers without the submodule.

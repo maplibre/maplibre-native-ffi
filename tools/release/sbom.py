@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import copy
-import hashlib
 import json
 import pathlib
 import re
@@ -253,15 +252,6 @@ def native(
         item = component(record["name"], version, record["license"], record["url"])
         if properties:
             item["properties"] = properties
-        if record["name"] == "mln-rs":
-            patches = sorted((REPOSITORY / "patches/mln-rs").glob("*.patch"))
-            item.setdefault("properties", []).extend(
-                {
-                    "name": f"maplibre:patch:{patch.name}",
-                    "value": hashlib.sha256(patch.read_bytes()).hexdigest(),
-                }
-                for patch in patches
-            )
         refs[record["name"]] = item["bom-ref"]
         components.append(item)
         for name, path in record["notices"].items():

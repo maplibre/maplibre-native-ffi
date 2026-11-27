@@ -94,11 +94,7 @@ func TestArrayInputsAreCopiedAtSubmission(t *testing.T) {
 
 func TestSynchronousCallsFillCallerSizedOutputsInInputOrder(t *testing.T) {
 	f := newFixture(t)
-	snapshot, err := f.m.Snapshot()
-	if err != nil {
-		t.Fatal(err)
-	}
-	projection, err := NewMapProjection(snapshot.View)
+	projection, err := f.m.ProjectionCreate(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

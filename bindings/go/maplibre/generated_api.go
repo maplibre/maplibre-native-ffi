@@ -644,29 +644,6 @@ func (value LogSeverityFlag) String() string {
 	return bindingFlagString(uint64(value), []bindingFlag{{2, "LogSeverityFlagInfo"}, {4, "LogSeverityFlagWarning"}, {8, "LogSeverityFlagError"}})
 }
 
-// MapDebugFlag corresponds to mln_map_debug_flag. A debug overlay that the map
-// draws.
-//
-// See mln_map_debug_flag in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type MapDebugFlag uint32
-
-const (
-	MapDebugFlagTileBorders MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_TILE_BORDERS)
-	MapDebugFlagParseStatus MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_PARSE_STATUS)
-	MapDebugFlagTimestamps  MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_TIMESTAMPS)
-	MapDebugFlagCollision   MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_COLLISION)
-	MapDebugFlagOverdraw    MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_OVERDRAW)
-	MapDebugFlagStencilClip MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_STENCIL_CLIP)
-	MapDebugFlagDepthBuffer MapDebugFlag = MapDebugFlag(C.MLN_MAP_DEBUG_DEPTH_BUFFER)
-)
-
-func (value MapDebugFlag) Has(flags MapDebugFlag) bool { return value&flags == flags }
-
-func (value MapDebugFlag) String() string {
-	return bindingFlagString(uint64(value), []bindingFlag{{2, "MapDebugFlagTileBorders"}, {4, "MapDebugFlagParseStatus"}, {8, "MapDebugFlagTimestamps"}, {16, "MapDebugFlagCollision"}, {32, "MapDebugFlagOverdraw"}, {64, "MapDebugFlagStencilClip"}, {128, "MapDebugFlagDepthBuffer"}})
-}
-
 // MapLoadError corresponds to mln_map_load_error. Why a map failed to load a
 // style.
 //
@@ -1520,7 +1497,11 @@ const (
 	RuntimeEventTypeMapLoadingFailed RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)
 	// The map rendered a complete frame and has nothing left to load, animate, or
 	// redraw.
-	RuntimeEventTypeMapIdle                RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_IDLE)
+	RuntimeEventTypeMapIdle RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_IDLE)
+	// Rendering a frame failed on the GPU, as when the device runs out of memory or
+	// the driver rejects a shader. The frame shows what did render. A map in
+	// MapModeContinuous raises it once for a run of failed frames, and renders
+	// again shortly in case the failure passes.
 	RuntimeEventTypeMapRenderError         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR)
 	RuntimeEventTypeMapRenderFrameStarted  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED)
 	RuntimeEventTypeMapRenderFrameFinished RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED)
@@ -1890,6 +1871,30 @@ func (value StyleVectorTileEncoding) String() string {
 		return "StyleVectorTileEncodingMlt"
 	}
 	return fmt.Sprintf("StyleVectorTileEncoding(%d)", value)
+}
+
+// TerrainSkirtLength corresponds to mln_terrain_skirt_length. How far the
+// skirts that hide the cracks between terrain tiles reach down.
+//
+// See mln_terrain_skirt_length in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type TerrainSkirtLength uint32
+
+const (
+	// Far enough to hide the cracks.
+	TerrainSkirtLengthAuto TerrainSkirtLength = TerrainSkirtLength(C.MLN_TERRAIN_SKIRT_LENGTH_AUTO)
+	// No skirts, so they don't show through translucent layers over the terrain.
+	TerrainSkirtLengthNone TerrainSkirtLength = TerrainSkirtLength(C.MLN_TERRAIN_SKIRT_LENGTH_NONE)
+)
+
+func (value TerrainSkirtLength) String() string {
+	switch value {
+	case 0:
+		return "TerrainSkirtLengthAuto"
+	case 1:
+		return "TerrainSkirtLengthNone"
+	}
+	return fmt.Sprintf("TerrainSkirtLength(%d)", value)
 }
 
 // TileLodMode corresponds to mln_tile_lod_mode. How the map picks the level of
@@ -4910,6 +4915,12 @@ type MapOptions struct {
 	// (fallback_font_faces, then the system's) before glyph PBFs, rather than from
 	// a glyph PBF downloaded for every few characters. Without it, they do.
 	LocalIdeographsEnabled *bool
+	// The terrain's skirts. Without it, TerrainSkirtLengthAuto.
+	TerrainSkirtLength *TerrainSkirtLength
+	// The most GPU memory, in bytes, for the layers drawn over the terrain. Past
+	// it, the terrain farthest from the center of the view looks blurrier. Without
+	// it, there's no limit.
+	TerrainDrapeMemoryLimit *uint64
 }
 
 func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
@@ -4924,6 +4935,8 @@ func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options {
 	raw.fallback_font_faces = C.mln_buffer_view{data: arena.bytes([]byte(input.FallbackFontFaces)), size: C.size_t(len(input.FallbackFontFaces))}
 	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED, &raw.system_fonts_enabled, input.SystemFontsEnabled, arena, bindingBool[bool, C.bool])
 	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED, &raw.local_ideographs_enabled, input.LocalIdeographsEnabled, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH, &raw.terrain_skirt_length, input.TerrainSkirtLength, arena, bindingNumber[TerrainSkirtLength, C.mln_terrain_skirt_length])
+	bindingMasked(&raw.fields, C.MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT, &raw.terrain_drape_memory_limit, input.TerrainDrapeMemoryLimit, arena, bindingNumber[uint64, C.uint64_t])
 	return raw
 }
 
@@ -4940,18 +4953,37 @@ func copyMapProjectionCameraResult(raw C.mln_map_projection_camera_result) MapPr
 	return result
 }
 
+// MapProjectionTerrainElevationResult corresponds to
+// mln_map_projection_terrain_elevation_result. The height of the ground at a
+// coordinate.
+//
+// See mln_map_projection_terrain_elevation_result in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+type MapProjectionTerrainElevationResult struct {
+	// Whether the map drew terrain at the coordinate.
+	HasElevation bool
+	// Meters above sea level, with the terrain's exaggeration. 0 without
+	// has_elevation.
+	ElevationMeters float64
+}
+
+func copyMapProjectionTerrainElevationResult(raw C.mln_map_projection_terrain_elevation_result) MapProjectionTerrainElevationResult {
+	var result MapProjectionTerrainElevationResult
+	result.HasElevation = bool(raw.has_elevation)
+	result.ElevationMeters = float64(raw.elevation_meters)
+	return result
+}
+
 // MapSnapshot corresponds to mln_map_snapshot. A map's state, as
 // MapHandle.Snapshot() reads it.
 //
 // See mln_map_snapshot in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapSnapshot struct {
-	DebugFlags MapDebugFlag
 	// Grows with each change to the map's state.
 	Generation uint64
 	// Whether the style and every resource that the view needs have loaded.
-	FullyLoaded               bool
-	RenderingStatsViewEnabled bool
+	FullyLoaded bool
 	// Whether a gesture recognizer's gesture, or the glide and snap after it, moves
 	// the camera.
 	GestureInProgress    bool
@@ -4965,16 +4997,12 @@ type MapSnapshot struct {
 	View                         MapView
 	// Whether the map draws as a globe, alone or blending into Mercator.
 	GlobeRendering bool
-	// The setting from MapHandle.SetGlobeFreeBearingEnabled().
-	GlobeFreeBearingEnabled bool
 }
 
 func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
 	var result MapSnapshot
-	result.DebugFlags = MapDebugFlag(raw.debug_flags)
 	result.Generation = uint64(raw.generation)
 	result.FullyLoaded = bool(raw.fully_loaded)
-	result.RenderingStatsViewEnabled = bool(raw.rendering_stats_view_enabled)
 	result.GestureInProgress = bool(raw.gesture_in_progress)
 	result.TransitionInProgress = bool(raw.transition_in_progress)
 	result.EventMask = RuntimeEventFlag(raw.event_mask)
@@ -4984,7 +5012,6 @@ func copyMapSnapshot(raw C.mln_map_snapshot) MapSnapshot {
 	result.FreeCamera = copyFreeCamera(raw.free_camera)
 	result.View = copyMapView(raw.view)
 	result.GlobeRendering = bool(raw.globe_rendering)
-	result.GlobeFreeBearingEnabled = bool(raw.globe_free_bearing_enabled)
 	return result
 }
 
@@ -5095,10 +5122,12 @@ func nativeMapView(input MapView, arena *bindingArena) C.mln_map_view {
 // See mln_map_viewport in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapViewport struct {
-	NorthOrientation NorthOrientation
-	ConstrainMode    ConstrainMode
-	ViewportMode     ViewportMode
-	FrustumOffset    EdgeInsets
+	NorthOrientation      NorthOrientation
+	ConstrainMode         ConstrainMode
+	ViewportMode          ViewportMode
+	FrustumOffset         EdgeInsets
+	CenterClampedToGround bool
+	GlobeFreeBearing      bool
 }
 
 func copyMapViewport(raw C.mln_map_viewport) MapViewport {
@@ -5107,6 +5136,8 @@ func copyMapViewport(raw C.mln_map_viewport) MapViewport {
 	result.ConstrainMode = ConstrainMode(raw.constrain_mode)
 	result.ViewportMode = ViewportMode(raw.viewport_mode)
 	result.FrustumOffset = copyEdgeInsets(raw.frustum_offset)
+	result.CenterClampedToGround = bool(raw.center_clamped_to_ground)
+	result.GlobeFreeBearing = bool(raw.globe_free_bearing)
 	return result
 }
 
@@ -5116,6 +5147,8 @@ func nativeMapViewport(input MapViewport, arena *bindingArena) C.mln_map_viewpor
 	raw.constrain_mode = C.mln_constrain_mode(input.ConstrainMode)
 	raw.viewport_mode = C.mln_viewport_mode(input.ViewportMode)
 	raw.frustum_offset = nativeEdgeInsets(input.FrustumOffset, arena)
+	raw.center_clamped_to_ground = C.bool(input.CenterClampedToGround)
+	raw.globe_free_bearing = C.bool(input.GlobeFreeBearing)
 	return raw
 }
 
@@ -5129,6 +5162,12 @@ type MapViewportOptions struct {
 	ConstrainMode    *ConstrainMode
 	ViewportMode     *ViewportMode
 	FrustumOffset    *EdgeInsets
+	// Whether the camera's center stands on the terrain, in place of the center
+	// altitude it's given, the style's included. On by default.
+	CenterClampedToGround *bool
+	// Whether drags and zooms on a globe turn the bearing to keep the planet's
+	// orientation, which lets a drag carry the camera over a pole. Off by default.
+	GlobeFreeBearing *bool
 }
 
 func nativeMapViewportOptions(input MapViewportOptions, arena *bindingArena) C.mln_map_viewport_options {
@@ -5139,6 +5178,8 @@ func nativeMapViewportOptions(input MapViewportOptions, arena *bindingArena) C.m
 	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE, &raw.constrain_mode, input.ConstrainMode, arena, bindingNumber[ConstrainMode, C.mln_constrain_mode])
 	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE, &raw.viewport_mode, input.ViewportMode, arena, bindingNumber[ViewportMode, C.mln_viewport_mode])
 	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET, &raw.frustum_offset, input.FrustumOffset, arena, nativeEdgeInsets)
+	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND, &raw.center_clamped_to_ground, input.CenterClampedToGround, arena, bindingBool[bool, C.bool])
+	bindingMasked(&raw.fields, C.MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING, &raw.globe_free_bearing, input.GlobeFreeBearing, arena, bindingBool[bool, C.bool])
 	return raw
 }
 
@@ -8060,6 +8101,12 @@ func nativeWaylandSurfaceTarget(input WaylandSurfaceTarget, arena *bindingArena)
 // an OpenGL device that wraps your WebGL2 context, the canvas must be the
 // context's own.
 //
+// When the browser loses a WebGPU session's device, the session fails with
+// StatusTargetLost, and once you release it, you can attach a new session to
+// the canvas. After Chromium's GPU process restarts, though, an OffscreenCanvas
+// in a Web Worker shows no new frames, and the worker gets no more animation
+// frames: the page has to load again.
+//
 // See mln_web_canvas_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
 type WebCanvasTarget struct {
@@ -10207,23 +10254,26 @@ func (receiver *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) 
 	}, completionCommand)
 }
 
-// NewMapProjection creates a projection that converts coordinates for one view
-// of a map.
+// ProjectionCreate creates a projection that converts coordinates as a map
+// does, for one view of it.
 //
-// Create it from the view of an MapSnapshot or an RenderFrameResult. The
-// projection doesn't follow the map, so create a new one after the map's
-// camera, size, or style projection changes.
+// view is the view to convert for, such as a frame result's, or null for the
+// map's current view. Over terrain, coordinates convert on the ground that the
+// map drew. The projection doesn't follow the map, so create a new one after
+// the map's view or terrain changes.
 //
 // See mln_map_projection_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
 //
 // Errors:
+//   - StatusInvalidState until RuntimeHandle.CreateMap() completes with
+//     StatusOk.
 //   - StatusUnsupported when the view's style projection draws a globe and the
 //     library can't project one.
-func NewMapProjection(view MapView) (*MapProjectionHandle, error) {
+func (receiver *MapHandle) ProjectionCreate(view *MapView) (*MapProjectionHandle, error) {
 	var outProjection C.mln_map_projection
-	return bindingGet(bindingGlobal(), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_create(bindingStore(nativeMapView(view, arena), arena), &outProjection, diagnostic))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_create(C.mln_map(raw), bindingStoreOptional(view, arena, nativeMapView), &outProjection, diagnostic))
 	}, func(arena *bindingArena) *MapProjectionHandle {
 		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
 		return adopted
@@ -10241,6 +10291,21 @@ func (receiver *MapProjectionHandle) Camera() (MapProjectionCameraResult, error)
 		return int32(C.mln_map_projection_get_camera(C.mln_map_projection(raw), &outResult, diagnostic))
 	}, func(arena *bindingArena) MapProjectionCameraResult {
 		return copyMapProjectionCameraResult(outResult)
+	})
+}
+
+// GetTerrainElevation reads the height of the terrain that the map drew at a
+// coordinate.
+//
+// See mln_map_projection_get_terrain_elevation in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+func (receiver *MapProjectionHandle) GetTerrainElevation(coordinate LatLng) (MapProjectionTerrainElevationResult, error) {
+	var outResult C.mln_map_projection_terrain_elevation_result
+	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+	return bindingGet(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_get_terrain_elevation(C.mln_map_projection(raw), nativeLatLng(coordinate, arena), &outResult, diagnostic))
+	}, func(arena *bindingArena) MapProjectionTerrainElevationResult {
+		return copyMapProjectionTerrainElevationResult(outResult)
 	})
 }
 
@@ -10512,7 +10577,7 @@ func (receiver *MapHandle) RequestRepaint() (*Future[CommandCompletion], error) 
 // Errors:
 //   - StatusCancelled when the map is released before the image is done.
 //   - StatusNativeError when the style or a resource that the image needs fails
-//     to load.
+//     to load, or rendering the image fails on the GPU.
 func (receiver *MapHandle) RequestStillImage() (*Future[struct{}], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_request_still_image(C.mln_map(raw), completion, diagnostic))
@@ -10624,18 +10689,6 @@ func (receiver *MapHandle) SetCustomVectorSourceTileData(sourceID string, tileID
 func (receiver *MapHandle) SetCustomVectorSourceTileError(sourceID string, tileID CanonicalTileID, message string) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_custom_vector_source_tile_error(C.mln_map(raw), bindingView(sourceID, arena), nativeCanonicalTileID(tileID, arena), bindingView(message, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetDebugFlags draws debugging overlays, such as tile borders, on the map.
-//
-// flags replaces the overlays set before.
-//
-// See mln_map_set_debug_flags in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) SetDebugFlags(flags MapDebugFlag) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_debug_flags(C.mln_map(raw), C.mln_map_debug_flags(flags), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -10770,23 +10823,6 @@ func (receiver *MapHandle) SetGlobalStateProperty(propertyName string, value str
 	}, completionCommand)
 }
 
-// SetGlobeFreeBearingEnabled sets whether drags and zooms on a globe turn the
-// bearing.
-//
-// When it's on, a drag or a zoom around a point on the globe turns the bearing
-// so the planet keeps its orientation, and a drag can carry the camera over a
-// pole. When it's off, the default, they keep the bearing, as MapLibre GL JS
-// does. Turn it on for a map whose users can rotate it. It changes nothing
-// while the map draws Mercator.
-//
-// See mln_map_set_globe_free_bearing_enabled in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) SetGlobeFreeBearingEnabled(enabled bool) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_globe_free_bearing_enabled(C.mln_map(raw), C.bool(enabled), completion, diagnostic))
-	}, completionCommand)
-}
-
 // SetImageSourceCoordinates moves the image of an image source.
 //
 // coordinates are the image's four corners, clockwise from the top left.
@@ -10853,17 +10889,6 @@ func (receiver *MapHandle) SetProjectionMode(options ProjectionModeOptions) (*Fu
 	}, completionCommand)
 }
 
-// SetRenderingStatsViewEnabled shows or hides an overlay of rendering
-// statistics on the map.
-//
-// See mln_map_set_rendering_stats_view_enabled in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) SetRenderingStatsViewEnabled(enabled bool) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_rendering_stats_view_enabled(C.mln_map(raw), C.bool(enabled), completion, diagnostic))
-	}, completionCommand)
-}
-
 // SetStyleImage adds an image to the map's style, or replaces the image named
 // imageID.
 //
@@ -10900,9 +10925,10 @@ func (receiver *MapHandle) SetStyleJSON(json string) (*Future[CommandCompletion]
 // SetStyleLayerProperty sets a property of a layer in the map's style.
 //
 // propertyName is one of the layer's layout or paint
-// [properties](https://maplibre.org/maplibre-style-spec/layers/), or filter,
-// minzoom, maxzoom, source, or source-layer. A null value resets any of these
-// but source and source-layer to its default.
+// [properties](https://maplibre.org/maplibre-style-spec/layers/), filter,
+// minzoom, maxzoom, source, or source-layer, or an extension's member, named
+// <namespace>:<name>. A null value resets any of these but source and
+// source-layer to its default.
 //
 // See mln_map_set_style_layer_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -10936,8 +10962,9 @@ func (receiver *MapHandle) SetStyleLightProperty(propertyName string, value stri
 // such as light, sky, projection, or terrain, without reloading the style.
 //
 // propertyName is a root property other than sources and layers, which the
-// source and layer calls change. A null value resets the property to its
-// default, as if the style didn't set it.
+// source and layer calls change, or an extension's member, named
+// <namespace>:<name>. A null value resets the property to its default, as if
+// the style didn't set it.
 //
 // See mln_map_set_style_root_property in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
@@ -12507,13 +12534,6 @@ func (view MapHandleDiscarding) SetCustomVectorSourceTileError(sourceID string, 
 	})
 }
 
-func (view MapHandleDiscarding) SetDebugFlags(flags MapDebugFlag) error {
-	receiver := view.owner
-	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_debug_flags(C.mln_map(raw), C.mln_map_debug_flags(flags), completion, diagnostic))
-	})
-}
-
 func (view MapHandleDiscarding) SetEventMask(mask RuntimeEventFlag) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
@@ -12563,13 +12583,6 @@ func (view MapHandleDiscarding) SetGlobalStateProperty(propertyName string, valu
 	})
 }
 
-func (view MapHandleDiscarding) SetGlobeFreeBearingEnabled(enabled bool) error {
-	receiver := view.owner
-	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_globe_free_bearing_enabled(C.mln_map(raw), C.bool(enabled), completion, diagnostic))
-	})
-}
-
 func (view MapHandleDiscarding) SetImageSourceCoordinates(sourceID string, coordinates []LatLng) error {
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
@@ -12595,13 +12608,6 @@ func (view MapHandleDiscarding) SetProjectionMode(options ProjectionModeOptions)
 	receiver := view.owner
 	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_set_projection_mode(C.mln_map(raw), bindingStore(nativeProjectionModeOptions(options, arena), arena), completion, diagnostic))
-	})
-}
-
-func (view MapHandleDiscarding) SetRenderingStatsViewEnabled(enabled bool) error {
-	receiver := view.owner
-	return callDiscard(bindingOwned(receiver.owner()), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_rendering_stats_view_enabled(C.mln_map(raw), C.bool(enabled), completion, diagnostic))
 	})
 }
 

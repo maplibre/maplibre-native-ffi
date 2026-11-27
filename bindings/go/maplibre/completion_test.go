@@ -11,7 +11,7 @@ import (
 
 func TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError(t *testing.T) {
 	f := newFixture(t)
-	if err := f.m.Discarding().SetDebugFlags(MapDebugFlagTileBorders); err != nil {
+	if err := f.m.Discarding().SetEventMask(RuntimeEventFlagMapIdle); err != nil {
 		t.Fatal(err)
 	}
 	// A later command on the same map completes after the discarded one.
@@ -20,8 +20,8 @@ func TestDiscardedCommandsAreFencedAndSyncRejectionReturnsError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.DebugFlags != MapDebugFlagTileBorders {
-		t.Fatalf("debug flags = %v", snapshot.DebugFlags)
+	if snapshot.EventMask != RuntimeEventFlagMapIdle {
+		t.Fatalf("event mask = %v", snapshot.EventMask)
 	}
 	if err := f.m.Discarding().Resize(LogicalExtent{Width: 0, Height: 8, ScaleFactor: 1}); !errors.Is(err, StatusInvalidArgument) {
 		t.Fatalf("Resize = %v, want StatusInvalidArgument", err)

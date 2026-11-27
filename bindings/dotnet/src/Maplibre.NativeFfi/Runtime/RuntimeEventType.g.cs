@@ -41,6 +41,13 @@ public enum RuntimeEventType : uint
     /// or redraw.
     /// </summary>
     MapIdle = 8,
+
+    /// <summary>
+    /// Rendering a frame failed on the GPU, as when the device runs out of
+    /// memory or the driver rejects a shader. The frame shows what did render.
+    /// A map in <c>MapMode.Continuous</c> raises it once for a run of failed
+    /// frames, and renders again shortly in case the failure passes.
+    /// </summary>
     MapRenderError = 9,
     MapRenderFrameStarted = 10,
     MapRenderFrameFinished = 11,

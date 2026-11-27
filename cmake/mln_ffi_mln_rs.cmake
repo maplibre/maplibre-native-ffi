@@ -31,7 +31,7 @@ function(mln_ffi_check_mln_rs_headers)
   if(NOT IS_DIRECTORY "${theirs}")
     message(
       FATAL_ERROR
-        "third_party/mln-rs is not checked out; run `mise deps` to check it out and apply patches/mln-rs"
+        "third_party/mln-rs is not checked out; run `mise deps` to check it out"
     )
   endif()
   file(GLOB_RECURSE our_headers RELATIVE "${ours}" CONFIGURE_DEPENDS
@@ -593,7 +593,7 @@ function(mln_ffi_add_c_api_library target)
   mln_ffi_add_mln_rs_components(${target} FEATURES ${features})
 endfunction()
 
-# The components that the library carries: mln-rs, with its patches, the Rust
+# The components that the library carries: mln-rs, the Rust
 # crates that Cargo builds into it, as cargo-about lists them, and the Rust
 # standard library. FEATURES names the crate's features for a build without its
 # default ones, as each preset builds.
@@ -609,7 +609,7 @@ function(mln_ffi_add_mln_rs_components target)
   mln_ffi_add_component(
     ${target}
     mln-rs
-    https://github.com/louwers/mln-rs
+    https://github.com/maplibre/mln-rs
     BSD-2-Clause
     SOURCE
     "${MLN_FFI_MLN_RS_DIR}"

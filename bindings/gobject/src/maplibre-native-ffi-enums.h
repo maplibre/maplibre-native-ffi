@@ -622,35 +622,6 @@ GType maplibre_native_ffi_log_severity_flag_get_type(void) G_GNUC_CONST;
   (maplibre_native_ffi_log_severity_flag_get_type())
 
 /**
- * MaplibreNativeFfiMapDebugFlag:
- * @MAPLIBRE_NATIVE_FFI_MAP_DEBUG_TILE_BORDERS:
- * @MAPLIBRE_NATIVE_FFI_MAP_DEBUG_PARSE_STATUS:
- * @MAPLIBRE_NATIVE_FFI_MAP_DEBUG_TIMESTAMPS:
- * @MAPLIBRE_NATIVE_FFI_MAP_DEBUG_COLLISION:
- * @MAPLIBRE_NATIVE_FFI_MAP_DEBUG_OVERDRAW:
- * @MAPLIBRE_NATIVE_FFI_MAP_DEBUG_STENCIL_CLIP:
- * @MAPLIBRE_NATIVE_FFI_MAP_DEBUG_DEPTH_BUFFER:
- *
- * A debug overlay that the map draws.
- *
- * See `mln_map_debug_flag` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-typedef enum {
-  MAPLIBRE_NATIVE_FFI_MAP_DEBUG_TILE_BORDERS = 2,
-  MAPLIBRE_NATIVE_FFI_MAP_DEBUG_PARSE_STATUS = 4,
-  MAPLIBRE_NATIVE_FFI_MAP_DEBUG_TIMESTAMPS = 8,
-  MAPLIBRE_NATIVE_FFI_MAP_DEBUG_COLLISION = 16,
-  MAPLIBRE_NATIVE_FFI_MAP_DEBUG_OVERDRAW = 32,
-  MAPLIBRE_NATIVE_FFI_MAP_DEBUG_STENCIL_CLIP = 64,
-  MAPLIBRE_NATIVE_FFI_MAP_DEBUG_DEPTH_BUFFER = 128,
-} MaplibreNativeFfiMapDebugFlag;
-
-GType maplibre_native_ffi_map_debug_flag_get_type(void) G_GNUC_CONST;
-#define MAPLIBRE_NATIVE_FFI_TYPE_MAP_DEBUG_FLAG \
-  (maplibre_native_ffi_map_debug_flag_get_type())
-
-/**
  * MaplibreNativeFfiMapLoadError:
  * @MAPLIBRE_NATIVE_FFI_MAP_LOAD_ERROR_UNKNOWN:
  * @MAPLIBRE_NATIVE_FFI_MAP_LOAD_ERROR_STYLE_PARSE: The style document isn't a
@@ -1455,7 +1426,11 @@ GType maplibre_native_ffi_runtime_event_source_type_get_type(void) G_GNUC_CONST;
  *   a style.
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_IDLE: The map rendered a complete
  *   frame and has nothing left to load, animate, or redraw.
- * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_RENDER_ERROR:
+ * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_RENDER_ERROR: Rendering a frame failed
+ *   on the GPU, as when the device runs out of memory or the driver rejects a
+ *   shader. The frame shows what did render. A map in
+ *   `MAPLIBRE_NATIVE_FFI_MAP_MODE_CONTINUOUS` raises it once for a run of
+ *   failed frames, and renders again shortly in case the failure passes.
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED:
  * @MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED:
@@ -1689,6 +1664,27 @@ GType maplibre_native_ffi_style_vector_tile_encoding_get_type(
 ) G_GNUC_CONST;
 #define MAPLIBRE_NATIVE_FFI_TYPE_STYLE_VECTOR_TILE_ENCODING \
   (maplibre_native_ffi_style_vector_tile_encoding_get_type())
+
+/**
+ * MaplibreNativeFfiTerrainSkirtLength:
+ * @MAPLIBRE_NATIVE_FFI_TERRAIN_SKIRT_LENGTH_AUTO: Far enough to hide the
+ *   cracks.
+ * @MAPLIBRE_NATIVE_FFI_TERRAIN_SKIRT_LENGTH_NONE: No skirts, so they don't show
+ *   through translucent layers over the terrain.
+ *
+ * How far the skirts that hide the cracks between terrain tiles reach down.
+ *
+ * See `mln_terrain_skirt_length` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+typedef enum {
+  MAPLIBRE_NATIVE_FFI_TERRAIN_SKIRT_LENGTH_AUTO = 0,
+  MAPLIBRE_NATIVE_FFI_TERRAIN_SKIRT_LENGTH_NONE = 1,
+} MaplibreNativeFfiTerrainSkirtLength;
+
+GType maplibre_native_ffi_terrain_skirt_length_get_type(void) G_GNUC_CONST;
+#define MAPLIBRE_NATIVE_FFI_TYPE_TERRAIN_SKIRT_LENGTH \
+  (maplibre_native_ffi_terrain_skirt_length_get_type())
 
 /**
  * MaplibreNativeFfiTileLodMode:

@@ -17,3 +17,26 @@ public struct MapProjectionCameraResult: Equatable, Hashable, Sendable {
     camera = Camera(raw: raw.camera)
   }
 }
+
+/// The height of the ground at a coordinate.
+///
+/// See `mln_map_projection_terrain_elevation_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+public struct MapProjectionTerrainElevationResult: Equatable, Hashable,
+  Sendable
+{
+  /// Whether the map drew terrain at the coordinate.
+  public var hasElevation: Bool
+  /// Meters above sea level, with the terrain's exaggeration. 0 without
+  /// `has_elevation`.
+  public var elevationMeters: Double
+  public init(hasElevation: Bool = false, elevationMeters: Double = 0) {
+    self.hasElevation = hasElevation
+    self.elevationMeters = elevationMeters
+  }
+
+  init(raw: mln_map_projection_terrain_elevation_result) {
+    hasElevation = raw.has_elevation
+    elevationMeters = raw.elevation_meters
+  }
+}

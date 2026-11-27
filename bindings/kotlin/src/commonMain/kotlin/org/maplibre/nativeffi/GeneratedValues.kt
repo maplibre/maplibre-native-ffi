@@ -1273,88 +1273,6 @@ public class LogSeverityFlag(@get:JvmName("getRawValue") public val rawValue: UI
 }
 
 /**
- * A debug overlay that the map draws.
- *
- * Later versions may add flags; unknown bits keep their place in `rawValue`.
- *
- * See `mln_map_debug_flag` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public class MapDebugFlag(@get:JvmName("getRawValue") public val rawValue: UInt) {
-  public infix fun or(other: MapDebugFlag): MapDebugFlag = of(rawValue or other.rawValue)
-
-  public infix fun and(other: MapDebugFlag): MapDebugFlag = of(rawValue and other.rawValue)
-
-  public operator fun contains(other: MapDebugFlag): Boolean =
-    (rawValue and other.rawValue) == other.rawValue
-
-  override fun toString(): String =
-    flagLabel(
-      rawValue.toULong(),
-      "NONE",
-      listOf(
-        2uL to "TILE_BORDERS",
-        4uL to "PARSE_STATUS",
-        8uL to "TIMESTAMPS",
-        16uL to "COLLISION",
-        32uL to "OVERDRAW",
-        64uL to "STENCIL_CLIP",
-        128uL to "DEPTH_BUFFER",
-      ),
-    )
-
-  override fun equals(other: Any?): Boolean = other is MapDebugFlag && other.rawValue == rawValue
-
-  override fun hashCode(): Int = rawValue.hashCode()
-
-  public companion object {
-    /** No flags. */
-    @JvmField public val NONE: MapDebugFlag = MapDebugFlag(NONE_VALUE)
-    /** The `rawValue` of [NONE]. */
-    public const val NONE_VALUE: UInt = 0u
-    @JvmField public val TILE_BORDERS: MapDebugFlag = MapDebugFlag(TILE_BORDERS_VALUE)
-    /** The `rawValue` of [TILE_BORDERS]. */
-    public const val TILE_BORDERS_VALUE: UInt = 2u
-    @JvmField public val PARSE_STATUS: MapDebugFlag = MapDebugFlag(PARSE_STATUS_VALUE)
-    /** The `rawValue` of [PARSE_STATUS]. */
-    public const val PARSE_STATUS_VALUE: UInt = 4u
-    @JvmField public val TIMESTAMPS: MapDebugFlag = MapDebugFlag(TIMESTAMPS_VALUE)
-    /** The `rawValue` of [TIMESTAMPS]. */
-    public const val TIMESTAMPS_VALUE: UInt = 8u
-    @JvmField public val COLLISION: MapDebugFlag = MapDebugFlag(COLLISION_VALUE)
-    /** The `rawValue` of [COLLISION]. */
-    public const val COLLISION_VALUE: UInt = 16u
-    @JvmField public val OVERDRAW: MapDebugFlag = MapDebugFlag(OVERDRAW_VALUE)
-    /** The `rawValue` of [OVERDRAW]. */
-    public const val OVERDRAW_VALUE: UInt = 32u
-    @JvmField public val STENCIL_CLIP: MapDebugFlag = MapDebugFlag(STENCIL_CLIP_VALUE)
-    /** The `rawValue` of [STENCIL_CLIP]. */
-    public const val STENCIL_CLIP_VALUE: UInt = 64u
-    @JvmField public val DEPTH_BUFFER: MapDebugFlag = MapDebugFlag(DEPTH_BUFFER_VALUE)
-    /** The `rawValue` of [DEPTH_BUFFER]. */
-    public const val DEPTH_BUFFER_VALUE: UInt = 128u
-
-    /**
-     * Returns the constant whose `rawValue` is [rawValue], or a new flag set that holds its bits.
-     */
-    @JvmStatic
-    @JvmName("of")
-    public fun of(rawValue: UInt): MapDebugFlag =
-      when (rawValue) {
-        NONE_VALUE -> NONE
-        TILE_BORDERS_VALUE -> TILE_BORDERS
-        PARSE_STATUS_VALUE -> PARSE_STATUS
-        TIMESTAMPS_VALUE -> TIMESTAMPS
-        COLLISION_VALUE -> COLLISION
-        OVERDRAW_VALUE -> OVERDRAW
-        STENCIL_CLIP_VALUE -> STENCIL_CLIP
-        DEPTH_BUFFER_VALUE -> DEPTH_BUFFER
-        else -> MapDebugFlag(rawValue)
-      }
-  }
-}
-
-/**
  * Why a map failed to load a style.
  *
  * Later versions may add values; an unknown one keeps its `rawValue`.
@@ -3279,6 +3197,11 @@ public class RuntimeEventType(@get:JvmName("getRawValue") public val rawValue: U
     @JvmField public val MAP_IDLE: RuntimeEventType = RuntimeEventType(MAP_IDLE_VALUE)
     /** The `rawValue` of [MAP_IDLE]. */
     public const val MAP_IDLE_VALUE: UInt = 8u
+    /**
+     * Rendering a frame failed on the GPU, as when the device runs out of memory or the driver
+     * rejects a shader. The frame shows what did render. A map in `MapMode.CONTINUOUS` raises it
+     * once for a run of failed frames, and renders again shortly in case the failure passes.
+     */
     @JvmField
     public val MAP_RENDER_ERROR: RuntimeEventType = RuntimeEventType(MAP_RENDER_ERROR_VALUE)
     /** The `rawValue` of [MAP_RENDER_ERROR]. */
@@ -3855,6 +3778,49 @@ public class StyleVectorTileEncoding(@get:JvmName("getRawValue") public val rawV
         MVT_VALUE -> MVT
         MLT_VALUE -> MLT
         else -> StyleVectorTileEncoding(rawValue)
+      }
+  }
+}
+
+/**
+ * How far the skirts that hide the cracks between terrain tiles reach down.
+ *
+ * Later versions may add values; an unknown one keeps its `rawValue`.
+ *
+ * See `mln_terrain_skirt_length` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public class TerrainSkirtLength(@get:JvmName("getRawValue") public val rawValue: UInt) {
+  override fun toString(): String =
+    when (rawValue) {
+      0u -> "AUTO"
+      1u -> "NONE"
+      else -> "TerrainSkirtLength($rawValue)"
+    }
+
+  override fun equals(other: Any?): Boolean =
+    other is TerrainSkirtLength && other.rawValue == rawValue
+
+  override fun hashCode(): Int = rawValue.hashCode()
+
+  public companion object {
+    /** Far enough to hide the cracks. */
+    @JvmField public val AUTO: TerrainSkirtLength = TerrainSkirtLength(AUTO_VALUE)
+    /** The `rawValue` of [AUTO]. */
+    public const val AUTO_VALUE: UInt = 0u
+    /** No skirts, so they don't show through translucent layers over the terrain. */
+    @JvmField public val NONE: TerrainSkirtLength = TerrainSkirtLength(NONE_VALUE)
+    /** The `rawValue` of [NONE]. */
+    public const val NONE_VALUE: UInt = 1u
+
+    /** Returns the constant whose `rawValue` is [rawValue], or a new value that keeps it. */
+    @JvmStatic
+    @JvmName("of")
+    public fun of(rawValue: UInt): TerrainSkirtLength =
+      when (rawValue) {
+        AUTO_VALUE -> AUTO
+        NONE_VALUE -> NONE
+        else -> TerrainSkirtLength(rawValue)
       }
   }
 }
@@ -4994,6 +4960,8 @@ public data class MapViewport(
   public val constrainMode: ConstrainMode = ConstrainMode.NONE,
   public val viewportMode: ViewportMode = ViewportMode.DEFAULT,
   public val frustumOffset: EdgeInsets = EdgeInsets(),
+  public val centerClampedToGround: Boolean = false,
+  public val globeFreeBearing: Boolean = false,
 ) {
   @PublishedApi
   internal fun withNorthOrientation(northOrientation: NorthOrientation): MapViewport =
@@ -5010,6 +4978,14 @@ public data class MapViewport(
   @PublishedApi
   internal fun withFrustumOffset(frustumOffset: EdgeInsets): MapViewport =
     copy(frustumOffset = frustumOffset)
+
+  @PublishedApi
+  internal fun withCenterClampedToGround(centerClampedToGround: Boolean): MapViewport =
+    copy(centerClampedToGround = centerClampedToGround)
+
+  @PublishedApi
+  internal fun withGlobeFreeBearing(globeFreeBearing: Boolean): MapViewport =
+    copy(globeFreeBearing = globeFreeBearing)
 
   public companion object {
     /**
@@ -7748,6 +7724,11 @@ public data class ExportedRingTarget(
  * it has one. For an OpenGL device that wraps your WebGL2 context, the canvas must be the context's
  * own.
  *
+ * When the browser loses a WebGPU session's device, the session fails with `Status.TARGET_LOST`,
+ * and once you release it, you can attach a new session to the canvas. After Chromium's GPU process
+ * restarts, though, an `OffscreenCanvas` in a Web Worker shows no new frames, and the worker gets
+ * no more animation frames: the page has to load again.
+ *
  * See `mln_web_canvas_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
@@ -8378,12 +8359,10 @@ public data class FreeCamera(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class MapSnapshot(
-  public val debugFlags: MapDebugFlag,
   /** Grows with each change to the map's state. */
   @get:JvmName("getGeneration") public val generation: ULong,
   /** Whether the style and every resource that the view needs have loaded. */
   public val fullyLoaded: Boolean,
-  public val renderingStatsViewEnabled: Boolean,
   /** Whether a gesture recognizer's gesture, or the glide and snap after it, moves the camera. */
   public val gestureInProgress: Boolean,
   public val transitionInProgress: Boolean,
@@ -8396,18 +8375,14 @@ public data class MapSnapshot(
   public val view: MapView,
   /** Whether the map draws as a globe, alone or blending into Mercator. */
   public val globeRendering: Boolean,
-  /** The setting from `MapHandle.setGlobeFreeBearingEnabled()`. */
-  public val globeFreeBearingEnabled: Boolean,
 ) {
   public companion object {
     /** Creates a value, for Java, which can't call the constructor. */
     @JvmStatic
     @PublishedApi
     internal fun of(
-      debugFlags: MapDebugFlag,
       generation: Long,
       fullyLoaded: Boolean,
-      renderingStatsViewEnabled: Boolean,
       gestureInProgress: Boolean,
       transitionInProgress: Boolean,
       eventMask: RuntimeEventFlag,
@@ -8417,13 +8392,10 @@ public data class MapSnapshot(
       freeCamera: FreeCamera,
       view: MapView,
       globeRendering: Boolean,
-      globeFreeBearingEnabled: Boolean,
     ): MapSnapshot =
       MapSnapshot(
-        debugFlags = debugFlags,
         generation = generation.toULong(),
         fullyLoaded = fullyLoaded,
-        renderingStatsViewEnabled = renderingStatsViewEnabled,
         gestureInProgress = gestureInProgress,
         transitionInProgress = transitionInProgress,
         eventMask = eventMask,
@@ -8433,7 +8405,6 @@ public data class MapSnapshot(
         freeCamera = freeCamera,
         view = view,
         globeRendering = globeRendering,
-        globeFreeBearingEnabled = globeFreeBearingEnabled,
       )
   }
 }
@@ -8927,6 +8898,16 @@ public data class MapViewportOptions(
   public val constrainMode: ConstrainMode? = null,
   public val viewportMode: ViewportMode? = null,
   public val frustumOffset: EdgeInsets? = null,
+  /**
+   * Whether the camera's center stands on the terrain, in place of the center altitude it's given,
+   * the style's included. On by default.
+   */
+  public val centerClampedToGround: Boolean? = null,
+  /**
+   * Whether drags and zooms on a globe turn the bearing to keep the planet's orientation, which
+   * lets a drag carry the camera over a pole. Off by default.
+   */
+  public val globeFreeBearing: Boolean? = null,
 ) {
   @PublishedApi
   internal fun withNorthOrientation(northOrientation: NorthOrientation): MapViewportOptions =
@@ -8943,6 +8924,14 @@ public data class MapViewportOptions(
   @PublishedApi
   internal fun withFrustumOffset(frustumOffset: EdgeInsets): MapViewportOptions =
     copy(frustumOffset = frustumOffset)
+
+  @PublishedApi
+  internal fun withCenterClampedToGround(centerClampedToGround: Boolean): MapViewportOptions =
+    copy(centerClampedToGround = centerClampedToGround)
+
+  @PublishedApi
+  internal fun withGlobeFreeBearing(globeFreeBearing: Boolean): MapViewportOptions =
+    copy(globeFreeBearing = globeFreeBearing)
 
   public companion object {
     /**
@@ -9351,6 +9340,19 @@ public data class GpuDeviceVulkanContextResult(
  */
 public data class MapProjectionCameraResult(
   public val camera: Camera,
+)
+
+/**
+ * The height of the ground at a coordinate.
+ *
+ * See `mln_map_projection_terrain_elevation_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+ */
+public data class MapProjectionTerrainElevationResult(
+  /** Whether the map drew terrain at the coordinate. */
+  public val hasElevation: Boolean,
+  /** Meters above sea level, with the terrain's exaggeration. 0 without `has_elevation`. */
+  public val elevationMeters: Double,
 )
 
 /**
@@ -9900,7 +9902,18 @@ public data class MapOptions(
    * Without it, they do.
    */
   public val localIdeographsEnabled: Boolean? = null,
+  /** The terrain's skirts. Without it, `TerrainSkirtLength.AUTO`. */
+  public val terrainSkirtLength: TerrainSkirtLength? = null,
+  /**
+   * The most GPU memory, in bytes, for the layers drawn over the terrain. Past it, the terrain
+   * farthest from the center of the view looks blurrier. Without it, there's no limit.
+   */
+  @get:JvmSynthetic public val terrainDrapeMemoryLimit: ULong? = null,
 ) {
+  @PublishedApi
+  @JvmName("getTerrainDrapeMemoryLimit")
+  internal fun terrainDrapeMemoryLimitForJava(): Long? = terrainDrapeMemoryLimit?.toLong()
+
   @PublishedApi internal fun withMapMode(mapMode: MapMode): MapOptions = copy(mapMode = mapMode)
 
   @PublishedApi
@@ -9925,6 +9938,14 @@ public data class MapOptions(
   @PublishedApi
   internal fun withLocalIdeographsEnabled(localIdeographsEnabled: Boolean): MapOptions =
     copy(localIdeographsEnabled = localIdeographsEnabled)
+
+  @PublishedApi
+  internal fun withTerrainSkirtLength(terrainSkirtLength: TerrainSkirtLength): MapOptions =
+    copy(terrainSkirtLength = terrainSkirtLength)
+
+  @PublishedApi
+  internal fun withTerrainDrapeMemoryLimit(terrainDrapeMemoryLimit: Long): MapOptions =
+    copy(terrainDrapeMemoryLimit = terrainDrapeMemoryLimit.toULong())
 
   public companion object {
     /**

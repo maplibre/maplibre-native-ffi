@@ -48,7 +48,7 @@ public sealed class HandleLifecycleTests
     public async Task AHandleNamesItsIdAndWhetherItIsClosed()
     {
         await using var fixture = await NativeFixture.CreateAsync();
-        var projection = MapProjectionHandle.Create(fixture.Map.GetSnapshot().View);
+        var projection = fixture.Map.ProjectionCreate();
         var projectionId = $"0x{projection.Id:x}";
         Assert.False(projection.IsClosed);
         Assert.Equal(

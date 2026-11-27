@@ -13,114 +13,14 @@ submodule_paths=("$mln_path" third_party/Vulkan-Headers)
 
 cd "$repo_root"
 
-# Changes we carry against the pinned commit until they land upstream. They are
-# applied to the worktree rather than tracked as a fork, so the submodule keeps
-# pointing at louwers/mln-rs. Each patch file opens with its reason, and the
-# patches apply in filename order.
-shopt -s nullglob
-mln_patches=("$repo_root"/patches/mln-rs/*.patch)
-shopt -u nullglob
-
-# The patches may overlap, so no single patch reverses cleanly on its own once
-# the later ones are on. A sync instead records what it produced: the pinned
-# commit, a hash of the worktree's diff against it, and a hash of the patch
-# list. A worktree that still matches that record is synced. Any edit since,
-# patched path or not, changes the diff hash, and adding, editing, or dropping
-# a patch changes the list hash.
-mln_stamp_path() {
-  printf '%s/mln-ffi-sync.stamp' "$(git -C "$mln_path" rev-parse --absolute-git-dir)"
-}
-
-mln_state() {
-  printf '%s %s %s\n' "$(git -C "$mln_path" rev-parse HEAD)" \
-    "$(git -C "$mln_path" diff --binary HEAD | git hash-object --stdin)" \
-    "$(cat /dev/null "${mln_patches[@]}" | git hash-object --stdin)"
-}
-
-mln_synced() {
-  local stamp
-  stamp="$(mln_stamp_path)"
-  [[ -f "$stamp" ]] && [[ "$(cat "$stamp")" == "$(mln_state)" ]]
-}
-
-# Prints, each ending in a NUL, the paths that a patch introduces: the files it
-# creates, and the destinations of its renames and copies. git apply --numstat
-# -z names each file the patch leaves, unquoted, in the order of the patch's
-# file headers. Those headers say which files are introduced, so the two are
-# read side by side. A header line can't be mistaken for a hunk line, because
-# every hunk line starts with a space, "+", "-", or "\\".
-mln_patch_introduced_paths() {
-  local patch="$1" kinds entry index=0
-  kinds="$(awk '
-    /^diff --git / { if (files++) printf "%s", kind; kind = "."; next }
-    files && /^(new file mode|rename to|copy to) / { kind = "+" }
-    END { if (files) printf "%s", kind }
-  ' "$patch")"
-  while IFS= read -r -d '' entry; do
-    # Drop the added and removed counts in front of the path.
-    [[ "${kinds:index:1}" == "+" ]] && printf '%s\0' "${entry#*$'\t'*$'\t'}"
-    index=$((index + 1))
-  done < <(git -C "$mln_path" apply --numstat -z "$patch")
-  if ((index != ${#kinds})); then
-    printf 'sync-submodules: %s names %d files, but its headers describe %d\n' \
-      "$patch" "$index" "${#kinds}" >&2
-    return 1
-  fi
-}
-
-# Runs on a worktree the forced checkout below just reset, so every patch goes
-# on in order. The checkout restores the files a patch changes or renames
-# away, but leaves the files it introduces in place, so remove those before
-# the patch goes back on. A path that a patch only changes stays, since an
-# earlier patch may have introduced it.
-apply_mln_patches() {
-  local patch path paths
-  for patch in "${mln_patches[@]}"; do
-    paths="$(mktemp)"
-    mln_patch_introduced_paths "$patch" > "$paths"
-    while IFS= read -r -d '' path; do
-      if [[ -d "$mln_path/$(dirname "$path")" ]]; then
-        git -C "$mln_path/$(dirname "$path")" clean -fq -- "$(basename "$path")"
-      fi
-    done < "$paths"
-    rm -f "$paths"
-    git -C "$mln_path" apply "$patch"
-  done
-  mln_state > "$(mln_stamp_path)"
-}
-
-# A synced worktree is modified in exactly the paths that the listed patches
-# touch, so a tracked change anywhere else is an edit made by hand or a
-# leftover from a patch that has since left the list.
-mln_unexplained_paths() {
-  local patch patched path
-  patched="$(
-    for patch in "${mln_patches[@]}"; do
-      # --numstat reads the patch alone; its columns are added, removed, path.
-      git -C "$mln_path" apply --numstat "$patch" | cut -f3
-    done
-  )"
-  git -C "$mln_path" status --porcelain --untracked-files=no | cut -c4- |
-    while read -r path; do
-      grep -qxF "$path" <<<"$patched" || printf '%s\n' "$path"
-    done
-}
-
-# The submodule worktrees are managed rather than edited, so the update runs
-# with --force: it throws away local changes and checks out even when a
-# submodule already sits at its pinned commit. That is what puts a worktree
-# carrying an applied patch back on the pinned files before the patch goes on
-# again, whether the patch was since edited or dropped from the list entirely.
-#
-# Report the paths that no listed patch accounts for, because an edit made by
-# hand goes with them. Paths that a patch does account for are routine: the
-# checkout resets them and the patch goes back on.
+# A local edit in mln-rs stays until the pin changes, when the forced checkout
+# below discards it. Name the files that go with it.
 report_discarded_mln_changes() {
   local changes
   if [[ ! -e "$mln_path/.git" ]]; then
     return 0
   fi
-  changes="$(mln_unexplained_paths)"
+  changes="$(git -C "$mln_path" status --porcelain --untracked-files=no | cut -c4-)"
   if [[ -n "$changes" ]]; then
     printf 'sync-submodules: discarding local changes in %s\n%s\n' \
       "$mln_path" "$changes" >&2
@@ -130,8 +30,7 @@ report_discarded_mln_changes() {
 status="$(git submodule status "${submodule_paths[@]}" 2>/dev/null || true)"
 status_count="$(printf '%s\n' "$status" | sed '/^$/d' | wc -l | tr -d ' ')"
 if [[ "$status_count" == "${#submodule_paths[@]}" ]] &&
-  ! grep -qE '^[+-U]' <<<"$status" &&
-  mln_synced; then
+  ! grep -qE '^[+-U]' <<<"$status"; then
   exit 0
 fi
 
@@ -142,5 +41,3 @@ git -c submodule.recurse=false submodule sync "${submodule_paths[@]}"
 # skip them when resolving a git dependency on this repository. --checkout is
 # the opt back in for the builds that do need the source.
 git -c submodule.recurse=false submodule update --init --checkout --force --depth 1 "${submodule_paths[@]}"
-
-apply_mln_patches

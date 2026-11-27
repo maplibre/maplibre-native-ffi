@@ -135,9 +135,7 @@ def camera(map_handle: mln.MapHandle) -> None:
         tick(recognizer, 32)
 
     # #region convert
-    with mln.MapProjectionHandle.create(
-        map_handle.get_snapshot().view
-    ) as projection:
+    with map_handle.projection_create() as projection:
         coordinate = projection.lat_lng_for_pixel(
             mln.ScreenPoint(x=100, y=200)
         )

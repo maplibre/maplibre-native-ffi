@@ -15,5 +15,7 @@ public readonly partial record struct MapViewport(
     NorthOrientation NorthOrientation,
     ConstrainMode ConstrainMode,
     ViewportMode ViewportMode,
-    EdgeInsets FrustumOffset
+    EdgeInsets FrustumOffset,
+    bool CenterClampedToGround,
+    bool GlobeFreeBearing
 );

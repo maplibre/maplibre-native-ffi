@@ -189,20 +189,6 @@ internal fun NativeArena.writeLogicalExtent(value: LogicalExtent): Long =
   allocate(16, w(8, 8, 4)).also { putLogicalExtent(it, value) }
 
 @JvmSynthetic
-internal fun NativeArena.putMapView(target: Long, value: MapView) {
-  writeU32(target, w(208, 208, 196).toUInt())
-  putCamera(target + w(8, 8, 4), value.camera)
-  putLogicalExtent(target + w(104, 104, 100), value.extent)
-  putProjectionMode(target + w(120, 120, 116), value.projectionMode)
-  putMapViewport(target + w(144, 144, 136), value.viewport)
-  putProjectionDefinition(target + w(192, 192, 180), value.projection)
-}
-
-@JvmSynthetic
-internal fun NativeArena.writeMapView(value: MapView): Long =
-  allocate(w(208, 208, 196), w(8, 8, 4)).also { putMapView(it, value) }
-
-@JvmSynthetic
 internal fun NativeArena.putLatLng(target: Long, value: LatLng) {
   writeF64(target, value.latitude)
   writeF64(target + 8, value.longitude)
@@ -688,6 +674,20 @@ internal fun NativeArena.writeCameraOptions(value: CameraOptions): Long =
   allocate(120, w(8, 8, 4)).also { putCameraOptions(it, value) }
 
 @JvmSynthetic
+internal fun NativeArena.putMapView(target: Long, value: MapView) {
+  writeU32(target, w(216, 216, 200).toUInt())
+  putCamera(target + w(8, 8, 4), value.camera)
+  putLogicalExtent(target + w(104, 104, 100), value.extent)
+  putProjectionMode(target + w(120, 120, 116), value.projectionMode)
+  putMapViewport(target + w(144, 144, 136), value.viewport)
+  putProjectionDefinition(target + w(200, 200, 184), value.projection)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeMapView(value: MapView): Long =
+  allocate(w(216, 216, 200), w(8, 8, 4)).also { putMapView(it, value) }
+
+@JvmSynthetic
 internal fun NativeArena.putBoundOptions(target: Long, value: BoundOptions) {
   writeU32(target, 72.toUInt())
   var fields = 0u
@@ -866,7 +866,7 @@ internal fun NativeArena.writeMapTileOptions(value: MapTileOptions): Long =
 
 @JvmSynthetic
 internal fun NativeArena.putMapViewportOptions(target: Long, value: MapViewportOptions) {
-  writeU32(target, w(56, 56, 52).toUInt())
+  writeU32(target, w(64, 64, 56).toUInt())
   var fields = 0u
   value.northOrientation?.let {
     fields = fields or 1u
@@ -884,12 +884,20 @@ internal fun NativeArena.putMapViewportOptions(target: Long, value: MapViewportO
     fields = fields or 8u
     putEdgeInsets(target + w(24, 24, 20), it)
   }
+  value.centerClampedToGround?.let {
+    fields = fields or 16u
+    writeBool(target + w(56, 56, 52), it)
+  }
+  value.globeFreeBearing?.let {
+    fields = fields or 32u
+    writeBool(target + w(57, 57, 53), it)
+  }
   writeU32(target + 4, fields)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeMapViewportOptions(value: MapViewportOptions): Long =
-  allocate(w(56, 56, 52), w(8, 8, 4)).also { putMapViewportOptions(it, value) }
+  allocate(w(64, 64, 56), w(8, 8, 4)).also { putMapViewportOptions(it, value) }
 
 @JvmSynthetic
 internal fun NativeCall.putCameraUpdate(target: Long, value: CameraUpdate) {
@@ -1123,7 +1131,7 @@ internal fun NativeArena.writeResourceTransformError(value: ResourceTransformErr
 
 @JvmSynthetic
 internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
-  writeU32(target, w(56, 72).toUInt())
+  writeU32(target, w(72, 80, 68).toUInt())
   var fields = 0u
   putLogicalExtent(target + 8, value.initialExtent)
   writeU32(target + 24, value.mapMode.rawValue)
@@ -1145,12 +1153,20 @@ internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
     fields = fields or 8u
     writeBool(target + w(53, 65), it)
   }
+  value.terrainSkirtLength?.let {
+    fields = fields or 16u
+    writeU32(target + w(56, 68), it.rawValue)
+  }
+  value.terrainDrapeMemoryLimit?.let {
+    fields = fields or 32u
+    writeU64(target + w(64, 72, 60), it)
+  }
   writeU32(target + 4, fields)
 }
 
 @JvmSynthetic
 internal fun NativeArena.writeMapOptions(value: MapOptions): Long =
-  allocate(w(56, 72), w(8, 8, 4)).also { putMapOptions(it, value) }
+  allocate(w(72, 80, 68), w(8, 8, 4)).also { putMapOptions(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: OfflineRegionDefinition) {
@@ -1444,8 +1460,8 @@ internal fun readRenderFrameResult(source: Long): RenderFrameResult =
     frameGeneration = readU64(source + 32),
     needsRepaint = readBool(source + 40),
     view = readMapView(source + w(48, 48, 44)),
-    frameProjection = readFrameProjection(source + w(256, 256, 240)),
-    mode = RenderMode.of(readU32(source + w(424, 424, 400))),
+    frameProjection = readFrameProjection(source + w(264, 264, 244)),
+    mode = RenderMode.of(readU32(source + w(432, 432, 404))),
   )
 
 @JvmSynthetic
@@ -1516,20 +1532,17 @@ internal fun readCameraQueryResult(source: Long): CameraQueryResult =
 @JvmSynthetic
 internal fun readMapSnapshot(source: Long): MapSnapshot =
   MapSnapshot(
-    debugFlags = MapDebugFlag.of(readU32(source + 4)),
-    generation = readU64(source + 8),
-    fullyLoaded = readBool(source + 16),
-    renderingStatsViewEnabled = readBool(source + 17),
-    gestureInProgress = readBool(source + 18),
-    transitionInProgress = readBool(source + 19),
-    eventMask = RuntimeEventFlag.of(readU64(source + w(24, 24, 20))),
-    latestRenderUpdateGeneration = readU64(source + w(32, 32, 28)),
-    tile = readMapTileSettings(source + w(40, 40, 36)),
-    bounds = readCameraBounds(source + w(88, 88, 76)),
-    freeCamera = readFreeCamera(source + w(160, 160, 144)),
-    view = readMapView(source + w(216, 216, 200)),
-    globeRendering = readBool(source + w(424, 424, 396)),
-    globeFreeBearingEnabled = readBool(source + w(425, 425, 397)),
+    generation = readU64(source + w(8, 8, 4)),
+    fullyLoaded = readBool(source + w(16, 16, 12)),
+    gestureInProgress = readBool(source + w(17, 17, 13)),
+    transitionInProgress = readBool(source + w(18, 18, 14)),
+    eventMask = RuntimeEventFlag.of(readU64(source + w(24, 24, 16))),
+    latestRenderUpdateGeneration = readU64(source + w(32, 32, 24)),
+    tile = readMapTileSettings(source + w(40, 40, 32)),
+    bounds = readCameraBounds(source + w(88, 88, 72)),
+    freeCamera = readFreeCamera(source + w(160, 160, 140)),
+    view = readMapView(source + w(216, 216, 196)),
+    globeRendering = readBool(source + w(432, 432, 396)),
   )
 
 @JvmSynthetic
@@ -1654,6 +1667,15 @@ internal fun readMapProjectionCameraResult(source: Long): MapProjectionCameraRes
   MapProjectionCameraResult(camera = readCamera(source + w(8, 8, 4)))
 
 @JvmSynthetic
+internal fun readMapProjectionTerrainElevationResult(
+  source: Long,
+): MapProjectionTerrainElevationResult =
+  MapProjectionTerrainElevationResult(
+    hasElevation = readBool(source + 4),
+    elevationMeters = readF64(source + 8),
+  )
+
+@JvmSynthetic
 internal fun readScreenPoint(source: Long): ScreenPoint =
   ScreenPoint(x = readF64(source), y = readF64(source + 8))
 
@@ -1670,7 +1692,7 @@ internal fun readRenderFrameBatchView(source: Long): List<RenderFrameResult> =
     readAddress(source + 8),
     readSize(source + w(12, 16)),
     readU32(source + 4).toULong(),
-    w(432, 432, 404),
+    w(440, 440, 408),
   ) { item ->
     readRenderFrameResult(item)
   }
@@ -1824,56 +1846,6 @@ internal fun NativeArena.putVulkanContextDescriptor(target: Long, value: VulkanC
 @JvmSynthetic
 internal fun NativeArena.writeVulkanContextDescriptor(value: VulkanContextDescriptor): Long =
   allocate(w(28, 56), w(4, 8)).also { putVulkanContextDescriptor(it, value) }
-
-@JvmSynthetic
-internal fun NativeArena.putCamera(target: Long, value: Camera) {
-  putLatLng(target, value.center)
-  writeF64(target + 16, value.centerAltitude)
-  putEdgeInsets(target + 24, value.padding)
-  writeF64(target + 56, value.zoom)
-  writeF64(target + 64, value.bearing)
-  writeF64(target + 72, value.pitch)
-  writeF64(target + 80, value.roll)
-  writeF64(target + 88, value.fieldOfView)
-}
-
-@JvmSynthetic
-internal fun NativeArena.writeCamera(value: Camera): Long =
-  allocate(96, w(8, 8, 4)).also { putCamera(it, value) }
-
-@JvmSynthetic
-internal fun NativeArena.putProjectionMode(target: Long, value: ProjectionMode) {
-  writeBool(target, value.axonometric)
-  writeF64(target + w(8, 8, 4), value.xSkew)
-  writeF64(target + w(16, 16, 12), value.ySkew)
-}
-
-@JvmSynthetic
-internal fun NativeArena.writeProjectionMode(value: ProjectionMode): Long =
-  allocate(w(24, 24, 20), w(8, 8, 4)).also { putProjectionMode(it, value) }
-
-@JvmSynthetic
-internal fun NativeArena.putMapViewport(target: Long, value: MapViewport) {
-  writeU32(target, value.northOrientation.rawValue)
-  writeU32(target + 4, value.constrainMode.rawValue)
-  writeU32(target + 8, value.viewportMode.rawValue)
-  putEdgeInsets(target + w(16, 16, 12), value.frustumOffset)
-}
-
-@JvmSynthetic
-internal fun NativeArena.writeMapViewport(value: MapViewport): Long =
-  allocate(w(48, 48, 44), w(8, 8, 4)).also { putMapViewport(it, value) }
-
-@JvmSynthetic
-internal fun NativeArena.putProjectionDefinition(target: Long, value: ProjectionDefinition) {
-  writeU32(target, value.from.rawValue)
-  writeU32(target + 4, value.to.rawValue)
-  writeF64(target + 8, value.transition)
-}
-
-@JvmSynthetic
-internal fun NativeArena.writeProjectionDefinition(value: ProjectionDefinition): Long =
-  allocate(16, w(8, 8, 4)).also { putProjectionDefinition(it, value) }
 
 @JvmSynthetic
 internal fun NativeArena.putStyleExpressionType(target: Long, value: StyleExpressionType) {
@@ -2306,6 +2278,58 @@ internal fun NativeArena.writeFeatureId(value: FeatureId): Long =
   allocate(w(16, 24, 12), w(8, 8, 4)).also { putFeatureId(it, value) }
 
 @JvmSynthetic
+internal fun NativeArena.putCamera(target: Long, value: Camera) {
+  putLatLng(target, value.center)
+  writeF64(target + 16, value.centerAltitude)
+  putEdgeInsets(target + 24, value.padding)
+  writeF64(target + 56, value.zoom)
+  writeF64(target + 64, value.bearing)
+  writeF64(target + 72, value.pitch)
+  writeF64(target + 80, value.roll)
+  writeF64(target + 88, value.fieldOfView)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeCamera(value: Camera): Long =
+  allocate(96, w(8, 8, 4)).also { putCamera(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putProjectionMode(target: Long, value: ProjectionMode) {
+  writeBool(target, value.axonometric)
+  writeF64(target + w(8, 8, 4), value.xSkew)
+  writeF64(target + w(16, 16, 12), value.ySkew)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeProjectionMode(value: ProjectionMode): Long =
+  allocate(w(24, 24, 20), w(8, 8, 4)).also { putProjectionMode(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putMapViewport(target: Long, value: MapViewport) {
+  writeU32(target, value.northOrientation.rawValue)
+  writeU32(target + 4, value.constrainMode.rawValue)
+  writeU32(target + 8, value.viewportMode.rawValue)
+  putEdgeInsets(target + w(16, 16, 12), value.frustumOffset)
+  writeBool(target + w(48, 48, 44), value.centerClampedToGround)
+  writeBool(target + w(49, 49, 45), value.globeFreeBearing)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeMapViewport(value: MapViewport): Long =
+  allocate(w(56, 56, 48), w(8, 8, 4)).also { putMapViewport(it, value) }
+
+@JvmSynthetic
+internal fun NativeArena.putProjectionDefinition(target: Long, value: ProjectionDefinition) {
+  writeU32(target, value.from.rawValue)
+  writeU32(target + 4, value.to.rawValue)
+  writeF64(target + 8, value.transition)
+}
+
+@JvmSynthetic
+internal fun NativeArena.writeProjectionDefinition(value: ProjectionDefinition): Long =
+  allocate(16, w(8, 8, 4)).also { putProjectionDefinition(it, value) }
+
+@JvmSynthetic
 internal fun NativeArena.putVec3(target: Long, value: Vec3) {
   writeF64(target, value.x)
   writeF64(target + 8, value.y)
@@ -2539,7 +2563,7 @@ internal fun readCustomLayerRenderParameters(source: Long): CustomLayerRenderPar
         }
       },
     frame = readCustomLayerFrame(source + w(64, 96)),
-    layerDepth = readF64(source + w(448, 480, 428)),
+    layerDepth = readF64(source + w(456, 488, 432)),
   )
 
 @JvmSynthetic
@@ -2583,7 +2607,7 @@ internal fun readMapView(source: Long): MapView =
     extent = readLogicalExtent(source + w(104, 104, 100)),
     projectionMode = readProjectionMode(source + w(120, 120, 116)),
     viewport = readMapViewport(source + w(144, 144, 136)),
-    projection = readProjectionDefinition(source + w(192, 192, 180)),
+    projection = readProjectionDefinition(source + w(200, 200, 184)),
   )
 
 @JvmSynthetic
@@ -2951,9 +2975,9 @@ internal fun readD3d12CustomLayerEncoder(source: Long): D3d12CustomLayerEncoder 
 internal fun readCustomLayerFrame(source: Long): CustomLayerFrame =
   CustomLayerFrame(
     view = readMapView(source),
-    frameProjection = readFrameProjection(source + w(208, 208, 196)),
-    width = readU32(source + w(376, 376, 356)),
-    height = readU32(source + w(380, 380, 360)),
+    frameProjection = readFrameProjection(source + w(216, 216, 200)),
+    width = readU32(source + w(384, 384, 360)),
+    height = readU32(source + w(388, 388, 364)),
   )
 
 @JvmSynthetic
@@ -3063,6 +3087,8 @@ internal fun readMapViewport(source: Long): MapViewport =
     constrainMode = ConstrainMode.of(readU32(source + 4)),
     viewportMode = ViewportMode.of(readU32(source + 8)),
     frustumOffset = readEdgeInsets(source + w(16, 16, 12)),
+    centerClampedToGround = readBool(source + w(48, 48, 44)),
+    globeFreeBearing = readBool(source + w(49, 49, 45)),
   )
 
 @JvmSynthetic

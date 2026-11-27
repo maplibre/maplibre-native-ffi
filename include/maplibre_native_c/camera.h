@@ -18,36 +18,6 @@
 extern "C" {
 #endif
 
-/**
- * Draws debugging overlays, such as tile borders, on the map.
- *
- * `flags` replaces the overlays set before.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_debug_flags(
-  mln_map map, mln_map_debug_flags flags, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-/** Shows or hides an overlay of rendering statistics on the map. */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
-  mln_map map, bool enabled, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-/**
- * Sets whether drags and zooms on a globe turn the bearing.
- *
- * When it's on, a drag or a zoom around a point on the globe turns the bearing
- * so the planet keeps its orientation, and a drag can carry the camera over a
- * pole. When it's off, the default, they keep the bearing, as MapLibre GL JS
- * does. Turn it on for a map whose users can rotate it. It changes nothing
- * while the map draws Mercator.
- */
-MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_globe_free_bearing_enabled(
-  mln_map map, bool enabled, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
 /** Logs debugging information about the map's style and sources. */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_dump_debug_logs(

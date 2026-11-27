@@ -147,11 +147,7 @@ internal static class Camera
         recognizer.Release();
 
         // #region convert
-        using (
-            var projection = MapProjectionHandle.Create(
-                map.GetSnapshot().View
-            )
-        )
+        using (var projection = map.ProjectionCreate())
         {
             var coordinate = projection.LatLngForPixel(
                 new ScreenPoint(100, 200)

@@ -4,7 +4,7 @@
 # passes --checkout to opt back in for the builds that need the source.
 [submodule "third_party/mln-rs"]
 	path = third_party/mln-rs
-	url = https://github.com/louwers/mln-rs
+	url = https://github.com/maplibre/mln-rs
 	shallow = true
 	ignore = dirty
 	update = none

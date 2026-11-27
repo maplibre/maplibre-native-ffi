@@ -2775,19 +2775,31 @@ static napi_value mln_ts_export_mln_map_projection_create(
 ) {
   mln_ts_call call_state;
   mln_ts_call* call = &call_state;
+  mln_map arg_map = 0;
   mln_map_view arg_view;
+  const void* present_view = NULL;
   mln_map_projection arg_out_projection = MLN_HANDLE_NULL;
   mln_diagnostic diagnostic;
   mln_status status;
-  if (!mln_ts_begin(call, env, info, 1)) return NULL;
-  memset(&arg_view, 0, sizeof arg_view);
-  arg_view.size = sizeof arg_view;
-  if (!mln_ts_read_record(call, call->argv[0], "view")) goto done;
-  if (!mln_ts_write_map_view(call, call->argv[0], &arg_view, "view")) goto done;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
+    arg_map = (mln_map)number;
+  }
+  if (!mln_ts_is_absent(call, call->argv[1])) {
+    memset(&arg_view, 0, sizeof arg_view);
+    arg_view.size = sizeof arg_view;
+    if (!mln_ts_read_record(call, call->argv[1], "view")) goto done;
+    if (!mln_ts_write_map_view(call, call->argv[1], &arg_view, "view"))
+      goto done;
+    present_view = &arg_view;
+  }
   diagnostic.size = sizeof diagnostic;
   diagnostic.message[0] = '\0';
-  status =
-    mln_map_projection_create(&arg_view, &arg_out_projection, &diagnostic);
+  status = mln_map_projection_create(
+    arg_map, present_view, &arg_out_projection, &diagnostic
+  );
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
   call->result = mln_ts_u64(env, (uint64_t)arg_out_projection);
 done:
@@ -2817,6 +2829,41 @@ static napi_value mln_ts_export_mln_map_projection_get_camera(
     mln_map_projection_get_camera(arg_projection, &arg_out_result, &diagnostic);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
   call->result = mln_ts_read_map_projection_camera_result(
+    env, &(arg_out_result), sizeof(arg_out_result)
+  );
+done:
+  return mln_ts_end(call);
+}
+
+static napi_value mln_ts_export_mln_map_projection_get_terrain_elevation(
+  napi_env env, napi_callback_info info
+) {
+  mln_ts_call call_state;
+  mln_ts_call* call = &call_state;
+  mln_map_projection arg_projection = 0;
+  mln_lat_lng arg_coordinate;
+  mln_map_projection_terrain_elevation_result arg_out_result;
+  mln_diagnostic diagnostic;
+  mln_status status;
+  if (!mln_ts_begin(call, env, info, 2)) return NULL;
+  {
+    uint64_t number = 0;
+    if (!mln_ts_read_u64(call, call->argv[0], &number, "projection")) goto done;
+    arg_projection = (mln_map_projection)number;
+  }
+  memset(&arg_coordinate, 0, sizeof arg_coordinate);
+  if (!mln_ts_read_record(call, call->argv[1], "coordinate")) goto done;
+  if (!mln_ts_write_lat_lng(call, call->argv[1], &arg_coordinate, "coordinate"))
+    goto done;
+  memset(&arg_out_result, 0, sizeof arg_out_result);
+  arg_out_result.size = sizeof arg_out_result;
+  diagnostic.size = sizeof diagnostic;
+  diagnostic.message[0] = '\0';
+  status = mln_map_projection_get_terrain_elevation(
+    arg_projection, arg_coordinate, &arg_out_result, &diagnostic
+  );
+  if (!mln_ts_check(call, status, &diagnostic)) goto done;
+  call->result = mln_ts_read_map_projection_terrain_elevation_result(
     env, &(arg_out_result), sizeof(arg_out_result)
   );
 done:
@@ -3657,47 +3704,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_set_debug_flags(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  mln_map_debug_flags arg_flags;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_flags, 0, sizeof arg_flags);
-  {
-    int64_t number = 0;
-    if (!mln_ts_read_int(
-          call, call->argv[1], 0LL, 4294967295LL, &number, "flags"
-        ))
-      goto done;
-    arg_flags = (mln_map_debug_flags)number;
-  }
-  if (!mln_ts_read_completion(
-        call, call->argv[2], true, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_set_debug_flags(
-    arg_map, arg_flags, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_map_set_event_mask(
   napi_env env, napi_callback_info info
 ) {
@@ -3968,44 +3974,6 @@ done:
   return mln_ts_end(call);
 }
 
-static napi_value mln_ts_export_mln_map_set_globe_free_bearing_enabled(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  bool arg_enabled;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_enabled, 0, sizeof arg_enabled);
-  {
-    bool flag = false;
-    if (!mln_ts_read_bool(call, call->argv[1], &flag, "enabled")) goto done;
-    arg_enabled = flag;
-  }
-  if (!mln_ts_read_completion(
-        call, call->argv[2], true, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_set_globe_free_bearing_enabled(
-    arg_map, arg_enabled, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
 static napi_value mln_ts_export_mln_map_set_image_source_coordinates(
   napi_env env, napi_callback_info info
 ) {
@@ -4163,44 +4131,6 @@ static napi_value mln_ts_export_mln_map_set_projection_mode(
   diagnostic.message[0] = '\0';
   status = mln_map_set_projection_mode(
     arg_map, &arg_options, present_completion, &diagnostic
-  );
-  if (status == MLN_STATUS_OK) mln_ts_accept(call);
-  if (!mln_ts_check(call, status, &diagnostic)) goto done;
-done:
-  return mln_ts_end(call);
-}
-
-static napi_value mln_ts_export_mln_map_set_rendering_stats_view_enabled(
-  napi_env env, napi_callback_info info
-) {
-  mln_ts_call call_state;
-  mln_ts_call* call = &call_state;
-  mln_map arg_map = 0;
-  bool arg_enabled;
-  mln_completion arg_completion;
-  const mln_completion* present_completion = NULL;
-  mln_diagnostic diagnostic;
-  mln_status status;
-  if (!mln_ts_begin(call, env, info, 3)) return NULL;
-  {
-    uint64_t number = 0;
-    if (!mln_ts_read_u64(call, call->argv[0], &number, "map")) goto done;
-    arg_map = (mln_map)number;
-  }
-  memset(&arg_enabled, 0, sizeof arg_enabled);
-  {
-    bool flag = false;
-    if (!mln_ts_read_bool(call, call->argv[1], &flag, "enabled")) goto done;
-    arg_enabled = flag;
-  }
-  if (!mln_ts_read_completion(
-        call, call->argv[2], true, NULL, &arg_completion, &present_completion
-      ))
-    goto done;
-  diagnostic.size = sizeof diagnostic;
-  diagnostic.message[0] = '\0';
-  status = mln_map_set_rendering_stats_view_enabled(
-    arg_map, arg_enabled, present_completion, &diagnostic
   );
   if (status == MLN_STATUS_OK) mln_ts_accept(call);
   if (!mln_ts_check(call, status, &diagnostic)) goto done;
@@ -7162,6 +7092,8 @@ static const mln_ts_export exports[] = {
   {"mln_map_projection_create", mln_ts_export_mln_map_projection_create},
   {"mln_map_projection_get_camera",
    mln_ts_export_mln_map_projection_get_camera},
+  {"mln_map_projection_get_terrain_elevation",
+   mln_ts_export_mln_map_projection_get_terrain_elevation},
   {"mln_map_projection_is_location_occluded",
    mln_ts_export_mln_map_projection_is_location_occluded},
   {"mln_map_projection_lat_lng_for_pixel",
@@ -7198,7 +7130,6 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_set_custom_vector_source_tile_data},
   {"mln_map_set_custom_vector_source_tile_error",
    mln_ts_export_mln_map_set_custom_vector_source_tile_error},
-  {"mln_map_set_debug_flags", mln_ts_export_mln_map_set_debug_flags},
   {"mln_map_set_event_mask", mln_ts_export_mln_map_set_event_mask},
   {"mln_map_set_feature_state", mln_ts_export_mln_map_set_feature_state},
   {"mln_map_set_free_camera_options",
@@ -7211,16 +7142,12 @@ static const mln_ts_export exports[] = {
    mln_ts_export_mln_map_set_geo_json_source_url},
   {"mln_map_set_global_state_property",
    mln_ts_export_mln_map_set_global_state_property},
-  {"mln_map_set_globe_free_bearing_enabled",
-   mln_ts_export_mln_map_set_globe_free_bearing_enabled},
   {"mln_map_set_image_source_coordinates",
    mln_ts_export_mln_map_set_image_source_coordinates},
   {"mln_map_set_image_source_image",
    mln_ts_export_mln_map_set_image_source_image},
   {"mln_map_set_image_source_url", mln_ts_export_mln_map_set_image_source_url},
   {"mln_map_set_projection_mode", mln_ts_export_mln_map_set_projection_mode},
-  {"mln_map_set_rendering_stats_view_enabled",
-   mln_ts_export_mln_map_set_rendering_stats_view_enabled},
   {"mln_map_set_style_image", mln_ts_export_mln_map_set_style_image},
   {"mln_map_set_style_json", mln_ts_export_mln_map_set_style_json},
   {"mln_map_set_style_layer_property",

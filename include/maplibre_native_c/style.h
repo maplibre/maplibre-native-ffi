@@ -1447,8 +1447,9 @@ MLN_API mln_status mln_map_get_style_layer_json(
  * reloading the style.
  *
  * `property_name` is a root property other than `sources` and `layers`, which
- * the source and layer calls change. A null `value` resets the property to its
- * default, as if the style didn't set it.
+ * the source and layer calls change, or an extension's member, named
+ * `<namespace>:<name>`. A null `value` resets the property to its default, as
+ * if the style didn't set it.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when `property_name` isn't a root property, is
@@ -1543,9 +1544,10 @@ MLN_API mln_status mln_map_get_style_transition_options(
  * Sets a property of a layer in the map's style.
  *
  * `property_name` is one of the layer's layout or paint
- * [properties](https://maplibre.org/maplibre-style-spec/layers/), or `filter`,
- * `minzoom`, `maxzoom`, `source`, or `source-layer`. A null `value` resets any
- * of these but `source` and `source-layer` to its default.
+ * [properties](https://maplibre.org/maplibre-style-spec/layers/), `filter`,
+ * `minzoom`, `maxzoom`, `source`, or `source-layer`, or an extension's member,
+ * named `<namespace>:<name>`. A null `value` resets any of these but `source`
+ * and `source-layer` to its default.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when the style has no layer named `layer_id`.

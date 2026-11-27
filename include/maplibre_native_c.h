@@ -2,7 +2,7 @@
  * @file maplibre_native_c.h
  * The MapLibre Native C API. Every declaration follows the
  * [API
- * guidelines](https://github.com/louwers/mln-rs/blob/main/crates/mln_c/README.md#api-guidelines).
+ * guidelines](https://github.com/maplibre/mln-rs/blob/main/crates/mln_c/README.md#api-guidelines).
  */
 
 #ifndef MAPLIBRE_NATIVE_C_H

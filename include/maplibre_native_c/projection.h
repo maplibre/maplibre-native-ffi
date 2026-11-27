@@ -21,18 +21,23 @@ extern "C" {
 #endif
 
 /**
- * Creates a projection that converts coordinates for one view of a map.
+ * Creates a projection that converts coordinates as a map does, for one view
+ * of it.
  *
- * Create it from the `view` of an mln_map_snapshot or an
- * mln_render_frame_result. The projection doesn't follow the map, so create a
- * new one after the map's camera, size, or style projection changes.
+ * `view` is the view to convert for, such as a frame result's, or null for the
+ * map's current view. Over terrain, coordinates convert on the ground that the
+ * map drew. The projection doesn't follow the map, so create a new one after
+ * the map's view or terrain changes.
  *
  * Returns:
+ * - MLN_STATUS_INVALID_STATE until mln_runtime_create_map() completes with
+ *   MLN_STATUS_OK.
  * - MLN_STATUS_UNSUPPORTED when the view's style projection draws a globe and
  *   the library can't project one.
  */
+MLN_BINDING("execution=snapshot")
 MLN_API mln_status mln_map_projection_create(
-  const mln_map_view* view,
+  mln_map map, const mln_map_view* view MLN_BINDING("nullable=true"),
   mln_map_projection* out_projection MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -157,6 +162,26 @@ MLN_API mln_status mln_map_projection_lat_lngs_for_pixels_unwrapped(
   const mln_screen_point* points MLN_BINDING("length=point_count"),
   size_t point_count,
   mln_lat_lng* out_coordinates MLN_BINDING("direction=out;length=point_count"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/** The height of the ground at a coordinate. */
+typedef struct mln_map_projection_terrain_elevation_result {
+  uint32_t size;
+  /** Whether the map drew terrain at the coordinate. */
+  bool has_elevation;
+  /**
+   * Meters above sea level, with the terrain's exaggeration. 0 without
+   * `has_elevation`.
+   */
+  double elevation_meters;
+} mln_map_projection_terrain_elevation_result;
+
+/** Reads the height of the terrain that the map drew at a coordinate. */
+MLN_API mln_status mln_map_projection_get_terrain_elevation(
+  mln_map_projection projection, mln_lat_lng coordinate,
+  mln_map_projection_terrain_elevation_result* out_result
+    MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

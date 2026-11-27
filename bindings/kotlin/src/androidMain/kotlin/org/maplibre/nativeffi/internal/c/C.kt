@@ -611,8 +611,10 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int
 
+  @CriticalNative
   @JvmStatic
   actual external fun mln_map_projection_create(
+    map: Long,
     view: Long,
     outProjection: Long,
     outDiagnostic: Long,
@@ -621,6 +623,14 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_map_projection_get_camera(
     projection: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
+  actual external fun mln_map_projection_get_terrain_elevation(
+    projection: Long,
+    coordinate: Long,
     outResult: Long,
     outDiagnostic: Long,
   ): Int
@@ -804,14 +814,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_debug_flags(
-    map: Long,
-    flags: Int,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_set_event_mask(
     map: Long,
     mask: Long,
@@ -873,14 +875,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_set_globe_free_bearing_enabled(
-    map: Long,
-    enabled: Boolean,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_set_image_source_coordinates(
     map: Long,
     sourceId: Long,
@@ -912,14 +906,6 @@ internal actual object C {
   actual external fun mln_map_set_projection_mode(
     map: Long,
     options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_set_rendering_stats_view_enabled(
-    map: Long,
-    enabled: Boolean,
     completion: Long,
     outDiagnostic: Long,
   ): Int

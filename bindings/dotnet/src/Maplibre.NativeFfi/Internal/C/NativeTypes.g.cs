@@ -872,6 +872,8 @@ internal unsafe struct mln_map_options
     public mln_buffer_view fallback_font_faces;
     public byte system_fonts_enabled;
     public byte local_ideographs_enabled;
+    public mln_terrain_skirt_length terrain_skirt_length;
+    public ulong terrain_drape_memory_limit;
 }
 
 internal unsafe struct mln_map_projection_camera_result
@@ -880,13 +882,18 @@ internal unsafe struct mln_map_projection_camera_result
     public mln_camera camera;
 }
 
+internal unsafe struct mln_map_projection_terrain_elevation_result
+{
+    public uint size;
+    public byte has_elevation;
+    public double elevation_meters;
+}
+
 internal unsafe struct mln_map_snapshot
 {
     public uint size;
-    public uint debug_flags;
     public ulong generation;
     public byte fully_loaded;
-    public byte rendering_stats_view_enabled;
     public byte gesture_in_progress;
     public byte transition_in_progress;
     public ulong event_mask;
@@ -896,7 +903,6 @@ internal unsafe struct mln_map_snapshot
     public mln_free_camera free_camera;
     public mln_map_view view;
     public byte globe_rendering;
-    public byte globe_free_bearing_enabled;
 }
 
 internal unsafe struct mln_map_tile_options
@@ -937,6 +943,8 @@ internal unsafe struct mln_map_viewport
     public mln_constrain_mode constrain_mode;
     public mln_viewport_mode viewport_mode;
     public mln_edge_insets frustum_offset;
+    public byte center_clamped_to_ground;
+    public byte globe_free_bearing;
 }
 
 internal unsafe struct mln_map_viewport_options
@@ -947,6 +955,8 @@ internal unsafe struct mln_map_viewport_options
     public mln_constrain_mode constrain_mode;
     public mln_viewport_mode viewport_mode;
     public mln_edge_insets frustum_offset;
+    public byte center_clamped_to_ground;
+    public byte globe_free_bearing;
 }
 
 internal unsafe struct mln_mat4
@@ -2365,17 +2375,6 @@ internal enum mln_log_severity_flag : uint
     MLN_LOG_SEVERITY_FLAG_ALL = 14,
 }
 
-internal enum mln_map_debug_flag : uint
-{
-    MLN_MAP_DEBUG_TILE_BORDERS = 2,
-    MLN_MAP_DEBUG_PARSE_STATUS = 4,
-    MLN_MAP_DEBUG_TIMESTAMPS = 8,
-    MLN_MAP_DEBUG_COLLISION = 16,
-    MLN_MAP_DEBUG_OVERDRAW = 32,
-    MLN_MAP_DEBUG_STENCIL_CLIP = 64,
-    MLN_MAP_DEBUG_DEPTH_BUFFER = 128,
-}
-
 internal enum mln_map_load_error : uint
 {
     MLN_MAP_LOAD_ERROR_UNKNOWN = 0,
@@ -2396,6 +2395,8 @@ internal enum mln_map_option_field : uint
     MLN_MAP_OPTION_TILE_CACHE_ENABLED = 2,
     MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED = 4,
     MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED = 8,
+    MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH = 16,
+    MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT = 32,
 }
 
 internal enum mln_map_tile_option_field : uint
@@ -2414,6 +2415,8 @@ internal enum mln_map_viewport_option_field : uint
     MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE = 2,
     MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 4,
     MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8,
+    MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND = 16,
+    MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING = 32,
 }
 
 internal enum mln_momentum_decay_field : uint
@@ -2935,6 +2938,12 @@ internal enum mln_style_vector_tile_encoding : uint
 {
     MLN_STYLE_VECTOR_TILE_ENCODING_MVT = 0,
     MLN_STYLE_VECTOR_TILE_ENCODING_MLT = 1,
+}
+
+internal enum mln_terrain_skirt_length : uint
+{
+    MLN_TERRAIN_SKIRT_LENGTH_AUTO = 0,
+    MLN_TERRAIN_SKIRT_LENGTH_NONE = 1,
 }
 
 internal enum mln_tile_lod_mode : uint

@@ -137,7 +137,7 @@ def test_public_type_hints_resolve() -> None:
 def test_synchronous_calls_fill_caller_sized_outputs_in_input_order(
     map_handle: mln.MapHandle,
 ) -> None:
-    projection = mln.MapProjectionHandle.create(map_handle.get_snapshot().view)
+    projection = map_handle.projection_create()
     try:
         coordinates = (mln.LatLng(0, 0), mln.LatLng(10, 20), mln.LatLng(-12, -30))
         points = projection.pixels_for_lat_lngs(coordinates)

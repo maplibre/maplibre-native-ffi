@@ -2153,24 +2153,6 @@ export interface LogicalSize {
 }
 
 /**
- * A debug overlay that the map draws.
- *
- * See `mln_map_debug_flag` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-export const MapDebugFlag = {
-  tileBorders: 2,
-  parseStatus: 4,
-  timestamps: 8,
-  collision: 16,
-  overdraw: 32,
-  stencilClip: 64,
-  depthBuffer: 128,
-} as const;
-/** A bitwise OR of MapDebugFlag flags. */
-export type MapDebugFlag = number;
-
-/**
  * Why a map failed to load a style.
  *
  * See `mln_map_load_error` in the
@@ -2270,6 +2252,16 @@ export interface MapOptions {
    * from a glyph PBF downloaded for every few characters. Without it, they do.
    */
   localIdeographsEnabled?: boolean;
+  /**
+   * The terrain's skirts. Without it, `TerrainSkirtLength.auto`.
+   */
+  terrainSkirtLength?: TerrainSkirtLength;
+  /**
+   * The most GPU memory, in bytes, for the layers drawn over the terrain. Past
+   * it, the terrain farthest from the center of the view looks blurrier.
+   * Without it, there's no limit.
+   */
+  terrainDrapeMemoryLimit?: bigint;
 }
 
 /**
@@ -2283,13 +2275,30 @@ export interface MapProjectionCameraResult {
 }
 
 /**
+ * The height of the ground at a coordinate.
+ *
+ * See `mln_map_projection_terrain_elevation_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+ */
+export interface MapProjectionTerrainElevationResult {
+  /**
+   * Whether the map drew terrain at the coordinate.
+   */
+  readonly hasElevation: boolean;
+  /**
+   * Meters above sea level, with the terrain's exaggeration. 0 without
+   * `has_elevation`.
+   */
+  readonly elevationMeters: number;
+}
+
+/**
  * A map's state, as `MapHandle.getSnapshot()` reads it.
  *
  * See `mln_map_snapshot` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 export interface MapSnapshot {
-  readonly debugFlags: MapDebugFlag;
   /**
    * Grows with each change to the map's state.
    */
@@ -2298,7 +2307,6 @@ export interface MapSnapshot {
    * Whether the style and every resource that the view needs have loaded.
    */
   readonly fullyLoaded: boolean;
-  readonly renderingStatsViewEnabled: boolean;
   /**
    * Whether a gesture recognizer's gesture, or the glide and snap after it,
    * moves the camera.
@@ -2318,10 +2326,6 @@ export interface MapSnapshot {
    * Whether the map draws as a globe, alone or blending into Mercator.
    */
   readonly globeRendering: boolean;
-  /**
-   * The setting from `MapHandle.setGlobeFreeBearingEnabled()`.
-   */
-  readonly globeFreeBearingEnabled: boolean;
 }
 
 /**
@@ -2411,6 +2415,8 @@ export interface MapViewport {
   constrainMode: ConstrainMode;
   viewportMode: ViewportMode;
   frustumOffset: EdgeInsets;
+  centerClampedToGround: boolean;
+  globeFreeBearing: boolean;
 }
 
 /**
@@ -2424,6 +2430,17 @@ export interface MapViewportOptions {
   constrainMode?: ConstrainMode;
   viewportMode?: ViewportMode;
   frustumOffset?: EdgeInsets;
+  /**
+   * Whether the camera's center stands on the terrain, in place of the center
+   * altitude it's given, the style's included. On by default.
+   */
+  centerClampedToGround?: boolean;
+  /**
+   * Whether drags and zooms on a globe turn the bearing to keep the planet's
+   * orientation, which lets a drag carry the camera over a pole. Off by
+   * default.
+   */
+  globeFreeBearing?: boolean;
 }
 
 /**
@@ -4446,6 +4463,12 @@ export const RuntimeEventType = {
    * redraw.
    */
   mapIdle: 8,
+  /**
+   * Rendering a frame failed on the GPU, as when the device runs out of memory
+   * or the driver rejects a shader. The frame shows what did render. A map in
+   * `MapMode.continuous` raises it once for a run of failed frames, and renders
+   * again shortly in case the failure passes.
+   */
   mapRenderError: 9,
   mapRenderFrameStarted: 10,
   mapRenderFrameFinished: 11,
@@ -4970,6 +4993,27 @@ export type StyleVectorTileEncoding =
   | (number & {});
 
 /**
+ * How far the skirts that hide the cracks between terrain tiles reach down.
+ *
+ * See `mln_terrain_skirt_length` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+export const TerrainSkirtLength = {
+  /**
+   * Far enough to hide the cracks.
+   */
+  auto: 0,
+  /**
+   * No skirts, so they don't show through translucent layers over the terrain.
+   */
+  none: 1,
+} as const;
+/** One of the TerrainSkirtLength values, or a value this binding does not know. */
+export type TerrainSkirtLength =
+  | (typeof TerrainSkirtLength)[keyof typeof TerrainSkirtLength]
+  | (number & {});
+
+/**
  * The layout of the pixels that `RenderSessionHandle.readTexture()` reads.
  *
  * See `mln_texture_image_info` in the
@@ -5462,6 +5506,12 @@ export interface WaylandSurfaceTarget {
  * WebGPU build asks the browser for a device, and attaches once it has one. For
  * an OpenGL device that wraps your WebGL2 context, the canvas must be the
  * context's own.
+ *
+ * When the browser loses a WebGPU session's device, the session fails with
+ * `Status.targetLost`, and once you release it, you can attach a new session to
+ * the canvas. After Chromium's GPU process restarts, though, an
+ * `OffscreenCanvas` in a Web Worker shows no new frames, and the worker gets no
+ * more animation frames: the page has to load again.
  *
  * See `mln_web_canvas_target` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

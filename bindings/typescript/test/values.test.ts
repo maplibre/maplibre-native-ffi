@@ -201,7 +201,7 @@ test("an array input is copied when the call submits it", async () => {
 test("a synchronous call fills a caller-sized output array in input order", async () => {
   const fixture = await openRuntime();
   const map = await fixture.openMap();
-  const projection = MapProjectionHandle.create(map.getSnapshot().view);
+  const projection = map.projectionCreate();
   try {
     const coordinates: LatLng[] = [
       { latitude: 0, longitude: 0 },

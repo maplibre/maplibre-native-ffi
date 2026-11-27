@@ -383,9 +383,21 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int
+  fun mln_map_projection_create(
+    map: Long,
+    view: Long,
+    outProjection: Long,
+    outDiagnostic: Long,
+  ): Int
 
   fun mln_map_projection_get_camera(projection: Long, outResult: Long, outDiagnostic: Long): Int
+
+  fun mln_map_projection_get_terrain_elevation(
+    projection: Long,
+    coordinate: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int
 
   fun mln_map_projection_is_location_occluded(
     projection: Long,
@@ -525,8 +537,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_set_debug_flags(map: Long, flags: Int, completion: Long, outDiagnostic: Long): Int
-
   fun mln_map_set_event_mask(map: Long, mask: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_set_feature_state(
@@ -576,13 +586,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_set_globe_free_bearing_enabled(
-    map: Long,
-    enabled: Boolean,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_set_image_source_coordinates(
     map: Long,
     sourceId: Long,
@@ -611,13 +614,6 @@ internal expect object C {
   fun mln_map_set_projection_mode(
     map: Long,
     options: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_set_rendering_stats_view_enabled(
-    map: Long,
-    enabled: Boolean,
     completion: Long,
     outDiagnostic: Long,
   ): Int

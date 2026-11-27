@@ -603,6 +603,15 @@ G_GNUC_INTERNAL void maplibre_native_ffi_map_projection_camera_result_read(
   MaplibreNativeFfiMapProjectionCameraResult* out,
   const mln_map_projection_camera_result* in
 );
+G_GNUC_INTERNAL MaplibreNativeFfiMapProjectionTerrainElevationResult*
+maplibre_native_ffi_map_projection_terrain_elevation_result_from_native(
+  const mln_map_projection_terrain_elevation_result* in
+);
+G_GNUC_INTERNAL void
+maplibre_native_ffi_map_projection_terrain_elevation_result_read(
+  MaplibreNativeFfiMapProjectionTerrainElevationResult* out,
+  const mln_map_projection_terrain_elevation_result* in
+);
 G_GNUC_INTERNAL MaplibreNativeFfiMapTileSettings*
 maplibre_native_ffi_map_tile_settings_from_native(
   const mln_map_tile_settings* in

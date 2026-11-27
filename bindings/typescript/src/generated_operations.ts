@@ -40,9 +40,9 @@ import type {
   LogSeverityFlag,
   LogicalExtent,
   LogicalSize,
-  MapDebugFlag,
   MapOptions,
   MapProjectionCameraResult,
+  MapProjectionTerrainElevationResult,
   MapSnapshot,
   MapTileOptions,
   MapView,
@@ -1127,7 +1127,7 @@ export class GpuDeviceHandle extends Owner {
    * Errors:
    *
    * - `Status.unsupported` in every build: the library's WebGPU (wgpu) can't
-   *   wrap a `GPUDevice` yet (https://github.com/louwers/mln-rs/issues/263).
+   *   wrap a `GPUDevice` yet (https://github.com/maplibre/mln-rs/issues/263).
    *   Attach a web canvas target without a device, and the session asks the
    *   browser for one.
    */
@@ -2252,6 +2252,34 @@ export class MapHandle extends Owner {
   }
 
   /**
+   * Creates a projection that converts coordinates as a map does, for one view
+   * of it.
+   *
+   * `view` is the view to convert for, such as a frame result's, or null for
+   * the map's current view. Over terrain, coordinates convert on the ground
+   * that the map drew. The projection doesn't follow the map, so create a new
+   * one after the map's view or terrain changes.
+   *
+   * See `mln_map_projection_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.invalidState` until `RuntimeHandle.createMap()` completes with
+   *   `Status.ok`.
+   * - `Status.unsupported` when the view's style projection draws a globe and
+   *   the library can't project one.
+   */
+  projectionCreate(view?: MapView): MapProjectionHandle {
+    const handle = native.mln_map_projection_create(this.id, view);
+    return adopt(
+      handle,
+      () => new MapProjectionHandle(ADOPT, handle),
+      (disposed) => native.mln_map_projection_release(disposed, undefined),
+    );
+  }
+
+  /**
    * Releases the map.
    *
    * Detach the map's render session first.
@@ -2373,7 +2401,7 @@ export class MapHandle extends Owner {
    *
    * - `Status.cancelled` when the map is released before the image is done.
    * - `Status.nativeError` when the style or a resource that the image needs
-   *   fails to load.
+   *   fails to load, or rendering the image fails on the GPU.
    */
   requestStillImage(): Promise<void> {
     return run((completion) =>
@@ -2541,20 +2569,6 @@ export class MapHandle extends Owner {
         message,
         completion,
       ),
-    );
-  }
-
-  /**
-   * Draws debugging overlays, such as tile borders, on the map.
-   *
-   * `flags` replaces the overlays set before.
-   *
-   * See `mln_map_set_debug_flags` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  setDebugFlags(flags: MapDebugFlag): Promise<CommandCompletion> {
-    return command((completion) =>
-      native.mln_map_set_debug_flags(this.id, flags, completion),
     );
   }
 
@@ -2743,28 +2757,6 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Sets whether drags and zooms on a globe turn the bearing.
-   *
-   * When it's on, a drag or a zoom around a point on the globe turns the
-   * bearing so the planet keeps its orientation, and a drag can carry the
-   * camera over a pole. When it's off, the default, they keep the bearing, as
-   * MapLibre GL JS does. Turn it on for a map whose users can rotate it. It
-   * changes nothing while the map draws Mercator.
-   *
-   * See `mln_map_set_globe_free_bearing_enabled` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  setGlobeFreeBearingEnabled(enabled: boolean): Promise<CommandCompletion> {
-    return command((completion) =>
-      native.mln_map_set_globe_free_bearing_enabled(
-        this.id,
-        enabled,
-        completion,
-      ),
-    );
-  }
-
-  /**
    * Moves the image of an image source.
    *
    * `coordinates` are the image's four corners, clockwise from the top left.
@@ -2860,22 +2852,6 @@ export class MapHandle extends Owner {
   }
 
   /**
-   * Shows or hides an overlay of rendering statistics on the map.
-   *
-   * See `mln_map_set_rendering_stats_view_enabled` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  setRenderingStatsViewEnabled(enabled: boolean): Promise<CommandCompletion> {
-    return command((completion) =>
-      native.mln_map_set_rendering_stats_view_enabled(
-        this.id,
-        enabled,
-        completion,
-      ),
-    );
-  }
-
-  /**
    * Adds an image to the map's style, or replaces the image named `imageId`.
    *
    * See `mln_map_set_style_image` in the
@@ -2927,9 +2903,10 @@ export class MapHandle extends Owner {
    * Sets a property of a layer in the map's style.
    *
    * `propertyName` is one of the layer's layout or paint
-   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/), or
-   * `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null `value`
-   * resets any of these but `source` and `source-layer` to its default.
+   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/),
+   * `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`, or an
+   * extension's member, named `<namespace>:<name>`. A null `value` resets any
+   * of these but `source` and `source-layer` to its default.
    *
    * See `mln_map_set_style_layer_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2988,8 +2965,9 @@ export class MapHandle extends Owner {
    * reloading the style.
    *
    * `propertyName` is a root property other than `sources` and `layers`, which
-   * the source and layer calls change. A null `value` resets the property to
-   * its default, as if the style didn't set it.
+   * the source and layer calls change, or an extension's member, named
+   * `<namespace>:<name>`. A null `value` resets the property to its default, as
+   * if the style didn't set it.
    *
    * See `mln_map_set_style_root_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3752,18 +3730,6 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Draws debugging overlays, such as tile borders, on the map.
-   *
-   * `flags` replaces the overlays set before.
-   *
-   * See `mln_map_set_debug_flags` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  setDebugFlags(flags: MapDebugFlag): void {
-    native.mln_map_set_debug_flags(this.#owner.id, flags, undefined);
-  }
-
-  /**
    * Selects the events that the map reports.
    *
    * See `mln_map_set_event_mask` in the
@@ -3891,26 +3857,6 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Sets whether drags and zooms on a globe turn the bearing.
-   *
-   * When it's on, a drag or a zoom around a point on the globe turns the
-   * bearing so the planet keeps its orientation, and a drag can carry the
-   * camera over a pole. When it's off, the default, they keep the bearing, as
-   * MapLibre GL JS does. Turn it on for a map whose users can rotate it. It
-   * changes nothing while the map draws Mercator.
-   *
-   * See `mln_map_set_globe_free_bearing_enabled` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  setGlobeFreeBearingEnabled(enabled: boolean): void {
-    native.mln_map_set_globe_free_bearing_enabled(
-      this.#owner.id,
-      enabled,
-      undefined,
-    );
-  }
-
-  /**
    * Moves the image of an image source.
    *
    * `coordinates` are the image's four corners, clockwise from the top left.
@@ -3974,20 +3920,6 @@ export class MapHandleDiscarding {
   }
 
   /**
-   * Shows or hides an overlay of rendering statistics on the map.
-   *
-   * See `mln_map_set_rendering_stats_view_enabled` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  setRenderingStatsViewEnabled(enabled: boolean): void {
-    native.mln_map_set_rendering_stats_view_enabled(
-      this.#owner.id,
-      enabled,
-      undefined,
-    );
-  }
-
-  /**
    * Adds an image to the map's style, or replaces the image named `imageId`.
    *
    * See `mln_map_set_style_image` in the
@@ -4025,9 +3957,10 @@ export class MapHandleDiscarding {
    * Sets a property of a layer in the map's style.
    *
    * `propertyName` is one of the layer's layout or paint
-   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/), or
-   * `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null `value`
-   * resets any of these but `source` and `source-layer` to its default.
+   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/),
+   * `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`, or an
+   * extension's member, named `<namespace>:<name>`. A null `value` resets any
+   * of these but `source` and `source-layer` to its default.
    *
    * See `mln_map_set_style_layer_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4068,8 +4001,9 @@ export class MapHandleDiscarding {
    * reloading the style.
    *
    * `propertyName` is a root property other than `sources` and `layers`, which
-   * the source and layer calls change. A null `value` resets the property to
-   * its default, as if the style didn't set it.
+   * the source and layer calls change, or an extension's member, named
+   * `<namespace>:<name>`. A null `value` resets the property to its default, as
+   * if the style didn't set it.
    *
    * See `mln_map_set_style_root_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4204,30 +4138,6 @@ export class MapProjectionHandle extends Owner {
   declare [Symbol.dispose]: () => void;
 
   /**
-   * Creates a projection that converts coordinates for one view of a map.
-   *
-   * Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`.
-   * The projection doesn't follow the map, so create a new one after the map's
-   * camera, size, or style projection changes.
-   *
-   * See `mln_map_projection_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   *
-   * Errors:
-   *
-   * - `Status.unsupported` when the view's style projection draws a globe and
-   *   the library can't project one.
-   */
-  static create(view: MapView): MapProjectionHandle {
-    const handle = native.mln_map_projection_create(view);
-    return adopt(
-      handle,
-      () => new MapProjectionHandle(ADOPT, handle),
-      (disposed) => native.mln_map_projection_release(disposed, undefined),
-    );
-  }
-
-  /**
    * Reads the projection's camera.
    *
    * See `mln_map_projection_get_camera` in the
@@ -4235,6 +4145,16 @@ export class MapProjectionHandle extends Owner {
    */
   getCamera(): MapProjectionCameraResult {
     return native.mln_map_projection_get_camera(this.id);
+  }
+
+  /**
+   * Reads the height of the terrain that the map drew at a coordinate.
+   *
+   * See `mln_map_projection_get_terrain_elevation` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
+  getTerrainElevation(coordinate: LatLng): MapProjectionTerrainElevationResult {
+    return native.mln_map_projection_get_terrain_elevation(this.id, coordinate);
   }
 
   /**

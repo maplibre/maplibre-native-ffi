@@ -567,6 +567,12 @@ typedef struct mln_ohos_window_target {
  * backend: a WebGPU build asks the browser for a device, and attaches once it
  * has one. For an OpenGL device that wraps your WebGL2 context, the canvas must
  * be the context's own.
+ *
+ * When the browser loses a WebGPU session's device, the session fails with
+ * MLN_STATUS_TARGET_LOST, and once you release it, you can attach a new session
+ * to the canvas. After Chromium's GPU process restarts, though, an
+ * `OffscreenCanvas` in a Web Worker shows no new frames, and the worker gets no
+ * more animation frames: the page has to load again.
  */
 typedef struct mln_web_canvas_target {
   mln_logical_size logical_size MLN_BINDING("required=true");

@@ -123,9 +123,7 @@ export async function camera(map: MapHandle): Promise<void> {
   recognizer.release();
 
   // #region convert
-  const projection = MapProjectionHandle.create(
-    map.getSnapshot().view,
-  );
+  const projection = map.projectionCreate();
 
   const coordinate = projection.latLngForPixel({ x: 100, y: 200 });
   const point = projection.pixelForLatLng(coordinate);

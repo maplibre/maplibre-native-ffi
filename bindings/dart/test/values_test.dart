@@ -88,7 +88,7 @@ void main() {
     () async {
       final fixture = await openRuntime();
       final map = await fixture.openMap();
-      final projection = MapProjectionHandle.create(map.getSnapshot().view);
+      final projection = map.projectionCreate();
       addTearDown(projection.release);
       const coordinates = [
         LatLng(),

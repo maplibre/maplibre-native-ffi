@@ -187,11 +187,8 @@ void mln_doc_camera(mln_map map) {
   mln_gesture_recognizer_release(recognizer);
 
   // #region convert
-  mln_map_snapshot current = {.size = sizeof(mln_map_snapshot)};
-  mln_map_get_snapshot(map, &current, NULL);
-
   mln_map_projection projection = MLN_HANDLE_NULL;
-  mln_map_projection_create(&current.view, &projection, NULL);
+  mln_map_projection_create(map, NULL, &projection, NULL);
 
   mln_lat_lng coordinate;
   mln_map_projection_lat_lng_for_pixel(

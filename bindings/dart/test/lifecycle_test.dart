@@ -14,7 +14,7 @@ void main() {
   test('a second release is a no-op and the handle reports it', () async {
     final fixture = await openRuntime();
     final map = await fixture.openMap();
-    final projection = MapProjectionHandle.create(map.getSnapshot().view);
+    final projection = map.projectionCreate();
 
     expect(projection.id, isNot(0));
     expect(projection.isClosed, isFalse);

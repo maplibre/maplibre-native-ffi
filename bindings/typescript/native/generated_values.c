@@ -1649,6 +1649,25 @@ napi_value mln_ts_read_map_projection_camera_result(
   return result;
 }
 
+napi_value mln_ts_read_map_projection_terrain_elevation_result(
+  napi_env env, const mln_map_projection_terrain_elevation_result* source,
+  size_t size
+) {
+  (void)size;
+  napi_value result = mln_ts_object(env);
+  if (result == NULL) return NULL;
+  if (!mln_ts_set(
+        env, result, "hasElevation", mln_ts_bool(env, source->has_elevation)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "elevationMeters",
+        mln_ts_number(env, (double)(source->elevation_meters))
+      ))
+    return NULL;
+  return result;
+}
+
 napi_value mln_ts_read_map_snapshot(
   napi_env env, const mln_map_snapshot* source, size_t size
 ) {
@@ -1656,22 +1675,12 @@ napi_value mln_ts_read_map_snapshot(
   napi_value result = mln_ts_object(env);
   if (result == NULL) return NULL;
   if (!mln_ts_set(
-        env, result, "debugFlags",
-        mln_ts_number(env, (double)(source->debug_flags))
-      ))
-    return NULL;
-  if (!mln_ts_set(
         env, result, "generation",
         mln_ts_u64(env, (uint64_t)(source->generation))
       ))
     return NULL;
   if (!mln_ts_set(
         env, result, "fullyLoaded", mln_ts_bool(env, source->fully_loaded)
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "renderingStatsViewEnabled",
-        mln_ts_bool(env, source->rendering_stats_view_enabled)
       ))
     return NULL;
   if (!mln_ts_set(
@@ -1722,11 +1731,6 @@ napi_value mln_ts_read_map_snapshot(
     return NULL;
   if (!mln_ts_set(
         env, result, "globeRendering", mln_ts_bool(env, source->globe_rendering)
-      ))
-    return NULL;
-  if (!mln_ts_set(
-        env, result, "globeFreeBearingEnabled",
-        mln_ts_bool(env, source->globe_free_bearing_enabled)
       ))
     return NULL;
   return result;
@@ -1837,6 +1841,16 @@ napi_value mln_ts_read_map_viewport(
         mln_ts_read_edge_insets(
           env, &(source->frustum_offset), sizeof(source->frustum_offset)
         )
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "centerClampedToGround",
+        mln_ts_bool(env, source->center_clamped_to_ground)
+      ))
+    return NULL;
+  if (!mln_ts_set(
+        env, result, "globeFreeBearing",
+        mln_ts_bool(env, source->globe_free_bearing)
       ))
     return NULL;
   return result;
@@ -6373,6 +6387,28 @@ bool mln_ts_write_map_options(
     }
     out->fields |= MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED;
   }
+  if (!mln_ts_member(call, value, "terrainSkirtLength", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "terrainSkirtLength");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      int64_t number = 0;
+      if (!mln_ts_read_int(call, member, 0LL, 4294967295LL, &number, child))
+        return false;
+      out->terrain_skirt_length = (mln_terrain_skirt_length)number;
+    }
+    out->fields |= MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH;
+  }
+  if (!mln_ts_member(call, value, "terrainDrapeMemoryLimit", &member))
+    return false;
+  mln_ts_path(child, sizeof child, path, "terrainDrapeMemoryLimit");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      uint64_t number = 0;
+      if (!mln_ts_read_u64(call, member, &number, child)) return false;
+      out->terrain_drape_memory_limit = (uint64_t)number;
+    }
+    out->fields |= MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT;
+  }
   return true;
 }
 
@@ -6524,6 +6560,21 @@ bool mln_ts_write_map_viewport(
   if (!mln_ts_read_record(call, member, child)) return false;
   if (!mln_ts_write_edge_insets(call, member, &out->frustum_offset, child))
     return false;
+  if (!mln_ts_member(call, value, "centerClampedToGround", &member))
+    return false;
+  mln_ts_path(child, sizeof child, path, "centerClampedToGround");
+  {
+    bool flag = false;
+    if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+    out->center_clamped_to_ground = flag;
+  }
+  if (!mln_ts_member(call, value, "globeFreeBearing", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "globeFreeBearing");
+  {
+    bool flag = false;
+    if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+    out->globe_free_bearing = flag;
+  }
   return true;
 }
 
@@ -6575,6 +6626,27 @@ bool mln_ts_write_map_viewport_options(
     if (!mln_ts_write_edge_insets(call, member, &out->frustum_offset, child))
       return false;
     out->fields |= MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+  }
+  if (!mln_ts_member(call, value, "centerClampedToGround", &member))
+    return false;
+  mln_ts_path(child, sizeof child, path, "centerClampedToGround");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      bool flag = false;
+      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+      out->center_clamped_to_ground = flag;
+    }
+    out->fields |= MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND;
+  }
+  if (!mln_ts_member(call, value, "globeFreeBearing", &member)) return false;
+  mln_ts_path(child, sizeof child, path, "globeFreeBearing");
+  if (!mln_ts_is_absent(call, member)) {
+    {
+      bool flag = false;
+      if (!mln_ts_read_bool(call, member, &flag, child)) return false;
+      out->globe_free_bearing = flag;
+    }
+    out->fields |= MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING;
   }
   return true;
 }

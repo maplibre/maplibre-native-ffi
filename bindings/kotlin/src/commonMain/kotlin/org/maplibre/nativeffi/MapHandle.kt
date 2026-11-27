@@ -749,7 +749,7 @@ private constructor(
    */
   public fun getSnapshot(): MapSnapshot =
     nativeCall(this, binding) {
-      val out = sized(w(432, 432, 400), w(8, 8, 4))
+      val out = sized(w(440, 440, 400), w(8, 8, 4))
       check(C.mln_map_get_snapshot(handle, out, diagnostic))
       readMapSnapshot(out)
     }
@@ -1160,6 +1160,31 @@ private constructor(
     }
 
   /**
+   * Creates a projection that converts coordinates as a map does, for one view of it.
+   *
+   * `view` is the view to convert for, such as a frame result's, or null for the map's current
+   * view. Over terrain, coordinates convert on the ground that the map drew. The projection doesn't
+   * follow the map, so create a new one after the map's view or terrain changes.
+   *
+   * See `mln_map_projection_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   *
+   * Errors:
+   *
+   * - `Status.INVALID_STATE` until `RuntimeHandle.createMap()` completes with `Status.OK`.
+   * - `Status.UNSUPPORTED` when the view's style projection draws a globe and the library can't
+   *   project one.
+   */
+  public fun projectionCreate(view: MapView? = null): MapProjectionHandle =
+    nativeCall(this, binding) {
+      val out = allocate(8, w(8, 8, 4))
+      check(
+        C.mln_map_projection_create(handle, view?.let { writeMapView(it) } ?: 0L, out, diagnostic),
+      )
+      adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle.wrap(it) }
+    }
+
+  /**
    * Releases the map.
    *
    * Detach the map's render session first.
@@ -1272,7 +1297,8 @@ private constructor(
    * Errors:
    *
    * - `Status.CANCELLED` when the map is released before the image is done.
-   * - `Status.NATIVE_ERROR` when the style or a resource that the image needs fails to load.
+   * - `Status.NATIVE_ERROR` when the style or a resource that the image needs fails to load, or
+   *   rendering the image fails on the GPU.
    */
   public fun requestStillImage(): Completion<Unit> =
     nativeUnit(this, binding) {
@@ -1440,19 +1466,6 @@ private constructor(
           diagnostic,
         ),
       )
-    }
-
-  /**
-   * Draws debugging overlays, such as tile borders, on the map.
-   *
-   * `flags` replaces the overlays set before.
-   *
-   * See `mln_map_set_debug_flags` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun setDebugFlags(flags: MapDebugFlag): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_debug_flags(handle, flags.rawValue.toInt(), completion, diagnostic))
     }
 
   /**
@@ -1641,22 +1654,6 @@ private constructor(
     }
 
   /**
-   * Sets whether drags and zooms on a globe turn the bearing.
-   *
-   * When it's on, a drag or a zoom around a point on the globe turns the bearing so the planet
-   * keeps its orientation, and a drag can carry the camera over a pole. When it's off, the default,
-   * they keep the bearing, as MapLibre GL JS does. Turn it on for a map whose users can rotate it.
-   * It changes nothing while the map draws Mercator.
-   *
-   * See `mln_map_set_globe_free_bearing_enabled` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun setGlobeFreeBearingEnabled(enabled: Boolean): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic))
-    }
-
-  /**
    * Moves the image of an image source.
    *
    * `coordinates` are the image's four corners, clockwise from the top left.
@@ -1756,17 +1753,6 @@ private constructor(
     }
 
   /**
-   * Shows or hides an overlay of rendering statistics on the map.
-   *
-   * See `mln_map_set_rendering_stats_view_enabled` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun setRenderingStatsViewEnabled(enabled: Boolean): Completion<CommandCompletion> =
-    nativeCommand(this, binding) {
-      check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic))
-    }
-
-  /**
    * Adds an image to the map's style, or replaces the image named `imageId`.
    *
    * See `mln_map_set_style_image` in the
@@ -1817,9 +1803,9 @@ private constructor(
    * Sets a property of a layer in the map's style.
    *
    * `propertyName` is one of the layer's layout or paint
-   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/), or `filter`, `minzoom`,
-   * `maxzoom`, `source`, or `source-layer`. A null `value` resets any of these but `source` and
-   * `source-layer` to its default.
+   * &#91;properties&#93;(https://maplibre.org/maplibre-style-spec/layers/), `filter`, `minzoom`,
+   * `maxzoom`, `source`, or `source-layer`, or an extension's member, named `<namespace>:<name>`. A
+   * null `value` resets any of these but `source` and `source-layer` to its default.
    *
    * See `mln_map_set_style_layer_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -1878,7 +1864,8 @@ private constructor(
    * style, such as `light`, `sky`, `projection`, or `terrain`, without reloading the style.
    *
    * `propertyName` is a root property other than `sources` and `layers`, which the source and layer
-   * calls change. A null `value` resets the property to its default, as if the style didn't set it.
+   * calls change, or an extension's member, named `<namespace>:<name>`. A null `value` resets the
+   * property to its default, as if the style didn't set it.
    *
    * See `mln_map_set_style_root_property` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2466,12 +2453,6 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
       )
     }
 
-  /** [MapHandle.setDebugFlags] without its completion. */
-  public fun setDebugFlags(flags: MapDebugFlag): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_debug_flags(handle, flags.rawValue.toInt(), completion, diagnostic))
-    }
-
   /** [MapHandle.setEventMask] without its completion. */
   public fun setEventMask(mask: RuntimeEventFlag): Unit =
     nativeDiscard(owner, binding) {
@@ -2561,12 +2542,6 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
       )
     }
 
-  /** [MapHandle.setGlobeFreeBearingEnabled] without its completion. */
-  public fun setGlobeFreeBearingEnabled(enabled: Boolean): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic))
-    }
-
   /** [MapHandle.setImageSourceCoordinates] without its completion. */
   public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>): Unit =
     nativeDiscard(owner, binding) {
@@ -2615,12 +2590,6 @@ public class MapDiscarding private constructor(@get:JvmSynthetic internal val ow
           diagnostic,
         ),
       )
-    }
-
-  /** [MapHandle.setRenderingStatsViewEnabled] without its completion. */
-  public fun setRenderingStatsViewEnabled(enabled: Boolean): Unit =
-    nativeDiscard(owner, binding) {
-      check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic))
     }
 
   /** [MapHandle.setStyleImage] without its completion. */
