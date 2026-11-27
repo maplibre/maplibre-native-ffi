@@ -3,7 +3,7 @@
 # Provide target jsi and MLN_HERMES_JSI_DIR for the matching engine headers,
 # and MLN_FFI_NATIVE_PREFIX for an installed C library (or set
 # MLN_FFI_HERMES_NATIVE_LIBRARY to a library or XCFramework explicitly).
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.22...3.28)
 project(maplibre_native_ffi_hermes LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
