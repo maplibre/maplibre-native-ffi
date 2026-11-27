@@ -29,14 +29,20 @@ Pod::Spec.new do |s|
   s.public_header_files = "ios/*.h"
   s.vendored_frameworks = "ios/MaplibreNativeC.xcframework"
 
-  s.pod_target_xcconfig = {
+  # The XCFramework's only simulator slice is arm64, so a simulator build
+  # without a destination, which also asks for x86_64, would find no slice
+  # and fail to link. The app and this pod leave x86_64 out instead.
+  excluded_archs = { "EXCLUDED_ARCHS[sdk=iphonesimulator*]" => "x86_64" }
+  s.user_target_xcconfig = excluded_archs
+
+  s.pod_target_xcconfig = excluded_archs.merge(
     "HEADER_SEARCH_PATHS" => %w[cpp native native/include native/node-api-headers]
       .map { |path| "\"${PODS_TARGET_SRCROOT}/#{path}\"" }.join(" "),
     "GCC_PREPROCESSOR_DEFINITIONS" => "$(inherited) NAPI_VERSION=8",
     # The adapter's Node-API functions stay private to this library.
     "OTHER_CFLAGS" => "$(inherited) #{symbols}",
     "OTHER_CPLUSPLUSFLAGS" => "$(inherited) #{symbols}",
-  }
+  )
 
   # React Native's helper adds the JSI and the rest of React Native's pods.
   install_modules_dependencies(s)
