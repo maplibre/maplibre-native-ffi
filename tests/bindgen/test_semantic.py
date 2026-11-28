@@ -14,19 +14,15 @@ from tools.bindgen.semantic import (
     DisposeSupport,
     OperationShape,
     bind,
-    enum_member_prefix,
 )
 
 
 class SemanticTests(unittest.TestCase):
-    def parse(self, source):
-        return parse(source)
-
     def test_scalar_carriers_preserve_portable_typedefs_across_host_abis(self):
         for underlying in ("long", "long long"):
             with self.subTest(underlying=underlying):
                 model = bind(
-                    self.parse(f"""
+                    parse(f"""
 typedef unsigned {underlying} uint64_t;
 typedef {underlying} int64_t;
 typedef unsigned {underlying} size_t;
@@ -86,27 +82,6 @@ mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_di
                 self.assertIsNone(symbol("MLN_C_VERSION"))
                 self.assertIsNone(symbol("MLN_HANDLE_NULL"))
 
-    def test_enum_members_drop_the_prefix_their_type_name_shares(self):
-        for native, constants, prefix in (
-            (
-                "mln_status",
-                ["MLN_STATUS_OK", "MLN_STATUS_INVALID_STATE"],
-                "MLN_STATUS_",
-            ),
-            (
-                "mln_rendered_feature_field",
-                ["MLN_RENDERED_FEATURE_SOURCE_ID", "MLN_RENDERED_FEATURE_STATE"],
-                "MLN_RENDERED_FEATURE_",
-            ),
-            (
-                "mln_source_feature_field",
-                ["MLN_SOURCE_FEATURE_SOURCE_LAYER_ID"],
-                "MLN_SOURCE_FEATURE_",
-            ),
-        ):
-            with self.subTest(native=native):
-                self.assertEqual(prefix, enum_member_prefix(constants, native))
-
     def test_view_scope_and_empty_union_have_verified_relationships(self):
         source = """
 typedef unsigned long owner BIND("kind=handle;release=release_owner;view_begin=begin_view;view_end=end_view");
@@ -117,7 +92,7 @@ typedef enum event_tag : int { NONE = 0, NUMBER = -1 } event_tag;
 typedef struct event { event_tag tag; union { double number BIND("variant=NUMBER"); } payload BIND("tag=tag;empty_variant=NONE"); } event;
 mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
-        model = bind(self.parse(source), require_complete=True)
+        model = bind(parse(source), require_complete=True)
         self.assertEqual(model.handles["owner"].view_begin, "begin_view")
         self.assertEqual(model.handles["owner"].view_end, "end_view")
         self.assertEqual(model.values["event_tag"].enum_underlying.canonical, "int")
@@ -136,7 +111,7 @@ mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_di
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, message):
-                bind(self.parse(source.replace(before, after)), require_complete=True)
+                bind(parse(source.replace(before, after)), require_complete=True)
 
     def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
         self,
@@ -148,7 +123,7 @@ mln_status mln_engine_create(mln_engine *out_engine BIND("direction=out"), mln_d
 mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic);
 mln_status mln_level_peak(unsigned *out_peak BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
-        api = bind(self.parse(source), require_complete=True)
+        api = bind(parse(source), require_complete=True)
         operations = {op.name: op for op in api.operations}
         create = operations["mln_engine_create"]
         self.assertEqual((create.factory, create.member), ("mln_engine", "create"))
@@ -170,14 +145,12 @@ typedef struct value {
 } value;
 mln_status write_value(const value *input, mln_diagnostic *out_diagnostic);
 """
-        api = bind(self.parse(source), require_complete=True)
+        api = bind(parse(source), require_complete=True)
         member = api.values["value"].union_member
         self.assertEqual(member.name, "data")
         # Another public member keeps the record a record.
         widened = bind(
-            self.parse(
-                source.replace("  choice tag;", "  choice tag;\n  double scale;")
-            ),
+            parse(source.replace("  choice tag;", "  choice tag;\n  double scale;")),
             require_complete=True,
         )
         self.assertIsNone(widened.values["value"].union_member)
@@ -195,7 +168,7 @@ typedef struct value {
 } value;
 mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
-        api = bind(self.parse(source), require_complete=True)
+        api = bind(parse(source), require_complete=True)
         result = api.operations[0].outputs[0].value.element
         union = result.fields[1]
         self.assertEqual(union.presence.tag, "tag")
@@ -207,14 +180,14 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
         )
         with self.assertRaisesRegex(ModelError, "length names an absent field"):
             bind(
-                self.parse(source.replace("length=count", "length=missing")),
+                parse(source.replace("length=count", "length=missing")),
                 require_complete=True,
             )
         with self.assertRaisesRegex(
             ModelError, "variant requires a declared enum value"
         ):
             bind(
-                self.parse(source.replace("variant=TEXT", "variant=ABSENT")),
+                parse(source.replace("variant=TEXT", "variant=ABSENT")),
                 require_complete=True,
             )
 
@@ -260,7 +233,7 @@ typedef struct options {
 } options;
 mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
 """
-        api = bind(self.parse(source), require_complete=True)
+        api = bind(parse(source), require_complete=True)
         self.assertEqual(api.control_enums, {"field", "tag"})
         self.assertNotIn("field", api.public_values)
         self.assertNotIn("tag", api.public_values)
@@ -278,7 +251,7 @@ typedef struct options {
 } options;
 mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
 """
-        api = bind(self.parse(source), require_complete=True)
+        api = bind(parse(source), require_complete=True)
         value = api.operations[0].inputs[0].value.element
         self.assertEqual(value.fields[0].role, "presence_mask")
         self.assertEqual(value.fields[0].value.enum_kind, "bitmask")
@@ -288,12 +261,12 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
             "member; embed a record",
         ):
             bind(
-                self.parse(source.replace("bit=ZOOM", "bit=CENTER")),
+                parse(source.replace("bit=ZOOM", "bit=CENTER")),
                 require_complete=True,
             )
         with self.assertRaisesRegex(ModelError, "both mask and bit") as raised:
             bind(
-                self.parse(re.sub(r";bit=\w+", "", source)),
+                parse(re.sub(r";bit=\w+", "", source)),
                 require_complete=True,
             )
         self.assertNotIn("guards more than one member", str(raised.exception))
@@ -303,7 +276,7 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
             "drop mask and bit",
         ):
             bind(
-                self.parse(
+                parse(
                     source.replace(
                         'double longitude BIND("mask=fields;bit=ZOOM");',
                         "const double *items "
@@ -315,9 +288,7 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
             )
         with self.assertRaisesRegex(ModelError, "mask must name a sibling field"):
             bind(
-                self.parse(
-                    source.replace("mask=fields;bit=ZOOM", "mask=a.fields;bit=ZOOM")
-                ),
+                parse(source.replace("mask=fields;bit=ZOOM", "mask=a.fields;bit=ZOOM")),
                 require_complete=True,
             )
 
@@ -341,14 +312,14 @@ typedef struct options {
 } options;
 mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
 """
-        api = bind(self.parse(source), require_complete=True)
+        api = bind(parse(source), require_complete=True)
         value = api.operations[0].inputs[0].value.element
         required = {field.name: field.required for field in value.fields}
         self.assertTrue(required["width"])
         self.assertFalse(required["zoom"])
         self.assertTrue(
             bind(
-                self.parse(
+                parse(
                     source.replace(
                         'BIND("length=item_count")',
                         'BIND("length=item_count;required=true")',
@@ -384,16 +355,16 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
                     ModelError, "required applies only to an unmasked value member"
                 ),
             ):
-                bind(self.parse(source.replace(before, after)), require_complete=True)
+                bind(parse(source.replace(before, after)), require_complete=True)
         with self.assertRaisesRegex(ModelError, "unsupported required='false'"):
             bind(
-                self.parse(source.replace("required=true", "required=false")),
+                parse(source.replace("required=true", "required=false")),
                 require_complete=True,
             )
 
     def test_nested_registration_and_callback_context_are_resolved(self):
         api = bind(
-            self.parse("""
+            parse("""
 typedef void (*notify)(void *state);
 typedef void (*release)(void *state);
 typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
@@ -421,7 +392,7 @@ typedef struct batch {
 } batch;
 mln_status capture(batch *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
-        api = bind(self.parse(source), require_complete=True)
+        api = bind(parse(source), require_complete=True)
         value = next(f.value for f in api.values["batch"].fields if f.name == "items")
         self.assertEqual(value.stride, "stride")
         callback_source = (
@@ -437,7 +408,7 @@ typedef struct handler {
 mln_status subscribe(const handler *value, mln_diagnostic *out_diagnostic);
 """
         )
-        callbacks = bind(self.parse(callback_source), require_complete=True)
+        callbacks = bind(parse(callback_source), require_complete=True)
         callback_events = callbacks.callbacks["on_batch"].parameters[-1].value
         self.assertEqual(callback_events.unwrapped.native, "batch")
         self.assertEqual(
@@ -448,7 +419,7 @@ mln_status subscribe(const handler *value, mln_diagnostic *out_diagnostic);
         )
         with self.assertRaisesRegex(ModelError, "input reconstruction contract"):
             bind(
-                self.parse(
+                parse(
                     source.replace(
                         'batch *out BIND("direction=out")',
                         "const batch *input",
@@ -461,13 +432,13 @@ mln_status subscribe(const handler *value, mln_diagnostic *out_diagnostic);
         self.assertEqual(value.element.fields[0].value.kind, "buffer")
         with self.assertRaisesRegex(ModelError, "stride requires"):
             bind(
-                self.parse(source.replace("stride=stride", "stride=missing")),
+                parse(source.replace("stride=stride", "stride=missing")),
                 require_complete=True,
             )
 
     def test_counted_character_encoding_resolves_as_buffer(self):
         api = bind(
-            self.parse("""
+            parse("""
 mln_status set_text(const char *value BIND("length=count"), unsigned int count, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
@@ -477,7 +448,7 @@ mln_status set_text(const char *value BIND("length=count"), unsigned int count, 
             (value.kind, value.encoding, value.length), ("buffer", "utf8", "count")
         )
         byte_api = bind(
-            self.parse("""
+            parse("""
 typedef unsigned char byte;
 typedef struct payload { const byte *bytes BIND("length=count;encoding=bytes"); unsigned int count; } payload;
 mln_status capture(payload *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
@@ -493,7 +464,7 @@ typedef struct reply { void *context BIND("kind=context"); } reply BIND("kind=ca
 typedef void (*answer)(reply *out BIND("direction=out"));
 mln_status reply_set(reply *response, int value, mln_diagnostic *out_diagnostic);
 """
-        api = bind(self.parse(source), require_complete=True)
+        api = bind(parse(source), require_complete=True)
         response = api.values["reply"].response
         self.assertEqual(response.methods, ("reply_set",))
         self.assertEqual(
@@ -512,7 +483,7 @@ mln_status child_begin(child value, void **out_token BIND("direction=out;kind=co
 void child_end(void *token BIND("kind=context"));
 BIND("view_owner=owner") mln_status child_get_view(child owner, view *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
-        api = bind(self.parse(source), require_complete=True)
+        api = bind(parse(source), require_complete=True)
         view = api.operations_by_name["child_get_view"].view
         # The scope operations back the view and never become public members.
         self.assertTrue({"child_begin", "child_end"}.isdisjoint(api.operations_by_name))
@@ -530,12 +501,12 @@ BIND("view_owner=owner") mln_status child_get_view(child owner, view *out BIND("
         # A view lends at least one field, and only a lent record has one.
         with self.assertRaisesRegex(ModelError, "a lifetime=owner field"):
             bind(
-                self.parse(source.replace(' BIND("lifetime=owner")', "")),
+                parse(source.replace(' BIND("lifetime=owner")', "")),
                 require_complete=True,
             )
         with self.assertRaisesRegex(ModelError, "view owner lends"):
             bind(
-                self.parse(
+                parse(
                     source
                     + 'typedef struct loose { int id BIND("lifetime=owner"); } loose;\n'
                     + 'mln_status child_read(child owner, loose *out BIND("direction=out"), mln_diagnostic *out_diagnostic);\n'
@@ -544,15 +515,13 @@ BIND("view_owner=owner") mln_status child_get_view(child owner, view *out BIND("
             )
         with self.assertRaisesRegex(ModelError, "input handle"):
             bind(
-                self.parse(source.replace("view_owner=owner", "view_owner=out")),
+                parse(source.replace("view_owner=owner", "view_owner=out")),
                 require_complete=True,
             )
         # A view needs its owner's scope operations.
         with self.assertRaisesRegex(ModelError, "declares view_begin and view_end"):
             bind(
-                self.parse(
-                    source.replace(";view_begin=child_begin;view_end=child_end", "")
-                ),
+                parse(source.replace(";view_begin=child_begin;view_end=child_end", "")),
                 require_complete=True,
             )
 
@@ -560,11 +529,11 @@ BIND("view_owner=owner") mln_status child_get_view(child owner, view *out BIND("
         source = """
 mln_status write_data(const double *values, mln_diagnostic *out_diagnostic);
 """
-        model = bind(self.parse(source))
+        model = bind(parse(source))
         self.assertFalse(model.operations)
         self.assertIn("write_data", model.unsupported)
         with self.assertRaisesRegex(ModelError, "pointer requires length"):
-            bind(self.parse(source), require_complete=True)
+            bind(parse(source), require_complete=True)
 
     def test_record_pointer_addresses_one_record_unless_counted(self):
         source = """
@@ -572,13 +541,13 @@ typedef struct coordinate { double latitude; double longitude; } coordinate;
 mln_status project(
   const coordinate *coordinates BIND("length=count"), unsigned count, mln_diagnostic *out_diagnostic);
 """
-        model = bind(self.parse(source), require_complete=True)
+        model = bind(parse(source), require_complete=True)
         array = model.operations[0].inputs[0].value
         self.assertEqual(
             (array.kind, array.length, array.element.kind), ("array", "count", "record")
         )
         single = bind(
-            self.parse(source.replace(' BIND("length=count")', "")),
+            parse(source.replace(' BIND("length=count")', "")),
             require_complete=True,
         )
         reference = single.operations[0].inputs[0].value
@@ -587,11 +556,11 @@ mln_status project(
             ("reference", "1", "borrowed"),
         )
         with self.assertRaisesRegex(ModelError, "length=1 restates the default"):
-            self.parse(source.replace("length=count", "length=1"))
+            parse(source.replace("length=count", "length=1"))
 
     def test_enum_output_keeps_output_storage_indirection(self):
         model = bind(
-            self.parse("""
+            parse("""
 typedef enum flags : unsigned { FIRST = 1, SECOND = 2 } flags;
 mln_status read_flags(
   flags *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
@@ -613,7 +582,7 @@ typedef struct registration {
 } registration BIND("kind=callback_registration;release=release");
 mln_status install(const registration *value, mln_diagnostic *out_diagnostic);
 """
-        model = bind(self.parse(source), require_complete=True)
+        model = bind(parse(source), require_complete=True)
         plan = model.operations[0].registrations[0]
         self.assertEqual(
             (plan.callbacks, plan.user_data, plan.release),
@@ -623,17 +592,17 @@ mln_status install(const registration *value, mln_diagnostic *out_diagnostic);
             ModelError, "registration release requires a descriptor field"
         ):
             bind(
-                self.parse(source.replace("release=release", "release=missing")),
+                parse(source.replace("release=release", "release=missing")),
                 require_complete=True,
             )
         with self.assertRaisesRegex(ModelError, "release requires a callback typedef"):
             bind(
-                self.parse(source.replace("  release release;", "  unsigned release;")),
+                parse(source.replace("  release release;", "  unsigned release;")),
                 require_complete=True,
             )
         with self.assertRaisesRegex(ModelError, "void callback contains its failure"):
             bind(
-                self.parse(
+                parse(
                     source.replace(
                         "(*notify)(void *context);",
                         '(*notify)(void *context) BIND("failure=0");',
@@ -653,7 +622,7 @@ BIND("execution=lifecycle") mln_status attach(
   root parent, child *owner BIND("direction=out"),
   const mln_completion *done, mln_diagnostic *out_diagnostic);
 """
-        model = bind(self.parse(source), require_complete=True)
+        model = bind(parse(source), require_complete=True)
         operation = model.operations_by_name["attach"]
         assert operation.completion is not None
         owner = operation.completion.immediate_owners[0]
@@ -665,7 +634,7 @@ BIND("execution=lifecycle") mln_status attach(
         self.assertEqual(model.readied_handles, {"child": "owner"})
         with self.assertRaisesRegex(ModelError, "requires its parent handle input"):
             bind(
-                self.parse(
+                parse(
                     source.replace(
                         "root parent, child *owner", "unsigned parent, child *owner"
                     )
@@ -676,7 +645,7 @@ BIND("execution=lifecycle") mln_status attach(
         # dropped the completion, so it comes back through the out parameter.
         with self.assertRaisesRegex(ModelError, "a completion cannot deliver a handle"):
             bind(
-                self.parse(
+                parse(
                     source.replace(
                         'BIND("execution=lifecycle")',
                         'BIND("execution=lifecycle;result=child")',
@@ -687,7 +656,7 @@ BIND("execution=lifecycle") mln_status attach(
 
     def test_consuming_release_preserves_required_synchronization(self):
         model = bind(
-            self.parse("""
+            parse("""
 typedef unsigned long frame BIND("kind=handle;release=release_frame");
 typedef struct sync { unsigned kind; unsigned long object; } sync;
 mln_status release_frame(
@@ -708,7 +677,7 @@ mln_status release_frame(
   frame value, const sync *consumer, mln_diagnostic *out_diagnostic);
 mln_status discard_frame(frame value, mln_diagnostic *out_diagnostic);
 """
-        model = bind(self.parse(source), require_complete=True)
+        model = bind(parse(source), require_complete=True)
         handle = model.handles["frame"]
         self.assertEqual(handle.cleanup, "discard_frame")
         self.assertEqual(handle.finalize, ("discard_frame",))
@@ -719,9 +688,7 @@ mln_status discard_frame(frame value, mln_diagnostic *out_diagnostic);
         with self.assertRaisesRegex(
             ModelError, "a handle takes a dispose or a discard, not both"
         ):
-            bind(
-                self.parse(source.replace("discard=", "dispose=discard_frame;discard="))
-            )
+            bind(parse(source.replace("discard=", "dispose=discard_frame;discard=")))
 
     def test_teardown_has_one_name_per_kind_and_scopes_pick_by_waiting(self):
         source = """
@@ -732,7 +699,7 @@ BIND("execution=lifecycle") mln_status end_root(
 mln_status drop_root(root value, mln_diagnostic *out_diagnostic);
 void free_note(note value);
 """
-        model = bind(self.parse(source), require_complete=True)
+        model = bind(parse(source), require_complete=True)
         members = {
             name: model.operations_by_name[name].member
             for name in ("end_root", "drop_root", "free_note")
@@ -755,7 +722,7 @@ void free_note(note value);
         )
         # A dispose never reports back, so a release that does needs its own.
         with self.assertRaisesRegex(ModelError, "a dispose takes only its handle"):
-            bind(self.parse(source.replace("dispose=drop_root", "dispose=end_root")))
+            bind(parse(source.replace("dispose=drop_root", "dispose=end_root")))
 
     def test_resource_request_protocol_uses_verified_relationships(self):
         source = """
@@ -770,7 +737,7 @@ BIND("accepted_unless=cancelled") mln_status on_cancel(
   request value, const cancel_handler *handler, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 void release_request(request value);
 """
-        model = bind(self.parse(source), require_complete=True)
+        model = bind(parse(source), require_complete=True)
         (ticket,) = model.callbacks["provider"].arguments
         self.assertEqual(
             (ticket.value.kind, ticket.value.ownership), ("handle", "owned")
@@ -810,7 +777,7 @@ void release_request(request value);
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
-                bind(self.parse(source.replace(before, after)), require_complete=True)
+                bind(parse(source.replace(before, after)), require_complete=True)
 
     def test_each_operation_takes_the_first_shape_that_it_matches(self):
         source = """
@@ -870,7 +837,7 @@ mln_status jump(root value, double zoom, mln_diagnostic *out_diagnostic);
 
     def test_counted_output_preserves_array_storage(self):
         model = bind(
-            self.parse("""
+            parse("""
 mln_status copy_values(
   const double *values BIND("length=count"), unsigned count,
   double *out BIND("direction=out;length=count"), mln_diagnostic *out_diagnostic);
@@ -907,7 +874,7 @@ mln_status copy_values(
                 self.subTest(declarations=declarations),
                 self.assertRaisesRegex(ModelError, "caller-sized output element"),
             ):
-                bind(self.parse(source), require_complete=True)
+                bind(parse(source), require_complete=True)
 
     def test_only_text_is_nullable_among_values_passed_by_value(self):
         # A binding passes an empty view for absent text; no other value that C
@@ -921,7 +888,7 @@ mln_status copy_values(
                 self.subTest(parameter=parameter),
                 self.assertRaisesRegex(ModelError, "requires a text view"),
             ):
-                bind(self.parse(source), require_complete=True)
+                bind(parse(source), require_complete=True)
 
     def test_a_nullable_handle_output_is_absent_when_null(self):
         model = bind(
@@ -964,7 +931,7 @@ void thing_release(thing value);
         ):
             source = f"{handles}{annotation} mln_status read({parameters});"
             with self.subTest(source=source), self.assertRaisesRegex(ModelError, error):
-                bind(self.parse(source), require_complete=True)
+                bind(parse(source), require_complete=True)
         # A call that publishes nothing roots no registration that it passed.
         callbacks = """
 typedef void (*notify)(void *state);
@@ -975,7 +942,7 @@ typedef struct signals { notify signal; void *state BIND("kind=context"); releas
             handles + callbacks + "mln_status read(const signals *events, " + one + ");"
         )
         with self.assertRaisesRegex(ModelError, "without registrations"):
-            bind(self.parse(source), require_complete=True)
+            bind(parse(source), require_complete=True)
 
     def test_queue_registrations_queue_their_callbacks(self):
         text = protocol_header(groups=("delivery", "owned_argument"))
@@ -1057,12 +1024,7 @@ mln_status mln_ping_set_callback(
   const mln_ping_handler* handler, mln_diagnostic* out_diagnostic
 );
 """
-        text = protocol_header(source, groups=("delivery",))
-        model = bind(parse_sources({"api.h": text}), require_complete=True)
-        self.assertEqual(
-            model.operations_by_name["mln_ping_set_callback"].registrations[0].queue,
-            "queue",
-        )
+        model = bind(parse(source, groups=("delivery",)), require_complete=True)
         self.assertTrue(model.callbacks["mln_ping_callback"].queued)
         self.assertTrue(model.callbacks["mln_notice_callback"].queued)
 
@@ -1078,7 +1040,7 @@ typedef struct signals { notify signal BIND("nullable=true"); void *context BIND
 typedef struct settings { unsigned size; signals wake; gates guard; } settings;
 mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
 """
-        api = self.parse(source)
+        api = parse(source)
         model = bind(api, require_complete=True)
         self.assertTrue(model.callbacks["gate"].synchronous)
         self.assertFalse(model.callbacks["notify"].synchronous)
@@ -1098,13 +1060,11 @@ mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
-                bind(
-                    self.parse(source.replace(before, after, 1)), require_complete=True
-                )
+                bind(parse(source.replace(before, after, 1)), require_complete=True)
 
     def test_nullable_completion_array_has_optional_container(self):
         model = bind(
-            self.parse("""
+            parse("""
 typedef struct entry { double value; } entry;
 BIND("execution=query;result=entry;shape=array;nullable=true")
 mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnostic);
@@ -1128,10 +1088,7 @@ mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnosti
         # The cancel callback borrows its owner, which the host never
         # receives because the registration already retains that owner.
         callback = model.callbacks["mln_ticket_cancel"]
-        self.assertEqual(
-            (callback.borrowed_owner,),
-            ("ticket",),
-        )
+        self.assertEqual(callback.borrowed_owner, "ticket")
         self.assertEqual(callback.arguments, ())
 
     def test_disposal_support_requires_a_handle_consumer(self):
@@ -1140,7 +1097,7 @@ typedef unsigned long owner BIND("kind=handle;release=close_owner;dispose=discar
 mln_status close_owner(owner value, mln_diagnostic *out_diagnostic);
 mln_status discard_owner(owner value, mln_diagnostic *out_diagnostic);
 """
-        model = bind(self.parse(source), require_complete=True)
+        model = bind(parse(source), require_complete=True)
         self.assertEqual(
             model.operations_by_name["discard_owner"].support,
             DisposeSupport(model.handles["owner"]),

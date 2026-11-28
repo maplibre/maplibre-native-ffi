@@ -142,9 +142,7 @@ typedef decision (*provider)(void *context, request handle) BIND("failure=PASS")
         ):
             validate(parse(source.replace("release=request_close", "release=missing")))
 
-    def test_a_callback_borrows_its_registration_receiver(
-        self,
-    ):
+    def test_a_callback_borrows_its_registration_receiver(self):
         source = """
 typedef unsigned long long request BIND("kind=handle;release=request_close");
 typedef unsigned long long other BIND("kind=handle;release=other_close");
@@ -156,15 +154,13 @@ typedef struct watcher { unsigned size; cancel callback; void *context BIND("kin
 mln_status watch(request value, const watcher *handler, mln_diagnostic *out_diagnostic);
 """
         compile_api(parse(source))
-        for before, after, error in (
-            (
-                "borrowed_owner=owner",
-                "borrowed_owner=missing",
-                "borrowed_owner names an absent parameter 'missing'",
-            ),
+        with self.assertRaisesRegex(
+            ModelError, "borrowed_owner names an absent parameter 'missing'"
         ):
-            with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
-                bind(parse(source.replace(before, after)), require_complete=True)
+            bind(
+                parse(source.replace("borrowed_owner=owner", "borrowed_owner=missing")),
+                require_complete=True,
+            )
 
     def test_a_callback_handle_argument_says_who_owns_it(self):
         source = """

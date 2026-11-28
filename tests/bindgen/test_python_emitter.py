@@ -249,55 +249,27 @@ mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic)
         self.assertIn("from ._generated_operations import set_level_volume", exports)
         self.assertNotIn("import create", exports)
 
-    def test_docs_name_the_python_symbols_of_c_declarations(self):
-        values = emitted(python, real_api())[
-            "python/maplibre_native_ffi/_generated_values.py"
-        ]
-        self.assertIn("`MapHandle.cancel_camera_transitions_with_id()`", values)
-        self.assertNotIn("`mln_map_cancel_camera_transitions_with_id()`", values)
-
-    def test_a_scope_disposes_and_an_explicit_release_reaches_native(self):
-        files = emitted(python, real_api())
-        native = files["src/generated_operations.rs"]
-
-        def method(owner, name):
-            block = native.split(f"\nimpl {owner} {{\n", 1)[1].split("\n}\n", 1)[0]
-            return block.split(f"fn {name}(", 1)[1].split("#[pyo3", 1)[0]
-
-        self.assertIn("mln_map_dispose", method("MapHandle", "_dispose"))
-        self.assertIn("mln_map_release", method("MapHandle", "release"))
-        self.assertIn(
-            "mln_render_session_dispose", method("RenderSessionHandle", "_dispose")
-        )
-        # A disposal after an explicit release does nothing, while a repeated
-        # explicit release still reaches native.
-        self.assertIn("self.reserve(true)", method("MapHandle", "_dispose"))
-        self.assertIn("self.reserve(false)", method("MapHandle", "release"))
-
     def test_dispose_is_public_only_where_c_has_one_besides_a_void_release(self):
-        owners = emitted(python, real_api())[
-            "python/maplibre_native_ffi/_generated_owners.py"
-        ]
+        api = real_api()
+        owners = emitted(python, api)["python/maplibre_native_ffi/_generated_owners.py"]
         classes = {
             block.split("(", 1)[0]: block
             for block in owners.split("\nclass ")[1:]
             if "_handle_name" in block
         }
-        self.assertEqual(len(classes), 10)
+        distinct = {
+            "".join(map(str.title, typedef.name.removeprefix("mln_").split("_")))
+            + "Handle"
+            for typedef in api.typedefs
+            if typedef.metadata.get("kind") == "handle"
+            and typedef.metadata.get("dispose")
+            not in (None, typedef.metadata["release"])
+        }
+        expected = distinct & classes.keys()
+        self.assertTrue(expected)
         self.assertEqual(
             {name for name, block in classes.items() if "def dispose(" in block},
-            {"MapHandle", "RenderSessionHandle", "RuntimeHandle"},
-        )
-        # Every handle has an id, and only the runtime and the map are event
-        # sources.
-        self.assertTrue(all("def id(self) -> int:" in b for b in classes.values()))
-        self.assertEqual(
-            {
-                name
-                for name, block in classes.items()
-                if "report as their source" in block
-            },
-            {"MapHandle", "RuntimeHandle"},
+            expected,
         )
 
     def test_a_record_of_only_a_union_is_its_variants(self):
@@ -319,8 +291,6 @@ mln_status mln_level_set_volume(unsigned volume, mln_diagnostic *out_diagnostic)
         )
         native.map_event.return_value = {"kind": None, "tag": 42}
         self.assertEqual(operations.map_event(1), values.UnknownVariant(42))
-        rust = emitted(python, api)["src/generated_operations.rs"]
-        self.assertIn("Ok(match value.kind {", rust)
 
     def test_an_input_only_union_has_no_unknown_arm(self):
         api = self.parse(

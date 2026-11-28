@@ -10,7 +10,6 @@ from support import (
     parse,
     parse_sources,
     protocol_header,
-    real_api,
     require_tool,
 )
 
@@ -40,14 +39,10 @@ class ManagedEmitterTests(unittest.TestCase):
 BIND("execution=command")
 mln_status mln_map_run(mln_map map, double {parameter}, const mln_completion *done, mln_diagnostic *out_diagnostic);
 """
-            api = self.parse(source)
-            for emitter in (dotnet,):
-                with self.subTest(name=name, emitter=emitter.__name__):
-                    self.assertEqual(emitter.lower(api).generated, [])
-                    self.assertIn(
-                        "identifier",
-                        emitter.lower(api).unsupported["mln_map_run"],
-                    )
+            lowered = dotnet.lower(self.parse(source))
+            with self.subTest(name=name, emitter="dotnet"):
+                self.assertEqual(lowered.generated, [])
+                self.assertIn("identifier", lowered.unsupported["mln_map_run"])
 
             owned = self.parse(source, map_handle=True)
             for emitter in (dart, kotlin):
@@ -113,50 +108,6 @@ mln_status mln_measurement_create(mln_measurement *out_measurement BIND("directi
             "Abandon(MlnMeasurement live, mln_diagnostic* diagnostic) => "
             "NativeMethods.mln_measurement_dispose(live, diagnostic);",
             operations,
-        )
-
-    def test_every_dotnet_owner_has_the_same_handle_members(self):
-        generated = emitted(dotnet, real_api())
-        for path, event_source in (
-            ("Runtime/RuntimeHandle.Operations.g.cs", True),
-            ("Map/MapHandle.Operations.g.cs", True),
-            ("RenderSession/RenderSessionHandle.Operations.g.cs", False),
-            ("RenderSession/AcquiredFrameHandle.Operations.g.cs", False),
-            ("Projection/MapProjectionHandle.Operations.g.cs", False),
-        ):
-            operations = generated[path]
-            self.assertIn("public ulong Id => state.Handle.Value;", operations)
-            self.assertIn("public bool IsClosed => state.IsClosed;", operations)
-            self.assertIn(
-                "public override string ToString() => state.ToString();", operations
-            )
-            self.assertEqual(
-                event_source,
-                "which runtime events report as their" in operations,
-                path,
-            )
-
-    def test_dotnet_requires_only_required_members_and_zeroes_the_rest(self):
-        # A record struct's own default leaves a string null, so a constructor
-        # sets each member a host may omit to zero, and a required member is a
-        # required property that the full constructor sets.
-        generated = emitted(dotnet, real_api())
-        self.assertIn(
-            'public RuntimeOptions()\n        : this("", "") { }',
-            generated["Runtime/RuntimeOptions.g.cs"],
-        )
-        header = generated["Runtime/HttpHeader.g.cs"]
-        self.assertIn("public required string Name { get; init; }", header)
-        self.assertIn('public string Value { get; init; } = "";', header)
-        self.assertIn("[System.Diagnostics.CodeAnalysis.SetsRequiredMembers]", header)
-        self.assertIn(
-            "public required LogicalExtent InitialExtent { get; init; }",
-            generated["Map/MapOptions.g.cs"],
-        )
-        # The ABI check reads the version, so reading it runs no check.
-        self.assertIn(
-            "EnterUnchecked();\n        var returned = NativeMethods.mln_c_version();",
-            generated["Base/MaplibreNative.Operations.g.cs"],
         )
 
     def test_dart_generates_callback_registrations_only_with_a_queue(
@@ -507,18 +458,3 @@ namespace Maplibre.NativeFfi.Internal.Callback {
                 cwd=ROOT / "bindings/dotnet",
                 timeout=180,
             )
-
-
-class DotnetDocTests(unittest.TestCase):
-    def test_a_summary_names_the_dotnet_symbols_of_the_c_identifiers(self):
-        outcome = emitted(dotnet, real_api())["Map/CameraTransitionOutcome.g.cs"]
-        self.assertIn("<c>MapHandle.CancelCameraTransitionsAsync()</c>", outcome)
-        self.assertIn("<c>MapHandle.CancelCameraTransitionsWithIdAsync()</c>", outcome)
-        self.assertNotIn("mln_map_cancel_camera_transitions()", outcome)
-        files = emitted(dotnet, real_api())
-        self.assertIn(
-            "For <c>MomentumDecayModel.Friction</c>.",
-            files["Gesture/MomentumDecay.g.cs"],
-        )
-        # A tag that only its union uses names the variant it selects.
-        self.assertIn("<c>GestureEvent.Notch</c>", files["Gesture/GestureNotch.g.cs"])

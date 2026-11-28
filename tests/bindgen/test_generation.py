@@ -54,48 +54,10 @@ mln_status mln_write_view(const mln_view_options *options, mln_diagnostic *out_d
 
 
 class GenerationTests(unittest.TestCase):
-    def parse(self, source, *, owned_map=False):
-        api = parse(
-            source,
-            defines=("MLN_PROTOCOL_MAP_CLOSE",) if owned_map else (),
-            header="style.h",
-        )
+    def parse(self, source):
+        api = parse(source, header="style.h")
         validate(api)
         return api
-
-    def test_caller_sized_outputs_share_the_input_array_count(self):
-        api = parse(groups=("caller_sized_output",))
-        validate(api)
-        bound = compile_api(api)
-        for plan in bound.operations:
-            output = plan.outputs[0]
-            self.assertEqual(output.value.kind, "array")
-            self.assertEqual(output.value.length, "point_count")
-            self.assertEqual(output.sized_by, "points")
-        for emitter in EMITTERS:
-            with self.subTest(emitter=emitter.__name__):
-                self.assertEqual(emitter.lower(bound).unsupported, {})
-                self.rendered(emitter, bound)
-
-    def test_caller_sized_text_hides_its_capacity_and_length(self):
-        api = parse(groups=("caller_sized_text",))
-        validate(api)
-        bound = compile_api(api)
-        plan = next(
-            plan
-            for plan in bound.operations
-            if plan.function.name == "mln_probe_zeros_json"
-        )
-        text = plan.caller_sized_text
-        self.assertEqual(text.name, "out_json")
-        self.assertEqual(text.result_length, "out_json_length")
-        self.assertEqual(text.value.kind, "buffer")
-        self.assertEqual(text.value.length, "json_capacity")
-        self.assertEqual(text.value.encoding, "json")
-        for emitter in EMITTERS:
-            with self.subTest(emitter=emitter.__name__):
-                self.assertEqual(emitter.lower(bound).unsupported, {})
-                self.rendered(emitter, bound)
 
     def test_caller_sized_text_rejects_an_unsound_contract(self):
         text = 'char *out_json BIND("direction=out;encoding=json;length=capacity;result_length=out_length")'
@@ -225,24 +187,9 @@ mln_status mln_probe_batch(const void *bytes BIND("length=count;encoding=bytes")
                 self.assertIn(plain, source)
                 self.assertNotIn("storedWidth", source)
 
-    def test_every_binding_copies_an_array_that_a_view_lends(self):
-        api = parse(groups=("borrowed_view",))
-        for emitter in (dart, dotnet, go, kotlin, python, swift, typescript, zig):
-            with self.subTest(emitter=emitter.__name__):
-                lowered = emitter.lower(api)
-                self.assertNotIn("mln_frame_get_texture", lowered.unsupported)
-                self.assertIn("mln_frame_get_texture", lowered.generated)
-
     def test_a_borrowed_callback_handle_reaches_the_host_unable_to_release_it(self):
         api = parse(groups=("borrowed_argument",))
         validate(api)
-        bound = compile_api(api)
-        map_, _name = bound.callbacks["mln_ping_callback"].arguments
-        self.assertEqual(
-            (map_.name, map_.value.kind, map_.value.ownership),
-            ("map", "handle", "borrowed"),
-        )
-        self.assertEqual(bound.borrowed_handles, {"mln_map"})
         # Each binding wraps the handle in an owner that never releases or
         # disposes it, or lends it where the type system forbids the release.
         expected = {

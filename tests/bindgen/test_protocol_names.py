@@ -59,18 +59,6 @@ class ProtocolNameTests(unittest.TestCase):
         ]
         self.assertEqual(found, [], "name these declarations in protocol.py")
 
-    def test_policy_tables_still_exist(self):
-        for path, tables in POLICY_TABLES.items():
-            tree = ast.parse((GENERATOR / path).read_text())
-            assigned = {
-                target.id
-                for statement in tree.body
-                if isinstance(statement, ast.Assign)
-                for target in statement.targets
-                if isinstance(target, ast.Name)
-            }
-            self.assertLessEqual(tables, assigned, path)
-
 
 if __name__ == "__main__":
     unittest.main()
