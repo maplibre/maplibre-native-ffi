@@ -368,7 +368,7 @@ if ("wasmJs" in extensions.getByType<KotlinMultiplatformExtension>().targets.nam
       from(it.resolve("licenses")) { into("META-INF/licenses/maplibre-native-c") }
     }
     doFirst {
-      for (name in listOf("maplibre_native_c.js", "maplibre_native_c_bg.wasm")) {
+      for (name in listOf("index.js", "maplibre_native_c.js", "maplibre_native_c_bg.wasm")) {
         check(packageDirectory?.resolve(name)?.isFile == true) {
           "Missing browser package $name in $packageDirectory; build a web preset"
         }

@@ -1,8 +1,8 @@
 // The script of the module's tile worker Web Workers: mln-rs's
-// (third_party/mln-rs/crates/mln_c/js/tile_worker.js), over this package's
-// bindings, which wasm-bindgen copies three directories above it. Each message
-// is {module, port} from a map's instance: the first instantiates the module,
-// and each port gets tile workers of its own.
+// (third_party/mln-rs/crates/mln_c/web-package/tile_worker.js), over this
+// package's bindings, which wasm-bindgen copies three directories above it.
+// Each message is {module, port} from a map's instance: the first instantiates
+// the module, and each port gets tile workers of its own.
 //
 // A panic aborts the instance, and nothing may call into it after that: the
 // Web Worker sends {fatal: message} over each port instead.

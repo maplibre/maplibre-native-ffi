@@ -1,8 +1,8 @@
 // The Kotlin/Wasm binding's runtime: the browser package of one render
-// backend, which a bundler takes in through this import, and the module
-// object over it (runtime.mjs).
+// backend, which a bundler takes in through this import of the package's
+// entry (index.js), and the module object over it (runtime.mjs).
 
-import * as bindings from "./maplibre_native_c.js";
+import * as bindings from "./index.js";
 import { instantiateFrom } from "./runtime.mjs";
 
 /** Instantiates the package's module and returns the module object. */

@@ -12,7 +12,7 @@ set -euo pipefail
 preset="$1"
 package="build/$preset/install/share/maplibre-native-c/web"
 staging="$PWD/build/kotlin-wasm/$preset"
-if [[ ! -f "$package/maplibre_native_c.js" ]]; then
+if [[ ! -f "$package/index.js" ]]; then
   echo "error: $package holds no browser package; run mise run //:build $preset" >&2
   exit 1
 fi
@@ -25,7 +25,7 @@ import { instantiateFrom } from "./runtime.mjs";
 
 export default async function instantiate(options) {
   // Karma serves files outside its base path under /absolute.
-  const bindings = await import(/* webpackIgnore: true */ "/absolute$staging/maplibre_native_c.js");
+  const bindings = await import(/* webpackIgnore: true */ "/absolute$staging/index.js");
   return instantiateFrom(bindings, options);
 }
 SCRIPT

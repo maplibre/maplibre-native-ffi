@@ -15,6 +15,7 @@ interface Bindings {
   readonly mlnTsAddon: () => Addon;
   readonly mlnWebObjectInsert: (value: unknown) => number;
   readonly mlnWebObjectGet: (handle: number) => unknown;
+  readonly mlnWebSetShaperLoader: (loader: () => Promise<unknown>) => void;
 }
 
 let loading: Promise<void> | undefined;
@@ -39,11 +40,24 @@ export function loadModule(url: string | URL): Promise<void> {
   return loading;
 }
 
-async function load(url: string): Promise<void> {
+async function load(specifier: string): Promise<void> {
+  // A relative URL resolves as import() resolves it, so the files beside the
+  // bindings resolve against the same URL.
+  const url = new URL(specifier, import.meta.url).href;
   const bindings = (await import(
     /* @vite-ignore */ /* webpackIgnore: true */ url
   )) as Bindings;
   await bindings.default();
+  // mln-rs's font-face shaper module, which the package ships beside the
+  // bindings. The module starts its tile workers itself (web/src/lib.rs).
+  const shaper = new URL("mln_web_shaper.js", url).href;
+  bindings.mlnWebSetShaperLoader(async () => {
+    const module = (await import(
+      /* @vite-ignore */ /* webpackIgnore: true */ shaper
+    )) as { readonly default: () => Promise<unknown> };
+    await module.default();
+    return module;
+  });
   // Hosts report collected owners through console.warn, and host callback
   // errors through the global reportError.
   bindAddon(bindings.mlnTsAddon(), {}, installRealm);

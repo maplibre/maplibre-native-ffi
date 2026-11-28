@@ -6,8 +6,9 @@
 //! whose exports it calls as it calls the Node-API addon's on other hosts.
 //! Everything runs on the thread that loaded the module, which the library
 //! never blocks. The module starts its tile workers' Web Workers from its own
-//! script, which loads this package (js/tile_worker.js), and loads mln-rs's
-//! font-face shaper module from beside the package.
+//! script, which loads this package (js/tile_worker.js). The browser entry
+//! sets how it loads mln-rs's font-face shaper module, from beside the
+//! package.
 
 mod napi;
 
@@ -48,8 +49,8 @@ pub fn addon() -> Result<JsValue, JsValue> {
         return Ok(exports);
     }
     napi::install();
-    // Before any runtime: a spawn function takes the place of mln-rs's
-    // default script, which loads mln-rs's own package rather than this one.
+    // Before any runtime: mln-rs's own tile worker script loads mln-rs's
+    // package rather than this one.
     let script = wasm_bindgen::link_to!(module = "/js/tile_worker.js");
     mln_runtime::web::tile_workers::configure(None, Some(tile_worker_spawner(&script)));
     let exports = napi::register(napi_register_module_v1, add_test_exports)?;

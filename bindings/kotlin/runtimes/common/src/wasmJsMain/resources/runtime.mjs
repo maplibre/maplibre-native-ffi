@@ -1,5 +1,5 @@
 // The module object that the Kotlin/Wasm binding calls, over the browser
-// package's wasm-bindgen bindings (`maplibre_native_c.js`).
+// package's entry (`index.js`), which re-exports its wasm-bindgen bindings.
 //
 // The binding reaches the object through a `Symbol.for` global and calls the
 // module's raw C exports on it, `mln_*`, as on native. The object adds what
