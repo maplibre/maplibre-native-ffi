@@ -1529,7 +1529,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-builtins"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "bytemuck",
  "earcut",
@@ -1554,7 +1554,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-c"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "geo-types",
  "geojson",
@@ -1581,7 +1581,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-engine"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "ab_glyph_rasterizer",
  "block2",
@@ -1640,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-geometry"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "geo-types",
  "mln-rs-wire",
@@ -1648,7 +1648,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-gfx"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "bytemuck",
  "foldhash 0.2.0",
@@ -1661,7 +1661,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-gl"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "bytemuck",
  "glow",
@@ -1680,7 +1680,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-location-puck"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "bytemuck",
  "geo-types",
@@ -1693,7 +1693,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-mtl"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "block2",
  "bytemuck",
@@ -1711,7 +1711,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-runtime"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "geo-types",
  "geojson",
@@ -1739,7 +1739,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-style"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "cheap-ruler",
  "fixed_decimal",
@@ -1774,7 +1774,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-webgpu"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "js-sys",
  "log",
@@ -1787,7 +1787,7 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-wire"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "bytemuck",
  "foldhash 0.2.0",
@@ -1800,8 +1800,9 @@ dependencies = [
 
 [[package]]
 name = "mln-rs-wire-derive"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
+ "proc-macro-crate",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
