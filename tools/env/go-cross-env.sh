@@ -32,7 +32,6 @@ case "$1" in
     ndk_bin="$ndk_prebuilt/bin"
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$ndk_bin/${compiler_prefix}24-clang"
-    export CXX="$ndk_bin/${compiler_prefix}24-clang++"
     ;;
   linux-musl-arm64 | linux-musl-x64 | freebsd-x64 | linux-*-riscv64 | linux-*-loongarch64)
     if [[ "$1" == freebsd-* ]]; then
@@ -47,15 +46,14 @@ case "$1" in
       *) goarch=amd64 ;;
     esac
     compiler="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-cc"
-    compiler_cxx="$MISE_MONOREPO_ROOT/build/$1/zig-shim/zig-c++"
-    if [[ ! -x "$compiler" || ! -x "$compiler_cxx" ]]; then
-      echo "The Zig compiler wrappers do not exist for $1; run mise run build $1 first." >&2
+    if [[ ! -x "$compiler" ]]; then
+      echo "The Zig compiler wrapper does not exist for $1; run mise run build $1 first." >&2
       return 2
     fi
     # The binding links the C API's shared library, which makes Zig link musl
     # dynamically, so the test binary can load Alpine's graphics drivers.
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
-    export CC="$compiler" CXX="$compiler_cxx"
+    export CC="$compiler"
     ;;
   windows-x64 | windows-arm64 | mingw-*)
     if [[ "$1" == *-arm64 ]]; then
@@ -66,14 +64,13 @@ case "$1" in
     # cgo takes GNU-style compiler flags, including when it links an MSVC DLL.
     export GOOS=windows GOARCH="$goarch" CGO_ENABLED=1
     export CC="$MLN_FFI_MSYS2_ROOT/bin/clang.exe"
-    export CXX="$MLN_FFI_MSYS2_ROOT/bin/clang++.exe"
     export PKG_CONFIG="$MLN_FFI_MSYS2_ROOT/bin/pkgconf.exe"
     msys2_bin_dir="$(cygpath -u "$MLN_FFI_MSYS2_ROOT/bin")"
     export PATH="$msys2_bin_dir${PATH:+:$PATH}"
     ;;
   macos-x64)
     export GOARCH=amd64 CGO_ENABLED=1
-    export CC="clang -arch x86_64" CXX="clang++ -arch x86_64"
+    export CC="clang -arch x86_64"
     ;;
   ios-arm64 | ios-simulator-arm64 | ios-maccatalyst-arm64)
     goos=ios
@@ -86,8 +83,7 @@ case "$1" in
     target_flags="-target $target -isysroot $sdk"
     export GOOS="$goos" GOARCH=arm64 CGO_ENABLED=1
     CC="$(xcrun --sdk "$sdk_name" --find clang) $target_flags"
-    CXX="$(xcrun --sdk "$sdk_name" --find clang++) $target_flags"
-    export CC CXX
+    export CC
     ;;
   ohos-arm64 | ohos-x64)
     # Go has no OpenHarmony port, so use its Linux port with the OHOS sysroot.
@@ -103,7 +99,6 @@ case "$1" in
     target_flags="--target=$compiler_target --sysroot=$sysroot"
     export GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=1
     export CC="$OHOS_SDK_NATIVE/llvm/bin/clang $target_flags"
-    export CXX="$OHOS_SDK_NATIVE/llvm/bin/clang++ $target_flags"
     # The OHOS loader leaves Go's internal function-pointer relocations
     # unresolved in PIE executables. Link device binaries as ET_EXEC instead.
     export CGO_LDFLAGS="${CGO_LDFLAGS:-} -no-pie"

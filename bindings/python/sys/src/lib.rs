@@ -11,8 +11,7 @@
 //! for the Cargo target.
 //!
 //! On `x86_64-pc-windows-gnu`, link with MSYS2's MINGW64 Clang and LLD
-//! (`-C link-arg=-fuse-ld=lld`). Its MSVCRT and libstdc++ must match the native
-//! artifact. Keep MINGW64's `bin` directory on `PATH` for the runtime DLLs.
+//! (`-C link-arg=-fuse-ld=lld`). Its MSVCRT must match the native artifact. Keep MINGW64's `bin` directory on `PATH` for the runtime DLLs.
 
 #![allow(non_camel_case_types)]
 

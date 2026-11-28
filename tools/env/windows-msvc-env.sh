@@ -196,7 +196,7 @@ EOF
   done < <(tr ':' '\n' <<< "$msvc_path")
 
   redist_root="$(cygpath -u "${vs_install}\\VC\\Redist\\MSVC")"
-  crt_path="$(find "$redist_root" -path "*/${msvc_arch}/Microsoft.VC143.CRT/msvcp140_codecvt_ids.dll" -print 2>/dev/null | sort -r | sed -n '1p')"
+  crt_path="$(find "$redist_root" -path "*/${msvc_arch}/Microsoft.VC143.CRT/vcruntime140.dll" -print 2>/dev/null | sort -r | sed -n '1p')"
   if [[ -n "$crt_path" ]]; then
     crt_path="$(dirname "$crt_path")"
   fi

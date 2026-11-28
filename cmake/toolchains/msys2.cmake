@@ -18,9 +18,3 @@ set(CMAKE_RANLIB "${MLN_FFI_MSYS2_ROOT}/bin/llvm-ranlib.exe"
     CACHE FILEPATH "" FORCE)
 set(CMAKE_RC_COMPILER "${MLN_FFI_MSYS2_ROOT}/bin/windres.exe")
 list(PREPEND CMAKE_PREFIX_PATH "${MLN_FFI_MSYS2_ROOT}")
-
-# libstdc++ emits pthread calls from its inline synchronization helpers, so
-# every C++ executable, including a test that links only the DLL, needs it.
-if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "x64")
-  set(CMAKE_CXX_FLAGS_INIT "-pthread")
-endif()

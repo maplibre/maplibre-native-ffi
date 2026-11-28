@@ -136,14 +136,7 @@ void main() {
         platform: 'windows-mingw-$architecture',
         libraries: [
           'maplibre-native-c.dll',
-          if (architecture == 'arm64') ...[
-            'libc++.dll',
-            'libunwind.dll',
-          ] else ...[
-            'libgcc_s_seh-1.dll',
-            'libstdc++-6.dll',
-            'libwinpthread-1.dll',
-          ],
+          if (architecture == 'arm64') 'libunwind.dll',
         ],
       );
     }
@@ -161,7 +154,7 @@ void main() {
           {'local_build': 'build/mingw-$arch/install'},
         );
         expect(await bundled(output), 'windows-mingw-$arch');
-        expect(output.assets.code, hasLength(arch == 'arm64' ? 3 : 4));
+        expect(output.assets.code, hasLength(arch == 'arm64' ? 2 : 1));
       });
     }
 
@@ -186,13 +179,13 @@ void main() {
     _writePrefix(
       temporary.uri.resolve('build/windows-x64/install/'),
       platform: 'windows-x64',
-      libraries: ['maplibre-native-c.dll', 'msvcp140.dll', 'vcruntime140.dll'],
+      libraries: ['maplibre-native-c.dll', 'vcruntime140.dll'],
     );
     final output = await runHook(_windows, {
       'local_build': 'build/windows-x64/install',
     });
     expect(await bundled(output), 'windows-x64');
-    expect(output.assets.code, hasLength(3));
+    expect(output.assets.code, hasLength(2));
   });
 
   group('a published package', () {

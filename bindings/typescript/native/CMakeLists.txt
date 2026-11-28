@@ -92,12 +92,11 @@ if(WIN32)
     PATHS "${MLN_FFI_NATIVE_PREFIX}/bin" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
     REQUIRED)
   set(MLN_FFI_WINDOWS_DLLS "${MLN_FFI_NATIVE_DLL}")
-  # The C++ runtime DLLs that the C library carries load from beside it too.
+  # The runtime DLLs that the C library carries load from beside it too.
   if(MINGW)
     file(GLOB runtime_dlls "${MLN_FFI_NATIVE_PREFIX}/lib/*.dll")
   else()
-    file(GLOB runtime_dlls "${MLN_FFI_NATIVE_PREFIX}/bin/vcruntime140*.dll"
-         "${MLN_FFI_NATIVE_PREFIX}/bin/msvcp140*.dll")
+    file(GLOB runtime_dlls "${MLN_FFI_NATIVE_PREFIX}/bin/vcruntime140*.dll")
   endif()
   list(APPEND MLN_FFI_WINDOWS_DLLS ${runtime_dlls})
 endif()
@@ -203,11 +202,7 @@ install(
   DESTINATION sbom
   RENAME maplibre-native-ffi.cdx.json)
 if(OHOS)
-  # The OHPM package ships the shared C++ runtime beside the addon, which the
-  # device does not carry, and the headers for the host's own native modules.
-  install(
-    FILES "${OHOS_SDK_NATIVE}/llvm/lib/${OHOS_TOOLCHAIN_NAME}/libc++_shared.so"
-    DESTINATION .)
+  # The OHPM package ships the headers for the host's own native modules.
   install(DIRECTORY "${MLN_FFI_NATIVE_PREFIX}/include/" DESTINATION include)
 endif()
 

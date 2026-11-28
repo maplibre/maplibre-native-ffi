@@ -236,7 +236,6 @@ function(mln_ffi_cargo_environment out_environment out_rustc_arguments)
     if(MINGW)
       list(
         APPEND environment "CC_${target_lower}=${CMAKE_C_COMPILER}"
-        "CXX_${target_lower}=${CMAKE_CXX_COMPILER}"
         "AR_${target_lower}=${CMAKE_AR}"
         "CARGO_TARGET_${target_upper}_LINKER=${CMAKE_C_COMPILER}")
     endif()
@@ -244,26 +243,18 @@ function(mln_ffi_cargo_environment out_environment out_rustc_arguments)
     # Another host cross-compiles with clang-cl and lld-link against the
     # /winsysroot tree, which neither cc-rs nor rustc knows of.
     list(
-      APPEND
-      environment
-      "CC_${target_lower}=${CMAKE_C_COMPILER}"
-      "CXX_${target_lower}=${CMAKE_CXX_COMPILER}"
+      APPEND environment "CC_${target_lower}=${CMAKE_C_COMPILER}"
       "AR_${target_lower}=${CMAKE_AR}"
       "CFLAGS_${target_lower}=/winsysroot${MLN_FFI_WINSYSROOT}"
-      "CXXFLAGS_${target_lower}=/winsysroot${MLN_FFI_WINSYSROOT}"
       "CARGO_TARGET_${target_upper}_LINKER=${CMAKE_LINKER}")
     list(APPEND target_rustflags "-Clink-arg=/winsysroot:${MLN_FFI_WINSYSROOT}")
   else()
     # Linux, FreeBSD, Android, and OpenHarmony: the compiler that CMake uses,
     # wrapped with its target and flags.
     mln_ffi_write_compiler_shim(cc cc "${CMAKE_C_COMPILER}" C)
-    mln_ffi_write_compiler_shim(cxx c++ "${CMAKE_CXX_COMPILER}" CXX)
     mln_ffi_write_linker_shim(linker "${cc}")
     list(
-      APPEND
-      environment
-      "CC_${target_lower}=${cc}"
-      "CXX_${target_lower}=${cxx}"
+      APPEND environment "CC_${target_lower}=${cc}"
       "AR_${target_lower}=${CMAKE_AR}"
       "CARGO_TARGET_${target_upper}_AR=${CMAKE_AR}"
       "CARGO_TARGET_${target_upper}_LINKER=${linker}")

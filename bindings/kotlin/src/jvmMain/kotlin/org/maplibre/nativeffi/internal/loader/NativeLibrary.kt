@@ -282,14 +282,7 @@ internal object NativeLibrary {
       osName.contains("windows") ->
         listOf(
           "vcruntime140.dll",
-          "vcruntime140_1.dll",
-          "msvcp140.dll",
-          "msvcp140_codecvt_ids.dll",
-          "libwinpthread-1.dll",
-          "libgcc_s_seh-1.dll",
-          "libstdc++-6.dll",
           "libunwind.dll",
-          "libc++.dll",
           "vulkan-1.dll",
           "libEGL.dll",
           "libGLESv2.dll",

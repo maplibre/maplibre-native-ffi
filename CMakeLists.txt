@@ -3,26 +3,24 @@ cmake_minimum_required(VERSION 3.28)
 include("${CMAKE_CURRENT_LIST_DIR}/cmake/platform/apple.cmake")
 mln_ffi_configure_apple_toolchain_defaults()
 
-# Cargo builds the library from mln-rs (cmake/mln_ffi_mln_rs.cmake), with the
-# C and C++ compilers that CMake finds for mln-rs's C and C++ dependencies. C is
-# also the language of the test graphics fixtures and the docs' C snippets. A
-# web preset builds the browser package (cmake/mln_ffi_web.cmake), which needs
-# neither.
+# Cargo builds the library from mln-rs (cmake/mln_ffi_mln_rs.cmake), with the C
+# compiler that CMake finds for mln-rs's C dependencies. C is also the language
+# of the test graphics fixtures and the docs' C snippets. A web preset builds
+# the
+# browser package (cmake/mln_ffi_web.cmake), which needs no compiler.
 if(MLN_FFI_TARGET_PLATFORM MATCHES "^web-")
   set(MLN_FFI_WEB TRUE)
   set(languages NONE)
 else()
   set(MLN_FFI_WEB FALSE)
-  set(languages C CXX)
+  set(languages C)
 endif()
 project(maplibre_native_c VERSION 0.1.0 LANGUAGES ${languages})
 
 if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
   # The OHOS SDK toolchain injects --gcc-toolchain, which clang reports as
   # unused. Keep the warning non-fatal without weakening other platforms.
-  add_compile_options(
-    $<$<COMPILE_LANGUAGE:C>:-Wno-unused-command-line-argument>
-    $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-command-line-argument>)
+  add_compile_options(-Wno-unused-command-line-argument)
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

@@ -7,15 +7,9 @@
 # host's /winsysroot tree has none, so a cross build installs no runtime unless
 # that variable names a copy, and the package check refuses its package.
 #
-# Each list names the runtime DLLs that Rust code imports on that architecture:
-# vcruntime140.dll for the C runtime's startup and unwinding support, and on x64
-# vcruntime140_1.dll, which holds the newer exception handler. The one in the
-# ARM64 Microsoft.VC*.CRT directory is ARM64EC, for x64-compatible code, and an
-# ARM64 process can't load it.
-set(MLN_FFI_MSVC_RUNTIME_DLLS_x64 vcruntime140.dll vcruntime140_1.dll)
-set(MLN_FFI_MSVC_RUNTIME_DLLS_arm64 vcruntime140.dll)
-set(MLN_FFI_MSVC_RUNTIME_DLLS_arm64 vcruntime140.dll msvcp140.dll
-    msvcp140_codecvt_ids.dll)
+# Rust code imports one runtime DLL on either architecture: vcruntime140.dll,
+# for the C runtime's startup and unwinding support.
+set(MLN_FFI_MSVC_RUNTIME_DLLS vcruntime140.dll)
 
 function(mln_ffi_bundle_msvc_runtime target)
   # Read on every configure, so that a later environment takes effect.
@@ -41,7 +35,7 @@ function(mln_ffi_bundle_msvc_runtime target)
         "${redist}/${MLN_FFI_TARGET_ARCHITECTURE}")
   endif()
   set(runtime_dlls "")
-  foreach(dll IN LISTS MLN_FFI_MSVC_RUNTIME_DLLS_${MLN_FFI_TARGET_ARCHITECTURE})
+  foreach(dll IN LISTS MLN_FFI_MSVC_RUNTIME_DLLS)
     if(NOT EXISTS "${crt_dirs}/${dll}")
       message(FATAL_ERROR "${crt_dirs} has no ${dll}")
     endif()

@@ -180,8 +180,7 @@ fun configureAndroidRuntimePublication() {
 
   // Prefab doesn't read jni/, so the Prefab module carries its own copy of each
   // library, taken from the directories that the AAR's jni/ entries come from.
-  // The module declares the STL none because Prefab rejects a shared library that
-  // declares c++_static, and this library exports only mln_* symbols.
+  // The module declares the STL none, since the library uses no C++ runtime.
   val prefabModule = "modules/maplibre-native-c"
   val prefabAbis = androidTargets.map(AndroidTarget::ndkAbi)
   val prefabMinSdk = catalogVersionInt("android-minSdk")

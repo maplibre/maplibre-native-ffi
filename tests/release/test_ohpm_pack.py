@@ -42,7 +42,6 @@ class OhpmPackTest(unittest.TestCase):
                 for name in (
                     "libmaplibre_native_ffi.so",
                     "libmaplibre-native-c.so",
-                    "libc++_shared.so",
                     "include/maplibre_native_c.h",
                     "licenses/native.txt",
                 ):

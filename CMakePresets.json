@@ -312,7 +312,6 @@
       "toolchainFile": "$env{ANDROID_HOME}/ndk/$env{MLN_FFI_ANDROID_NDK_VERSION}/build/cmake/android.toolchain.cmake",
       "cacheVariables": {
         "ANDROID_PLATFORM": "android-24",
-        "ANDROID_STL": "c++_static",
         "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl"
       },
       "vendor": {
@@ -416,7 +415,6 @@
       "inherits": "_single-config",
       "toolchainFile": "$env{OHOS_SDK_NATIVE}/build/cmake/ohos.toolchain.cmake",
       "cacheVariables": {
-        "OHOS_STL": "c++_shared",
         "OHOS_COMPATIBLE_SDK_VERSION": "20",
         "MLN_FFI_RENDER_BACKENDS": "vulkan;opengl"
       }
@@ -482,7 +480,6 @@
       "inherits": "_windows",
       "cacheVariables": {
         "CMAKE_C_COMPILER_TARGET": "x86_64-pc-windows-msvc",
-        "CMAKE_CXX_COMPILER_TARGET": "x86_64-pc-windows-msvc",
         "MLN_FFI_TARGET_ARCHITECTURE": "x64",
         "MLN_FFI_TARGET_PLATFORM": "windows-x64",
         "MLN_FFI_ZIG_TARGET": "x86_64-windows-msvc",
@@ -501,7 +498,6 @@
       "inherits": "_windows",
       "cacheVariables": {
         "CMAKE_C_COMPILER_TARGET": "aarch64-pc-windows-msvc",
-        "CMAKE_CXX_COMPILER_TARGET": "aarch64-pc-windows-msvc",
         "MLN_FFI_TARGET_ARCHITECTURE": "arm64",
         "MLN_FFI_TARGET_PLATFORM": "windows-arm64",
         "MLN_FFI_ZIG_TARGET": "aarch64-windows-msvc",
