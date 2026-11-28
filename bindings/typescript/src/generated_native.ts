@@ -38,9 +38,9 @@ import type {
   LogSeverityFlag,
   LogicalExtent,
   LogicalSize,
-  MapDebugFlag,
   MapOptions,
   MapProjectionCameraResult,
+  MapProjectionTerrainElevationResult,
   MapSnapshot,
   MapTileOptions,
   MapView,
@@ -370,8 +370,12 @@ export interface NativeOperations {
     beforeLayerId: string | undefined,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_projection_create(view: MapView): bigint;
+  mln_map_projection_create(map: bigint, view: MapView | undefined): bigint;
   mln_map_projection_get_camera(projection: bigint): MapProjectionCameraResult;
+  mln_map_projection_get_terrain_elevation(
+    projection: bigint,
+    coordinate: LatLng,
+  ): MapProjectionTerrainElevationResult;
   mln_map_projection_is_location_occluded(
     projection: bigint,
     coordinate: LatLng,
@@ -481,11 +485,6 @@ export interface NativeOperations {
     message: string,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_set_debug_flags(
-    map: bigint,
-    flags: MapDebugFlag,
-    completion: NativeCompletion | undefined,
-  ): void;
   mln_map_set_event_mask(
     map: bigint,
     mask: RuntimeEventFlag,
@@ -526,11 +525,6 @@ export interface NativeOperations {
     value: unknown,
     completion: NativeCompletion | undefined,
   ): void;
-  mln_map_set_globe_free_bearing_enabled(
-    map: bigint,
-    enabled: boolean,
-    completion: NativeCompletion | undefined,
-  ): void;
   mln_map_set_image_source_coordinates(
     map: bigint,
     sourceId: string,
@@ -552,11 +546,6 @@ export interface NativeOperations {
   mln_map_set_projection_mode(
     map: bigint,
     options: ProjectionModeOptions,
-    completion: NativeCompletion | undefined,
-  ): void;
-  mln_map_set_rendering_stats_view_enabled(
-    map: bigint,
-    enabled: boolean,
     completion: NativeCompletion | undefined,
   ): void;
   mln_map_set_style_image(

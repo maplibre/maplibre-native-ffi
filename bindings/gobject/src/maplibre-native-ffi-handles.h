@@ -2224,6 +2224,35 @@ maplibre_native_ffi_map_move_style_layer_finish(
 );
 
 /**
+ * maplibre_native_ffi_map_projection_create:
+ * @view: (nullable): the value, or %NULL
+ *
+ * Creates a projection that converts coordinates as a map does, for one view of
+ * it.
+ *
+ * `view` is the view to convert for, such as a frame result's, or null for the
+ * map's current view. Over terrain, coordinates convert on the ground that the
+ * map drew. The projection doesn't follow the map, so create a new one after
+ * the map's view or terrain changes.
+ *
+ * See `mln_map_projection_create` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+ *
+ * It fails with these errors:
+ *
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_INVALID_STATE` until
+ *   `maplibre_native_ffi_runtime_create_map()` completes with `0`.
+ * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the view's style projection
+ *   draws a globe and the library can't project one.
+ *
+ * Returns: (transfer full): the object
+ */
+MaplibreNativeFfiMapProjection* maplibre_native_ffi_map_projection_create(
+  MaplibreNativeFfiMap* self, const MaplibreNativeFfiMapView* view,
+  GError** error
+);
+
+/**
  * maplibre_native_ffi_map_release_async:
  * @callback: (scope async) (nullable): the callback to call when the release finishes
  * @user_data: the data to pass to `callback`
@@ -2459,7 +2488,7 @@ maplibre_native_ffi_map_request_repaint_finish(
  * - `MAPLIBRE_NATIVE_FFI_ERROR_CANCELLED` when the map is released before the
  *   image is done.
  * - `MAPLIBRE_NATIVE_FFI_ERROR_NATIVE_ERROR` when the style or a resource that
- *   the image needs fails to load.
+ *   the image needs fails to load, or rendering the image fails on the GPU.
  */
 void maplibre_native_ffi_map_request_still_image_async(
   MaplibreNativeFfiMap* self, GAsyncReadyCallback callback, gpointer user_data
@@ -2720,38 +2749,6 @@ void maplibre_native_ffi_map_set_custom_vector_source_tile_error_async(
  */
 MaplibreNativeFfiCommandCompletion*
 maplibre_native_ffi_map_set_custom_vector_source_tile_error_finish(
-  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
-);
-
-/**
- * maplibre_native_ffi_map_set_debug_flags_async:
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Draws debugging overlays, such as tile borders, on the map.
- *
- * `flags` replaces the overlays set before.
- *
- * See `mln_map_set_debug_flags` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- *
- * Without `callback`, nothing reports whether the call succeeds.
- */
-void maplibre_native_ffi_map_set_debug_flags_async(
-  MaplibreNativeFfiMap* self, MaplibreNativeFfiMapDebugFlag flags,
-  GAsyncReadyCallback callback, gpointer user_data
-);
-
-/**
- * maplibre_native_ffi_map_set_debug_flags_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_map_set_debug_flags_async` started.
- *
- * Returns: (transfer full): the command's completion, or %NULL with `error` set
- */
-MaplibreNativeFfiCommandCompletion*
-maplibre_native_ffi_map_set_debug_flags_finish(
   MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
 );
 
@@ -3044,42 +3041,6 @@ maplibre_native_ffi_map_set_global_state_property_finish(
 );
 
 /**
- * maplibre_native_ffi_map_set_globe_free_bearing_enabled_async:
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Sets whether drags and zooms on a globe turn the bearing.
- *
- * When it's on, a drag or a zoom around a point on the globe turns the bearing
- * so the planet keeps its orientation, and a drag can carry the camera over a
- * pole. When it's off, the default, they keep the bearing, as MapLibre GL JS
- * does. Turn it on for a map whose users can rotate it. It changes nothing
- * while the map draws Mercator.
- *
- * See `mln_map_set_globe_free_bearing_enabled` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- *
- * Without `callback`, nothing reports whether the call succeeds.
- */
-void maplibre_native_ffi_map_set_globe_free_bearing_enabled_async(
-  MaplibreNativeFfiMap* self, gboolean enabled, GAsyncReadyCallback callback,
-  gpointer user_data
-);
-
-/**
- * maplibre_native_ffi_map_set_globe_free_bearing_enabled_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_map_set_globe_free_bearing_enabled_async` started.
- *
- * Returns: (transfer full): the command's completion, or %NULL with `error` set
- */
-MaplibreNativeFfiCommandCompletion*
-maplibre_native_ffi_map_set_globe_free_bearing_enabled_finish(
-  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
-);
-
-/**
  * maplibre_native_ffi_map_set_image_source_coordinates_async:
  * @source_id: the UTF-8 text
  * @coordinates: (array length=coordinate_count): the items
@@ -3239,36 +3200,6 @@ maplibre_native_ffi_map_set_projection_mode_finish(
 );
 
 /**
- * maplibre_native_ffi_map_set_rendering_stats_view_enabled_async:
- * @callback: (scope async) (nullable): the callback to call when the call finishes
- * @user_data: the data to pass to `callback`
- *
- * Shows or hides an overlay of rendering statistics on the map.
- *
- * See `mln_map_set_rendering_stats_view_enabled` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
- *
- * Without `callback`, nothing reports whether the call succeeds.
- */
-void maplibre_native_ffi_map_set_rendering_stats_view_enabled_async(
-  MaplibreNativeFfiMap* self, gboolean enabled, GAsyncReadyCallback callback,
-  gpointer user_data
-);
-
-/**
- * maplibre_native_ffi_map_set_rendering_stats_view_enabled_finish:
- * @result: the result that the callback received
- *
- * Finishes a call that `maplibre_native_ffi_map_set_rendering_stats_view_enabled_async` started.
- *
- * Returns: (transfer full): the command's completion, or %NULL with `error` set
- */
-MaplibreNativeFfiCommandCompletion*
-maplibre_native_ffi_map_set_rendering_stats_view_enabled_finish(
-  MaplibreNativeFfiMap* self, GAsyncResult* result, GError** error
-);
-
-/**
  * maplibre_native_ffi_map_set_style_image_async:
  * @image_id: the UTF-8 text
  * @options: (nullable): the value, or %NULL
@@ -3358,9 +3289,10 @@ maplibre_native_ffi_map_set_style_json_finish(
  * Sets a property of a layer in the map's style.
  *
  * `property_name` is one of the layer's layout or paint
- * \[properties\](https://maplibre.org/maplibre-style-spec/layers/), or
- * `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null `value`
- * resets any of these but `source` and `source-layer` to its default.
+ * \[properties\](https://maplibre.org/maplibre-style-spec/layers/), `filter`,
+ * `minzoom`, `maxzoom`, `source`, or `source-layer`, or an extension's member,
+ * named `<namespace>:<name>`. A null `value` resets any of these but `source`
+ * and `source-layer` to its default.
  *
  * See `mln_map_set_style_layer_property` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3441,8 +3373,9 @@ maplibre_native_ffi_map_set_style_light_property_finish(
  * reloading the style.
  *
  * `property_name` is a root property other than `sources` and `layers`, which
- * the source and layer calls change. A null `value` resets the property to its
- * default, as if the style didn't set it.
+ * the source and layer calls change, or an extension's member, named
+ * `<namespace>:<name>`. A null `value` resets the property to its default, as
+ * if the style didn't set it.
  *
  * See `mln_map_set_style_root_property` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3768,30 +3701,6 @@ guint64 maplibre_native_ffi_map_projection_get_id(
 );
 
 /**
- * maplibre_native_ffi_map_projection_create: (constructor)
- *
- * Creates a projection that converts coordinates for one view of a map.
- *
- * Create it from the `view` of an `MaplibreNativeFfiMapSnapshot` or an
- * `MaplibreNativeFfiRenderFrameResult`. The projection doesn't follow the map,
- * so create a new one after the map's camera, size, or style projection
- * changes.
- *
- * See `mln_map_projection_create` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
- *
- * It fails with these errors:
- *
- * - `MAPLIBRE_NATIVE_FFI_ERROR_UNSUPPORTED` when the view's style projection
- *   draws a globe and the library can't project one.
- *
- * Returns: (transfer full): the object
- */
-MaplibreNativeFfiMapProjection* maplibre_native_ffi_map_projection_create(
-  const MaplibreNativeFfiMapView* view, GError** error
-);
-
-/**
  * maplibre_native_ffi_map_projection_get_camera:
  *
  * Reads the projection's camera.
@@ -3804,6 +3713,22 @@ MaplibreNativeFfiMapProjection* maplibre_native_ffi_map_projection_create(
 MaplibreNativeFfiMapProjectionCameraResult*
 maplibre_native_ffi_map_projection_get_camera(
   MaplibreNativeFfiMapProjection* self, GError** error
+);
+
+/**
+ * maplibre_native_ffi_map_projection_get_terrain_elevation:
+ *
+ * Reads the height of the terrain that the map drew at a coordinate.
+ *
+ * See `mln_map_projection_get_terrain_elevation` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+ *
+ * Returns: (transfer full): the value
+ */
+MaplibreNativeFfiMapProjectionTerrainElevationResult*
+maplibre_native_ffi_map_projection_get_terrain_elevation(
+  MaplibreNativeFfiMapProjection* self,
+  const MaplibreNativeFfiLatLng* coordinate, GError** error
 );
 
 /**

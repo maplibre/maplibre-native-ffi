@@ -851,22 +851,6 @@ class LogSeverityFlag(IntFlag):
     ALL = 14
 
 
-class MapDebugFlag(IntFlag):
-    """A debug overlay that the map draws.
-
-    See `mln_map_debug_flag` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    """
-
-    TILE_BORDERS = 2
-    PARSE_STATUS = 4
-    TIMESTAMPS = 8
-    COLLISION = 16
-    OVERDRAW = 32
-    STENCIL_CLIP = 64
-    DEPTH_BUFFER = 128
-
-
 class MapLoadError(UnknownIntEnum):
     """Why a map failed to load a style.
 
@@ -1438,6 +1422,17 @@ class StyleVectorTileEncoding(UnknownIntEnum):
 
     MVT = 0
     MLT = 1
+
+
+class TerrainSkirtLength(UnknownIntEnum):
+    """How far the skirts that hide the cracks between terrain tiles reach down.
+
+    See `mln_terrain_skirt_length` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    AUTO = 0
+    NONE = 1
 
 
 class TileLodMode(UnknownIntEnum):
@@ -3774,6 +3769,15 @@ class MapOptions:
     do.
     """
 
+    terrain_skirt_length: TerrainSkirtLength | None = None
+    """The terrain's skirts. Without it, `TerrainSkirtLength.AUTO`."""
+
+    terrain_drape_memory_limit: int | None = None
+    """The most GPU memory, in bytes, for the layers drawn over the terrain.
+    Past it, the terrain farthest from the center of the view looks blurrier.
+    Without it, there's no limit.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -3785,6 +3789,10 @@ class MapOptions:
             fallback_font_faces=raw["fallback_font_faces"],
             system_fonts_enabled=raw["system_fonts_enabled"],
             local_ideographs_enabled=raw["local_ideographs_enabled"],
+            terrain_skirt_length=_maybe(
+                TerrainSkirtLength, raw["terrain_skirt_length"]
+            ),
+            terrain_drape_memory_limit=raw["terrain_drape_memory_limit"],
         )
 
 
@@ -3804,6 +3812,29 @@ class MapProjectionCameraResult:
 
 
 @dataclass(frozen=True, slots=True)
+class MapProjectionTerrainElevationResult:
+    """The height of the ground at a coordinate.
+
+    See `mln_map_projection_terrain_elevation_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    """
+
+    has_elevation: bool
+    """Whether the map drew terrain at the coordinate."""
+
+    elevation_meters: float
+    """Meters above sea level, with the terrain's exaggeration. 0 without
+    `has_elevation`.
+    """
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            has_elevation=raw["has_elevation"], elevation_meters=raw["elevation_meters"]
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class MapSnapshot:
     """A map's state, as `MapHandle.get_snapshot()` reads it.
 
@@ -3811,15 +3842,11 @@ class MapSnapshot:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    debug_flags: MapDebugFlag
-
     generation: int
     """Grows with each change to the map's state."""
 
     fully_loaded: bool
     """Whether the style and every resource that the view needs have loaded."""
-
-    rendering_stats_view_enabled: bool
 
     gesture_in_progress: bool
     """Whether a gesture recognizer's gesture, or the glide and snap after it,
@@ -3844,16 +3871,11 @@ class MapSnapshot:
     globe_rendering: bool
     """Whether the map draws as a globe, alone or blending into Mercator."""
 
-    globe_free_bearing_enabled: bool
-    """The setting from `MapHandle.set_globe_free_bearing_enabled()`."""
-
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            debug_flags=MapDebugFlag(raw["debug_flags"]),
             generation=raw["generation"],
             fully_loaded=raw["fully_loaded"],
-            rendering_stats_view_enabled=raw["rendering_stats_view_enabled"],
             gesture_in_progress=raw["gesture_in_progress"],
             transition_in_progress=raw["transition_in_progress"],
             event_mask=RuntimeEventFlag(raw["event_mask"]),
@@ -3863,7 +3885,6 @@ class MapSnapshot:
             free_camera=FreeCamera._from_native(raw["free_camera"]),
             view=MapView._from_native(raw["view"]),
             globe_rendering=raw["globe_rendering"],
-            globe_free_bearing_enabled=raw["globe_free_bearing_enabled"],
         )
 
 
@@ -3995,6 +4016,10 @@ class MapViewport:
 
     frustum_offset: EdgeInsets = field(default_factory=lambda: EdgeInsets())
 
+    center_clamped_to_ground: bool = False
+
+    globe_free_bearing: bool = False
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -4002,6 +4027,8 @@ class MapViewport:
             constrain_mode=ConstrainMode(raw["constrain_mode"]),
             viewport_mode=ViewportMode(raw["viewport_mode"]),
             frustum_offset=EdgeInsets._from_native(raw["frustum_offset"]),
+            center_clamped_to_ground=raw["center_clamped_to_ground"],
+            globe_free_bearing=raw["globe_free_bearing"],
         )
 
 
@@ -4021,6 +4048,17 @@ class MapViewportOptions:
 
     frustum_offset: EdgeInsets | None = None
 
+    center_clamped_to_ground: bool | None = None
+    """Whether the camera's center stands on the terrain, in place of the center
+    altitude it's given, the style's included. On by default.
+    """
+
+    globe_free_bearing: bool | None = None
+    """Whether drags and zooms on a globe turn the bearing to keep the planet's
+    orientation, which lets a drag carry the camera over a pole. Off by
+    default.
+    """
+
     @classmethod
     def _from_native(cls, raw):
         return cls(
@@ -4028,6 +4066,8 @@ class MapViewportOptions:
             constrain_mode=_maybe(ConstrainMode, raw["constrain_mode"]),
             viewport_mode=_maybe(ViewportMode, raw["viewport_mode"]),
             frustum_offset=_maybe(EdgeInsets._from_native, raw["frustum_offset"]),
+            center_clamped_to_ground=raw["center_clamped_to_ground"],
+            globe_free_bearing=raw["globe_free_bearing"],
         )
 
 
@@ -7006,6 +7046,12 @@ class WebCanvasTarget:
     build's backend: a WebGPU build asks the browser for a device, and
     attaches once it has one. For an OpenGL device that wraps your WebGL2
     context, the canvas must be the context's own.
+
+    When the browser loses a WebGPU session's device, the session fails with
+    `Status.TARGET_LOST`, and once you release it, you can attach a new
+    session to the canvas. After Chromium's GPU process restarts, though, an
+    `OffscreenCanvas` in a Web Worker shows no new frames, and the worker
+    gets no more animation frames: the page has to load again.
 
     See `mln_web_canvas_target` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).

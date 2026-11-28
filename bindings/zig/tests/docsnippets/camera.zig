@@ -134,8 +134,7 @@ fn camera(map: maplibre.Map) !void {
     try tick(recognizer, 32);
 
     // #region convert
-    const view = (try map.getSnapshot(null)).view;
-    var projection = try maplibre.MapProjection.create(view, null);
+    var projection = try map.projectionCreate(null, null);
     defer projection.release();
 
     const coordinate =

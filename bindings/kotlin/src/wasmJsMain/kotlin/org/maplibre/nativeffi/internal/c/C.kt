@@ -726,14 +726,32 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int =
-    mln_kw_mln_map_projection_create(word(view), word(outProjection), word(outDiagnostic))
+  actual fun mln_map_projection_create(
+    map: Long,
+    view: Long,
+    outProjection: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_projection_create(map, word(view), word(outProjection), word(outDiagnostic))
 
   actual fun mln_map_projection_get_camera(
     projection: Long,
     outResult: Long,
     outDiagnostic: Long,
   ): Int = mln_kw_mln_map_projection_get_camera(projection, word(outResult), word(outDiagnostic))
+
+  actual fun mln_map_projection_get_terrain_elevation(
+    projection: Long,
+    coordinate: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_kw_mln_map_projection_get_terrain_elevation(
+      projection,
+      word(coordinate),
+      word(outResult),
+      word(outDiagnostic),
+    )
 
   actual fun mln_map_projection_is_location_occluded(
     projection: Long,
@@ -976,13 +994,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_set_debug_flags(
-    map: Long,
-    flags: Int,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int = mln_kw_mln_map_set_debug_flags(map, flags, word(completion), word(outDiagnostic))
-
   actual fun mln_map_set_event_mask(
     map: Long,
     mask: Long,
@@ -1078,19 +1089,6 @@ internal actual object C {
       word(outDiagnostic),
     )
 
-  actual fun mln_map_set_globe_free_bearing_enabled(
-    map: Long,
-    enabled: Boolean,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_set_globe_free_bearing_enabled(
-      map,
-      if (enabled) 1 else 0,
-      word(completion),
-      word(outDiagnostic),
-    )
-
   actual fun mln_map_set_image_source_coordinates(
     map: Long,
     sourceId: Long,
@@ -1145,19 +1143,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_kw_mln_map_set_projection_mode(map, word(options), word(completion), word(outDiagnostic))
-
-  actual fun mln_map_set_rendering_stats_view_enabled(
-    map: Long,
-    enabled: Boolean,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_kw_mln_map_set_rendering_stats_view_enabled(
-      map,
-      if (enabled) 1 else 0,
-      word(completion),
-      word(outDiagnostic),
-    )
 
   actual fun mln_map_set_style_image(
     map: Long,
@@ -2374,11 +2359,21 @@ private fun mln_kw_mln_map_move_style_layer(p0: Long, p1: Int, p2: Int, p3: Int,
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_move_style_layer(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_projection_create(p0: Int, p1: Int, p2: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_create(p0, p1, p2)")
+private fun mln_kw_mln_map_projection_create(p0: Long, p1: Int, p2: Int, p3: Int): Int =
+  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_create(p0, p1, p2, p3)")
 
 private fun mln_kw_mln_map_projection_get_camera(p0: Long, p1: Int, p2: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_get_camera(p0, p1, p2)")
+
+private fun mln_kw_mln_map_projection_get_terrain_elevation(
+  p0: Long,
+  p1: Int,
+  p2: Int,
+  p3: Int,
+): Int =
+  js(
+    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_projection_get_terrain_elevation(p0, p1, p2, p3)",
+  )
 
 private fun mln_kw_mln_map_projection_is_location_occluded(
   p0: Long,
@@ -2543,9 +2538,6 @@ private fun mln_kw_mln_map_set_custom_vector_source_tile_error(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_custom_vector_source_tile_error(p0, p1, p2, p3, p4, p5)",
   )
 
-private fun mln_kw_mln_map_set_debug_flags(p0: Long, p1: Int, p2: Int, p3: Int): Int =
-  js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_debug_flags(p0, p1, p2, p3)")
-
 private fun mln_kw_mln_map_set_event_mask(p0: Long, p1: Long, p2: Int, p3: Int): Int =
   js("globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_event_mask(p0, p1, p2, p3)")
 
@@ -2603,16 +2595,6 @@ private fun mln_kw_mln_map_set_global_state_property(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_global_state_property(p0, p1, p2, p3, p4)",
   )
 
-private fun mln_kw_mln_map_set_globe_free_bearing_enabled(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_globe_free_bearing_enabled(p0, p1, p2, p3)",
-  )
-
 private fun mln_kw_mln_map_set_image_source_coordinates(
   p0: Long,
   p1: Int,
@@ -2644,16 +2626,6 @@ private fun mln_kw_mln_map_set_image_source_url(p0: Long, p1: Int, p2: Int, p3: 
 private fun mln_kw_mln_map_set_projection_mode(p0: Long, p1: Int, p2: Int, p3: Int): Int =
   js(
     "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_projection_mode(p0, p1, p2, p3)",
-  )
-
-private fun mln_kw_mln_map_set_rendering_stats_view_enabled(
-  p0: Long,
-  p1: Int,
-  p2: Int,
-  p3: Int,
-): Int =
-  js(
-    "globalThis[Symbol.for('org.maplibre.nativeffi.c')].mln_map_set_rendering_stats_view_enabled(p0, p1, p2, p3)",
   )
 
 private fun mln_kw_mln_map_set_style_image(

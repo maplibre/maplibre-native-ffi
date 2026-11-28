@@ -218,14 +218,6 @@ pub const MLN_LOG_SEVERITY_FLAG_WARNING: mln_log_severity_flag = 4;
 pub const MLN_LOG_SEVERITY_FLAG_ERROR: mln_log_severity_flag = 8;
 pub const MLN_LOG_SEVERITY_FLAG_DEFAULT: mln_log_severity_flag = 6;
 pub const MLN_LOG_SEVERITY_FLAG_ALL: mln_log_severity_flag = 14;
-pub type mln_map_debug_flag = u32;
-pub const MLN_MAP_DEBUG_TILE_BORDERS: mln_map_debug_flag = 2;
-pub const MLN_MAP_DEBUG_PARSE_STATUS: mln_map_debug_flag = 4;
-pub const MLN_MAP_DEBUG_TIMESTAMPS: mln_map_debug_flag = 8;
-pub const MLN_MAP_DEBUG_COLLISION: mln_map_debug_flag = 16;
-pub const MLN_MAP_DEBUG_OVERDRAW: mln_map_debug_flag = 32;
-pub const MLN_MAP_DEBUG_STENCIL_CLIP: mln_map_debug_flag = 64;
-pub const MLN_MAP_DEBUG_DEPTH_BUFFER: mln_map_debug_flag = 128;
 pub type mln_map_load_error = u32;
 pub const MLN_MAP_LOAD_ERROR_UNKNOWN: mln_map_load_error = 0;
 pub const MLN_MAP_LOAD_ERROR_STYLE_PARSE: mln_map_load_error = 1;
@@ -239,6 +231,8 @@ pub const MLN_MAP_OPTION_EVENT_MASK: mln_map_option_field = 1;
 pub const MLN_MAP_OPTION_TILE_CACHE_ENABLED: mln_map_option_field = 2;
 pub const MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED: mln_map_option_field = 4;
 pub const MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED: mln_map_option_field = 8;
+pub const MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH: mln_map_option_field = 16;
+pub const MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT: mln_map_option_field = 32;
 pub type mln_map_tile_option_field = u32;
 pub const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA: mln_map_tile_option_field = 1;
 pub const MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS: mln_map_tile_option_field = 2;
@@ -251,6 +245,8 @@ pub const MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION: mln_map_viewport_option_fie
 pub const MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE: mln_map_viewport_option_field = 2;
 pub const MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE: mln_map_viewport_option_field = 4;
 pub const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET: mln_map_viewport_option_field = 8;
+pub const MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND: mln_map_viewport_option_field = 16;
+pub const MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING: mln_map_viewport_option_field = 32;
 pub type mln_momentum_decay_field = u32;
 pub const MLN_MOMENTUM_DECAY_MODEL: mln_momentum_decay_field = 1;
 pub const MLN_MOMENTUM_DECAY_HALF_LIFE_MS: mln_momentum_decay_field = 2;
@@ -606,6 +602,9 @@ pub const MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS:
 pub type mln_style_vector_tile_encoding = u32;
 pub const MLN_STYLE_VECTOR_TILE_ENCODING_MVT: mln_style_vector_tile_encoding = 0;
 pub const MLN_STYLE_VECTOR_TILE_ENCODING_MLT: mln_style_vector_tile_encoding = 1;
+pub type mln_terrain_skirt_length = u32;
+pub const MLN_TERRAIN_SKIRT_LENGTH_AUTO: mln_terrain_skirt_length = 0;
+pub const MLN_TERRAIN_SKIRT_LENGTH_NONE: mln_terrain_skirt_length = 1;
 pub type mln_tile_lod_mode = u32;
 pub const MLN_TILE_LOD_MODE_DEFAULT: mln_tile_lod_mode = 0;
 pub const MLN_TILE_LOD_MODE_DISTANCE: mln_tile_lod_mode = 1;
@@ -1385,6 +1384,8 @@ pub struct mln_map_options {
     pub fallback_font_faces: mln_buffer_view,
     pub system_fonts_enabled: bool,
     pub local_ideographs_enabled: bool,
+    pub terrain_skirt_length: mln_terrain_skirt_length,
+    pub terrain_drape_memory_limit: u64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1394,12 +1395,17 @@ pub struct mln_map_projection_camera_result {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_map_projection_terrain_elevation_result {
+    pub size: u32,
+    pub has_elevation: bool,
+    pub elevation_meters: f64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_map_snapshot {
     pub size: u32,
-    pub debug_flags: mln_map_debug_flags,
     pub generation: u64,
     pub fully_loaded: bool,
-    pub rendering_stats_view_enabled: bool,
     pub gesture_in_progress: bool,
     pub transition_in_progress: bool,
     pub event_mask: mln_runtime_event_flags,
@@ -1409,7 +1415,6 @@ pub struct mln_map_snapshot {
     pub free_camera: mln_free_camera,
     pub view: mln_map_view,
     pub globe_rendering: bool,
-    pub globe_free_bearing_enabled: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1450,6 +1455,8 @@ pub struct mln_map_viewport {
     pub constrain_mode: mln_constrain_mode,
     pub viewport_mode: mln_viewport_mode,
     pub frustum_offset: mln_edge_insets,
+    pub center_clamped_to_ground: bool,
+    pub globe_free_bearing: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1460,6 +1467,8 @@ pub struct mln_map_viewport_options {
     pub constrain_mode: mln_constrain_mode,
     pub viewport_mode: mln_viewport_mode,
     pub frustum_offset: mln_edge_insets,
+    pub center_clamped_to_ground: bool,
+    pub globe_free_bearing: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -2563,7 +2572,6 @@ pub type mln_log_severity_flags = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_map(pub u64);
-pub type mln_map_debug_flags = u32;
 pub type mln_map_option_fields = u32;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -3136,6 +3144,7 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_projection_create(
+        map: mln_map,
         view: *const mln_map_view,
         out_projection: *mut mln_map_projection,
         out_diagnostic: *mut mln_diagnostic,
@@ -3143,6 +3152,12 @@ unsafe extern "C" {
     pub fn mln_map_projection_get_camera(
         projection: mln_map_projection,
         out_result: *mut mln_map_projection_camera_result,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_projection_get_terrain_elevation(
+        projection: mln_map_projection,
+        coordinate: mln_lat_lng,
+        out_result: *mut mln_map_projection_terrain_elevation_result,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_projection_is_location_occluded(
@@ -3286,12 +3301,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_debug_flags(
-        map: mln_map,
-        flags: mln_map_debug_flags,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_set_event_mask(
         map: mln_map,
         mask: mln_runtime_event_flags,
@@ -3339,12 +3348,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_globe_free_bearing_enabled(
-        map: mln_map,
-        enabled: bool,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_set_image_source_coordinates(
         map: mln_map,
         source_id: mln_buffer_view,
@@ -3370,12 +3373,6 @@ unsafe extern "C" {
     pub fn mln_map_set_projection_mode(
         map: mln_map,
         options: *const mln_projection_mode_options,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_rendering_stats_view_enabled(
-        map: mln_map,
-        enabled: bool,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

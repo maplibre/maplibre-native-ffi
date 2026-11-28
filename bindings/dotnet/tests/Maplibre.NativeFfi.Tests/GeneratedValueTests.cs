@@ -56,7 +56,7 @@ public sealed class GeneratedValueTests
     public async Task SynchronousCallsFillCallerSizedOutputsInInputOrder()
     {
         await using var fixture = await NativeFixture.CreateAsync();
-        using var projection = MapProjectionHandle.Create(fixture.Map.GetSnapshot().View);
+        using var projection = fixture.Map.ProjectionCreate();
         LatLng[] coordinates = [new(0, 0), new(10, 20), new(-12, -30)];
         var points = projection.PixelsForLatLngs(coordinates);
         Assert.Equal(coordinates.Select(projection.PixelForLatLng), points);

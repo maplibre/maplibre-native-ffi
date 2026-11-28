@@ -37,7 +37,7 @@ public fun <T> AcquiredFrameHandle.withWebGpuTexture(block: (WebGpuTextureFrame)
  * Errors:
  *
  * - `Status.UNSUPPORTED` in every build: the library's WebGPU (wgpu) can't wrap a `GPUDevice` yet
- *   (https://github.com/louwers/mln-rs/issues/263). Attach a web canvas target without a device,
+ *   (https://github.com/maplibre/mln-rs/issues/263). Attach a web canvas target without a device,
  *   and the session asks the browser for one.
  */
 public fun GpuDeviceHandle.Companion.wrapWebGpu(context: WebGpuContextDescriptor): GpuDeviceHandle =

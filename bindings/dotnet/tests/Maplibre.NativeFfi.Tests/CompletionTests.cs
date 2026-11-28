@@ -9,10 +9,10 @@ public sealed class CompletionTests
     public async Task DiscardedCommandsAreFencedAndSynchronousRejectionThrows()
     {
         await using var fixture = await NativeFixture.CreateAsync();
-        fixture.Map.Discarding.SetDebugFlags(MapDebugFlag.TileBorders);
+        fixture.Map.Discarding.SetEventMask(RuntimeEventFlag.MapIdle);
         // A later command on the same map completes after the discarded one.
         await fixture.Map.RequestRepaintAsync();
-        Assert.Equal(MapDebugFlag.TileBorders, fixture.Map.GetSnapshot().DebugFlags);
+        Assert.Equal(RuntimeEventFlag.MapIdle, fixture.Map.GetSnapshot().EventMask);
         Assert.Throws<MaplibreException>(() =>
             fixture.Map.Discarding.Resize(new LogicalExtent(0, 8, 1))
         );

@@ -3,13 +3,7 @@
 
 import assert from "node:assert/strict";
 
-import {
-  AwaitableWake,
-  MapDebugFlag,
-  MapMode,
-  MaplibreError,
-  Status,
-} from "../src/index.ts";
+import { AwaitableWake, MapMode, MaplibreError, Status } from "../src/index.ts";
 import { mapOptions, openRuntime } from "./support/fixture.ts";
 import { bounded, test } from "./support/harness.ts";
 import { emptyStyle } from "./support/styles.ts";
@@ -38,10 +32,7 @@ test("a value that fails to convert rejects its completion", async () => {
 test("a failed command rejects with its status and generation", async () => {
   const fixture = await openRuntime();
   const map = await fixture.openStyledMap();
-  const committed = await bounded(
-    map.setDebugFlags(MapDebugFlag.tileBorders),
-    "a committed command",
-  );
+  const committed = await bounded(map.requestRepaint(), "a committed command");
 
   await assert.rejects(
     bounded(map.removeStyleSource("missing-source"), "source removal"),
@@ -60,7 +51,6 @@ test("discarded commands are fenced and synchronous rejection throws", async () 
 
   // A discarded command returns once native accepts it, and a later
   // completion on the same map follows it.
-  map.discarding.setDebugFlags(MapDebugFlag.tileBorders);
   map.discarding.addStyleSourceJson("discarded", {
     type: "geojson",
     data: { type: "FeatureCollection", features: [] },

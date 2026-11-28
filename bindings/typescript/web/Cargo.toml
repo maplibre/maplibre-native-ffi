@@ -29,7 +29,8 @@ test = []
 [dependencies]
 js-sys = "0.3.107"
 mln-rs-c = { path = "../../../third_party/mln-rs/crates/mln_c", default-features = false }
-mln-rs-web-host = { path = "../../../third_party/mln-rs/crates/mln_web_host" }
+# The browser glue, `mln_runtime::web`: its tile workers.
+mln-rs-runtime = { path = "../../../third_party/mln-rs/crates/mln_runtime", default-features = false }
 # The version that mln-rs locks, which .config/mise.web.toml's wasm-bindgen
 # matches.
 wasm-bindgen = "=0.2.130"
@@ -43,6 +44,11 @@ cc = "1.11.1"
 lto = "fat"
 codegen-units = 1
 opt-level = "s"
+
+# mln-rs's patched dependencies, which its own `[patch.crates-io]` doesn't
+# carry into this workspace.
+[patch.crates-io]
+fsst-rs = { path = "../../../third_party/mln-rs/patches/fsst-rs" }
 
 # Its own workspace, with a lockfile that follows mln-rs's, rather than a
 # member of the repository's.

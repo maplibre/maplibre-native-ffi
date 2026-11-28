@@ -19,7 +19,6 @@ import org.maplibre.nativeffi.GestureResult
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LatLngBounds
 import org.maplibre.nativeffi.MapHandle
-import org.maplibre.nativeffi.MapProjectionHandle
 import org.maplibre.nativeffi.PointerKind
 import org.maplibre.nativeffi.ScreenPoint
 
@@ -152,7 +151,7 @@ private suspend fun camera(map: MapHandle) {
   recognizer.release()
 
   // #region convert
-  val projection = MapProjectionHandle.create(map.getSnapshot().view)
+  val projection = map.projectionCreate()
 
   val coordinate =
     projection.latLngForPixel(ScreenPoint(x = 100.0, y = 200.0))

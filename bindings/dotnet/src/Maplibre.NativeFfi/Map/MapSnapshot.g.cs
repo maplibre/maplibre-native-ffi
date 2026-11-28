@@ -25,14 +25,9 @@ namespace Maplibre.NativeFfi;
 /// <param name="GlobeRendering">
 /// Whether the map draws as a globe, alone or blending into Mercator.
 /// </param>
-/// <param name="GlobeFreeBearingEnabled">
-/// The setting from <c>MapHandle.SetGlobeFreeBearingEnabledAsync()</c>.
-/// </param>
 public readonly partial record struct MapSnapshot(
-    MapDebugFlag DebugFlags,
     ulong Generation,
     bool FullyLoaded,
-    bool RenderingStatsViewEnabled,
     bool GestureInProgress,
     bool TransitionInProgress,
     RuntimeEventFlag EventMask,
@@ -41,6 +36,5 @@ public readonly partial record struct MapSnapshot(
     CameraBounds Bounds,
     FreeCamera FreeCamera,
     MapView View,
-    bool GlobeRendering,
-    bool GlobeFreeBearingEnabled
+    bool GlobeRendering
 );

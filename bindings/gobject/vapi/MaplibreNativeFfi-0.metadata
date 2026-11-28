@@ -27,6 +27,7 @@ LatLngBounds struct
 LogicalExtent struct
 LogicalSize struct
 MapProjectionCameraResult struct
+MapProjectionTerrainElevationResult struct
 MapSnapshot struct
 MapTileSettings struct
 MapView struct

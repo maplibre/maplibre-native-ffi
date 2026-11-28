@@ -171,7 +171,7 @@ runs:
         restore-keys: |
           submodules-v1-${{ hashFiles('.gitmodules', 'tools/deps/sync-submodules') }}-
 
-    # Checks out mln-rs and applies patches/mln-rs.
+    # Checks out mln-rs and the Vulkan headers at their pins.
     - name: Sync submodule sources
       shell: bash
       run: tools/deps/sync-submodules

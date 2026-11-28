@@ -130,9 +130,7 @@ private func camera(_ map: MapHandle) async throws {
   recognizer.release()
 
   // #region convert
-  let projection = try MapProjectionHandle.create(
-    view: map.getSnapshot().view
-  )
+  let projection = try map.projectionCreate()
 
   let coordinate = try projection.latLngForPixel(
     point: ScreenPoint(x: 100, y: 200)

@@ -10,7 +10,7 @@ Read these when the task needs them:
 - [Guides](docs/src/content/docs/guides/): how to use the library, starting with
   [Create a map](docs/src/content/docs/guides/create-a-map.mdx).
 - [Overview](docs/src/content/docs/development/overview.mdx): setup, everyday
-  commands, other targets such as Windows under Wine, engine patches, CI, and
+  commands, other targets such as Windows under Wine, changes to mln-rs, CI, and
   releases.
 - [Guidelines](docs/src/content/docs/development/guidelines.mdx): read before
   you change a binding's API or the documentation.
@@ -25,16 +25,16 @@ these goals conflict, safety comes first, then similarity, then language idioms.
 Add a convenience API to a binding only when its language's safety or ergonomics
 require one. Don't repeat validation that native code already does.
 
-The library is [mln-rs](https://github.com/louwers/mln-rs), the Rust port of
-MapLibre Native, at the `third_party/mln-rs` submodule's pinned commit with the
-patches in `patches/mln-rs/` applied. Its `crates/mln_c` crate defines the C API
-in its headers and implements it, and the native build compiles it with Cargo.
-Answer questions about library behavior from that source. `include/` is a copy
-of those headers, which `mise run sync-c-headers` refreshes; configuring a
-preset fails while the two differ. If the submodule is empty, run `mise deps` to
-check it out and apply the patches. Every `mise run`, `mise exec`, and commit
-hook does the same, which discards submodule edits that no patch holds. Save a
-change to mln-rs to its patch before you run any of them.
+The library is [mln-rs](https://github.com/maplibre/mln-rs), the Rust port of
+MapLibre Native, at the `third_party/mln-rs` submodule's pinned commit. Its
+`crates/mln_c` crate defines the C API in its headers and implements it, and the
+native build compiles it with Cargo. Answer questions about library behavior
+from that source. `include/` is a copy of those headers, which
+`mise run sync-c-headers` refreshes; configuring a preset fails while the two
+differ. If the submodule is empty, run `mise deps` to check it out. Every
+`mise run`, `mise exec`, and commit hook does the same, and a change of pin
+discards edits in the submodule. Make a change to mln-rs in mln-rs, and update
+the pin once it merges.
 
 After a rebase, run `mise deps` before you stage anything.
 `git submodule update` skips this submodule. Before you push, check
@@ -43,9 +43,9 @@ the diff reverts the mln-rs pin.
 
 ## Tests
 
-mln-rs tests native behavior, so a change to it, or a patch to it, gets its
-tests in mln-rs's own tests. A binding's suite tests only what the binding adds:
-its runtime, its generated code, and its platform integration.
+mln-rs tests native behavior, so a change to it gets its tests in mln-rs's own
+tests. A binding's suite tests only what the binding adds: its runtime, its
+generated code, and its platform integration.
 
 Test behavior that callers can observe, not implementation details. Add a test
 only when it would catch a regression in that behavior. Don't test what the

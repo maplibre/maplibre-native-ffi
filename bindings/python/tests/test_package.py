@@ -5,7 +5,7 @@ from pathlib import Path
 import maplibre_native_ffi as mln
 import pytest
 from maplibre_native_ffi import _native
-from support import result
+from support import EMPTY_STYLE, result
 
 RUNTIMES = (
     "maplibre_native_ffi_runtime",
@@ -18,6 +18,19 @@ def test_the_package_loads_the_extension_of_its_runtime() -> None:
     assert _native is sys.modules[f"{runtime}._native"]
     with mln.RuntimeHandle.create() as handle:
         result(handle.clear_resource_transform())
+
+
+def test_the_library_has_the_location_puck_layer_type(
+    map_handle: mln.MapHandle,
+) -> None:
+    # The library built on the C++ core had a location indicator layer, and a
+    # release keeps its replacement.
+    result(map_handle.set_style_json(EMPTY_STYLE))
+    result(
+        map_handle.add_style_layer_json(
+            {"id": "puck", "type": "org.maplibre.location-puck"}
+        )
+    )
 
 
 def _run_the_runtime_lookup() -> None:

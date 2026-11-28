@@ -5,11 +5,11 @@
 version: 1
 context: >-
   A C API for MapLibre Native, implemented by mln-rs, the Rust port of the
-  MapLibre Native map renderer, which is vendored as a git submodule with
-  carried patches. Bindings for Dart, Go, Kotlin, .NET, Python, Swift,
-  TypeScript, and Zig wrap the C API, as does a GObject library for C, Vala, and
-  GJS, and example apps use them. Mise defines tools and tasks, CMake drives
-  Cargo to build the native library, and Gradle builds the Kotlin packages.
+  MapLibre Native map renderer, which is vendored as a git submodule. Bindings
+  for Dart, Go, Kotlin, .NET, Python, Swift, TypeScript, and Zig wrap the C API,
+  as does a GObject library for C, Vala, and GJS, and example apps use them.
+  Mise defines tools and tasks, CMake drives Cargo to build the native library,
+  and Gradle builds the Kotlin packages.
 
 labels:
   context: >-
@@ -36,7 +36,8 @@ labels:
           decision rather than shipped code.
     area:
       min: 1
-      guidance: A patch to mln-rs takes the area of the behavior it changes.
+      guidance:
+        A change to the mln-rs pin takes the area of the behavior it changes.
       labels:
         "area:*": ~
         area:api: >-
@@ -140,12 +141,11 @@ labels:
       labels:
         upstream:
           meaning: >-
-            The work changes mln-rs's own code: a patch under `patches/mln-rs/`
-            or the `third_party/mln-rs` submodule.
+            The work changes mln-rs's own code: the `third_party/mln-rs`
+            submodule.
           rules:
             - if:
                 files:
-                  - patches/mln-rs/**
                   - third_party/mln-rs
               then: apply
           otherwise: skip
@@ -236,7 +236,6 @@ ci:
             files:
               - bindings/gobject/**
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     linux-arm64:
       covers: >-
@@ -251,7 +250,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     linux-musl:
       covers: >-
@@ -263,7 +261,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     linux-musl-arm64:
       covers: >-
@@ -278,7 +275,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     linux-riscv64:
       covers: >-
@@ -296,7 +292,6 @@ ci:
               - tools/deps/sync-linux-sysroot
               - tools/devices/linux-root
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     linux-loongarch64:
       covers: >-
@@ -314,7 +309,6 @@ ci:
               - tools/deps/sync-linux-sysroot
               - tools/devices/linux-root
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     freebsd:
       covers: >-
@@ -330,7 +324,6 @@ ci:
               - scripts/run-freebsd-test.sh
               - tools/devices/freebsd-host
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     macos:
       covers: >-
@@ -345,7 +338,6 @@ ci:
               - bindings/gobject/**
               - bindings/kotlin/src/macosTest/**
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     macos-x64:
       covers: >-
@@ -360,7 +352,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     ios:
       covers: >-
@@ -375,7 +366,6 @@ ci:
             files:
               - bindings/kotlin/src/iosTest/**
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     tvos:
       covers: >-
@@ -389,7 +379,6 @@ ci:
             files:
               - bindings/kotlin/src/tvosTest/**
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     visionos:
       covers: >-
@@ -402,7 +391,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     windows-x64:
       covers: >-
@@ -414,7 +402,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     mingw:
       covers: >-
@@ -429,7 +416,6 @@ ci:
               - cmake/toolchains/msys2.cmake
               - .config/mise.msys2.*
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     mingw-arm64:
       covers: >-
@@ -445,7 +431,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     windows-arm64:
       covers: >-
@@ -459,7 +444,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     android:
       covers: >-
@@ -477,7 +461,6 @@ ci:
               - tools/devices/android-serial
               - tools/env/swift-android-env.sh
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     android-arm64:
       covers: >-
@@ -492,7 +475,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     android-arm:
       covers: >-
@@ -508,7 +490,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     android-x86:
       covers: >-
@@ -525,7 +506,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     android-multi-abi:
       covers: >-
@@ -562,7 +542,6 @@ ci:
               - bindings/typescript/test/ohpm/**
               - tools/devices/ohos-key
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     ohos-arm64:
       covers: >-
@@ -577,7 +556,6 @@ ci:
         - if:
             files:
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     web:
       covers: >-
@@ -595,7 +573,6 @@ ci:
               - examples/styles.json
               - examples/fallback-font-faces.json
               - third_party/mln-rs
-              - patches/mln-rs/**
           then: apply
     maven:
       covers: >-

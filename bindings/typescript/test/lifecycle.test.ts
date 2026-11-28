@@ -34,7 +34,7 @@ test("repeated asynchronous release reaches native", async () => {
   const map = await fixture.openMap();
 
   // A synchronous release is idempotent.
-  const projection = MapProjectionHandle.create(map.getSnapshot().view);
+  const projection = map.projectionCreate();
   projection.release();
   projection.release();
 
@@ -89,9 +89,7 @@ test(
 
 test("a handle names its id and whether it is closed", async () => {
   const fixture = await openRuntime();
-  const projection = MapProjectionHandle.create(
-    (await fixture.openMap()).getSnapshot().view,
-  );
+  const projection = (await fixture.openMap()).projectionCreate();
   const projectionId = `0x${projection.id.toString(16)}`;
   assert.equal(projection.isClosed, false);
   assert.equal(

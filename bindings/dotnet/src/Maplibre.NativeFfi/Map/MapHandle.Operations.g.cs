@@ -1541,6 +1541,43 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Creates a projection that converts coordinates as a map does, for one
+    /// view of it.
+    /// </summary>
+    /// <remarks>
+    /// <para><c>view</c> is the view to convert for, such as a frame result's,
+    /// or null for the map's current view. Over terrain, coordinates convert on
+    /// the ground that the map drew. The projection doesn't follow the map, so
+    /// create a new one after the map's view or terrain changes.</para>
+    /// <para>See <c>mln_map_projection_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
+    /// <para>Errors:</para>
+    /// <list type="bullet">
+    /// <item><description><c>Status.InvalidState</c> until
+    /// <c>RuntimeHandle.CreateMap()</c> completes with
+    /// <c>Status.Ok</c>.</description></item>
+    /// <item><description><c>Status.Unsupported</c> when the view's style
+    /// projection draws a globe and the library can't project
+    /// one.</description></item>
+    /// </list>
+    /// </remarks>
+    public MapProjectionHandle ProjectionCreate(MapView? view = null)
+    {
+        using var call = Enter(this);
+        var nativeView = view is null ? default(mln_map_view) : NativeMapView(view.Value);
+        MlnMapProjection outProjection = default;
+        Check(
+            NativeMethods.mln_map_projection_create(
+                NativeHandle,
+                view is null ? null : &nativeView,
+                &outProjection,
+                Diagnostic
+            )
+        );
+        return MapProjectionHandle.Adopt(outProjection);
+    }
+
+    /// <summary>
     /// Releases the map.
     /// </summary>
     /// <remarks>
@@ -1725,7 +1762,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// <item><description><c>Status.Cancelled</c> when the map is released
     /// before the image is done.</description></item>
     /// <item><description><c>Status.NativeError</c> when the style or a
-    /// resource that the image needs fails to load.</description></item>
+    /// resource that the image needs fails to load, or rendering the image
+    /// fails on the GPU.</description></item>
     /// </list>
     /// </remarks>
     public Task RequestStillImageAsync()
@@ -1939,27 +1977,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Utf8(sourceId),
             NativeCanonicalTileId(tileId),
             scope.Utf8(message),
-            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
-    /// Draws debugging overlays, such as tile borders, on the map.
-    /// </summary>
-    /// <remarks>
-    /// <para><c>flags</c> replaces the overlays set before.</para>
-    /// <para>See <c>mln_map_set_debug_flags</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
-    /// </remarks>
-    public Task<CommandCompletion> SetDebugFlagsAsync(MapDebugFlag flags)
-    {
-        using var scope = new NativeCallScope(this);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_set_debug_flags(
-            NativeHandle,
-            (uint)flags,
             NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
             Diagnostic
         );
@@ -2189,31 +2206,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Sets whether drags and zooms on a globe turn the bearing.
-    /// </summary>
-    /// <remarks>
-    /// <para>When it's on, a drag or a zoom around a point on the globe turns
-    /// the bearing so the planet keeps its orientation, and a drag can carry
-    /// the camera over a pole. When it's off, the default, they keep the
-    /// bearing, as MapLibre GL JS does. Turn it on for a map whose users can
-    /// rotate it. It changes nothing while the map draws Mercator.</para>
-    /// <para>See <c>mln_map_set_globe_free_bearing_enabled</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.</para>
-    /// </remarks>
-    public Task<CommandCompletion> SetGlobeFreeBearingEnabledAsync(bool enabled)
-    {
-        using var scope = new NativeCallScope(this);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_set_globe_free_bearing_enabled(
-            NativeHandle,
-            (byte)(enabled ? 1 : 0),
-            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
     /// Moves the image of an image source.
     /// </summary>
     /// <remarks>
@@ -2344,26 +2336,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Shows or hides an overlay of rendering statistics on the map.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_rendering_stats_view_enabled</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetRenderingStatsViewEnabledAsync(bool enabled)
-    {
-        using var scope = new NativeCallScope(this);
-        mln_completion nativeCompletion;
-        var nativeStatus = NativeMethods.mln_map_set_rendering_stats_view_enabled(
-            NativeHandle,
-            (byte)(enabled ? 1 : 0),
-            NativeCompletion.StartCommand(&nativeCompletion, out var nativePending),
-            Diagnostic
-        );
-        return scope.Accepted(nativePending.Submitted(nativeStatus));
-    }
-
-    /// <summary>
     /// Adds an image to the map's style, or replaces the image named
     /// <c>imageId</c>.
     /// </summary>
@@ -2433,10 +2405,11 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </summary>
     /// <remarks>
     /// <para><c>propertyName</c> is one of the layer's layout or paint
-    /// [properties](https://maplibre.org/maplibre-style-spec/layers/), or
+    /// [properties](https://maplibre.org/maplibre-style-spec/layers/),
     /// <c>filter</c>, <c>minzoom</c>, <c>maxzoom</c>, <c>source</c>, or
-    /// <c>source-layer</c>. A null <c>value</c> resets any of these but
-    /// <c>source</c> and <c>source-layer</c> to its default.</para>
+    /// <c>source-layer</c>, or an extension's member, named
+    /// <c>&lt;namespace&gt;:&lt;name&gt;</c>. A null <c>value</c> resets any of
+    /// these but <c>source</c> and <c>source-layer</c> to its default.</para>
     /// <para>See <c>mln_map_set_style_layer_property</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.</para>
     /// <para>Errors:</para>
@@ -2501,7 +2474,8 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// </summary>
     /// <remarks>
     /// <para><c>propertyName</c> is a root property other than <c>sources</c>
-    /// and <c>layers</c>, which the source and layer calls change. A null
+    /// and <c>layers</c>, which the source and layer calls change, or an
+    /// extension's member, named <c>&lt;namespace&gt;:&lt;name&gt;</c>. A null
     /// <c>value</c> resets the property to its default, as if the style didn't
     /// set it.</para>
     /// <para>See <c>mln_map_set_style_root_property</c> in the <see
@@ -3237,16 +3211,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetDebugFlags(MapDebugFlag flags)
-        {
-            var receiverHandle = owner.NativeHandle;
-            using var scope = new NativeCallScope(owner);
-            Check(
-                NativeMethods.mln_map_set_debug_flags(receiverHandle, (uint)flags, null, Diagnostic)
-            );
-            scope.Accept();
-        }
-
         public void SetEventMask(RuntimeEventFlag mask)
         {
             var receiverHandle = owner.NativeHandle;
@@ -3354,21 +3318,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             scope.Accept();
         }
 
-        public void SetGlobeFreeBearingEnabled(bool enabled)
-        {
-            var receiverHandle = owner.NativeHandle;
-            using var scope = new NativeCallScope(owner);
-            Check(
-                NativeMethods.mln_map_set_globe_free_bearing_enabled(
-                    receiverHandle,
-                    (byte)(enabled ? 1 : 0),
-                    null,
-                    Diagnostic
-                )
-            );
-            scope.Accept();
-        }
-
         public void SetImageSourceCoordinates(string sourceId, LatLng[] coordinates)
         {
             var receiverHandle = owner.NativeHandle;
@@ -3431,21 +3380,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_set_projection_mode(
                     receiverHandle,
                     &nativeOptions,
-                    null,
-                    Diagnostic
-                )
-            );
-            scope.Accept();
-        }
-
-        public void SetRenderingStatsViewEnabled(bool enabled)
-        {
-            var receiverHandle = owner.NativeHandle;
-            using var scope = new NativeCallScope(owner);
-            Check(
-                NativeMethods.mln_map_set_rendering_stats_view_enabled(
-                    receiverHandle,
-                    (byte)(enabled ? 1 : 0),
                     null,
                     Diagnostic
                 )

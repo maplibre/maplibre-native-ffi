@@ -244,6 +244,10 @@ napi_value mln_ts_read_logical_extent(
 napi_value mln_ts_read_map_projection_camera_result(
   napi_env env, const mln_map_projection_camera_result* source, size_t size
 );
+napi_value mln_ts_read_map_projection_terrain_elevation_result(
+  napi_env env, const mln_map_projection_terrain_elevation_result* source,
+  size_t size
+);
 napi_value mln_ts_read_map_snapshot(
   napi_env env, const mln_map_snapshot* source, size_t size
 );

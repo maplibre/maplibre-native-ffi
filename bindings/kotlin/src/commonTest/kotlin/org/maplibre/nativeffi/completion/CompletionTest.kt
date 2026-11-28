@@ -16,9 +16,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.LogicalExtent
-import org.maplibre.nativeffi.MapDebugFlag
 import org.maplibre.nativeffi.MapMode
 import org.maplibre.nativeffi.MaplibreException
+import org.maplibre.nativeffi.RuntimeEventFlag
 import org.maplibre.nativeffi.RuntimeEventHandler
 import org.maplibre.nativeffi.RuntimeEventType
 import org.maplibre.nativeffi.Status
@@ -31,10 +31,10 @@ class CompletionTest {
   @Test
   fun aDiscardedCommandIsFencedAndSynchronousRejectionThrows() = runSuspendTest {
     withMap {
-      map.discarding.setDebugFlags(MapDebugFlag.TILE_BORDERS)
+      map.discarding.setEventMask(RuntimeEventFlag.MAP_IDLE)
       // A later command on the same map completes after the discarded one.
       map.requestRepaint().await()
-      assertEquals(MapDebugFlag.TILE_BORDERS, map.getSnapshot().debugFlags)
+      assertEquals(RuntimeEventFlag.MAP_IDLE, map.getSnapshot().eventMask)
       assertFailsWithStatus(Status.INVALID_ARGUMENT) {
         map.discarding.resize(LogicalExtent(0u, 8u, 1.0))
       }

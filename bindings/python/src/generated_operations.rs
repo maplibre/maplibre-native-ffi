@@ -708,18 +708,26 @@ fn generated_copy_mln_map_projection_camera_result(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_map_projection_terrain_elevation_result(
+    py: Python<'_>,
+    value: &sys::mln_map_projection_terrain_elevation_result,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("has_elevation", generated_value(py, value.has_elevation)?)?;
+    dict.set_item(
+        "elevation_meters",
+        generated_value(py, value.elevation_meters)?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_map_snapshot(
     py: Python<'_>,
     value: &sys::mln_map_snapshot,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("debug_flags", generated_value(py, value.debug_flags)?)?;
     dict.set_item("generation", generated_value(py, value.generation)?)?;
     dict.set_item("fully_loaded", generated_value(py, value.fully_loaded)?)?;
-    dict.set_item(
-        "rendering_stats_view_enabled",
-        generated_value(py, value.rendering_stats_view_enabled)?,
-    )?;
     dict.set_item(
         "gesture_in_progress",
         generated_value(py, value.gesture_in_progress)?,
@@ -749,10 +757,6 @@ fn generated_copy_mln_map_snapshot(
     dict.set_item(
         "globe_rendering",
         generated_value(py, value.globe_rendering)?,
-    )?;
-    dict.set_item(
-        "globe_free_bearing_enabled",
-        generated_value(py, value.globe_free_bearing_enabled)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -813,6 +817,14 @@ fn generated_copy_mln_map_viewport(
     dict.set_item(
         "frustum_offset",
         generated_copy_mln_edge_insets(py, &value.frustum_offset)?,
+    )?;
+    dict.set_item(
+        "center_clamped_to_ground",
+        generated_value(py, value.center_clamped_to_ground)?,
+    )?;
+    dict.set_item(
+        "globe_free_bearing",
+        generated_value(py, value.globe_free_bearing)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -2985,6 +2997,14 @@ fn generated_input_mln_map_options<'py>(
         raw.local_ideographs_enabled = field.extract::<bool>()?;
         raw.fields |= sys::MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED;
     }
+    if let Some(field) = generated_present(value, "terrain_skirt_length")? {
+        raw.terrain_skirt_length = field.extract::<sys::mln_terrain_skirt_length>()?;
+        raw.fields |= sys::MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH;
+    }
+    if let Some(field) = generated_present(value, "terrain_drape_memory_limit")? {
+        raw.terrain_drape_memory_limit = field.extract::<u64>()?;
+        raw.fields |= sys::MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT;
+    }
     Ok(raw)
 }
 
@@ -3055,6 +3075,10 @@ fn generated_input_mln_map_viewport<'py>(
         .extract::<sys::mln_viewport_mode>()?;
     raw.frustum_offset =
         generated_input_mln_edge_insets(&value.getattr("frustum_offset")?, storage)?;
+    raw.center_clamped_to_ground = value
+        .getattr("center_clamped_to_ground")?
+        .extract::<bool>()?;
+    raw.globe_free_bearing = value.getattr("globe_free_bearing")?.extract::<bool>()?;
     Ok(raw)
 }
 
@@ -3080,6 +3104,14 @@ fn generated_input_mln_map_viewport_options<'py>(
     if let Some(field) = generated_present(value, "frustum_offset")? {
         raw.frustum_offset = generated_input_mln_edge_insets(&field, storage)?;
         raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+    }
+    if let Some(field) = generated_present(value, "center_clamped_to_ground")? {
+        raw.center_clamped_to_ground = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND;
+    }
+    if let Some(field) = generated_present(value, "globe_free_bearing")? {
+        raw.globe_free_bearing = field.extract::<bool>()?;
+        raw.fields |= sys::MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING;
     }
     Ok(raw)
 }
@@ -6317,6 +6349,31 @@ impl MapHandle {
             })
         }
     }
+    #[pyo3(signature = (view=None))]
+    fn projection_create(
+        &self,
+        py: Python<'_>,
+        view: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let view = view.unwrap_or_else(|| py.None().into_bound(py));
+        let view_value =
+            generated_maybe(&view, |view| generated_input_mln_map_view(&view, storage))?;
+        let handle = self.input();
+        let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_map_projection_create(
+                    handle,
+                    generated_pointer(&view_value),
+                    &mut out_projection,
+                    diagnostic,
+                )
+            })
+        }?;
+        unsafe { MapProjectionHandle::adopt(py, out_projection, Vec::new()) }
+    }
     #[pyo3(signature = ())]
     fn release(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -6770,34 +6827,6 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (flags))]
-    fn set_debug_flags(
-        &self,
-        py: Python<'_>,
-        flags: sys::mln_map_debug_flags,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_debug_flags(handle, flags, completion, diagnostic)
-            })
-        }
-    }
-    #[pyo3(signature = (flags))]
-    fn _discard_set_debug_flags(
-        &self,
-        py: Python<'_>,
-        flags: sys::mln_map_debug_flags,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_set_debug_flags(handle, flags, completion, diagnostic)
-            })
-        }
-    }
     #[pyo3(signature = (mask))]
     fn set_event_mask(
         &self,
@@ -7098,30 +7127,6 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (enabled))]
-    fn set_globe_free_bearing_enabled(&self, py: Python<'_>, enabled: bool) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic)
-            })
-        }
-    }
-    #[pyo3(signature = (enabled))]
-    fn _discard_set_globe_free_bearing_enabled(
-        &self,
-        py: Python<'_>,
-        enabled: bool,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_set_globe_free_bearing_enabled(handle, enabled, completion, diagnostic)
-            })
-        }
-    }
     #[pyo3(signature = (source_id, coordinates))]
     fn set_image_source_coordinates(
         &self,
@@ -7301,38 +7306,6 @@ impl MapHandle {
         unsafe {
             call.discard(|completion, diagnostic| {
                 sys::mln_map_set_projection_mode(handle, &options_value, completion, diagnostic)
-            })
-        }
-    }
-    #[pyo3(signature = (enabled))]
-    fn set_rendering_stats_view_enabled(
-        &self,
-        py: Python<'_>,
-        enabled: bool,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        unsafe {
-            call.command(|completion, diagnostic| {
-                sys::mln_map_set_rendering_stats_view_enabled(
-                    handle, enabled, completion, diagnostic,
-                )
-            })
-        }
-    }
-    #[pyo3(signature = (enabled))]
-    fn _discard_set_rendering_stats_view_enabled(
-        &self,
-        py: Python<'_>,
-        enabled: bool,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let handle = self.input();
-        unsafe {
-            call.discard(|completion, diagnostic| {
-                sys::mln_map_set_rendering_stats_view_enabled(
-                    handle, enabled, completion, diagnostic,
-                )
             })
         }
     }
@@ -7790,20 +7763,6 @@ impl MapHandle {
 
 #[pymethods]
 impl MapProjectionHandle {
-    #[staticmethod]
-    #[pyo3(signature = (view))]
-    fn create(py: Python<'_>, view: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py);
-        let storage = &mut call.storage;
-        let view_value = generated_input_mln_map_view(&view.clone(), storage)?;
-        let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_map_projection_create(&view_value, &mut out_projection, diagnostic)
-            })
-        }?;
-        unsafe { MapProjectionHandle::adopt(py, out_projection, Vec::new()) }
-    }
     #[pyo3(signature = ())]
     fn get_camera(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py);
@@ -7816,6 +7775,32 @@ impl MapProjectionHandle {
             })
         }?;
         generated_copy_mln_map_projection_camera_result(py, &out_result)
+    }
+    #[pyo3(signature = (coordinate))]
+    fn get_terrain_elevation(
+        &self,
+        py: Python<'_>,
+        coordinate: &Bound<'_, PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py);
+        let storage = &mut call.storage;
+        let coordinate_value = generated_input_mln_lat_lng(&coordinate.clone(), storage)?;
+        let handle = self.input();
+        let mut out_result: sys::mln_map_projection_terrain_elevation_result =
+            unsafe { std::mem::zeroed() };
+        out_result.size =
+            std::mem::size_of::<sys::mln_map_projection_terrain_elevation_result>() as _;
+        unsafe {
+            call.status(|diagnostic| {
+                sys::mln_map_projection_get_terrain_elevation(
+                    handle,
+                    coordinate_value,
+                    &mut out_result,
+                    diagnostic,
+                )
+            })
+        }?;
+        generated_copy_mln_map_projection_terrain_elevation_result(py, &out_result)
     }
     #[pyo3(signature = (coordinate))]
     fn is_location_occluded(

@@ -131,7 +131,8 @@ class SwiftEmitterTests(unittest.TestCase):
             ".init(rawValue: 0), `fastPforEnabled`: Bool = false, `eventMask`: "
             "RuntimeEventFlag? = nil, `tileCacheEnabled`: Bool? = nil, "
             '`fallbackFontFaces`: String = "", `systemFontsEnabled`: Bool? = nil, '
-            "`localIdeographsEnabled`: Bool? = nil)",
+            "`localIdeographsEnabled`: Bool? = nil, `terrainSkirtLength`: "
+            "TerrainSkirtLength? = nil, `terrainDrapeMemoryLimit`: UInt64? = nil)",
             values,
         )
         self.assertNotIn("static var `default`", values)

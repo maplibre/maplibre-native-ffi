@@ -19,7 +19,6 @@ import org.maplibre.nativeffi.GestureTap
 import org.maplibre.nativeffi.LatLng
 import org.maplibre.nativeffi.LogSeverityFlag
 import org.maplibre.nativeffi.MapMode
-import org.maplibre.nativeffi.MapProjectionHandle
 import org.maplibre.nativeffi.OfflineRegionDefinition
 import org.maplibre.nativeffi.PremultipliedRgba8Image
 import org.maplibre.nativeffi.ScreenPoint
@@ -57,7 +56,7 @@ class GeneratedShapesTest {
   @Test
   fun synchronousCallsFillCallerSizedOutputsInInputOrder() = runSuspendTest {
     withMap {
-      val projection = MapProjectionHandle.create(map.getSnapshot().view)
+      val projection = map.projectionCreate()
       try {
         val coordinates = listOf(LatLng(0.0, 0.0), LatLng(10.0, 20.0), LatLng(-12.0, -30.0))
         val points = projection.pixelsForLatLngs(coordinates)

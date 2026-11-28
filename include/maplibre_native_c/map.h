@@ -102,20 +102,6 @@ typedef enum MLN_BINDING(
 /** A set of mln_projection_mode_option_field bits. */
 typedef uint32_t mln_projection_mode_option_fields;
 
-/** A debug overlay that the map draws. */
-typedef enum MLN_BINDING("kind=bitmask") mln_map_debug_flag : uint32_t {
-  MLN_MAP_DEBUG_TILE_BORDERS = 1U << 1U,
-  MLN_MAP_DEBUG_PARSE_STATUS = 1U << 2U,
-  MLN_MAP_DEBUG_TIMESTAMPS = 1U << 3U,
-  MLN_MAP_DEBUG_COLLISION = 1U << 4U,
-  MLN_MAP_DEBUG_OVERDRAW = 1U << 5U,
-  MLN_MAP_DEBUG_STENCIL_CLIP = 1U << 6U,
-  MLN_MAP_DEBUG_DEPTH_BUFFER = 1U << 7U,
-} mln_map_debug_flag;
-
-/** A set of mln_map_debug_flag bits. */
-typedef uint32_t mln_map_debug_flags;
-
 /** The screen direction that north points to when the bearing is 0. */
 typedef enum mln_north_orientation : uint32_t {
   MLN_NORTH_ORIENTATION_UP = 0,
@@ -150,6 +136,8 @@ typedef enum MLN_BINDING(
   MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE = 1U << 1U,
   MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 1U << 2U,
   MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 1U << 3U,
+  MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND = 1U << 4U,
+  MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING = 1U << 5U,
 } mln_map_viewport_option_field;
 
 /** A set of mln_map_viewport_option_field bits. */
@@ -186,6 +174,19 @@ typedef enum mln_map_mode : uint32_t {
   MLN_MAP_MODE_TILE = 2,
 } mln_map_mode;
 
+/**
+ * How far the skirts that hide the cracks between terrain tiles reach down.
+ */
+typedef enum mln_terrain_skirt_length : uint32_t {
+  /** Far enough to hide the cracks. */
+  MLN_TERRAIN_SKIRT_LENGTH_AUTO = 0,
+  /**
+   * No skirts, so they don't show through translucent layers over the
+   * terrain.
+   */
+  MLN_TERRAIN_SKIRT_LENGTH_NONE = 1,
+} mln_terrain_skirt_length;
+
 /** A size in logical pixels, and the physical pixels in each logical pixel. */
 typedef struct mln_logical_extent {
   uint32_t width;
@@ -205,6 +206,8 @@ typedef enum MLN_BINDING("kind=bitmask") mln_map_option_field : uint32_t {
   MLN_MAP_OPTION_TILE_CACHE_ENABLED = 1U << 1U,
   MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED = 1U << 2U,
   MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED = 1U << 3U,
+  MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH = 1U << 4U,
+  MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT = 1U << 5U,
 } mln_map_option_field;
 
 /** A set of mln_map_option_field bits. */
@@ -265,6 +268,16 @@ typedef struct mln_map_options {
    */
   bool local_ideographs_enabled
     MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED");
+  /** The terrain's skirts. Without it, MLN_TERRAIN_SKIRT_LENGTH_AUTO. */
+  mln_terrain_skirt_length terrain_skirt_length
+    MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH");
+  /**
+   * The most GPU memory, in bytes, for the layers drawn over the terrain. Past
+   * it, the terrain farthest from the center of the view looks blurrier.
+   * Without it, there's no limit.
+   */
+  uint64_t terrain_drape_memory_limit
+    MLN_BINDING("mask=fields;bit=MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT");
 } mln_map_options;
 
 /** A point on the screen, in logical pixels from the map's top-left corner. */
@@ -1009,6 +1022,20 @@ typedef struct mln_map_viewport_options {
     MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE");
   mln_edge_insets frustum_offset
     MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET");
+  /**
+   * Whether the camera's center stands on the terrain, in place of the center
+   * altitude it's given, the style's included. On by default.
+   */
+  bool center_clamped_to_ground MLN_BINDING(
+    "mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND"
+  );
+  /**
+   * Whether drags and zooms on a globe turn the bearing to keep the planet's
+   * orientation, which lets a drag carry the camera over a pole. Off by
+   * default.
+   */
+  bool globe_free_bearing
+    MLN_BINDING("mask=fields;bit=MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING");
 } mln_map_viewport_options;
 
 /**
@@ -1021,6 +1048,8 @@ typedef struct mln_map_viewport {
   mln_constrain_mode constrain_mode;
   mln_viewport_mode viewport_mode;
   mln_edge_insets frustum_offset;
+  bool center_clamped_to_ground;
+  bool globe_free_bearing;
 } mln_map_viewport;
 
 /**
@@ -1204,12 +1233,10 @@ typedef struct mln_map_tile_settings {
 /** A map's state, as mln_map_get_snapshot() reads it. */
 typedef struct mln_map_snapshot {
   uint32_t size;
-  mln_map_debug_flags debug_flags;
   /** Grows with each change to the map's state. */
   uint64_t generation;
   /** Whether the style and every resource that the view needs have loaded. */
   bool fully_loaded;
-  bool rendering_stats_view_enabled;
   /**
    * Whether a gesture recognizer's gesture, or the glide and snap after it,
    * moves the camera.
@@ -1225,8 +1252,6 @@ typedef struct mln_map_snapshot {
   mln_map_view view;
   /** Whether the map draws as a globe, alone or blending into Mercator. */
   bool globe_rendering;
-  /** The setting from mln_map_set_globe_free_bearing_enabled(). */
-  bool globe_free_bearing_enabled;
 } mln_map_snapshot;
 
 /** A map's camera, with the snapshot generation that it matches. */
@@ -1378,7 +1403,7 @@ MLN_API mln_status mln_map_remove_feature_state(
  * Completes with:
  * - MLN_STATUS_CANCELLED when the map is released before the image is done.
  * - MLN_STATUS_NATIVE_ERROR when the style or a resource that the image needs
- *   fails to load.
+ *   fails to load, or rendering the image fails on the GPU.
  */
 MLN_BINDING("execution=operation")
 MLN_API mln_status mln_map_request_still_image(

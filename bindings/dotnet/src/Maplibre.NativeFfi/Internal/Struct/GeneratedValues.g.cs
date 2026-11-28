@@ -1629,6 +1629,17 @@ internal static unsafe class GeneratedValues
             MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED,
             static present => (byte)(present ? 1 : 0)
         );
+        native.fields |= Put(
+            value.TerrainSkirtLength,
+            ref native.terrain_skirt_length,
+            MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH,
+            static present => (mln_terrain_skirt_length)present
+        );
+        native.fields |= Put(
+            value.TerrainDrapeMemoryLimit,
+            ref native.terrain_drape_memory_limit,
+            MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT
+        );
         return native;
     }
 
@@ -1636,12 +1647,14 @@ internal static unsafe class GeneratedValues
         mln_map_projection_camera_result value
     ) => new(CopyCamera(value.camera));
 
+    internal static MapProjectionTerrainElevationResult CopyMapProjectionTerrainElevationResult(
+        mln_map_projection_terrain_elevation_result value
+    ) => new(value.has_elevation != 0, value.elevation_meters);
+
     internal static MapSnapshot CopyMapSnapshot(mln_map_snapshot value) =>
         new(
-            (global::Maplibre.NativeFfi.MapDebugFlag)value.debug_flags,
             value.generation,
             value.fully_loaded != 0,
-            value.rendering_stats_view_enabled != 0,
             value.gesture_in_progress != 0,
             value.transition_in_progress != 0,
             (global::Maplibre.NativeFfi.RuntimeEventFlag)value.event_mask,
@@ -1650,8 +1663,7 @@ internal static unsafe class GeneratedValues
             CopyCameraBounds(value.bounds),
             CopyFreeCamera(value.free_camera),
             CopyMapView(value.view),
-            value.globe_rendering != 0,
-            value.globe_free_bearing_enabled != 0
+            value.globe_rendering != 0
         );
 
     internal static mln_map_tile_options NativeMapTileOptions(MapTileOptions value)
@@ -1725,7 +1737,9 @@ internal static unsafe class GeneratedValues
             (global::Maplibre.NativeFfi.NorthOrientation)value.north_orientation,
             (global::Maplibre.NativeFfi.ConstrainMode)value.constrain_mode,
             (global::Maplibre.NativeFfi.ViewportMode)value.viewport_mode,
-            CopyEdgeInsets(value.frustum_offset)
+            CopyEdgeInsets(value.frustum_offset),
+            value.center_clamped_to_ground != 0,
+            value.globe_free_bearing != 0
         );
 
     internal static mln_map_viewport NativeMapViewport(MapViewport value)
@@ -1735,6 +1749,8 @@ internal static unsafe class GeneratedValues
         native.constrain_mode = (mln_constrain_mode)value.ConstrainMode;
         native.viewport_mode = (mln_viewport_mode)value.ViewportMode;
         native.frustum_offset = NativeEdgeInsets(value.FrustumOffset);
+        native.center_clamped_to_ground = (byte)(value.CenterClampedToGround ? 1 : 0);
+        native.globe_free_bearing = (byte)(value.GlobeFreeBearing ? 1 : 0);
         return native;
     }
 
@@ -1766,6 +1782,18 @@ internal static unsafe class GeneratedValues
             ref native.frustum_offset,
             MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET,
             NativeEdgeInsets
+        );
+        native.fields |= Put(
+            value.CenterClampedToGround,
+            ref native.center_clamped_to_ground,
+            MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND,
+            static present => (byte)(present ? 1 : 0)
+        );
+        native.fields |= Put(
+            value.GlobeFreeBearing,
+            ref native.globe_free_bearing,
+            MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING,
+            static present => (byte)(present ? 1 : 0)
         );
         return native;
     }

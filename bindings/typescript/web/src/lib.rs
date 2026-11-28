@@ -51,7 +51,7 @@ pub fn addon() -> Result<JsValue, JsValue> {
     // Before any runtime: a spawn function takes the place of mln-rs's
     // default script, which loads mln-rs's own package rather than this one.
     let script = wasm_bindgen::link_to!(module = "/js/tile_worker.js");
-    mln_web_host::tile_workers::configure(None, Some(tile_worker_spawner(&script)));
+    mln_runtime::web::tile_workers::configure(None, Some(tile_worker_spawner(&script)));
     let exports = napi::register(napi_register_module_v1, add_test_exports)?;
     ADDON.with(|addon| addon.set(exports.clone()).ok());
     Ok(exports)

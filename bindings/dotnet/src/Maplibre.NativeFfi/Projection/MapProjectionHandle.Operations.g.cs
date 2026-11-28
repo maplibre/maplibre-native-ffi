@@ -58,32 +58,6 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Creates a projection that converts coordinates for one view of a map.
-    /// </summary>
-    /// <remarks>
-    /// <para>Create it from the <c>view</c> of an <c>MapSnapshot</c> or an
-    /// <c>RenderFrameResult</c>. The projection doesn't follow the map, so
-    /// create a new one after the map's camera, size, or style projection
-    /// changes.</para>
-    /// <para>See <c>mln_map_projection_create</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.</para>
-    /// <para>Errors:</para>
-    /// <list type="bullet">
-    /// <item><description><c>Status.Unsupported</c> when the view's style
-    /// projection draws a globe and the library can't project
-    /// one.</description></item>
-    /// </list>
-    /// </remarks>
-    public static MapProjectionHandle Create(MapView view)
-    {
-        using var call = Enter(null);
-        var nativeView = NativeMapView(view);
-        MlnMapProjection outProjection = default;
-        Check(NativeMethods.mln_map_projection_create(&nativeView, &outProjection, Diagnostic));
-        return MapProjectionHandle.Adopt(outProjection);
-    }
-
-    /// <summary>
     /// Reads the projection's camera.
     /// </summary>
     /// <remarks>
@@ -99,6 +73,31 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         };
         Check(NativeMethods.mln_map_projection_get_camera(NativeHandle, &outResult, Diagnostic));
         return CopyMapProjectionCameraResult(outResult);
+    }
+
+    /// <summary>
+    /// Reads the height of the terrain that the map drew at a coordinate.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_get_terrain_elevation</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
+    public MapProjectionTerrainElevationResult GetTerrainElevation(LatLng coordinate)
+    {
+        using var call = Enter(this);
+        var outResult = new mln_map_projection_terrain_elevation_result
+        {
+            size = (uint)sizeof(mln_map_projection_terrain_elevation_result),
+        };
+        Check(
+            NativeMethods.mln_map_projection_get_terrain_elevation(
+                NativeHandle,
+                NativeLatLng(coordinate),
+                &outResult,
+                Diagnostic
+            )
+        );
+        return CopyMapProjectionTerrainElevationResult(outResult);
     }
 
     /// <summary>

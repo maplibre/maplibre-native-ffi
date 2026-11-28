@@ -337,7 +337,7 @@ MLN_API mln_status mln_gpu_device_wrap_open_gl(
  *
  * Returns:
  * - MLN_STATUS_UNSUPPORTED in every build: the library's WebGPU (wgpu) can't
- *   wrap a `GPUDevice` yet (https://github.com/louwers/mln-rs/issues/263).
+ *   wrap a `GPUDevice` yet (https://github.com/maplibre/mln-rs/issues/263).
  *   Attach a web canvas target without a device, and the session asks the
  *   browser for one.
  */

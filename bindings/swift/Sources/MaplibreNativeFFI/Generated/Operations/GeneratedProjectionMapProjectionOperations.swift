@@ -4,29 +4,6 @@ internal import MaplibreNativeC
 import Foundation
 
 public extension MapProjectionHandle {
-  /// Creates a projection that converts coordinates for one view of a map.
-  ///
-  /// Create it from the `view` of an `MapSnapshot` or an `RenderFrameResult`.
-  /// The projection doesn't follow the map, so create a new one after the map's
-  /// camera, size, or style projection changes.
-  ///
-  /// See `mln_map_projection_create` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  ///
-  /// Errors:
-  ///
-  /// - `Status.unsupported` when the view's style projection draws a globe and
-  ///   the library can't project one.
-  static func create(view bindingArg0: MapView) throws -> MapProjectionHandle {
-    var value0: mln_map_projection = 0
-    return try MaplibreNativeFFI
-      .nativeInvoke { _, arena, diagnostic in mln_map_projection_create(
-        arena.store(bindingArg0.nativeValue()),
-        &value0,
-        diagnostic
-      ) } result: { try MapProjectionHandle(adopting: value0) }
-  }
-
   /// Reads the projection's camera.
   ///
   /// See `mln_map_projection_get_camera` in the
@@ -41,6 +18,27 @@ public extension MapProjectionHandle {
         diagnostic
       )
     } result: { MapProjectionCameraResult(raw: value0) }
+  }
+
+  /// Reads the height of the terrain that the map drew at a coordinate.
+  ///
+  /// See `mln_map_projection_get_terrain_elevation` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  func getTerrainElevation(coordinate bindingArg0: LatLng) throws
+    -> MapProjectionTerrainElevationResult
+  {
+    var value0 = mln_map_projection_terrain_elevation_result()
+    value0
+      .size = UInt32(MemoryLayout<mln_map_projection_terrain_elevation_result>
+        .size)
+    return try nativeInvoke { raw, _, diagnostic in
+      mln_map_projection_get_terrain_elevation(
+        raw,
+        bindingArg0.nativeValue(),
+        &value0,
+        diagnostic
+      )
+    } result: { MapProjectionTerrainElevationResult(raw: value0) }
   }
 
   /// Reports whether the globe hides a coordinate from the camera.

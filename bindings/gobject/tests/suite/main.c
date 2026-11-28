@@ -185,8 +185,8 @@ static void a_command_without_a_callback_still_applies(void) {
   MaplibreNativeFfiMap* map = create_map(runtime, 0, 64, 64);
   // A discarded command passes no completion. The map applies commands in
   // order, so it has applied the first once the second completes.
-  maplibre_native_ffi_map_set_debug_flags_async(
-    map, MAPLIBRE_NATIVE_FFI_MAP_DEBUG_TILE_BORDERS, NULL, NULL
+  maplibre_native_ffi_map_set_event_mask_async(
+    map, MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_IDLE, NULL, NULL
   );
   Pending pending = {0};
   maplibre_native_ffi_map_request_repaint_async(map, store_result, &pending);
@@ -199,8 +199,8 @@ static void a_command_without_a_callback_still_applies(void) {
     maplibre_native_ffi_map_get_snapshot(map, &error);
   g_assert_no_error(error);
   g_assert_cmpuint(snapshot->generation, >=, completion->generation);
-  g_assert_true(
-    snapshot->debug_flags & MAPLIBRE_NATIVE_FFI_MAP_DEBUG_TILE_BORDERS
+  g_assert_cmpuint(
+    snapshot->event_mask, ==, MAPLIBRE_NATIVE_FFI_RUNTIME_EVENT_FLAG_MAP_IDLE
   );
   release_map(map);
   release_runtime(runtime);
@@ -308,11 +308,8 @@ static void a_bulk_projection_returns_every_result(void) {
   MaplibreNativeFfiRuntime* runtime = create_runtime();
   MaplibreNativeFfiMap* map = create_map(runtime, 0, 64, 64);
   g_autoptr(GError) error = NULL;
-  g_autoptr(MaplibreNativeFfiMapSnapshot) snapshot =
-    maplibre_native_ffi_map_get_snapshot(map, &error);
-  g_assert_no_error(error);
   g_autoptr(MaplibreNativeFfiMapProjection) projection =
-    maplibre_native_ffi_map_projection_create(&snapshot->view, &error);
+    maplibre_native_ffi_map_projection_create(map, NULL, &error);
   g_assert_no_error(error);
 
   const MaplibreNativeFfiLatLng coordinates[] = {

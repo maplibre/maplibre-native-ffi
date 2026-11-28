@@ -163,11 +163,7 @@ func camera(ctx context.Context, m *maplibre.MapHandle) error {
 	}
 
 	// #region convert
-	current, err := m.Snapshot()
-	if err != nil {
-		return err
-	}
-	projection, err := maplibre.NewMapProjection(current.View)
+	projection, err := m.ProjectionCreate(nil)
 	if err != nil {
 		return err
 	}

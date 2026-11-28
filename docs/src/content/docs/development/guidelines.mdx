@@ -28,9 +28,9 @@ equal the epoch.
 
 ## API
 
-The C API is [mln-rs](https://github.com/louwers/mln-rs)'s: its headers, which
+The C API is [mln-rs](https://github.com/maplibre/mln-rs)'s: its headers, which
 `include/` copies, follow its
-[C API guidelines](https://github.com/louwers/mln-rs/blob/main/crates/mln_c/README.md#api-guidelines).
+[C API guidelines](https://github.com/maplibre/mln-rs/blob/main/crates/mln_c/README.md#api-guidelines).
 A generator in `tools/bindgen` reads them and writes each language binding's
 declarations. It reads the headers' `MLN_BINDING` annotations to write safe
 wrappers in each binding.

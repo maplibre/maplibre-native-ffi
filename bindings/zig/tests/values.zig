@@ -176,7 +176,7 @@ test "an array input is copied at submission" {
 test "synchronous calls fill caller-sized outputs in input order" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
-    var projection = try maplibre.MapProjection.create((try fixture.map.getSnapshot(null)).view, null);
+    var projection = try fixture.map.projectionCreate(null, null);
     defer projection.release();
     const coordinates = [_]maplibre.LatLng{ .{ .latitude = 0, .longitude = 0 }, .{ .latitude = 10, .longitude = 20 }, .{ .latitude = -12, .longitude = -30 } };
     var points = try projection.pixelsForLatLngs(testing.allocator, &coordinates, null);

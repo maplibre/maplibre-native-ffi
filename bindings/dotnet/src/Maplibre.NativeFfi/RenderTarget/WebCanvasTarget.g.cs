@@ -12,6 +12,11 @@ namespace Maplibre.NativeFfi;
 /// backend: a WebGPU build asks the browser for a device, and attaches once it
 /// has one. For an OpenGL device that wraps your WebGL2 context, the canvas
 /// must be the context's own.</para>
+/// <para>When the browser loses a WebGPU session's device, the session fails
+/// with <c>Status.TargetLost</c>, and once you release it, you can attach a new
+/// session to the canvas. After Chromium's GPU process restarts, though, an
+/// <c>OffscreenCanvas</c> in a Web Worker shows no new frames, and the worker
+/// gets no more animation frames: the page has to load again.</para>
 /// <para>See <c>mln_web_canvas_target</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.</para>
 /// </remarks>

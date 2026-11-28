@@ -591,37 +591,6 @@ final class LogSeverityFlag extends _Flags<LogSeverityFlag> {
   });
 }
 
-/// A debug overlay that the map draws.
-///
-/// See `mln_map_debug_flag` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class MapDebugFlag extends _Flags<MapDebugFlag> {
-  const MapDebugFlag.fromRawValue(super.rawValue);
-  static const tileBorders = MapDebugFlag.fromRawValue(2);
-  static const parseStatus = MapDebugFlag.fromRawValue(4);
-  static const timestamps = MapDebugFlag.fromRawValue(8);
-  static const collision = MapDebugFlag.fromRawValue(16);
-  static const overdraw = MapDebugFlag.fromRawValue(32);
-  static const stencilClip = MapDebugFlag.fromRawValue(64);
-  static const depthBuffer = MapDebugFlag.fromRawValue(128);
-
-  /// No flags.
-  static const none = MapDebugFlag.fromRawValue(0);
-  @override
-  MapDebugFlag _of(int rawValue) => MapDebugFlag.fromRawValue(rawValue);
-  @override
-  String toString() => _describe('MapDebugFlag', const {
-    0: 'none',
-    2: 'tileBorders',
-    4: 'parseStatus',
-    8: 'timestamps',
-    16: 'collision',
-    32: 'overdraw',
-    64: 'stencilClip',
-    128: 'depthBuffer',
-  });
-}
-
 /// Why a map failed to load a style.
 ///
 /// See `mln_map_load_error` in the
@@ -1417,6 +1386,11 @@ final class RuntimeEventType extends _Enum {
   /// The map rendered a complete frame and has nothing left to load, animate,
   /// or redraw.
   static const mapIdle = RuntimeEventType.fromRawValue(8);
+
+  /// Rendering a frame failed on the GPU, as when the device runs out of memory
+  /// or the driver rejects a shader. The frame shows what did render. A map in
+  /// `MapMode.continuous` raises it once for a run of failed frames, and
+  /// renders again shortly in case the failure passes.
   static const mapRenderError = RuntimeEventType.fromRawValue(9);
   static const mapRenderFrameStarted = RuntimeEventType.fromRawValue(10);
   static const mapRenderFrameFinished = RuntimeEventType.fromRawValue(11);
@@ -1673,6 +1647,26 @@ final class StyleVectorTileEncoding extends _Enum {
     0 => 'StyleVectorTileEncoding.mvt',
     1 => 'StyleVectorTileEncoding.mlt',
     _ => 'StyleVectorTileEncoding($rawValue)',
+  };
+}
+
+/// How far the skirts that hide the cracks between terrain tiles reach down.
+///
+/// See `mln_terrain_skirt_length` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class TerrainSkirtLength extends _Enum {
+  const TerrainSkirtLength.fromRawValue(super.rawValue);
+
+  /// Far enough to hide the cracks.
+  static const auto = TerrainSkirtLength.fromRawValue(0);
+
+  /// No skirts, so they don't show through translucent layers over the terrain.
+  static const none = TerrainSkirtLength.fromRawValue(1);
+  @override
+  String toString() => switch (rawValue) {
+    0 => 'TerrainSkirtLength.auto',
+    1 => 'TerrainSkirtLength.none',
+    _ => 'TerrainSkirtLength($rawValue)',
   };
 }
 
@@ -2649,11 +2643,15 @@ final class MapViewport extends _Value {
     this.constrainMode = const ConstrainMode.fromRawValue(0),
     this.viewportMode = const ViewportMode.fromRawValue(0),
     this.frustumOffset = const EdgeInsets(),
+    this.centerClampedToGround = false,
+    this.globeFreeBearing = false,
   });
   final NorthOrientation northOrientation;
   final ConstrainMode constrainMode;
   final ViewportMode viewportMode;
   final EdgeInsets frustumOffset;
+  final bool centerClampedToGround;
+  final bool globeFreeBearing;
 
   /// A copy of this value with the given members replaced.
   MapViewport copyWith({
@@ -2661,11 +2659,15 @@ final class MapViewport extends _Value {
     ConstrainMode? constrainMode,
     ViewportMode? viewportMode,
     EdgeInsets? frustumOffset,
+    bool? centerClampedToGround,
+    bool? globeFreeBearing,
   }) => MapViewport(
     northOrientation: northOrientation ?? this.northOrientation,
     constrainMode: constrainMode ?? this.constrainMode,
     viewportMode: viewportMode ?? this.viewportMode,
     frustumOffset: frustumOffset ?? this.frustumOffset,
+    centerClampedToGround: centerClampedToGround ?? this.centerClampedToGround,
+    globeFreeBearing: globeFreeBearing ?? this.globeFreeBearing,
   );
 
   @override
@@ -2674,6 +2676,8 @@ final class MapViewport extends _Value {
     constrainMode,
     viewportMode,
     frustumOffset,
+    centerClampedToGround,
+    globeFreeBearing,
   ];
   @override
   String toString() => _describe('MapViewport', const [
@@ -2681,6 +2685,8 @@ final class MapViewport extends _Value {
     'constrainMode',
     'viewportMode',
     'frustumOffset',
+    'centerClampedToGround',
+    'globeFreeBearing',
   ]);
 }
 
@@ -5900,6 +5906,12 @@ final class ExportedRingTarget extends _Value {
 /// has one. For an OpenGL device that wraps your WebGL2 context, the canvas
 /// must be the context's own.
 ///
+/// When the browser loses a WebGPU session's device, the session fails with
+/// `Status.targetLost`, and once you release it, you can attach a new session
+/// to the canvas. After Chromium's GPU process restarts, though, an
+/// `OffscreenCanvas` in a Web Worker shows no new frames, and the worker gets
+/// no more animation frames: the page has to load again.
+///
 /// See `mln_web_canvas_target` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 final class WebCanvasTarget extends _Value {
@@ -6869,10 +6881,8 @@ final class FreeCamera extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class MapSnapshot extends _Value {
   const MapSnapshot({
-    this.debugFlags = MapDebugFlag.none,
     this.generation = 0,
     this.fullyLoaded = false,
-    this.renderingStatsViewEnabled = false,
     this.gestureInProgress = false,
     this.transitionInProgress = false,
     this.eventMask = RuntimeEventFlag.none,
@@ -6882,16 +6892,13 @@ final class MapSnapshot extends _Value {
     this.freeCamera = const FreeCamera(),
     this.view = const MapView(),
     this.globeRendering = false,
-    this.globeFreeBearingEnabled = false,
   });
-  final MapDebugFlag debugFlags;
 
   /// Grows with each change to the map's state.
   final int generation;
 
   /// Whether the style and every resource that the view needs have loaded.
   final bool fullyLoaded;
-  final bool renderingStatsViewEnabled;
 
   /// Whether a gesture recognizer's gesture, or the glide and snap after it,
   /// moves the camera.
@@ -6909,15 +6916,10 @@ final class MapSnapshot extends _Value {
   /// Whether the map draws as a globe, alone or blending into Mercator.
   final bool globeRendering;
 
-  /// The setting from `MapHandle.setGlobeFreeBearingEnabled()`.
-  final bool globeFreeBearingEnabled;
-
   @override
   List<Object?> get _members => [
-    debugFlags,
     generation,
     fullyLoaded,
-    renderingStatsViewEnabled,
     gestureInProgress,
     transitionInProgress,
     eventMask,
@@ -6927,14 +6929,11 @@ final class MapSnapshot extends _Value {
     freeCamera,
     view,
     globeRendering,
-    globeFreeBearingEnabled,
   ];
   @override
   String toString() => _describe('MapSnapshot', const [
-    'debugFlags',
     'generation',
     'fullyLoaded',
-    'renderingStatsViewEnabled',
     'gestureInProgress',
     'transitionInProgress',
     'eventMask',
@@ -6944,7 +6943,6 @@ final class MapSnapshot extends _Value {
     'freeCamera',
     'view',
     'globeRendering',
-    'globeFreeBearingEnabled',
   ]);
 }
 
@@ -7273,6 +7271,32 @@ final class MapProjectionCameraResult extends _Value {
   String toString() => _describe('MapProjectionCameraResult', const ['camera']);
 }
 
+/// The height of the ground at a coordinate.
+///
+/// See `mln_map_projection_terrain_elevation_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+final class MapProjectionTerrainElevationResult extends _Value {
+  const MapProjectionTerrainElevationResult({
+    this.hasElevation = false,
+    this.elevationMeters = 0,
+  });
+
+  /// Whether the map drew terrain at the coordinate.
+  final bool hasElevation;
+
+  /// Meters above sea level, with the terrain's exaggeration. 0 without
+  /// `has_elevation`.
+  final double elevationMeters;
+
+  @override
+  List<Object?> get _members => [hasElevation, elevationMeters];
+  @override
+  String toString() => _describe('MapProjectionTerrainElevationResult', const [
+    'hasElevation',
+    'elevationMeters',
+  ]);
+}
+
 /// Limits on the camera, for `MapHandle.setBounds()`.
 ///
 /// See `mln_bound_options` in the
@@ -7564,11 +7588,22 @@ final class MapViewportOptions extends _Value {
     this.constrainMode,
     this.viewportMode,
     this.frustumOffset,
+    this.centerClampedToGround,
+    this.globeFreeBearing,
   });
   final NorthOrientation? northOrientation;
   final ConstrainMode? constrainMode;
   final ViewportMode? viewportMode;
   final EdgeInsets? frustumOffset;
+
+  /// Whether the camera's center stands on the terrain, in place of the center
+  /// altitude it's given, the style's included. On by default.
+  final bool? centerClampedToGround;
+
+  /// Whether drags and zooms on a globe turn the bearing to keep the planet's
+  /// orientation, which lets a drag carry the camera over a pole. Off by
+  /// default.
+  final bool? globeFreeBearing;
 
   /// A copy of this value with the given members replaced.
   MapViewportOptions copyWith({
@@ -7576,11 +7611,15 @@ final class MapViewportOptions extends _Value {
     ConstrainMode? constrainMode,
     ViewportMode? viewportMode,
     EdgeInsets? frustumOffset,
+    bool? centerClampedToGround,
+    bool? globeFreeBearing,
   }) => MapViewportOptions(
     northOrientation: northOrientation ?? this.northOrientation,
     constrainMode: constrainMode ?? this.constrainMode,
     viewportMode: viewportMode ?? this.viewportMode,
     frustumOffset: frustumOffset ?? this.frustumOffset,
+    centerClampedToGround: centerClampedToGround ?? this.centerClampedToGround,
+    globeFreeBearing: globeFreeBearing ?? this.globeFreeBearing,
   );
 
   @override
@@ -7589,6 +7628,8 @@ final class MapViewportOptions extends _Value {
     constrainMode,
     viewportMode,
     frustumOffset,
+    centerClampedToGround,
+    globeFreeBearing,
   ];
   @override
   String toString() => _describe('MapViewportOptions', const [
@@ -7596,6 +7637,8 @@ final class MapViewportOptions extends _Value {
     'constrainMode',
     'viewportMode',
     'frustumOffset',
+    'centerClampedToGround',
+    'globeFreeBearing',
   ]);
 }
 
@@ -8258,6 +8301,8 @@ final class MapOptions extends _Value {
     this.fallbackFontFaces = '',
     this.systemFontsEnabled,
     this.localIdeographsEnabled,
+    this.terrainSkirtLength,
+    this.terrainDrapeMemoryLimit,
   });
 
   /// The map's first size, and its scale factor. Render sessions of the map
@@ -8301,6 +8346,14 @@ final class MapOptions extends _Value {
   /// from a glyph PBF downloaded for every few characters. Without it, they do.
   final bool? localIdeographsEnabled;
 
+  /// The terrain's skirts. Without it, `TerrainSkirtLength.auto`.
+  final TerrainSkirtLength? terrainSkirtLength;
+
+  /// The most GPU memory, in bytes, for the layers drawn over the terrain. Past
+  /// it, the terrain farthest from the center of the view looks blurrier.
+  /// Without it, there's no limit.
+  final int? terrainDrapeMemoryLimit;
+
   /// A copy of this value with the given members replaced.
   MapOptions copyWith({
     LogicalExtent? initialExtent,
@@ -8311,6 +8364,8 @@ final class MapOptions extends _Value {
     String? fallbackFontFaces,
     bool? systemFontsEnabled,
     bool? localIdeographsEnabled,
+    TerrainSkirtLength? terrainSkirtLength,
+    int? terrainDrapeMemoryLimit,
   }) => MapOptions(
     initialExtent: initialExtent ?? this.initialExtent,
     mapMode: mapMode ?? this.mapMode,
@@ -8321,6 +8376,9 @@ final class MapOptions extends _Value {
     systemFontsEnabled: systemFontsEnabled ?? this.systemFontsEnabled,
     localIdeographsEnabled:
         localIdeographsEnabled ?? this.localIdeographsEnabled,
+    terrainSkirtLength: terrainSkirtLength ?? this.terrainSkirtLength,
+    terrainDrapeMemoryLimit:
+        terrainDrapeMemoryLimit ?? this.terrainDrapeMemoryLimit,
   );
 
   @override
@@ -8333,6 +8391,8 @@ final class MapOptions extends _Value {
     fallbackFontFaces,
     systemFontsEnabled,
     localIdeographsEnabled,
+    terrainSkirtLength,
+    terrainDrapeMemoryLimit,
   ];
   @override
   String toString() => _describe('MapOptions', const [
@@ -8344,6 +8404,8 @@ final class MapOptions extends _Value {
     'fallbackFontFaces',
     'systemFontsEnabled',
     'localIdeographsEnabled',
+    'terrainSkirtLength',
+    'terrainDrapeMemoryLimit',
   ]);
 }
 

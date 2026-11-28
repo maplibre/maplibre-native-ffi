@@ -4306,26 +4306,34 @@ void maplibre_native_ffi_map_viewport_free(MaplibreNativeFfiMapViewport* self) {
   g_free(self);
 }
 
-G_STATIC_ASSERT(
-  sizeof(MaplibreNativeFfiMapViewport) == sizeof(mln_map_viewport)
-);
-SAME_MEMBER(MaplibreNativeFfiMapViewport, mln_map_viewport, north_orientation);
-SAME_MEMBER(MaplibreNativeFfiMapViewport, mln_map_viewport, constrain_mode);
-SAME_MEMBER(MaplibreNativeFfiMapViewport, mln_map_viewport, viewport_mode);
-SAME_MEMBER(MaplibreNativeFfiMapViewport, mln_map_viewport, frustum_offset);
-
 void maplibre_native_ffi_map_viewport_to_native(
   const MaplibreNativeFfiMapViewport* self, mln_map_viewport* out,
   MaplibreNativeFfiCall* call
 ) {
   (void)call;
-  memcpy(out, self, sizeof *out);
+  memset(out, 0, sizeof *out);
+  out->north_orientation = (mln_north_orientation)(self->north_orientation);
+  out->constrain_mode = (mln_constrain_mode)(self->constrain_mode);
+  out->viewport_mode = (mln_viewport_mode)(self->viewport_mode);
+  maplibre_native_ffi_edge_insets_to_native(
+    &self->frustum_offset, &out->frustum_offset, call
+  );
+  out->center_clamped_to_ground = (self->center_clamped_to_ground) != FALSE;
+  out->globe_free_bearing = (self->globe_free_bearing) != FALSE;
 }
 
 void maplibre_native_ffi_map_viewport_read(
   MaplibreNativeFfiMapViewport* out, const mln_map_viewport* in
 ) {
-  memcpy(out, in, sizeof *out);
+  out->north_orientation =
+    (MaplibreNativeFfiNorthOrientation)(in->north_orientation);
+  out->constrain_mode = (MaplibreNativeFfiConstrainMode)(in->constrain_mode);
+  out->viewport_mode = (MaplibreNativeFfiViewportMode)(in->viewport_mode);
+  maplibre_native_ffi_edge_insets_read(
+    &out->frustum_offset, &in->frustum_offset
+  );
+  out->center_clamped_to_ground = (in->center_clamped_to_ground) ? TRUE : FALSE;
+  out->globe_free_bearing = (in->globe_free_bearing) ? TRUE : FALSE;
 }
 
 MaplibreNativeFfiMapViewport* maplibre_native_ffi_map_viewport_from_native(
@@ -12905,6 +12913,8 @@ struct _MaplibreNativeFfiMapOptions {
   char* fallback_font_faces;
   gboolean system_fonts_enabled;
   gboolean local_ideographs_enabled;
+  MaplibreNativeFfiTerrainSkirtLength terrain_skirt_length;
+  guint64 terrain_drape_memory_limit;
 };
 
 enum {
@@ -12917,6 +12927,8 @@ enum {
   MAP_OPTIONS_PROP_FALLBACK_FONT_FACES,
   MAP_OPTIONS_PROP_SYSTEM_FONTS_ENABLED,
   MAP_OPTIONS_PROP_LOCAL_IDEOGRAPHS_ENABLED,
+  MAP_OPTIONS_PROP_TERRAIN_SKIRT_LENGTH,
+  MAP_OPTIONS_PROP_TERRAIN_DRAPE_MEMORY_LIMIT,
   MAP_OPTIONS_N_PROPERTIES
 };
 
@@ -12961,6 +12973,12 @@ static void maplibre_native_ffi_map_options_get_property(
       break;
     case MAP_OPTIONS_PROP_LOCAL_IDEOGRAPHS_ENABLED:
       g_value_set_boolean(value, self->local_ideographs_enabled);
+      break;
+    case MAP_OPTIONS_PROP_TERRAIN_SKIRT_LENGTH:
+      g_value_set_enum(value, self->terrain_skirt_length);
+      break;
+    case MAP_OPTIONS_PROP_TERRAIN_DRAPE_MEMORY_LIMIT:
+      g_value_set_uint64(value, self->terrain_drape_memory_limit);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
@@ -13012,6 +13030,16 @@ static void maplibre_native_ffi_map_options_set_property(
         self, g_value_get_boolean(value)
       );
       break;
+    case MAP_OPTIONS_PROP_TERRAIN_SKIRT_LENGTH:
+      maplibre_native_ffi_map_options_set_terrain_skirt_length(
+        self, g_value_get_enum(value)
+      );
+      break;
+    case MAP_OPTIONS_PROP_TERRAIN_DRAPE_MEMORY_LIMIT:
+      maplibre_native_ffi_map_options_set_terrain_drape_memory_limit(
+        self, g_value_get_uint64(value)
+      );
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
   }
@@ -13052,6 +13080,16 @@ static void maplibre_native_ffi_map_options_class_init(
   map_options_properties[MAP_OPTIONS_PROP_LOCAL_IDEOGRAPHS_ENABLED] =
     g_param_spec_boolean(
       "local-ideographs-enabled", NULL, NULL, FALSE, PROPERTY_FLAGS
+    );
+  map_options_properties[MAP_OPTIONS_PROP_TERRAIN_SKIRT_LENGTH] =
+    g_param_spec_enum(
+      "terrain-skirt-length", NULL, NULL,
+      MAPLIBRE_NATIVE_FFI_TYPE_TERRAIN_SKIRT_LENGTH, 0, PROPERTY_FLAGS
+    );
+  map_options_properties[MAP_OPTIONS_PROP_TERRAIN_DRAPE_MEMORY_LIMIT] =
+    g_param_spec_uint64(
+      "terrain-drape-memory-limit", NULL, NULL, 0, G_MAXUINT64, 0,
+      PROPERTY_FLAGS
     );
   g_object_class_install_properties(
     object_class, MAP_OPTIONS_N_PROPERTIES, map_options_properties
@@ -13272,6 +13310,69 @@ void maplibre_native_ffi_map_options_set_local_ideographs_enabled(
     );
 }
 
+MaplibreNativeFfiTerrainSkirtLength
+maplibre_native_ffi_map_options_get_terrain_skirt_length(
+  MaplibreNativeFfiMapOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self),
+    (MaplibreNativeFfiTerrainSkirtLength)0
+  );
+  return self->terrain_skirt_length;
+}
+
+gboolean maplibre_native_ffi_map_options_has_terrain_skirt_length(
+  MaplibreNativeFfiMapOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self), FALSE);
+  return (self->fields & MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH) != 0;
+}
+
+void maplibre_native_ffi_map_options_set_terrain_skirt_length(
+  MaplibreNativeFfiMapOptions* self, MaplibreNativeFfiTerrainSkirtLength value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self));
+  gboolean was_set = (self->fields & MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH) != 0;
+  gboolean changed = self->terrain_skirt_length != value;
+  self->terrain_skirt_length = value;
+  self->fields |= MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      map_options_properties[MAP_OPTIONS_PROP_TERRAIN_SKIRT_LENGTH]
+    );
+}
+
+guint64 maplibre_native_ffi_map_options_get_terrain_drape_memory_limit(
+  MaplibreNativeFfiMapOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self), 0);
+  return self->terrain_drape_memory_limit;
+}
+
+gboolean maplibre_native_ffi_map_options_has_terrain_drape_memory_limit(
+  MaplibreNativeFfiMapOptions* self
+) {
+  g_return_val_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self), FALSE);
+  return (self->fields & MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT) != 0;
+}
+
+void maplibre_native_ffi_map_options_set_terrain_drape_memory_limit(
+  MaplibreNativeFfiMapOptions* self, guint64 value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_OPTIONS(self));
+  gboolean was_set =
+    (self->fields & MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT) != 0;
+  gboolean changed = self->terrain_drape_memory_limit != value;
+  self->terrain_drape_memory_limit = value;
+  self->fields |= MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self),
+      map_options_properties[MAP_OPTIONS_PROP_TERRAIN_DRAPE_MEMORY_LIMIT]
+    );
+}
+
 void maplibre_native_ffi_map_options_to_native(
   const MaplibreNativeFfiMapOptions* self, mln_map_options* out,
   MaplibreNativeFfiCall* call
@@ -13290,6 +13391,10 @@ void maplibre_native_ffi_map_options_to_native(
     maplibre_native_ffi_text_view(self->fallback_font_faces);
   out->system_fonts_enabled = (self->system_fonts_enabled) != FALSE;
   out->local_ideographs_enabled = (self->local_ideographs_enabled) != FALSE;
+  out->terrain_skirt_length =
+    (mln_terrain_skirt_length)(self->terrain_skirt_length);
+  out->terrain_drape_memory_limit =
+    (uint64_t)(self->terrain_drape_memory_limit);
 }
 
 G_DEFINE_BOXED_TYPE(
@@ -13327,6 +13432,45 @@ maplibre_native_ffi_map_projection_camera_result_from_native(
   MaplibreNativeFfiMapProjectionCameraResult* self =
     g_new0(MaplibreNativeFfiMapProjectionCameraResult, 1);
   maplibre_native_ffi_map_projection_camera_result_read(self, in);
+  return self;
+}
+
+G_DEFINE_BOXED_TYPE(
+  MaplibreNativeFfiMapProjectionTerrainElevationResult,
+  maplibre_native_ffi_map_projection_terrain_elevation_result,
+  maplibre_native_ffi_map_projection_terrain_elevation_result_copy,
+  maplibre_native_ffi_map_projection_terrain_elevation_result_free
+)
+
+MaplibreNativeFfiMapProjectionTerrainElevationResult*
+maplibre_native_ffi_map_projection_terrain_elevation_result_copy(
+  const MaplibreNativeFfiMapProjectionTerrainElevationResult* self
+) {
+  g_return_val_if_fail(self != NULL, NULL);
+  return g_memdup2(self, sizeof *self);
+}
+
+void maplibre_native_ffi_map_projection_terrain_elevation_result_free(
+  MaplibreNativeFfiMapProjectionTerrainElevationResult* self
+) {
+  g_free(self);
+}
+
+void maplibre_native_ffi_map_projection_terrain_elevation_result_read(
+  MaplibreNativeFfiMapProjectionTerrainElevationResult* out,
+  const mln_map_projection_terrain_elevation_result* in
+) {
+  out->has_elevation = (in->has_elevation) ? TRUE : FALSE;
+  out->elevation_meters = (gdouble)(in->elevation_meters);
+}
+
+MaplibreNativeFfiMapProjectionTerrainElevationResult*
+maplibre_native_ffi_map_projection_terrain_elevation_result_from_native(
+  const mln_map_projection_terrain_elevation_result* in
+) {
+  MaplibreNativeFfiMapProjectionTerrainElevationResult* self =
+    g_new0(MaplibreNativeFfiMapProjectionTerrainElevationResult, 1);
+  maplibre_native_ffi_map_projection_terrain_elevation_result_read(self, in);
   return self;
 }
 
@@ -13402,11 +13546,8 @@ void maplibre_native_ffi_map_snapshot_free(MaplibreNativeFfiMapSnapshot* self) {
 void maplibre_native_ffi_map_snapshot_read(
   MaplibreNativeFfiMapSnapshot* out, const mln_map_snapshot* in
 ) {
-  out->debug_flags = (MaplibreNativeFfiMapDebugFlag)(in->debug_flags);
   out->generation = (guint64)(in->generation);
   out->fully_loaded = (in->fully_loaded) ? TRUE : FALSE;
-  out->rendering_stats_view_enabled =
-    (in->rendering_stats_view_enabled) ? TRUE : FALSE;
   out->gesture_in_progress = (in->gesture_in_progress) ? TRUE : FALSE;
   out->transition_in_progress = (in->transition_in_progress) ? TRUE : FALSE;
   out->event_mask = (MaplibreNativeFfiRuntimeEventFlag)(in->event_mask);
@@ -13417,8 +13558,6 @@ void maplibre_native_ffi_map_snapshot_read(
   maplibre_native_ffi_free_camera_read(&out->free_camera, &in->free_camera);
   maplibre_native_ffi_map_view_read(&out->view, &in->view);
   out->globe_rendering = (in->globe_rendering) ? TRUE : FALSE;
-  out->globe_free_bearing_enabled =
-    (in->globe_free_bearing_enabled) ? TRUE : FALSE;
 }
 
 MaplibreNativeFfiMapSnapshot* maplibre_native_ffi_map_snapshot_from_native(
@@ -13780,6 +13919,8 @@ struct _MaplibreNativeFfiMapViewportOptions {
   MaplibreNativeFfiConstrainMode constrain_mode;
   MaplibreNativeFfiViewportMode viewport_mode;
   MaplibreNativeFfiEdgeInsets frustum_offset;
+  gboolean center_clamped_to_ground;
+  gboolean globe_free_bearing;
 };
 
 enum {
@@ -13788,6 +13929,8 @@ enum {
   MAP_VIEWPORT_OPTIONS_PROP_CONSTRAIN_MODE,
   MAP_VIEWPORT_OPTIONS_PROP_VIEWPORT_MODE,
   MAP_VIEWPORT_OPTIONS_PROP_FRUSTUM_OFFSET,
+  MAP_VIEWPORT_OPTIONS_PROP_CENTER_CLAMPED_TO_GROUND,
+  MAP_VIEWPORT_OPTIONS_PROP_GLOBE_FREE_BEARING,
   MAP_VIEWPORT_OPTIONS_N_PROPERTIES
 };
 
@@ -13816,6 +13959,12 @@ static void maplibre_native_ffi_map_viewport_options_get_property(
       break;
     case MAP_VIEWPORT_OPTIONS_PROP_FRUSTUM_OFFSET:
       g_value_set_boxed(value, &self->frustum_offset);
+      break;
+    case MAP_VIEWPORT_OPTIONS_PROP_CENTER_CLAMPED_TO_GROUND:
+      g_value_set_boolean(value, self->center_clamped_to_ground);
+      break;
+    case MAP_VIEWPORT_OPTIONS_PROP_GLOBE_FREE_BEARING:
+      g_value_set_boolean(value, self->globe_free_bearing);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID(object, id, pspec);
@@ -13846,6 +13995,16 @@ static void maplibre_native_ffi_map_viewport_options_set_property(
     case MAP_VIEWPORT_OPTIONS_PROP_FRUSTUM_OFFSET:
       maplibre_native_ffi_map_viewport_options_set_frustum_offset(
         self, g_value_get_boxed(value)
+      );
+      break;
+    case MAP_VIEWPORT_OPTIONS_PROP_CENTER_CLAMPED_TO_GROUND:
+      maplibre_native_ffi_map_viewport_options_set_center_clamped_to_ground(
+        self, g_value_get_boolean(value)
+      );
+      break;
+    case MAP_VIEWPORT_OPTIONS_PROP_GLOBE_FREE_BEARING:
+      maplibre_native_ffi_map_viewport_options_set_globe_free_bearing(
+        self, g_value_get_boolean(value)
       );
       break;
     default:
@@ -13880,6 +14039,14 @@ static void maplibre_native_ffi_map_viewport_options_class_init(
     g_param_spec_boxed(
       "frustum-offset", NULL, NULL, MAPLIBRE_NATIVE_FFI_TYPE_EDGE_INSETS,
       PROPERTY_FLAGS
+    );
+  map_viewport_options_properties
+    [MAP_VIEWPORT_OPTIONS_PROP_CENTER_CLAMPED_TO_GROUND] = g_param_spec_boolean(
+      "center-clamped-to-ground", NULL, NULL, FALSE, PROPERTY_FLAGS
+    );
+  map_viewport_options_properties
+    [MAP_VIEWPORT_OPTIONS_PROP_GLOBE_FREE_BEARING] = g_param_spec_boolean(
+      "globe-free-bearing", NULL, NULL, FALSE, PROPERTY_FLAGS
     );
   g_object_class_install_properties(
     object_class, MAP_VIEWPORT_OPTIONS_N_PROPERTIES,
@@ -14044,6 +14211,74 @@ void maplibre_native_ffi_map_viewport_options_set_frustum_offset(
     );
 }
 
+gboolean maplibre_native_ffi_map_viewport_options_get_center_clamped_to_ground(
+  MaplibreNativeFfiMapViewportOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_MAP_VIEWPORT_OPTIONS(self), FALSE
+  );
+  return self->center_clamped_to_ground;
+}
+
+gboolean maplibre_native_ffi_map_viewport_options_has_center_clamped_to_ground(
+  MaplibreNativeFfiMapViewportOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_MAP_VIEWPORT_OPTIONS(self), FALSE
+  );
+  return (self->fields & MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND) != 0;
+}
+
+void maplibre_native_ffi_map_viewport_options_set_center_clamped_to_ground(
+  MaplibreNativeFfiMapViewportOptions* self, gboolean value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_VIEWPORT_OPTIONS(self));
+  gboolean was_set =
+    (self->fields & MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND) != 0;
+  gboolean changed = self->center_clamped_to_ground != value;
+  self->center_clamped_to_ground = value;
+  self->fields |= MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), map_viewport_options_properties
+                        [MAP_VIEWPORT_OPTIONS_PROP_CENTER_CLAMPED_TO_GROUND]
+    );
+}
+
+gboolean maplibre_native_ffi_map_viewport_options_get_globe_free_bearing(
+  MaplibreNativeFfiMapViewportOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_MAP_VIEWPORT_OPTIONS(self), FALSE
+  );
+  return self->globe_free_bearing;
+}
+
+gboolean maplibre_native_ffi_map_viewport_options_has_globe_free_bearing(
+  MaplibreNativeFfiMapViewportOptions* self
+) {
+  g_return_val_if_fail(
+    MAPLIBRE_NATIVE_FFI_IS_MAP_VIEWPORT_OPTIONS(self), FALSE
+  );
+  return (self->fields & MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING) != 0;
+}
+
+void maplibre_native_ffi_map_viewport_options_set_globe_free_bearing(
+  MaplibreNativeFfiMapViewportOptions* self, gboolean value
+) {
+  g_return_if_fail(MAPLIBRE_NATIVE_FFI_IS_MAP_VIEWPORT_OPTIONS(self));
+  gboolean was_set =
+    (self->fields & MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING) != 0;
+  gboolean changed = self->globe_free_bearing != value;
+  self->globe_free_bearing = value;
+  self->fields |= MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING;
+  if (changed || !was_set)
+    g_object_notify_by_pspec(
+      G_OBJECT(self), map_viewport_options_properties
+                        [MAP_VIEWPORT_OPTIONS_PROP_GLOBE_FREE_BEARING]
+    );
+}
+
 void maplibre_native_ffi_map_viewport_options_to_native(
   const MaplibreNativeFfiMapViewportOptions* self,
   mln_map_viewport_options* out, MaplibreNativeFfiCall* call
@@ -14057,6 +14292,8 @@ void maplibre_native_ffi_map_viewport_options_to_native(
   maplibre_native_ffi_edge_insets_to_native(
     &self->frustum_offset, &out->frustum_offset, call
   );
+  out->center_clamped_to_ground = (self->center_clamped_to_ground) != FALSE;
+  out->globe_free_bearing = (self->globe_free_bearing) != FALSE;
 }
 
 struct _MaplibreNativeFfiMetalBorrowedTexture {

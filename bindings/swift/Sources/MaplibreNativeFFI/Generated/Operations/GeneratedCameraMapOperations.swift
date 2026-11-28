@@ -340,26 +340,6 @@ public extension MapHandle {
     }
   }
 
-  /// Draws debugging overlays, such as tile borders, on the map.
-  ///
-  /// `flags` replaces the overlays set before.
-  ///
-  /// See `mln_map_set_debug_flags` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setDebugFlags(_ bindingArg0: MapDebugFlag) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_set_debug_flags(
-        raw,
-        bindingArg0.rawValue,
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Places the camera at a position and orientation in space.
   ///
   /// The map adjusts them to a camera that it can show. It stops running camera
@@ -376,30 +356,6 @@ public extension MapHandle {
       mln_map_set_free_camera_options(
         raw,
         arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets whether drags and zooms on a globe turn the bearing.
-  ///
-  /// When it's on, a drag or a zoom around a point on the globe turns the
-  /// bearing so the planet keeps its orientation, and a drag can carry the
-  /// camera over a pole. When it's off, the default, they keep the bearing, as
-  /// MapLibre GL JS does. Turn it on for a map whose users can rotate it. It
-  /// changes nothing while the map draws Mercator.
-  ///
-  /// See `mln_map_set_globe_free_bearing_enabled` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setGlobeFreeBearingEnabled(_ bindingArg0: Bool) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_set_globe_free_bearing_enabled(
-        raw,
-        bindingArg0,
         completion,
         diagnostic
       )
@@ -423,24 +379,6 @@ public extension MapHandle {
       mln_map_set_projection_mode(
         raw,
         arena.store(bindingArg0.nativeValue()),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Shows or hides an overlay of rendering statistics on the map.
-  ///
-  /// See `mln_map_set_rendering_stats_view_enabled` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  @discardableResult
-  func setRenderingStatsViewEnabled(_ bindingArg0: Bool) async throws
-    -> CommandCompletion
-  {
-    try await nativeCommand { raw, _, completion, diagnostic in
-      mln_map_set_rendering_stats_view_enabled(
-        raw,
-        bindingArg0,
         completion,
         diagnostic
       )
@@ -610,15 +548,6 @@ public extension MapHandleDiscarding {
     ) }
   }
 
-  func setDebugFlags(_ bindingArg0: MapDebugFlag) throws {
-    try owner.nativeInvoke { raw, _, diagnostic in mln_map_set_debug_flags(
-      raw,
-      bindingArg0.rawValue,
-      nil,
-      diagnostic
-    ) }
-  }
-
   func setFreeCameraOptions(_ bindingArg0: FreeCameraOptions) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_set_free_camera_options(
@@ -629,18 +558,6 @@ public extension MapHandleDiscarding {
       ) }
   }
 
-  func setGlobeFreeBearingEnabled(_ bindingArg0: Bool) throws {
-    try owner
-      .nativeInvoke { raw, _, diagnostic in
-        mln_map_set_globe_free_bearing_enabled(
-          raw,
-          bindingArg0,
-          nil,
-          diagnostic
-        )
-      }
-  }
-
   func setProjectionMode(options bindingArg0: ProjectionModeOptions) throws {
     try owner
       .nativeInvoke { raw, arena, diagnostic in mln_map_set_projection_mode(
@@ -649,18 +566,6 @@ public extension MapHandleDiscarding {
         nil,
         diagnostic
       ) }
-  }
-
-  func setRenderingStatsViewEnabled(_ bindingArg0: Bool) throws {
-    try owner
-      .nativeInvoke { raw, _, diagnostic in
-        mln_map_set_rendering_stats_view_enabled(
-          raw,
-          bindingArg0,
-          nil,
-          diagnostic
-        )
-      }
   }
 
   func setTileOptions(_ bindingArg0: MapTileOptions) throws {

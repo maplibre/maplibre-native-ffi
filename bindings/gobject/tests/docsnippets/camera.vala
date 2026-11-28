@@ -124,9 +124,7 @@ namespace CameraSnippets {
 		recognizer.release ();
 
 		// #region convert
-		var projection = new MapProjection.create (
-			map.get_snapshot ().view
-		);
+		var projection = map.projection_create (null);
 		var coordinate = projection.lat_lng_for_pixel ({ x: 100, y: 200 });
 		var point = projection.pixel_for_lat_lng (coordinate);
 		// #endregion convert

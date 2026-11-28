@@ -49,9 +49,9 @@ from ._generated_values import (
     LogicalExtent,
     LogicalSize,
     LogSeverityFlag,
-    MapDebugFlag,
     MapOptions,
     MapProjectionCameraResult,
+    MapProjectionTerrainElevationResult,
     MapSnapshot,
     MapTileOptions,
     MapView,
@@ -1463,6 +1463,29 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.move_style_layer(layer_id, before_layer_id)
 
+    def projection_create(self, view: MapView | None = None) -> MapProjectionHandle:
+        """Creates a projection that converts coordinates as a map does, for one
+        view of it.
+
+        `view` is the view to convert for, such as a frame result's, or null
+        for the map's current view. Over terrain, coordinates convert on the
+        ground that the map drew. The projection doesn't follow the map, so
+        create a new one after the map's view or terrain changes.
+
+        See `mln_map_projection_create` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+
+        Errors:
+
+        - `Status.INVALID_STATE` until `RuntimeHandle.create_map()` completes
+          with `Status.OK`.
+        - `Status.UNSUPPORTED` when the view's style projection draws a globe
+          and the library can't project one.
+        """
+        return _adopt_value(
+            self._native.projection_create(view), "MapProjectionHandle", None
+        )
+
     def release(self) -> Future[None]:
         """Releases the map.
 
@@ -1563,7 +1586,7 @@ class _MapHandleOperations(GeneratedOperations):
         - `Status.CANCELLED` when the map is released before the image is
           done.
         - `Status.NATIVE_ERROR` when the style or a resource that the image
-          needs fails to load.
+          needs fails to load, or rendering the image fails on the GPU.
         """
         return self._native.request_still_image()
 
@@ -1686,16 +1709,6 @@ class _MapHandleOperations(GeneratedOperations):
         return self._native.set_custom_vector_source_tile_error(
             source_id, tile_id, message
         )
-
-    def set_debug_flags(self, flags: MapDebugFlag) -> Future[CommandCompletion]:
-        """Draws debugging overlays, such as tile borders, on the map.
-
-        `flags` replaces the overlays set before.
-
-        See `mln_map_set_debug_flags` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return self._native.set_debug_flags(flags)
 
     def set_event_mask(self, mask: RuntimeEventFlag) -> Future[CommandCompletion]:
         """Selects the events that the map reports.
@@ -1834,22 +1847,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_global_state_property(property_name, value)
 
-    def set_globe_free_bearing_enabled(
-        self, enabled: bool
-    ) -> Future[CommandCompletion]:
-        """Sets whether drags and zooms on a globe turn the bearing.
-
-        When it's on, a drag or a zoom around a point on the globe turns the
-        bearing so the planet keeps its orientation, and a drag can carry the
-        camera over a pole. When it's off, the default, they keep the
-        bearing, as MapLibre GL JS does. Turn it on for a map whose users can
-        rotate it. It changes nothing while the map draws Mercator.
-
-        See `mln_map_set_globe_free_bearing_enabled` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return self._native.set_globe_free_bearing_enabled(enabled)
-
     def set_image_source_coordinates(
         self, source_id: str, coordinates: Sequence[LatLng]
     ) -> Future[CommandCompletion]:
@@ -1920,16 +1917,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_projection_mode(options)
 
-    def set_rendering_stats_view_enabled(
-        self, enabled: bool
-    ) -> Future[CommandCompletion]:
-        """Shows or hides an overlay of rendering statistics on the map.
-
-        See `mln_map_set_rendering_stats_view_enabled` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return self._native.set_rendering_stats_view_enabled(enabled)
-
     def set_style_image(
         self,
         image_id: str,
@@ -1972,10 +1959,10 @@ class _MapHandleOperations(GeneratedOperations):
         """Sets a property of a layer in the map's style.
 
         `property_name` is one of the layer's layout or paint
-        \\[properties\\](https://maplibre.org/maplibre-style-spec/layers/), or
-        `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null
-        `value` resets any of these but `source` and `source-layer` to its
-        default.
+        \\[properties\\](https://maplibre.org/maplibre-style-spec/layers/),
+        `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`, or an
+        extension's member, named `<namespace>:<name>`. A null `value` resets
+        any of these but `source` and `source-layer` to its default.
 
         See `mln_map_set_style_layer_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2012,8 +1999,9 @@ class _MapHandleOperations(GeneratedOperations):
         without reloading the style.
 
         `property_name` is a root property other than `sources` and `layers`,
-        which the source and layer calls change. A null `value` resets the
-        property to its default, as if the style didn't set it.
+        which the source and layer calls change, or an extension's member,
+        named `<namespace>:<name>`. A null `value` resets the property to its
+        default, as if the style didn't set it.
 
         See `mln_map_set_style_root_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -2133,26 +2121,6 @@ class _MapHandleOperations(GeneratedOperations):
 class _MapProjectionHandleOperations(GeneratedOperations):
     _native: _native._MapProjectionHandle
 
-    @classmethod
-    def create(cls, view: MapView) -> MapProjectionHandle:
-        """Creates a projection that converts coordinates for one view of a map.
-
-        Create it from the `view` of an `MapSnapshot` or an
-        `RenderFrameResult`. The projection doesn't follow the map, so create
-        a new one after the map's camera, size, or style projection changes.
-
-        See `mln_map_projection_create` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-
-        Errors:
-
-        - `Status.UNSUPPORTED` when the view's style projection draws a globe
-          and the library can't project one.
-        """
-        return _adopt_value(
-            _native._MapProjectionHandle.create(view), "MapProjectionHandle", None
-        )
-
     def get_camera(self) -> MapProjectionCameraResult:
         """Reads the projection's camera.
 
@@ -2160,6 +2128,18 @@ class _MapProjectionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
         return MapProjectionCameraResult._from_native(self._native.get_camera())
+
+    def get_terrain_elevation(
+        self, coordinate: LatLng
+    ) -> MapProjectionTerrainElevationResult:
+        """Reads the height of the terrain that the map drew at a coordinate.
+
+        See `mln_map_projection_get_terrain_elevation` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+        """
+        return MapProjectionTerrainElevationResult._from_native(
+            self._native.get_terrain_elevation(coordinate)
+        )
 
     def is_location_occluded(self, coordinate: LatLng) -> bool:
         """Reports whether the globe hides a coordinate from the camera.
@@ -3969,16 +3949,6 @@ class MapHandleDiscarding:
             source_id, tile_id, message
         )
 
-    def set_debug_flags(self, flags: MapDebugFlag) -> None:
-        """Draws debugging overlays, such as tile borders, on the map.
-
-        `flags` replaces the overlays set before.
-
-        See `mln_map_set_debug_flags` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return self._native._discard_set_debug_flags(flags)
-
     def set_event_mask(self, mask: RuntimeEventFlag) -> None:
         """Selects the events that the map reports.
 
@@ -4073,20 +4043,6 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_global_state_property(property_name, value)
 
-    def set_globe_free_bearing_enabled(self, enabled: bool) -> None:
-        """Sets whether drags and zooms on a globe turn the bearing.
-
-        When it's on, a drag or a zoom around a point on the globe turns the
-        bearing so the planet keeps its orientation, and a drag can carry the
-        camera over a pole. When it's off, the default, they keep the
-        bearing, as MapLibre GL JS does. Turn it on for a map whose users can
-        rotate it. It changes nothing while the map draws Mercator.
-
-        See `mln_map_set_globe_free_bearing_enabled` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return self._native._discard_set_globe_free_bearing_enabled(enabled)
-
     def set_image_source_coordinates(
         self, source_id: str, coordinates: Sequence[LatLng]
     ) -> None:
@@ -4131,14 +4087,6 @@ class MapHandleDiscarding:
         """
         return self._native._discard_set_projection_mode(options)
 
-    def set_rendering_stats_view_enabled(self, enabled: bool) -> None:
-        """Shows or hides an overlay of rendering statistics on the map.
-
-        See `mln_map_set_rendering_stats_view_enabled` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return self._native._discard_set_rendering_stats_view_enabled(enabled)
-
     def set_style_image(
         self,
         image_id: str,
@@ -4171,10 +4119,10 @@ class MapHandleDiscarding:
         """Sets a property of a layer in the map's style.
 
         `property_name` is one of the layer's layout or paint
-        \\[properties\\](https://maplibre.org/maplibre-style-spec/layers/), or
-        `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`. A null
-        `value` resets any of these but `source` and `source-layer` to its
-        default.
+        \\[properties\\](https://maplibre.org/maplibre-style-spec/layers/),
+        `filter`, `minzoom`, `maxzoom`, `source`, or `source-layer`, or an
+        extension's member, named `<namespace>:<name>`. A null `value` resets
+        any of these but `source` and `source-layer` to its default.
 
         See `mln_map_set_style_layer_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -4198,8 +4146,9 @@ class MapHandleDiscarding:
         without reloading the style.
 
         `property_name` is a root property other than `sources` and `layers`,
-        which the source and layer calls change. A null `value` resets the
-        property to its default, as if the style didn't set it.
+        which the source and layer calls change, or an extension's member,
+        named `<namespace>:<name>`. A null `value` resets the property to its
+        default, as if the style didn't set it.
 
         See `mln_map_set_style_root_property` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).

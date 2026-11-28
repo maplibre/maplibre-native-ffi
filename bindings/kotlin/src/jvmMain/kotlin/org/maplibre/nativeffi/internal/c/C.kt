@@ -481,9 +481,18 @@ internal actual object C {
       JAVA_LONG,
     )
   private val mln_map_projection_create =
-    Ffm.downcall("mln_map_projection_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+    Ffm.downcall("mln_map_projection_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_projection_get_camera =
     Ffm.downcall("mln_map_projection_get_camera", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_map_projection_get_terrain_elevation =
+    Ffm.downcall(
+      "mln_map_projection_get_terrain_elevation",
+      JAVA_INT,
+      JAVA_LONG,
+      mln_lat_lng,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_projection_is_location_occluded =
     Ffm.downcall(
       "mln_map_projection_is_location_occluded",
@@ -654,8 +663,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_set_debug_flags =
-    Ffm.downcall("mln_map_set_debug_flags", JAVA_INT, JAVA_LONG, JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_map_set_event_mask =
     Ffm.downcall("mln_map_set_event_mask", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_set_feature_state =
@@ -717,15 +724,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_set_globe_free_bearing_enabled =
-    Ffm.downcall(
-      "mln_map_set_globe_free_bearing_enabled",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_BOOLEAN,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_set_image_source_coordinates =
     Ffm.downcall(
       "mln_map_set_image_source_coordinates",
@@ -763,15 +761,6 @@ internal actual object C {
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_set_rendering_stats_view_enabled =
-    Ffm.downcall(
-      "mln_map_set_rendering_stats_view_enabled",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_BOOLEAN,
       JAVA_LONG,
       JAVA_LONG,
     )
@@ -1964,14 +1953,31 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int =
-    mln_map_projection_create.invokeExact(view, outProjection, outDiagnostic) as Int
+  actual fun mln_map_projection_create(
+    map: Long,
+    view: Long,
+    outProjection: Long,
+    outDiagnostic: Long,
+  ): Int = mln_map_projection_create.invokeExact(map, view, outProjection, outDiagnostic) as Int
 
   actual fun mln_map_projection_get_camera(
     projection: Long,
     outResult: Long,
     outDiagnostic: Long,
   ): Int = mln_map_projection_get_camera.invokeExact(projection, outResult, outDiagnostic) as Int
+
+  actual fun mln_map_projection_get_terrain_elevation(
+    projection: Long,
+    coordinate: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_projection_get_terrain_elevation.invokeExact(
+      projection,
+      Ffm.value(coordinate, mln_lat_lng),
+      outResult,
+      outDiagnostic,
+    ) as Int
 
   actual fun mln_map_projection_is_location_occluded(
     projection: Long,
@@ -2233,13 +2239,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_set_debug_flags(
-    map: Long,
-    flags: Int,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int = mln_map_set_debug_flags.invokeExact(map, flags, completion, outDiagnostic) as Int
-
   actual fun mln_map_set_event_mask(
     map: Long,
     mask: Long,
@@ -2330,15 +2329,6 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_set_globe_free_bearing_enabled(
-    map: Long,
-    enabled: Boolean,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_globe_free_bearing_enabled.invokeExact(map, enabled, completion, outDiagnostic)
-      as Int
-
   actual fun mln_map_set_image_source_coordinates(
     map: Long,
     sourceId: Long,
@@ -2392,15 +2382,6 @@ internal actual object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int = mln_map_set_projection_mode.invokeExact(map, options, completion, outDiagnostic) as Int
-
-  actual fun mln_map_set_rendering_stats_view_enabled(
-    map: Long,
-    enabled: Boolean,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_set_rendering_stats_view_enabled.invokeExact(map, enabled, completion, outDiagnostic)
-      as Int
 
   actual fun mln_map_set_style_image(
     map: Long,

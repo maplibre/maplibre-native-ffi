@@ -957,8 +957,14 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_projection_create(view: Long, outProjection: Long, outDiagnostic: Long): Int =
+  actual fun mln_map_projection_create(
+    map: Long,
+    view: Long,
+    outProjection: Long,
+    outDiagnostic: Long,
+  ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_projection_create(
+      map.toULong(),
       view.toCPointer(),
       outProjection.toCPointer(),
       outDiagnostic.toCPointer(),
@@ -971,6 +977,19 @@ internal actual object C {
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_projection_get_camera(
       projection.toULong(),
+      outResult.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_projection_get_terrain_elevation(
+    projection: Long,
+    coordinate: Long,
+    outResult: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_projection_get_terrain_elevation(
+      projection.toULong(),
+      coordinate.toCPointer<mln_lat_lng>()!!.pointed.readValue(),
       outResult.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -1264,19 +1283,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_debug_flags(
-    map: Long,
-    flags: Int,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_debug_flags(
-      map.toULong(),
-      flags.toUInt(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_set_event_mask(
     map: Long,
     mask: Long,
@@ -1378,19 +1384,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_set_globe_free_bearing_enabled(
-    map: Long,
-    enabled: Boolean,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_globe_free_bearing_enabled(
-      map.toULong(),
-      enabled,
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_set_image_source_coordinates(
     map: Long,
     sourceId: Long,
@@ -1447,19 +1440,6 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_map_set_projection_mode(
       map.toULong(),
       options.toCPointer(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_set_rendering_stats_view_enabled(
-    map: Long,
-    enabled: Boolean,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_set_rendering_stats_view_enabled(
-      map.toULong(),
-      enabled,
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )

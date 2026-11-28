@@ -203,7 +203,7 @@ public extension MapHandle {
   ///
   /// - `Status.cancelled` when the map is released before the image is done.
   /// - `Status.nativeError` when the style or a resource that the image needs
-  ///   fails to load.
+  ///   fails to load, or rendering the image fails on the GPU.
   func requestStillImage() async throws {
     try await nativeUnit { raw, _, completion, diagnostic in
       mln_map_request_still_image(

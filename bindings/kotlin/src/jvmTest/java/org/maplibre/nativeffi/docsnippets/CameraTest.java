@@ -176,7 +176,7 @@ public class CameraTest {
       // #region convert
       ScreenPoint point;
       try (MapProjectionHandle projection =
-          MapProjectionHandle.create(map.getSnapshot().getView())) {
+          map.projectionCreate(null)) {
         LatLng coordinate =
             projection.latLngForPixel(new ScreenPoint(100.0, 200.0));
         point = projection.pixelForLatLng(coordinate);

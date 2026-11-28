@@ -1068,6 +1068,10 @@ final class mln_map_options extends Struct {
   external bool system_fonts_enabled;
   @Bool()
   external bool local_ideographs_enabled;
+  @Uint32()
+  external int terrain_skirt_length;
+  @Uint64()
+  external int terrain_drape_memory_limit;
 }
 
 final class mln_map_projection_camera_result extends Struct {
@@ -1076,17 +1080,22 @@ final class mln_map_projection_camera_result extends Struct {
   external mln_camera camera;
 }
 
+final class mln_map_projection_terrain_elevation_result extends Struct {
+  @Uint32()
+  external int size;
+  @Bool()
+  external bool has_elevation;
+  @Double()
+  external double elevation_meters;
+}
+
 final class mln_map_snapshot extends Struct {
   @Uint32()
   external int size;
-  @Uint32()
-  external int debug_flags;
   @Uint64()
   external int generation;
   @Bool()
   external bool fully_loaded;
-  @Bool()
-  external bool rendering_stats_view_enabled;
   @Bool()
   external bool gesture_in_progress;
   @Bool()
@@ -1101,8 +1110,6 @@ final class mln_map_snapshot extends Struct {
   external mln_map_view view;
   @Bool()
   external bool globe_rendering;
-  @Bool()
-  external bool globe_free_bearing_enabled;
 }
 
 final class mln_map_tile_options extends Struct {
@@ -1157,6 +1164,10 @@ final class mln_map_viewport extends Struct {
   @Uint32()
   external int viewport_mode;
   external mln_edge_insets frustum_offset;
+  @Bool()
+  external bool center_clamped_to_ground;
+  @Bool()
+  external bool globe_free_bearing;
 }
 
 final class mln_map_viewport_options extends Struct {
@@ -1171,6 +1182,10 @@ final class mln_map_viewport_options extends Struct {
   @Uint32()
   external int viewport_mode;
   external mln_edge_insets frustum_offset;
+  @Bool()
+  external bool center_clamped_to_ground;
+  @Bool()
+  external bool globe_free_bearing;
 }
 
 final class mln_mat4 extends Struct {
@@ -2670,15 +2685,6 @@ const MLN_LOG_SEVERITY_FLAG_ERROR = 8;
 const MLN_LOG_SEVERITY_FLAG_DEFAULT = 6;
 const MLN_LOG_SEVERITY_FLAG_ALL = 14;
 
-// mln_map_debug_flag
-const MLN_MAP_DEBUG_TILE_BORDERS = 2;
-const MLN_MAP_DEBUG_PARSE_STATUS = 4;
-const MLN_MAP_DEBUG_TIMESTAMPS = 8;
-const MLN_MAP_DEBUG_COLLISION = 16;
-const MLN_MAP_DEBUG_OVERDRAW = 32;
-const MLN_MAP_DEBUG_STENCIL_CLIP = 64;
-const MLN_MAP_DEBUG_DEPTH_BUFFER = 128;
-
 // mln_map_load_error
 const MLN_MAP_LOAD_ERROR_UNKNOWN = 0;
 const MLN_MAP_LOAD_ERROR_STYLE_PARSE = 1;
@@ -2694,6 +2700,8 @@ const MLN_MAP_OPTION_EVENT_MASK = 1;
 const MLN_MAP_OPTION_TILE_CACHE_ENABLED = 2;
 const MLN_MAP_OPTION_SYSTEM_FONTS_ENABLED = 4;
 const MLN_MAP_OPTION_LOCAL_IDEOGRAPHS_ENABLED = 8;
+const MLN_MAP_OPTION_TERRAIN_SKIRT_LENGTH = 16;
+const MLN_MAP_OPTION_TERRAIN_DRAPE_MEMORY_LIMIT = 32;
 
 // mln_map_tile_option_field
 const MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA = 1;
@@ -2708,6 +2716,8 @@ const MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION = 1;
 const MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE = 2;
 const MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE = 4;
 const MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET = 8;
+const MLN_MAP_VIEWPORT_OPTION_CENTER_CLAMPED_TO_GROUND = 16;
+const MLN_MAP_VIEWPORT_OPTION_GLOBE_FREE_BEARING = 32;
 
 // mln_momentum_decay_field
 const MLN_MOMENTUM_DECAY_MODEL = 1;
@@ -3115,6 +3125,10 @@ const MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS = 4;
 // mln_style_vector_tile_encoding
 const MLN_STYLE_VECTOR_TILE_ENCODING_MVT = 0;
 const MLN_STYLE_VECTOR_TILE_ENCODING_MLT = 1;
+
+// mln_terrain_skirt_length
+const MLN_TERRAIN_SKIRT_LENGTH_AUTO = 0;
+const MLN_TERRAIN_SKIRT_LENGTH_NONE = 1;
 
 // mln_tile_lod_mode
 const MLN_TILE_LOD_MODE_DEFAULT = 0;
@@ -4267,12 +4281,14 @@ external int mln_map_move_style_layer(
 
 @Native<
   Int32 Function(
+    mln_map,
     Pointer<mln_map_view>,
     Pointer<mln_map_projection>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_map_projection_create(
+  int map,
   Pointer<mln_map_view> view,
   Pointer<mln_map_projection> out_projection,
   Pointer<mln_diagnostic> out_diagnostic,
@@ -4288,6 +4304,21 @@ external int mln_map_projection_create(
 external int mln_map_projection_get_camera(
   int projection,
   Pointer<mln_map_projection_camera_result> out_result,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map_projection,
+    mln_lat_lng,
+    Pointer<mln_map_projection_terrain_elevation_result>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_projection_get_terrain_elevation(
+  int projection,
+  mln_lat_lng coordinate,
+  Pointer<mln_map_projection_terrain_elevation_result> out_result,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -4631,21 +4662,6 @@ external int mln_map_set_custom_vector_source_tile_error(
 @Native<
   Int32 Function(
     mln_map,
-    Uint32,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_debug_flags(
-  int map,
-  int flags,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
     Uint64,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
@@ -4761,21 +4777,6 @@ external int mln_map_set_global_state_property(
 @Native<
   Int32 Function(
     mln_map,
-    Bool,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_globe_free_bearing_enabled(
-  int map,
-  bool enabled,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
     mln_buffer_view,
     Pointer<mln_lat_lng>,
     Size,
@@ -4837,21 +4838,6 @@ external int mln_map_set_image_source_url(
 external int mln_map_set_projection_mode(
   int map,
   Pointer<mln_projection_mode_options> options,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Bool,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_rendering_stats_view_enabled(
-  int map,
-  bool enabled,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
