@@ -420,13 +420,13 @@ ci:
     mingw-arm64:
       covers: >-
         Windows ARM64 with Vulkan, D3D12, and OpenGL (WGL), built with Clang in
-        MSYS2's CLANGARM64 environment and running MinGW x64's suites, except
-        Zig, on GitHub-hosted ARM runners whose setup alone takes about 16
-        minutes. Catches only what differs by CPU architecture on MinGW:
-        architecture conditionals in code or build logic, a tool or dependency
-        fetched per architecture, such as the CLANGARM64 packages, and the ARM
-        runner setup. MinGW, Windows platform, renderer, and binding changes
-        that MinGW x64 already builds and tests don't need it.
+        MSYS2's CLANGARM64 environment and running MinGW x64's suites on
+        GitHub-hosted ARM runners whose setup alone takes about 16 minutes.
+        Catches only what differs by CPU architecture on MinGW: architecture
+        conditionals in code or build logic, a tool or dependency fetched per
+        architecture, such as the CLANGARM64 packages, and the ARM runner setup.
+        MinGW, Windows platform, renderer, and binding changes that MinGW x64
+        already builds and tests don't need it.
       rules:
         - if:
             files:

@@ -1,12 +1,9 @@
-# Builds the Linux and FreeBSD targets with `zig cc` / `zig c++` against the
-# selected libc and LLVM libc++, rather than the build host's GCC, libc, and
-# libstdc++.
+# Builds the Linux and FreeBSD targets with `zig cc` against the selected libc,
+# rather than the build host's GCC and libc.
 #
 # This sets the libc floor from the toolchain instead of from whichever image
-# the build runs on, and leaves the artifacts free of any libstdc++ ABI
-# requirement. Kotlin/Native's bundled Linux sysroot is the tightest consumer:
-# it supplies glibc 2.19 and GCC 8.3, and it statically links its own libstdc++
-# into every consumer binary.
+# the build runs on. Kotlin/Native's bundled Linux sysroot is the tightest
+# consumer: it supplies glibc 2.19.
 #
 # A same-architecture glibc preset is a native build, so CMAKE_SYSTEM_NAME stays
 # unset and try_run, find_package, and test binaries work on the host. Musl and
@@ -118,7 +115,7 @@ set(CMAKE_CXX_COMPILER "${MLN_FFI_ZIG_SHIM_DIR}/zig-c++")
 # zig ships no standalone ar/ranlib/nm/objcopy, and CMake's clang heuristics
 # look for llvm-* beside the compiler. The host's binutils know only its own
 # architecture, so these come from the Rust toolchain that every Linux build
-# already needs for the platform crate: its llvm-tools component and its lld.
+# already needs for mln-rs: its llvm-tools component and its lld.
 find_program(MLN_FFI_RUSTC NAMES rustc REQUIRED)
 execute_process(
   COMMAND "${MLN_FFI_RUSTC}" --print sysroot
@@ -191,14 +188,6 @@ if(MLN_FFI_ZIG_OS STREQUAL "freebsd")
   endforeach()
 endif()
 
-# zig builds libc++, libc++abi, and libunwind from source the first time a
-# target needs them, and those vendored headers carry nullability annotations
-# the rest of the tree does not use.
-set(MLN_FFI_ZIG_DIAGNOSTIC_FLAGS
-    "-Wno-nullability-completeness -Wno-unused-command-line-argument")
-set(CMAKE_C_FLAGS_INIT "${MLN_FFI_ZIG_DIAGNOSTIC_FLAGS}")
-set(CMAKE_CXX_FLAGS_INIT "${MLN_FFI_ZIG_DIAGNOSTIC_FLAGS}")
-
-# zig links libc++ into every binary it produces, so the platform layer bundles
-# that runtime into the distributed archive rather than leaving it to consumers.
-set(MLN_FFI_CXX_RUNTIME_IS_BUNDLED TRUE)
+# Clang warns about each argument that a compilation leaves unused.
+set(CMAKE_C_FLAGS_INIT "-Wno-unused-command-line-argument")
+set(CMAKE_CXX_FLAGS_INIT "-Wno-unused-command-line-argument")

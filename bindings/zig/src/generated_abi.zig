@@ -5,6 +5,11 @@
 //! function would read each later argument from the wrong register. On
 //! LoongArch, call.zig calls these wrappers, which pass the struct as the u64
 //! that holds it.
+//!
+//! Zig also loses the second member of a two-member struct whose second
+//! member is wider than its first, such as {u32, u64} or {f32, f64}. No
+//! wrapper covers that case, so the generator rejects a function that takes
+//! such a struct.
 const std = @import("std");
 const c = @import("c.zig").raw;
 

@@ -13,9 +13,6 @@ project(maplibre_native_ffi_node LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
-# zig 0.16's linker crashes when it writes a dependency file for a shared
-# object, and one module gains nothing from linker dependency tracking.
-set(CMAKE_LINK_DEPENDS_USE_LINKER OFF)
 
 get_filename_component(
   MLN_FFI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.."

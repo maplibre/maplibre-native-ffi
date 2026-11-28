@@ -22,13 +22,6 @@ link = "https://github.com/dotnet/runtime/issues/132866"
 
 [[entry]]
 bindings = ["zig"]
-platforms = ["ios", "tvos", "visionos"]
-status = "blocked"
-reason = "Zig 0.17.1 compiles these targets but cannot link them: the SDK's `libSystem` stub is tagged `arm64e-ios`, which Zig does not accept for `arm64-ios`, so even a hello world leaves every libc symbol undefined. Simulator targets link."
-link = "https://codeberg.org/ziglang/zig/issues/37298"
-
-[[entry]]
-bindings = ["zig"]
 platforms = ["ohos"]
 status = "blocked"
 reason = "Zig 0.17.1's `compiler_rt` needs `pthread_mutex_t` for emulated TLS on OpenHarmony, but `std.c` defines no layout for the `ohos` ABI."
@@ -165,6 +158,12 @@ reason = "Kotlin/Native's older MinGW sysroot and C++ runtime need a compatible 
 link = "https://github.com/maplibre/maplibre-native-ffi/issues/1322"
 
 # Medium integration work with an established toolchain and approach.
+
+[[entry]]
+bindings = ["zig"]
+platforms = ["ios", "tvos", "visionos"]
+status = "path-known"
+reason = "The binding rejects these targets. Zig 0.17.1 links them when `-Dtarget-libc` names the SDK's libc file, which `zig libc -target <target>` prints; without one, it links its bundled macOS `libSystem` stub and leaves every libc symbol undefined. The simulators also need a runner for the binding's suite."
 
 [[entry]]
 bindings = ["c"]
@@ -430,13 +429,6 @@ archs = ["arm64"]
 status = "blocked"
 reason = "Kotlin/Native ships no Windows ARM64 target."
 link = "https://youtrack.jetbrains.com/issue/KT-73917"
-
-[[entry]]
-bindings = ["zig"]
-platforms = ["windows", "windows-mingw"]
-archs = ["arm64"]
-status = "blocked"
-reason = "Zig's native ARM64 compiler fails to load build.zig, and its x64 compiler hangs under emulation."
 
 [[entry]]
 bindings = ["python"]

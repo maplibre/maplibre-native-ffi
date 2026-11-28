@@ -218,12 +218,6 @@ class PresetTest(unittest.TestCase):
                 and not emulated
             )
             packages = "cache" if emulated else zig.get(target.platform, "skip")
-            # Windows ARM64 has no Zig toolchain.
-            if (
-                target.platform in ("windows", "windows-mingw")
-                and target.architecture == "arm64"
-            ):
-                packages = "skip"
             drivers = {
                 "linux-gnu": "vulkan,egl",
                 "linux-musl": "vulkan,egl",

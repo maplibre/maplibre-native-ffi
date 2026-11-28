@@ -375,11 +375,53 @@ def packed_struct(api: Api, type_: CType) -> bool:
     return -(-size // alignment) * alignment <= 8
 
 
+def scalar_sizes(api: Api, type_: CType) -> list[int] | None:
+    """The sizes of a by-value struct's scalar members on LoongArch, in order
+    and through nested structs, or None if it isn't a struct of scalars."""
+    if not type_.canonical.startswith("struct "):
+        return None
+    record = api.records_by_name.get(type_.canonical.removeprefix("struct "))
+    if record is None:
+        return None
+    sizes = []
+    for field in record.fields:
+        canonical = field.type.canonical
+        if canonical in INTEGER_SIZES:
+            sizes.append(INTEGER_SIZES[canonical])
+        elif canonical in ("float", "double"):
+            sizes.append(4 if canonical == "float" else 8)
+        elif canonical.endswith("*"):
+            sizes.append(8)
+        elif (nested := scalar_sizes(api, field.type)) is not None:
+            sizes.extend(nested)
+        else:
+            return None
+    return sizes
+
+
+def miscompiled_struct(api: Api, type_: CType) -> bool:
+    """Whether Zig 0.17 passes a by-value parameter wrongly on LoongArch: a
+    struct of two scalars whose second is wider than its first, such as
+    {u32, u64} or {f32, f64}, whose second member the callee doesn't
+    receive."""
+    sizes = scalar_sizes(api, type_)
+    return sizes is not None and len(sizes) == 2 and sizes[1] > sizes[0]
+
+
 def abi_wrappers(api: Api) -> str:
     """generated_abi.zig: a wrapper for each native function that takes a
     packed struct by value."""
     wrappers = []
     for function in sorted(api.functions, key=lambda function: function.name):
+        for parameter in function.parameters:
+            if miscompiled_struct(api, parameter.type) and not packed_struct(
+                api, parameter.type
+            ):
+                raise failure(
+                    function,
+                    f"takes {parameter.type.canonical}, which Zig 0.17 passes "
+                    "wrongly on LoongArch, and no wrapper covers it",
+                )
         packed = [packed_struct(api, p.type) for p in function.parameters]
         if not any(packed):
             continue
@@ -412,6 +454,11 @@ def abi_wrappers(api: Api) -> str:
 //! function would read each later argument from the wrong register. On
 //! LoongArch, call.zig calls these wrappers, which pass the struct as the u64
 //! that holds it.
+//!
+//! Zig also loses the second member of a two-member struct whose second
+//! member is wider than its first, such as {u32, u64} or {f32, f64}. No
+//! wrapper covers that case, so the generator rejects a function that takes
+//! such a struct.
 const std = @import("std");
 const c = @import("c.zig").raw;
 
