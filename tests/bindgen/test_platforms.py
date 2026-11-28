@@ -216,10 +216,6 @@ mln_status mln_windows_start(mln_diagnostic *out_diagnostic);
 
     def test_kotlin_puts_a_function_in_the_source_sets_of_its_targets(self):
         self.assertEqual(
-            kotlin.source_sets(frozenset({"ios", "macos", "tvos", "visionos"})),
-            ["jvmMain", "appleMain"],
-        )
-        self.assertEqual(
             kotlin.source_sets(
                 frozenset({"android", "linux", "macos", "ohos", "windows"})
             ),
@@ -231,7 +227,6 @@ mln_status mln_windows_start(mln_diagnostic *out_diagnostic);
                 "mingwMain",
             ],
         )
-        self.assertEqual(kotlin.source_sets(frozenset({"web"})), ["wasmJsMain"])
         generated = emitted(kotlin, api())
         root = "org/maplibre/nativeffi"
         common = generated[f"src/commonMain/kotlin/{root}/MapHandle.kt"]

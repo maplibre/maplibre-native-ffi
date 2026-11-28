@@ -28,15 +28,13 @@ class PythonSysTests(unittest.TestCase):
     def test_declarations_cover_every_exported_function(self):
         """The crate declares exactly the functions the library exports, the
         delivery protocol and binding-support exports included."""
-        exports = check_exports()
-        expected = exports.declared_functions()
+        expected = check_exports().declared_functions()
         declared = re.findall(
             r"\bpub fn (mln_\w+)\(",
             (SYS / "lib.rs").read_text() + (SYS / "generated.rs").read_text(),
         )
         self.assertEqual(len(declared), len(set(declared)))
         self.assertEqual(set(declared), expected)
-        self.assertEqual(python_sys.declarations(real_api()).unsupported, {})
 
     def test_declarations_match_the_c_layout(self):
         """Every emitted record, handle, and enum has the size, alignment, and

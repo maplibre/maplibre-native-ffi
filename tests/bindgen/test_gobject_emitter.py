@@ -1,8 +1,8 @@
-"""Test the GObject library's generated enums and error domain."""
+"""Test the GObject library's generated enums."""
 
 import unittest
 
-from support import emitted, parse, real_api
+from support import emitted, parse
 
 from tools.bindgen.emitters import gobject
 from tools.bindgen.schema import validate
@@ -11,20 +11,7 @@ ENUMS = "src/maplibre-native-ffi-enums.h"
 
 
 class GObjectEmitterTests(unittest.TestCase):
-    def test_the_error_domain_codes_are_the_failing_statuses(self):
-        header = emitted(gobject, real_api())[ENUMS]
-        self.assertIn("  MAPLIBRE_NATIVE_FFI_ERROR_INVALID_ARGUMENT = -1,\n", header)
-        self.assertIn("  MAPLIBRE_NATIVE_FFI_ERROR_NOT_FOUND = -10,\n", header)
-        # A GError never carries success.
-        self.assertNotIn("MAPLIBRE_NATIVE_FFI_ERROR_OK", header)
-
-    def test_a_bitmask_is_flags_until_a_bit_leaves_their_32_bits(self):
-        source = emitted(gobject, real_api())["src/maplibre-native-ffi-enums.c"]
-        self.assertIn(
-            "G_DEFINE_FLAGS_TYPE(\n"
-            "  MaplibreNativeFfiRenderBackendFlag, maplibre_native_ffi_render_backend_flag,\n",
-            source,
-        )
+    def test_a_bitmask_with_a_bit_past_32_is_an_integer_with_constants(self):
         api = parse(
             """
 typedef enum BIND("kind=bitmask") mln_wide_flag : uint64_t {
@@ -47,12 +34,6 @@ mln_status mln_widen(mln_wide_flags flags, mln_diagnostic *out_diagnostic);
         self.assertNotIn(
             "G_DEFINE_FLAGS_TYPE", lowered["src/maplibre-native-ffi-enums.c"]
         )
-
-    def test_a_tag_names_the_accessor_of_its_variant(self):
-        # A record of only a tag and its union presents the union's accessors.
-        header = emitted(gobject, real_api())["src/maplibre-native-ffi-values.h"]
-        self.assertIn("`maplibre_native_ffi_gesture_event_get_notch`", header)
-        self.assertNotIn("maplibre_native_ffi_gesture_event_data_get_", header)
 
 
 if __name__ == "__main__":

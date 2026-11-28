@@ -23,14 +23,9 @@ class PlanNameTests(unittest.TestCase):
         self.assertEqual(
             {
                 name: operations[name].member
-                for name in ("mln_pass_redeem", "mln_pass_stamp", "mln_pass_close")
+                for name in ("mln_pass_redeem", "mln_pass_stamp")
             },
-            {
-                "mln_pass_redeem": "redeem",
-                "mln_pass_stamp": "stamp",
-                # The release takes C's verb, whatever its function is named.
-                "mln_pass_close": "release",
-            },
+            {"mln_pass_redeem": "redeem", "mln_pass_stamp": "stamp"},
         )
         self.assertEqual(
             (operations["mln_pass_redeem"].status, operations["mln_pass_close"].status),

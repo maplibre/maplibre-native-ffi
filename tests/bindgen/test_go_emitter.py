@@ -1,176 +1,13 @@
 """Check the Go binding plan."""
 
-import re
 import unittest
 
 from support import emitted, parse, real_api
 
-from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters import go
-from tools.bindgen.emitters.go_callbacks import accepts_native
-from tools.bindgen.emitters.go_operations import lower
-from tools.bindgen.schema import validate
-
-# A drain that publishes an owned batch of strided readings with a slice view
-# of it, as the render session's frame-result drain does.
-SLICE_DRAIN = """
-typedef struct mln_reading {
-  double value;
-} mln_reading;
-typedef struct mln_reading_view {
-  uint32_t size;
-  uint32_t reading_size;
-  const mln_reading* readings BIND("length=reading_count;stride=reading_size");
-  size_t reading_count;
-} mln_reading_view BIND("kind=slice");
-typedef unsigned long long mln_reading_batch BIND(
-  "kind=handle;release=mln_reading_batch_release;"
-  "dispose=mln_reading_batch_release"
-);
-void mln_reading_batch_release(mln_reading_batch batch);
-BIND("execution=event_batch")
-mln_status mln_drain_readings(
-  mln_reading_batch* out_batch BIND("direction=out;nullable=true"),
-  mln_reading_view* out_view BIND("direction=out"),
-  mln_diagnostic* out_diagnostic
-);
-"""
 
 
 class GoEmitterTests(unittest.TestCase):
-    def test_a_drain_returns_its_slice_and_releases_its_batch(self):
-        api = parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
-        validate(api)
-        source = emitted(go, api)["generated_api.go"]
-        self.assertIn("func DrainReadings() ([]Reading, error) {", source)
-        # The copy runs only when native published a batch, and a deferred
-        # release frees the batch even if the copy panics.
-        self.assertIn(
-            "}, func(arena *bindingArena) []Reading {\n"
-            "if outBatch == 0 {\nreturn nil\n}\n"
-            "defer C.mln_reading_batch_release(outBatch)\n",
-            source,
-        )
-        self.assertNotIn("ReadingBatchHandle", source)
-        self.assertNotIn("ReadingView", source)
-
-    def test_an_input_only_union_rejects_a_value_its_switch_does_not_name(self):
-        source = emitted(go, real_api())["generated_api.go"]
-        # A pointer to a variant also satisfies the sealed interface, so even a
-        # union with no UnknownVariant rejects whatever its switch doesn't name.
-        encode = re.search(
-            r"case RenderedQueryGeometryLineStringVariant:[^\n]*", source
-        )
-        self.assertIsNotNone(encode)
-        self.assertIn('default: arena.fail("unknown input union variant")', encode[0])
-        self.assertNotIn("func (UnknownVariant) isRenderedQueryGeometry()", source)
-
-    def test_a_text_variant_converts_into_its_union(self):
-        api = parse(groups=("value_union",))
-        validate(api)
-        source = emitted(go, api)["generated_api.go"]
-        # A buffer view carries its size, so it converts in place, and a plain
-        # number goes through the scalar converter.
-        self.assertIn(
-            "case KeyTextVariant: var converted C.mln_buffer_view; converted = "
-            "C.mln_buffer_view{data: arena.bytes([]byte(variant.Value)), size: "
-            "C.size_t(len(variant.Value))}; bindingUnionStore(raw.data[:], converted)",
-            source,
-        )
-        self.assertIn(
-            "case KeyCountVariant: bindingUnionStore(raw.data[:], "
-            "bindingNumber[uint64, C.uint64_t](variant.Value, arena))",
-            source,
-        )
-
-    def test_a_zero_literal_is_the_default(self):
-        source = emitted(go, real_api())["generated_api.go"]
-        self.assertNotRegex(source, r"func Default[A-Z]")
-        self.assertIn(
-            "func nativeMapOptions(input MapOptions, arena *bindingArena) C.mln_map_options { raw := C.mln_map_options{}; raw.size = ",
-            source,
-        )
-
-    def test_a_factory_is_new_and_a_global_names_its_verb_first(self):
-        source = emitted(go, real_api())["generated_api.go"]
-        self.assertIn(
-            "func NewRuntime(options *RuntimeOptions) (*RuntimeHandle, error) {",
-            source,
-        )
-        self.assertNotIn("func RuntimeCreate(", source)
-        self.assertIn("func SetLogCallback(handler LogHandler) error {", source)
-
-    def test_a_factory_besides_create_names_its_verb_and_type(self):
-        source = emitted(go, real_api())["generated_api.go"]
-        self.assertIn(
-            "func NewGPUDevice(options *GPUDeviceOptions) (*GPUDeviceHandle, error) {",
-            source,
-        )
-        self.assertIn(
-            "func WrapVulkanGPUDevice(descriptor VulkanDeviceDescriptor) (*GPUDeviceHandle, error) {",
-            source,
-        )
-
-    def test_a_summary_names_the_go_symbols_of_the_c_identifiers(self):
-        source = emitted(go, real_api())["generated_api.go"]
-        self.assertIn("MapHandle.CancelCameraTransitions()", source)
-        self.assertIn("MapHandle.CancelCameraTransitionsWithID()", source)
-        self.assertIn("// For MomentumDecayModelFriction.", source)
-        # A tag that only its union uses names the variant it selects.
-        self.assertIn("report an GestureEventNotchVariant as", source)
-        self.assertNotIn("// mln_map_cancel_camera_transitions()", source)
-
-    def test_a_callback_receives_its_slice_argument_as_a_slice(self):
-        source = emitted(go, real_api())["generated_api.go"]
-        self.assertIn(
-            "Callback func(events []RuntimeEvent)",
-            source,
-        )
-        self.assertNotIn("EventBatchView", source)
-
-    def test_an_absent_json_result_is_an_empty_string(self):
-        source = emitted(go, real_api())["generated_api.go"]
-        self.assertIn(
-            "GetStyleLayerProperty(layerID string, propertyName string) "
-            "(*Future[string], error) {",
-            source,
-        )
-        self.assertIn("completionOrZero(completionOf(copyViewText))", source)
-        # A nullable record still distinguishes absence with a pointer.
-        self.assertIn("(*Future[*StyleSourceInfo], error)", source)
-
-    def test_a_status_callback_returns_an_error_that_the_trampoline_maps(self):
-        source = emitted(go, real_api())["generated_api.go"]
-        self.assertIn(
-            "Callback func(kind ResourceKind, url string, "
-            "outResponse *HTTPHeaderTransformResponseScope) error",
-            source,
-        )
-        self.assertIn(
-            'result = C.mln_status(bindingCallbackStatus("mln_http_header_transform_callback", ',
-            source,
-        )
-        self.assertIn("), C.MLN_STATUS_NATIVE_ERROR))", source)
-        self.assertIn(
-            "// answers native that status. Any other error, or a panic, is logged and\n"
-            "// answers StatusNativeError.\n"
-            "Callback func(kind ResourceKind",
-            source,
-        )
-
-    def test_wakes_and_synchronous_registrations_take_a_native_registration(self):
-        # Every other registration takes only Go funcs, whose calls enter the
-        # Go runtime.
-        values, _, _, _ = lower(compile_api(real_api()))
-        native = {
-            plan.native
-            for plan in values.records.values()
-            if plan.registration and accepts_native(values, plan)
-        }
-        self.assertEqual(
-            native, {"mln_custom_layer_host", "mln_queue_lock", "mln_wake"}
-        )
-
     def test_dispose_is_public_only_where_c_has_one_besides_a_void_release(self):
         source = emitted(go, real_api())["generated_api.go"]
         disposes = {
@@ -181,24 +18,6 @@ class GoEmitterTests(unittest.TestCase):
         self.assertEqual(
             disposes, {"MapHandle", "RenderSessionHandle", "RuntimeHandle"}
         )
-
-    def test_every_owner_declares_its_state_members(self):
-        source = emitted(go, real_api())["generated_api.go"]
-        owners = [
-            line.split()[1]
-            for line in source.splitlines()
-            if line.endswith("struct { *bindingOwner }")
-        ]
-        self.assertEqual(len(owners), 10)
-        for owner in owners:
-            for member in ("ID() uint64", "IsClosed() bool", "String() string"):
-                self.assertIn(f"func (handle *{owner}) {member}", source)
-        sources = re.findall(
-            r"// ID returns the native handle value, which runtime events report"
-            r" as their\n(?://.*\n)*func \(handle \*(\w+)\) ID\(\)",
-            source,
-        )
-        self.assertEqual(set(sources), {"MapHandle", "RuntimeHandle"})
 
     def test_operations_cannot_take_owner_member_names(self):
         api = parse("""

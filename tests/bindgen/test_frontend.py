@@ -12,9 +12,6 @@ from tools.bindgen.schema import validate
 
 
 class FrontendTests(unittest.TestCase):
-    def parse(self, source):
-        return parse(source)
-
     def test_interface_entrypoints_separate_runtime_exports_and_reject_orphans(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -114,7 +111,7 @@ class FrontendTests(unittest.TestCase):
                 parse_headers(root)
 
     def test_preserves_aliases_qualifiers_callbacks_and_nested_layout(self):
-        api = self.parse("""
+        api = parse("""
 typedef void (*mln_callback)(void *context, const mln_map *maps BIND("length=count"), unsigned count);
 typedef struct mln_value {
     unsigned flags;
@@ -159,7 +156,7 @@ mln_status mln_read(mln_runtime runtime, const mln_map *map,
         validate(api)
 
     def test_enum_typedef_underlying_preserves_unsigned_high_bits(self):
-        api = self.parse("""
+        api = parse("""
 typedef unsigned int sample_u32;
 typedef unsigned long long sample_u64;
 typedef signed int sample_i32;
@@ -196,12 +193,12 @@ typedef struct mln_options { union { int one; float two; } choice; } mln_options
     def test_query_requires_a_result_and_defaults_its_payload(self):
         with self.assertRaisesRegex(ModelError, "query requires a value payload"):
             validate(
-                self.parse("""
+                parse("""
 BIND("execution=query")
 mln_status mln_query(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
             )
-        api = self.parse("""
+        api = parse("""
 BIND("execution=query;result=double")
 mln_status mln_query(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
@@ -217,7 +214,7 @@ mln_status mln_query(mln_map map, const mln_completion *completion, mln_diagnost
         )
 
     def test_metadata_typos_and_const_output_are_rejected(self):
-        api = self.parse("""
+        api = parse("""
 BIND("ownershp=borrowed")
 mln_status mln_read(const double *value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
@@ -232,7 +229,7 @@ typedef unsigned long long mln_session BIND("kind=handle;release=mln_session_rel
 void mln_session_release(mln_session session);
 """
         validate(
-            self.parse(
+            parse(
                 handle
                 + 'BIND("after_release=true")\n'
                 + "mln_status mln_session_service(mln_session session, mln_diagnostic *out_diagnostic);"
@@ -249,7 +246,7 @@ void mln_session_release(mln_session session);
                     ModelError, "after_release requires an immediate function"
                 ),
             ):
-                validate(self.parse(handle + 'BIND("after_release=true")\n' + function))
+                validate(parse(handle + 'BIND("after_release=true")\n' + function))
 
     def test_options_names_a_bag_with_each_record_member_behind_a_bit(self):
         source = """
@@ -265,7 +262,7 @@ typedef struct view { double zoom; double tilt; } view BIND("options=view_option
 mln_status read_view(view *out_view BIND("direction=out"), mln_diagnostic *out_diagnostic);
 mln_status write_view(const view_options *options, mln_diagnostic *out_diagnostic);
 """
-        validate(self.parse(source))
+        validate(parse(source))
         for before, after, message in (
             ("options=view_options", "options=lens", "absent struct 'lens'"),
             (
@@ -289,18 +286,18 @@ mln_status write_view(const view_options *options, mln_diagnostic *out_diagnosti
                 self.subTest(message=message),
                 self.assertRaisesRegex(ModelError, message),
             ):
-                validate(self.parse(source.replace(before, after, 1)))
+                validate(parse(source.replace(before, after, 1)))
 
     def test_duplicate_metadata_is_rejected_at_the_declaration(self):
         with self.assertRaisesRegex(
             ModelError, "duplicate binding metadata 'execution'"
         ):
-            self.parse("""
+            parse("""
 BIND("execution=immediate;execution=query") mln_status mln_duplicate(mln_diagnostic *out_diagnostic);
 """)
 
     def test_bad_span_relation_and_scalar_encoding_are_rejected(self):
-        api = self.parse("""
+        api = parse("""
 mln_status mln_bad_span(const double *items BIND("length=missing"),
                         double number BIND("encoding=json"), mln_diagnostic *out_diagnostic);
 """)
@@ -312,7 +309,7 @@ mln_status mln_bad_span(const double *items BIND("length=missing"),
     def test_completion_requires_synchronous_acceptance_status(self):
         with self.assertRaisesRegex(ModelError, "mln_status acceptance gating"):
             validate(
-                self.parse("""
+                parse("""
 BIND("execution=query;result=double")
 void mln_broken_submission(mln_map map, const mln_completion *completion);
 """)
@@ -326,31 +323,28 @@ typedef struct mln_record {
   mln_kind_flags kinds;
 } mln_record;
 """
-        validate(self.parse(source))
-        for before, after in (
-            ("typedef unsigned mln_kind_flags;", ""),
-            (
+        validate(parse(source))
+        for variant in (
+            source.replace("typedef unsigned mln_kind_flags;", "").replace(
+                "mln_kind_flags kinds", "unsigned kinds"
+            ),
+            source.replace(
                 "typedef unsigned mln_kind_flags;",
                 "typedef unsigned long long mln_kind_flags;",
             ),
         ):
             with (
-                self.subTest(after=after),
+                self.subTest(variant=variant),
                 self.assertRaisesRegex(
                     ModelError,
                     "mln_kind_flag: a bitmask enum requires a mln_kind_flags "
                     "typedef of its underlying type",
                 ),
             ):
-                source_after = source.replace(before, after)
-                if not after:
-                    source_after = source_after.replace(
-                        "mln_kind_flags kinds", "unsigned kinds"
-                    )
-                validate(self.parse(source_after))
+                validate(parse(variant))
 
     def test_status_functions_report_through_a_final_diagnostic(self):
-        api = self.parse("""
+        api = parse("""
 mln_status mln_resize(mln_map map, double scale, mln_diagnostic *out_diagnostic);
 """)
         (function,) = api.functions
@@ -367,9 +361,9 @@ mln_status mln_resize(mln_map map, double scale, mln_diagnostic *out_diagnostic)
                 self.subTest(declaration=declaration),
                 self.assertRaisesRegex(ModelError, "final mln_diagnostic"),
             ):
-                validate(self.parse(f"{declaration}\n"))
+                validate(parse(f"{declaration}\n"))
         with self.assertRaisesRegex(ModelError, "must be the last parameter"):
-            self.parse(
+            parse(
                 "mln_status mln_resize(mln_diagnostic *out_diagnostic, mln_map map);\n"
             )
 

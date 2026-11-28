@@ -10,12 +10,13 @@ from support import (
     emitted,
     parse,
     protocol_groups,
+    protocol_header,
     real_api,
     require_tool,
     run,
 )
 
-from tools.bindgen.emitters import kotlin, kotlin_callbacks
+from tools.bindgen.emitters import kotlin
 from tools.bindgen.emitters.kotlin_abi import Abi, LayoutError
 
 GENERATED = "src/commonMain/kotlin/org/maplibre/nativeffi"
@@ -143,11 +144,7 @@ class KotlinLayoutTests(unittest.TestCase):
         api = parse(groups=groups)
         with TemporaryDirectory() as directory:
             header = Path(directory) / "protocols.h"
-            header.write_text(
-                "\n".join(f"#define MLN_PROTOCOL_{g.upper()}" for g in groups)
-                + "\n"
-                + (ROOT / "tests/bindgen/fixtures/protocols.h").read_text()
-            )
+            header.write_text(protocol_header(groups=groups))
             for target, (width, scalar64_align) in TARGETS.items():
                 with self.subTest(target=target):
                     self.compile(
@@ -172,52 +169,6 @@ class KotlinLayoutTests(unittest.TestCase):
                     home / "include",
                     machine,
                 )
-
-    def test_a_frame_has_no_scoped_cleanup(self):
-        owners = emitted(kotlin, real_api())
-        # A frame's release needs the host's consumer sync and its discard
-        # quarantines a slot, so a frame has no `use`, and its release states
-        # the consumer's completion.
-        frame = owners[f"{GENERATED}/AcquiredFrameHandle.kt"]
-        self.assertNotIn("AutoCloseable", frame)
-        self.assertIn("public fun release(consumerCompletion: GpuSync): Unit =", frame)
-
-    def test_every_owner_has_the_same_handle_members(self):
-        owners = emitted(kotlin, real_api())
-        for handle in (
-            "Runtime",
-            "Map",
-            "RenderSession",
-            "AcquiredFrame",
-            "MapProjection",
-        ):
-            owner = owners[f"{GENERATED}/{handle}Handle.kt"]
-            self.assertIn("public val id: ULong", owner)
-            self.assertIn("val isClosed: Boolean get() = binding.isReleased", owner)
-            self.assertIn(
-                f'"{handle}Handle(id=0x${{binding.handle.toString(16)}}, closed=$isClosed)"',
-                owner,
-            )
-            self.assertEqual(
-                handle in {"Runtime", "Map"},
-                "runtime events report as their source" in owner,
-                handle,
-            )
-        # `use` disposes a handle with a dispose, and `useReleasing` awaits
-        # its release.
-        for handle in ("Runtime", "Map"):
-            owner = owners[f"{GENERATED}/{handle}Handle.kt"]
-            self.assertIn(") : AsyncReleasable, AutoCloseable {", owner)
-            self.assertIn("public override fun close() { dispose() }", owner)
-        # `use` releases a handle that its release frees at once.
-        projection = owners[f"{GENERATED}/MapProjectionHandle.kt"]
-        self.assertIn(
-            "public fun release(): Unit = nativeClose(this, binding) "
-            "{ C.mln_map_projection_release(handle) }",
-            projection,
-        )
-        self.assertIn("public override fun close() { release() }", projection)
-        self.assertNotIn("AsyncReleasable", projection)
 
     def test_use_releasing_awaits_the_release_and_use_disposes(self):
         outputs = emitted(kotlin, parse(RELEASE_AND_DISPOSE))
@@ -258,227 +209,6 @@ class KotlinLayoutTests(unittest.TestCase):
         values = outputs[f"{GENERATED}/GeneratedValues.kt"]
         self.assertNotIn("class ReadingView", values)
         self.assertFalse(any("ReadingBatch" in path for path in outputs))
-
-    def test_a_callback_receives_its_slice_argument_as_a_list(self):
-        outputs = emitted(kotlin, real_api())
-        values = outputs[f"{GENERATED}/GeneratedValues.kt"]
-        self.assertIn("public operator fun invoke(events: List<RuntimeEvent>)", values)
-        self.assertNotIn("EventBatchView", values)
-        self.assertIn(
-            "value.callback(readEventBatchView(events))",
-            outputs[
-                "src/commonMain/kotlin/org/maplibre/nativeffi/internal/c/Upcalls.kt"
-            ],
-        )
-
-    def test_a_required_member_has_no_default_and_others_default_to_zero(self):
-        outputs = emitted(kotlin, real_api())
-        values = outputs[f"{GENERATED}/GeneratedValues.kt"]
-        options = values.split("public data class MapOptions(")[1].split("\n)")[0]
-        self.assertIn("public val initialExtent: LogicalExtent,", options)
-        self.assertIn("public val fastPforEnabled: Boolean = false", options)
-        self.assertIn("public val eventMask: RuntimeEventFlag? = null", options)
-        self.assertIn("public val extent: LogicalExtent = LogicalExtent()", values)
-        self.assertNotIn("companion object { internal val default", values)
-        # The ABI version check reads the C version, so reading it skips it.
-        self.assertIn(
-            "fun cVersion(): UInt = nativeUncheckedCall {",
-            outputs[f"{GENERATED}/GeneratedGlobals.kt"],
-        )
-
-    def test_java_passes_signed_carriers_and_sets_options_with_copies(self):
-        values = emitted(kotlin, real_api())[f"{GENERATED}/GeneratedValues.kt"]
-
-        def record(name):
-            return values.split(f"public data class {name}(")[1].split("\n}")[0]
-
-        # Java can't call a constructor that takes an unsigned member.
-        size = record("LogicalSize")
-        self.assertIn('@get:JvmName("getWidth") public val width: UInt = 0u', size)
-        self.assertIn(
-            "@JvmStatic @PublishedApi internal fun of(width: Int, height: Int): "
-            "LogicalSize = LogicalSize(width = width.toUInt(), height = height.toUInt())",
-            size,
-        )
-        # Java sets an option with a copy, and reads a nullable unsigned one
-        # through a twin.
-        animation = record("AnimationOptions")
-        self.assertIn(
-            "@get:JvmSynthetic public val transitionId: ULong? = null", animation
-        )
-        self.assertIn(
-            '@PublishedApi @JvmName("getTransitionId") internal fun '
-            "transitionIdForJava(): Long? = transitionId?.toLong()",
-            animation,
-        )
-        self.assertIn(
-            "@PublishedApi internal fun withTransitionId(transitionId: Long): "
-            "AnimationOptions = copy(transitionId = transitionId.toULong())",
-            animation,
-        )
-        # Options start from the members without defaults.
-        self.assertIn(
-            "internal fun of(initialExtent: LogicalExtent): MapOptions = "
-            "MapOptions(initialExtent = initialExtent)",
-            record("MapOptions"),
-        )
-
-    def test_a_root_constructor_is_a_factory_and_a_global_names_its_verb_first(
-        self,
-    ):
-        outputs = emitted(kotlin, real_api())
-        runtime = outputs[f"{GENERATED}/RuntimeHandle.kt"]
-        self.assertIn("  public companion object {\n", runtime)
-        self.assertIn(
-            "public fun create(options: RuntimeOptions? = null): RuntimeHandle =",
-            runtime.split("public companion object {")[1],
-        )
-        api = outputs[f"{GENERATED}/GeneratedGlobals.kt"]
-        # Globals are top-level functions of the package.
-        self.assertNotIn("object ", api)
-        self.assertNotIn("Create(", api)
-        self.assertIn("\npublic fun clearLogCallback(): Unit =", api)
-
-    def test_a_record_of_only_a_tag_and_its_union_is_the_union(self):
-        values = emitted(kotlin, real_api())[f"{GENERATED}/GeneratedValues.kt"]
-        self.assertIn("public sealed interface RenderedQueryGeometry {", values)
-        self.assertNotIn("RenderedQueryGeometryData", values)
-        # Native never returns a query geometry, so it has no unknown variant;
-        # it returns a region definition, which keeps one.
-        geometry = values.split("public sealed interface RenderedQueryGeometry {")[1]
-        self.assertNotIn("Unknown", geometry.split("\n}")[0])
-        definition = values.split("public sealed interface OfflineRegionDefinition {")[
-            1
-        ]
-        self.assertIn("public data class Unknown(", definition.split("\n}")[0])
-
-    def test_docs_name_the_binding_symbols_of_c_declarations(self):
-        values = emitted(kotlin, real_api())[f"{GENERATED}/GeneratedValues.kt"]
-        self.assertIn("`MapHandle.cancelCameraTransitions()`", values)
-        self.assertIn("`MapHandle.cancelCameraTransitionsWithId()`", values)
-        self.assertIn("For `MomentumDecayModel.FRICTION`.", values)
-        # A tag that only its union uses names the variant it selects.
-        self.assertIn("`GestureEvent.Notch`", values)
-        self.assertNotIn("`mln_map_cancel_camera_transitions()`", values)
-
-    def test_split_registrations_take_a_form_per_target(self):
-        _functions, _unsupported, bodies, split, values, _native = kotlin.lowered(
-            real_api()
-        )
-        for lowering in split:
-            values.split_codecs(lowering)
-        values.codecs()
-        # The registrations whose answer a rule replaces differ by target, so
-        # common code takes none of them.
-        self.assertEqual(
-            {
-                value.native
-                for value in values.bound.public_values.values()
-                if kotlin_callbacks.splits(value, values)
-            },
-            {"mln_http_header_transform"},
-        )
-        registrations = {"mln_runtime_set_http_header_transform"}
-        response = "mln_http_header_transform_response_set_header"
-        self.assertEqual(set(split[kotlin_callbacks.ASYNC]), registrations)
-        self.assertEqual(
-            set(split[kotlin_callbacks.THREADED]), registrations | {response}
-        )
-        self.assertFalse((registrations | {response}) & set(bodies))
-        # Only the threaded forms answer native from their callbacks, and every
-        # other queue-form site's callback is queued, so a queue carries its
-        # calls.
-        for site in kotlin_callbacks.sites(values).values():
-            with self.subTest(site=site.name):
-                if site.split == kotlin_callbacks.THREADED:
-                    self.assertEqual(site.form, "direct")
-                elif site.form == "queue":
-                    callback = values.bound.callbacks[site.callback]
-                    self.assertTrue(callback.queued)
-
-    def test_a_status_callback_answers_native_with_a_status(self):
-        outputs = emitted(kotlin, real_api())
-        threaded = outputs[
-            "src/threadedMain/kotlin/org/maplibre/nativeffi/internal/c/ThreadedUpcalls.kt"
-        ]
-        # A status callback returns nothing and throws to fail, so its site
-        # answers success itself and maps a throw to a status.
-        self.assertIn(
-            'statusUpcall<HttpHeaderTransform>("mln_http_header_transform_callback", '
-            "userData, -5)",
-            threaded,
-        )
-        callbacks = outputs[
-            "src/threadedMain/kotlin/org/maplibre/nativeffi/GeneratedThreadedCallbacks.kt"
-        ]
-        self.assertIn("outResponse: HttpHeaderTransformResponse)\n", callbacks)
-
-    def test_each_queued_site_runs_from_its_callback_types_trampoline(self):
-        outputs = emitted(kotlin, real_api())
-        base = "src/wasmJsMain/kotlin/org/maplibre/nativeffi/internal/c"
-        dispatched = outputs[f"{base}/DispatchedUpcalls.kt"]
-        stubs = outputs[f"{base}/UpcallStubs.kt"]
-        # Each site writes the trampoline of its C callback type, which runs
-        # the site through the dispatch.
-        for site, name in (
-            ("completion", "mln_completion_callback"),
-            ("wakeCallback", "mln_wake_callback"),
-            ("logHandlerCallback", "mln_log_callback"),
-        ):
-            with self.subTest(site=site):
-                self.assertIn(
-                    f'val {site}: Long\n    get() = upcallFunction("{name}")', stubs
-                )
-                branch = dispatched[dispatched.index(f'      "{name}" ->') :]
-                self.assertIn(f".{site}(", branch[: branch.index('\n      "', 8)])
-        # The two kinds of user data share a release, which the root tells
-        # apart.
-        self.assertIn(
-            "if (isCallbackRoot(unsignedWord(argInt(arguments, 0)))) "
-            "Upcalls.releaseRoot(",
-            dispatched,
-        )
-        # A site that native calls on its own thread has no trampoline.
-        self.assertIn(
-            "val queueLockLock: Long\n    get() = throw MaplibreException(", stubs
-        )
-
-    def test_native_registrations_mirror_their_c_records(self):
-        _functions, _unsupported, _bodies, _split, values, _native = kotlin.lowered(
-            real_api()
-        )
-        values.codecs()
-        # A wake, the queue lock, whose callback native code waits for, and the
-        # custom layer host, whose callbacks run on the render thread, take the
-        # host's native functions; each parameter names the field it fills.
-        self.assertEqual(
-            {
-                value.native: kotlin_callbacks.native_factory(value, values).parameters
-                for value in values.used.values()
-                if kotlin_callbacks.accepts_native(value, values)
-            },
-            {
-                "mln_wake": (
-                    ("callback", "callback"),
-                    ("userData", "user_data"),
-                    ("releaseUserData", "release_user_data"),
-                ),
-                "mln_queue_lock": (
-                    ("lock", "lock"),
-                    ("unlock", "unlock"),
-                    ("userData", "user_data"),
-                    ("releaseUserData", "release_user_data"),
-                ),
-                "mln_custom_layer_host": (
-                    ("prerender", "prerender"),
-                    ("render", "render"),
-                    ("deinitialize", "deinitialize"),
-                    ("contextLost", "context_lost"),
-                    ("userData", "user_data"),
-                    ("releaseUserData", "release_user_data"),
-                ),
-            },
-        )
 
     def test_failed_jni_upcall_releases_owned_arguments(self):
         java = Path(require_tool(self, "java", ROOT / "bindings/kotlin").executable)

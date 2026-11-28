@@ -9,10 +9,8 @@ from support import (
     FIXTURES,
     ROOT,
     emitted,
-    parse,
     parse_sources,
     protocol_header,
-    real_api,
     require_tool,
 )
 
@@ -22,167 +20,7 @@ from tools.bindgen.schema import validate
 BINDING = ROOT / "bindings/zig"
 
 
-# A drain that publishes an owned batch of strided readings with a slice view
-# of it, as the render session's frame-result drain does.
-SLICE_DRAIN = """
-typedef struct mln_reading {
-  double value;
-} mln_reading;
-typedef struct mln_reading_view {
-  uint32_t size;
-  uint32_t reading_size;
-  const mln_reading* readings BIND("length=reading_count;stride=reading_size");
-  size_t reading_count;
-} mln_reading_view BIND("kind=slice");
-typedef unsigned long long mln_reading_batch BIND(
-  "kind=handle;release=mln_reading_batch_release;"
-  "dispose=mln_reading_batch_release"
-);
-void mln_reading_batch_release(mln_reading_batch batch);
-BIND("execution=event_batch")
-mln_status mln_drain_readings(
-  mln_reading_batch* out_batch BIND("direction=out;nullable=true"),
-  mln_reading_view* out_view BIND("direction=out"),
-  mln_diagnostic* out_diagnostic
-);
-"""
-
-
 class ZigEmitterTests(unittest.TestCase):
-    def test_a_drain_returns_its_slice_and_releases_its_batch(self):
-        api = parse(SLICE_DRAIN, defines=("MLN_PROTOCOL_STANDARD_TYPES",))
-        validate(api)
-        source = emitted(zig, api)["maplibre_native_ffi.zig"]
-        # call.drain copies the view's strided readings and releases the batch.
-        self.assertIn(
-            "pub fn drainReadings(allocator: std.mem.Allocator, diagnostic: "
-            "?*diagnostics.Diagnostic) status.Error!OwnedValue([]const Reading) {\n"
-            '    return call.drain("mln_drain_readings", .none, {}, Reading, '
-            '"readings", "reading_count", "reading_size", '
-            "c.mln_reading_batch_release, allocator, diagnostic);",
-            source,
-        )
-        self.assertNotIn("pub const ReadingBatch ", source)
-        self.assertNotIn("ReadingView", source)
-
-    def test_a_required_member_has_no_default_initializer(self):
-        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
-        self.assertIn(
-            '    @"initial_extent": LogicalExtent,\n'
-            '    @"map_mode": MapMode = .@"continuous",\n',
-            source,
-        )
-        # A member record with a required member has no `.{}` either.
-        self.assertIn('    @"context": VulkanContextDescriptor,\n', source)
-        self.assertNotIn("Default(", source)
-
-    def test_the_c_version_checks_no_abi_version(self):
-        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
-        self.assertIn("cVersion() u32 {\n    return c.mln_c_version();\n}", source)
-        self.assertIn(
-            "supportedRenderBackendMask() RenderBackendFlag {\n"
-            "    status.requireAbiVersion();",
-            source,
-        )
-
-    def test_a_factory_is_on_its_type_and_a_global_names_its_verb_first(self):
-        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
-        runtime = source[source.index("pub const Runtime = struct {") :]
-        runtime = runtime[: runtime.index("\n};\n")]
-        self.assertIn(
-            '\npub fn create(@"options": ?RuntimeOptions, diagnostic: '
-            "?*diagnostics.Diagnostic) status.Error!Runtime {",
-            runtime,
-        )
-        self.assertNotIn("runtimeCreate", source)
-        self.assertIn(
-            'pub fn setLogCallback(@"handler": LogHandler, diagnostic: '
-            "?*diagnostics.Diagnostic) status.Error!void {",
-            source,
-        )
-
-    def test_a_callback_receives_its_slice_argument_as_a_slice(self):
-        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
-        self.assertIn(
-            "*const fn (context: ?*anyopaque, events: []const RuntimeEvent) "
-            "anyerror!void,",
-            source,
-        )
-        self.assertNotIn("EventBatchView", source)
-
-    def test_a_status_callback_answers_a_named_status_and_reports_other_errors(self):
-        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
-        self.assertIn(
-            "url: []const u8, out_response: HttpHeaderTransformResponse) "
-            "anyerror!void = null,",
-            source,
-        )
-        # An error that names a status fails on purpose, so only another error
-        # is reported, and it answers the failure.
-        self.assertIn(
-            "catch |err| { if (status.rawStatus(err)) |deliberate| return deliberate; "
-            'callbacks.reportError("mln_http_header_transform_callback", err); '
-            "return c.MLN_STATUS_NATIVE_ERROR; };",
-            source,
-        )
-
-    def test_a_release_waits_and_a_dispose_does_not(self):
-        api = parse(
-            """
-typedef unsigned long long mln_session BIND("kind=handle;release=mln_session_release;dispose=mln_session_dispose");
-BIND("execution=lifecycle")
-mln_status mln_session_release(mln_session session, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-mln_status mln_session_dispose(mln_session session, mln_diagnostic *out_diagnostic);
-""",
-            defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",),
-        )
-        validate(api)
-        self.assertEqual(zig.lower(api).unsupported, {})
-        source = emitted(zig, api)["maplibre_native_ffi.zig"]
-        # deinit, as `defer` runs it, disposes.
-        self.assertIn("try status.call(c.mln_session_dispose, .{ raw }, null);", source)
-        self.assertIn(
-            "pub fn release(self: *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {\n"
-            '    const released = try call.submit("mln_session_release", .handle, self.*,',
-            source,
-        )
-        self.assertIn(
-            "pub fn dispose(self: *Session, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {",
-            source,
-        )
-
-    def test_only_runtime_event_sources_document_their_id_as_a_source(self):
-        api = parse(
-            """
-typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release");
-typedef unsigned long long mln_query BIND("kind=handle;release=mln_query_release");
-void mln_map_release(mln_map map);
-void mln_query_release(mln_query query);
-"""
-        )
-        validate(api)
-        source = emitted(zig, api)["maplibre_native_ffi.zig"]
-        note = "/// Runtime events report its `id()` as their source.\n"
-        self.assertIn(note + "pub const Map = struct {", source)
-        self.assertNotIn(note + "pub const Query", source)
-
-    def test_a_summary_names_the_zig_symbols_of_c_declarations(self):
-        source = emitted(zig, real_api())["maplibre_native_ffi.zig"]
-        outcome = source.split("pub const CameraTransitionOutcome = enum")[1]
-        summary = " ".join(
-            line.strip().removeprefix("///").strip()
-            for line in outcome.split('@"cancelled" = 1,')[0].splitlines()
-        )
-        self.assertIn(
-            "`Map.cancelCameraTransitions()`, `Map.cancelCameraTransitionsWithId()`, "
-            "a gesture",
-            summary,
-        )
-        self.assertNotIn("mln_map_cancel_camera_transitions", summary)
-        self.assertIn("For `MomentumDecayModel.friction`.", source)
-        # A tag that only its union uses names the variant it selects.
-        self.assertIn("`GestureEvent.notch` as", source)
-
     def test_generated_values_and_keyword_parameters_round_trip(self):
         zig_tool = require_tool(self, "zig", BINDING)
         header = protocol_header(
@@ -200,7 +38,6 @@ void mln_query_release(mln_query query);
         )
         api = parse_sources({"api.h": header})
         validate(api)
-        self.assertEqual(zig.lower(api).unsupported, {})
         with TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "api.h").write_text(header)

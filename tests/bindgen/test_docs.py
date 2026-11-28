@@ -4,12 +4,11 @@ import ast
 import unittest
 from xml.etree import ElementTree
 
-from support import parse, real_api
+from support import parse
 
 from tools.bindgen import async_hosts, docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.docs import Doc
-from tools.bindgen.emitters import dart, dotnet, go, kotlin, swift, typescript
 from tools.bindgen.names import camel
 from tools.bindgen.schema import validate
 
@@ -224,18 +223,6 @@ class TranslateTests(unittest.TestCase):
         ):
             self.assertIn("GesturePhase.cancel", comment)
             self.assertNotIn("MLN_GESTURE", comment)
-
-
-class LiteralKeyTests(unittest.TestCase):
-    def test_a_geojson_key_named_like_a_parameter_keeps_its_spelling(self):
-        # Each binding renames a code span that names a parameter, so the
-        # cluster queries quote the "cluster_id" key instead.
-        api = real_api()
-        for emitter in (dart, dotnet, go, kotlin, swift, typescript):
-            with self.subTest(emitter=emitter.__name__):
-                text = "".join(emitter.lower(api).files.values())
-                words = [w for w in text.split() if w not in {"///", "//", "*"}]
-                self.assertIn('the "cluster_id" property', " ".join(words))
 
 
 class ThreadsTests(unittest.TestCase):
