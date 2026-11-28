@@ -19,10 +19,6 @@
     {
       "name": "libmaplibre-native-c.so",
       "compatibleSdkType": "OpenHarmony"
-    },
-    {
-      "name": "libc++_shared.so",
-      "compatibleSdkType": "OpenHarmony"
     }
   ],
   "dependencies": {

@@ -93,7 +93,7 @@ class PythonReleaseTest(unittest.TestCase):
         module.mkdir(parents=True)
         (module / "stale.dll").write_text("stale")
         (self.prefix / "bin").mkdir()
-        dlls = ("msvcp140.dll", "vcruntime140.dll")
+        dlls = ("vcruntime140.dll",)
         for name in (*dlls, "maplibre-native-c.dll"):
             (self.prefix / "bin" / name).write_text(name)
 

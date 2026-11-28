@@ -88,7 +88,7 @@ for preset in "$@"; do
   install="$binding/native/build/$preset/install"
   mkdir -p "$package/libs/$abi"
   cp "$install/libmaplibre_native_ffi.so" "$install/libmaplibre-native-c.so" \
-    "$install/libc++_shared.so" "$package/libs/$abi/"
+    "$package/libs/$abi/"
   cp -R "$install/include" "$install/licenses" "$package/"
   mkdir -p "$staging/runtime/inventories"
   cp "$install/sbom/maplibre-native-ffi.cdx.json" "$staging/runtime/inventories/$preset.json"

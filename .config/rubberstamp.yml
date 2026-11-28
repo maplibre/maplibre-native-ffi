@@ -408,8 +408,8 @@ ci:
         Windows x64 with Vulkan, D3D12, and OpenGL (WGL), built with Clang in
         MSYS2's MINGW64 environment. Runs the C#, Dart, Go, and TypeScript
         suites and verifies shared and static C package consumers. Catches MinGW
-        headers, libstdc++, GNU archive and import library handling, and MSYS2
-        toolchain setup.
+        headers, GNU archive and import library handling, and MSYS2 toolchain
+        setup.
       rules:
         - if:
             files:

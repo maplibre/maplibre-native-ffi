@@ -351,8 +351,7 @@ def verify_android(root: pathlib.Path) -> None:
                 payload = aar.read(expected)
                 if not payload.startswith(b"\x7fELF"):
                     raise SystemExit(f"{runtime} {expected} is not an ELF shared library")
-                # The Android presets link libc++ statically, so a host packages
-                # this library alone.
+                # The library needs no C++ runtime, so a host packages it alone.
                 if b"libc++_shared.so" in payload:
                     raise SystemExit(f"{runtime} {expected} needs libc++_shared.so")
             unexpected = [
