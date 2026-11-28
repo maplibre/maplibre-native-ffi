@@ -40,7 +40,10 @@ export function loadModule(url: string | URL): Promise<void> {
   return loading;
 }
 
-async function load(url: string): Promise<void> {
+async function load(specifier: string): Promise<void> {
+  // A relative URL resolves as import() resolves it, so the files beside the
+  // bindings resolve against the same URL.
+  const url = new URL(specifier, import.meta.url).href;
   const bindings = (await import(
     /* @vite-ignore */ /* webpackIgnore: true */ url
   )) as Bindings;
