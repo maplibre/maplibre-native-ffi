@@ -5,6 +5,26 @@
  * In a browser, the library is a WebAssembly module (wasm32-unknown-unknown)
  * that runs on the thread that loaded it: a Web Worker, or the page. Each
  * instance has its own memory and one thread.
+ *
+ * Beside the functions here, the module's JavaScript bindings export two
+ * functions that tell the library where the files it loads beside the module
+ * are. Call them before you create the first runtime. A package that ships
+ * those files usually calls both when it loads the module.
+ *
+ * - `mlnWebConfigureTileWorkers(count, spawn)` sets how the instance starts
+ *   the Web Workers that load its maps' tiles: `count` of them, or a default
+ *   number when `count` is undefined, each the return value of `spawn()`. A
+ *   new call replaces both settings. The script of each Web Worker that
+ *   `spawn()` returns loads the module's bindings, and gets a message
+ *   `{module, port}` for each map: on the first, it initializes the bindings
+ *   with `module`, and for each it calls their `mlnWebServeTileWorker(port)`.
+ *   Without a `spawn`, maps load their tiles on the instance's thread, and
+ *   the library logs a warning when a map starts to render.
+ * - `mlnWebSetShaperLoader(loader)` sets the function that loads the font-face
+ *   shaper module: `loader()` returns a promise of the module's bindings,
+ *   initialized. The library calls it the first time a style declares font
+ *   faces. Without a loader, those font faces draw no text, and the library
+ *   logs an error when a style declares them.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_WEB_H

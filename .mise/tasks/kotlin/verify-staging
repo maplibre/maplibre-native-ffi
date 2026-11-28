@@ -501,8 +501,12 @@ def verify_wasm(root: pathlib.Path) -> None:
                 "package.json",
                 "index.mjs",
                 "runtime.mjs",
+                "index.js",
                 "maplibre_native_c.js",
                 "maplibre_native_c_bg.wasm",
+                "tile_worker.js",
+                "mln_web_shaper.js",
+                "mln_web_shaper_bg.wasm",
                 "META-INF/LICENSE",
                 *(
                     f"META-INF/licenses/maplibre-native-c/{name}"

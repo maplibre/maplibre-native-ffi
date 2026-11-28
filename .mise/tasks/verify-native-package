@@ -162,9 +162,10 @@ REMEDIES = {
         "share/maplibre-native-c/web."
     ),
 }
-# The browser module and the glue that loads it, which a web package carries in
-# place of a C library.
+# The browser module, the glue that loads it, and the package's entry over the
+# glue, which a web package carries in place of a C library.
 WEB_PACKAGE_FILES = (
+    "share/maplibre-native-c/web/index.js",
     "share/maplibre-native-c/web/maplibre_native_c.js",
     "share/maplibre-native-c/web/maplibre_native_c_bg.wasm",
 )
