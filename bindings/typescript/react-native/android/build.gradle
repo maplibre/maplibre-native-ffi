@@ -27,9 +27,12 @@ android {
   externalNativeBuild {
     cmake {
       path "CMakeLists.txt"
-      // The binding's CMake needs a newer CMake than the SDK's default. Mise
-      // names the version that it installs in the SDK.
-      version System.getenv("MLN_FFI_ANDROID_CMAKE_VERSION") ?: "4.1.2"
+      // Any CMake from 3.22, the SDK's default, builds the module. Mise names
+      // the version that it installs in the SDK.
+      def cmakeVersion = System.getenv("MLN_FFI_ANDROID_CMAKE_VERSION")
+      if (cmakeVersion) {
+        version cmakeVersion
+      }
     }
   }
 
