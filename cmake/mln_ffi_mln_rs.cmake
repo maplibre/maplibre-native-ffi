@@ -347,10 +347,38 @@ function(mln_ffi_library_files)
   endforeach()
 endfunction()
 
+# The llvm-objcopy of the Rust toolchain's llvm-tools component, which every
+# host installs, and which reads every target's objects.
+function(mln_ffi_rust_llvm_objcopy out_var)
+  find_program(RUSTC_EXECUTABLE rustc REQUIRED)
+  execute_process(
+    COMMAND "${RUSTC_EXECUTABLE}" --print sysroot
+    OUTPUT_VARIABLE sysroot OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY)
+  execute_process(
+    COMMAND "${RUSTC_EXECUTABLE}" --print host-tuple
+    OUTPUT_VARIABLE host OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY)
+  set(objcopy
+      "${sysroot}/lib/rustlib/${host}/bin/llvm-objcopy${CMAKE_HOST_EXECUTABLE_SUFFIX}"
+  )
+  if(NOT EXISTS "${objcopy}")
+    message(
+      FATAL_ERROR
+        "The Rust toolchain has no llvm-objcopy; add its llvm-tools component")
+  endif()
+  set(${out_var} "${objcopy}" PARENT_SCOPE)
+endfunction()
+
 # The commands that turn Cargo's static archive into the package's. An ELF
 # archive comes out as one relocatable object whose only global symbols are the
 # C API's, so the Rust standard library, compiler-builtins, and C dependencies
 # inside it never meet a consumer's own copies, such as a Rust host's.
+#
+# Neither an ELF nor an Apple archive keeps the LLVM bitcode that the standard
+# library's prebuilt objects embed, such as compiler-builtins', which rustc
+# leaves out of link-time optimization. Go 1.26.10 and 1.27.4 refuse to link
+# an archive with an LTO section, and a C linker never reads them.
 function(mln_ffi_static_archive_commands out_var input output)
   get_target_property(format mln_ffi_platform_dependencies
                       MLN_FFI_ARCHIVE_FORMAT)
@@ -372,6 +400,8 @@ function(mln_ffi_static_archive_commands out_var input output)
         # The final link keeps one COMDAT group of each name and discards the
         # rest, which would drop members that the now local code still uses.
         --remove-section=.group
+        --remove-section=.llvmbc
+        --remove-section=.llvmcmd
         "${object}"
         COMMAND
         "${CMAKE_COMMAND}"
@@ -393,6 +423,11 @@ function(mln_ffi_static_archive_commands out_var input output)
         rm
         -f
         "${object}")
+  elseif(format STREQUAL "apple")
+    mln_ffi_rust_llvm_objcopy(objcopy)
+    set(commands
+        COMMAND "${objcopy}" --remove-section=__LLVM,__bitcode
+        --remove-section=__LLVM,__cmdline "${input}" "${output}")
   else()
     set(commands COMMAND "${CMAKE_COMMAND}" -E copy "${input}" "${output}")
   endif()
