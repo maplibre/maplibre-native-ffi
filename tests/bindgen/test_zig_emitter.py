@@ -2,6 +2,7 @@
 
 import shutil
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -15,6 +16,7 @@ from support import (
 )
 
 from tools.bindgen.emitters import zig
+from tools.bindgen.model import Unsupported
 from tools.bindgen.schema import validate
 
 BINDING = ROOT / "bindings/zig"
@@ -61,6 +63,19 @@ class ZigEmitterTests(unittest.TestCase):
                 timeout=300,
                 output=root / "zig-test.log",
             )
+
+    def test_rejects_a_struct_argument_that_zig_miscompiles_on_loongarch(self):
+        header = """#include <stdint.h>
+struct packed { uint8_t a; uint32_t b; };
+struct widening { uint32_t a; uint64_t b; };
+void take_packed(struct packed value);
+void take_widening(struct widening value);
+"""
+        api = parse_sources({"api.h": header})
+        packed = replace(api, functions=(api.functions_by_name["take_packed"],))
+        self.assertIn("pub fn take_packed(", zig.abi_wrappers(packed))
+        with self.assertRaisesRegex(Unsupported, "take_widening.*LoongArch"):
+            zig.abi_wrappers(api)
 
 
 if __name__ == "__main__":

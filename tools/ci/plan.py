@@ -376,7 +376,7 @@ def row(target: Target, save_toolchains: bool) -> dict[str, object]:
     # The key hashes every `build.zig.zon` and is shared by all rows on the
     # same runner. Cache keys are immutable, so a row that fetches only some
     # projects would claim the key with an incomplete cache. A row that runs no
-    # Zig project skips the fetch; Windows ARM64 has no Zig toolchain to run it.
+    # Zig project skips the fetch.
     zig_projects = [
         any(task.startswith(project) for task in tasks) for project in ZIG_PROJECTS
     ]
